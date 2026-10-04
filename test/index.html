@@ -90,7 +90,7 @@
       <div class="quest">방향키 또는 조이스틱으로 신호탑에 접근하세요</div>
       <div class="state-pill">STATE · <span id="animState">IDLE</span></div>
       <div class="curvature-control">
-        <div class="curve-axis"><label for="curveControl">X-곡률 (좌우) <output id="curveValue">55</output></label><input id="curveControl" type="range" min="0" max="100" value="55" aria-label="좌우 방향 월드 곡률 강도"></div>
+        <div class="curve-axis"><label for="curveControl">X-곡률 (좌우) <output id="curveValue">50</output></label><input id="curveControl" type="range" min="0" max="100" value="50" aria-label="좌우 방향 월드 곡률 강도"></div>
         <div class="curve-axis"><label for="yCurveControl">Y-곡률 (상하) <output id="yCurveValue">55</output></label><input id="yCurveControl" type="range" min="0" max="100" value="55" aria-label="상하 방향 월드 곡률 강도"></div>
       </div>
       <div class="geo-panel"><div class="geo-label" id="geoLabel">META GEO · VANCOUVER</div><div id="metaMap"></div></div>
@@ -176,7 +176,7 @@
         const cam=world.camera,cols=Math.ceil(vw/size/2)+5,rows=Math.ceil(vh/(size*.7)/2)+7;
         const sx=Math.max(0,Math.floor(cam.x-cols)),ex=Math.min(this.w,Math.ceil(cam.x+cols));
         // The forward edge is deliberately finite: its projected top edge becomes the curved horizon.
-        const horizonRows=Math.min(rows,Math.max(10,Math.round(vh/(size*.7)*.46)));
+        const horizonRows=Math.min(rows,Math.max(12,Math.round(vh/(size*.7)*.70)));
         const sy=Math.max(0,Math.floor(cam.y-horizonRows)),ey=Math.min(this.h,Math.ceil(cam.y+rows));
         const colors={grass:'#5f9960',forest:'#397454',water:'#3a88aa',road:'#98a39d',dirt:'#9a744d',urban:'#d2c9ad'};
         ctx.lineJoin='round';
@@ -195,7 +195,7 @@
     class CollisionLayer{constructor(layer){this.layer=layer}canEnter(x,y){const t=this.layer.at(x,y);return !!t&&!t.blocked}metadata(x,y){const t=this.layer.at(x,y);return t?{blocked:t.blocked,terrain:t.type,swimmable:t.swim}:null}}
     class ObjectLayer{draw(ctx,world,size,vw,vh){const p=world.project(40,22,vw,vh),scale=world.scaleAt(40,22,vw);ctx.fillStyle='rgba(240,198,79,.18)';ctx.beginPath();ctx.ellipse(p.x,p.y,22*scale,7*scale,0,0,Math.PI*2);ctx.fill();ctx.save();ctx.translate(p.x,p.y);ctx.fillStyle='#173f30';ctx.fillRect(-3*scale,-13*scale,6*scale,25*scale);ctx.fillStyle='#f0c64f';ctx.beginPath();ctx.arc(0,-24*scale,13*scale+Math.sin(world.time*3)*2,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#fff4a4';ctx.lineWidth=3*scale;ctx.stroke();ctx.restore()}}
     class RPGWorld{
-      constructor(canvas,cfg,city){this.canvas=canvas;this.ctx=canvas.getContext('2d');this.cfg=cfg;this.city=city;this.layer=new TileLayer(64,64,city.seed);this.collision=new CollisionLayer(this.layer);this.objects=new ObjectLayer();this.player={x:32,y:34};this.camera={x:32,y:34};this.animator=new CharacterAnimator();this.keys={};this.joy={x:0,y:0};this.time=0;this.last=performance.now();this.effects=[];this.size=46;this.xCurvature=.55;this.yCurvature=.55;this.running=true;this.resize();addEventListener('resize',()=>this.resize())}
+      constructor(canvas,cfg,city){this.canvas=canvas;this.ctx=canvas.getContext('2d');this.cfg=cfg;this.city=city;this.layer=new TileLayer(64,64,city.seed);this.collision=new CollisionLayer(this.layer);this.objects=new ObjectLayer();this.player={x:32,y:34};this.camera={x:32,y:34};this.animator=new CharacterAnimator();this.keys={};this.joy={x:0,y:0};this.time=0;this.last=performance.now();this.effects=[];this.size=46;this.xCurvature=.50;this.yCurvature=.55;this.running=true;this.resize();addEventListener('resize',()=>this.resize())}
       resize(){const d=Math.min(devicePixelRatio||1,2),r=this.canvas.getBoundingClientRect();this.canvas.width=Math.floor(r.width*d);this.canvas.height=Math.floor(r.height*d);this.dpr=d}
       anchorY(vh){return vh*.72}
       project(wx,wy,vw,vh){
@@ -204,7 +204,7 @@
         // Circular-arc drop makes the player feel centered on top of a small planet.
         const lateral=Math.max(0,Math.abs(dx)-this.size*1.45);
         const forward=Math.max(0,-dy-this.size*.72);
-        const radiusX=Math.max(460,vw*.68),radiusY=Math.max(420,vh*.72);
+        const radiusX=Math.max(460,vw*.68),radiusY=Math.max(620,vh*1.16);
         const thetaX=Math.min(1.18,lateral/radiusX),thetaY=Math.min(1.22,forward/radiusY);
         const liftX=this.xCurvature*radiusX*(1-Math.cos(thetaX))*.82;
         const liftY=this.yCurvature*radiusY*(1-Math.cos(thetaY))*1.85;
