@@ -63,14 +63,16 @@
   </div>
   <div id="tab-content">
     <div id="tab-hair">
-      <div class="section-label">스타일</div>
-      <div class="style-grid" id="hair-styles"></div>
+      <div class="section-label">남성</div>
+      <div class="style-grid" id="hair-m"></div>
+      <div class="section-label">여성</div>
+      <div class="style-grid" id="hair-f"></div>
     </div>
     <div id="tab-eyes" style="display:none;">
-      <div class="section-label">스타일</div>
-      <div class="style-grid" id="eye-styles"></div>
-      <div class="section-label">색상</div>
-      <div class="style-grid" id="eye-colors"></div>
+      <div class="section-label">남성</div>
+      <div class="style-grid" id="eye-m"></div>
+      <div class="section-label">여성</div>
+      <div class="style-grid" id="eye-f"></div>
     </div>
   </div>
 </div>
@@ -80,16 +82,36 @@ const EYE_L = [-0.2273, 1.2773, 0.3066], EYE_R = [0.2280, 1.2773, 0.3007];
 const HEAD_C = [0.0003, 1.2936, -0.0011];
 
 const HAIRS = {
-  bob: {name:'단발', front:'assets/hair_bob_front.png', side:'assets/hair_bob_side.png', back:'assets/hair_bob_back.png'},
-  spiky: {name:'스파이키', front:'assets/hair_spiky_t.png', side:'assets/hair_spiky_t.png', back:'assets/hair_spiky_t.png'},
-  long: {name:'긴머리', front:'assets/hair_long_t.png', side:'assets/hair_long_t.png', back:'assets/hair_long_t.png'},
+  m1: {name:'스파이키', front:'assets/hair_m1_spiky.png'},
+  m2: {name:'단정한숏', front:'assets/hair_m2_neat.png'},
+  m3: {name:'내추럴', front:'assets/hair_m3_messy.png'},
+  m4: {name:'옆머리', front:'assets/hair_m4_swept.png'},
+  m5: {name:'와일드', front:'assets/hair_m5_wild.png'},
+  f1: {name:'단발', front:'assets/hair_f1_bob.png'},
+  f2: {name:'긴생머리', front:'assets/hair_f2_long.png'},
+  f3: {name:'트윈테일', front:'assets/hair_f3_twintail.png'},
+  f4: {name:'포니테일', front:'assets/hair_f4_ponytail.png'},
+  f5: {name:'웨이브', front:'assets/hair_f5_wavy.png'},
 };
 const EYES = {
-  soft: {name:'소프트', front:'assets/eyes_soft_front.png', side:'assets/eyes_soft_side.png'},
+  m1: {name:'시크', front:'assets/eye_m1_cool.png'},
+  m2: {name:'순한', front:'assets/eye_m2_gentle.png'},
+  m3: {name:'의지', front:'assets/eye_m3_determined.png'},
+  m4: {name:'밝은', front:'assets/eye_m4_bright.png'},
+  m5: {name:'나른', front:'assets/eye_m5_sleepy.png'},
+  m6: {name:'진지', front:'assets/eye_m6_serious.png'},
+  m7: {name:'장난', front:'assets/eye_m7_playful.png'},
+  f1: {name:'왕눈이', front:'assets/eye_f1_big.png'},
+  f2: {name:'순한', front:'assets/eye_f2_gentle.png'},
+  f3: {name:'반짝이', front:'assets/eye_f3_sparkle.png'},
+  f4: {name:'고양이', front:'assets/eye_f4_cat.png'},
+  f5: {name:'처진눈', front:'assets/eye_f5_droopy.png'},
+  f6: {name:'밝은', front:'assets/eye_f6_bright.png'},
+  f7: {name:'수줍은', front:'assets/eye_f7_shy.png'},
 };
 const EYE_COLORS = {};
 
-let curHair='bob', curEye='soft', curEyeColor='soft';
+let curHair='m1', curEye='f1', curEyeColor='f1';
 let hairSprite=null, eyeSprite=null, curView='front';
 
 const wrap = document.getElementById('canvas-wrap');
@@ -243,25 +265,32 @@ function animate() {
 // --- UI ---
 function el(id){ return document.getElementById(id); }
 function refreshHairUI() {
-  const c = el('hair-styles'); c.innerHTML='';
-  for (const [k,v] of Object.entries(HAIRS)) {
-    const b = document.createElement('div');
-    b.className = 'style-btn'+(k===curHair?' active':'');
-    b.innerHTML = `<img class="thumb" src="${v.front}"><div>${v.name}</div>`;
-    b.onclick = ()=>buildHair(k);
-    c.appendChild(b);
-  }
+  const mk = (id, prefix) => {
+    const c = el(id); c.innerHTML='';
+    for (const [k,v] of Object.entries(HAIRS)) {
+      if (!k.startsWith(prefix)) continue;
+      const b = document.createElement('div');
+      b.className = 'style-btn'+(k===curHair?' active':'');
+      b.innerHTML = `<img class="thumb" src="${v.front}"><div>${v.name}</div>`;
+      b.onclick = ()=>buildHair(k);
+      c.appendChild(b);
+    }
+  };
+  mk('hair-m','m'); mk('hair-f','f');
 }
 function refreshEyeUI() {
-  const c = el('eye-styles'); c.innerHTML='';
-  for (const [k,v] of Object.entries(EYES)) {
-    const b = document.createElement('div');
-    b.className = 'style-btn'+(k===curEye?' active':'');
-    b.innerHTML = `<img class="thumb" src="${v.front}"><div>${v.name}</div>`;
-    b.onclick = ()=>buildEyes(k, curEyeColor);
-    c.appendChild(b);
-  }
-  el('eye-colors').innerHTML='';
+  const mk = (id, prefix) => {
+    const c = el(id); c.innerHTML='';
+    for (const [k,v] of Object.entries(EYES)) {
+      if (!k.startsWith(prefix)) continue;
+      const b = document.createElement('div');
+      b.className = 'style-btn'+(k===curEye?' active':'');
+      b.innerHTML = `<img class="thumb" src="${v.front}"><div>${v.name}</div>`;
+      b.onclick = ()=>buildEyes(k, k);
+      c.appendChild(b);
+    }
+  };
+  mk('eye-m','m'); mk('eye-f','f');
 }
 document.querySelectorAll('#tabs button').forEach(b=>{
   b.onclick=()=>{
