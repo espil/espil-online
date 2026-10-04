@@ -1351,7 +1351,7 @@
     var cont=document.getElementById('intro-continue');
     var canvas=document.getElementById('intro-stars');
     var WORD='Espil Online';
-    var TYPE_MIN=50,TYPE_JITTER=50; /* 50-100ms per char, natural rhythm */
+    var TYPE_MIN=460,TYPE_JITTER=140; /* ~5.8s total: slow, watchable typewriter reveal */
     var CARET_LINGER=2000; /* caret keeps blinking 2s after typing completes, then disappears */
     var done=false,continued=false,earthReady=false,typedDone=false,caretGone=false,idx=0;
     var reduced=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
