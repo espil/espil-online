@@ -1028,7 +1028,7 @@
     });
 
     var raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2(),hovered=null,selected=null;
-    var orbitDistance=6.6,targetDistance=6.6,minDistance=1.15,maxDistance=12.2;
+    var orbitDistance=6.6,targetDistance=6.6,minDistance=2.1,maxDistance=12.2; /* minDistance keeps the camera outside the globe: max zoom-in is the city zoom level */
     var yaw=0,pitch=0,targetYaw=0,targetPitch=0;
     var dragging=false,moved=false,lastX=0,lastY=0,hasInteracted=false;
     var cameraLook=new THREE.Vector3(),desiredCameraPosition=new THREE.Vector3(),desiredCameraLook=new THREE.Vector3();
@@ -1277,6 +1277,11 @@
     canvas.addEventListener('pointerup',function(event){
       dragging=false;canvas.classList.remove('is-dragging');canvas.releasePointerCapture(event.pointerId);
       if(!moved){if(window.__espilIntroActive)return;var hit=pick(event);if(hit)selectCity(hit.object);}
+      else if(!window.__espilIntroActive&&!cityPhaseActive){
+        /* The text div always matches the map: after a manual rotate, re-sync the reel. */
+        var facing=nearestFacingMarker();
+        if(facing&&facing!==centeredMarker){centerReel(facing,false);navIndex=markers.indexOf(facing);}
+      }
       canvas.style.cursor='grab';
     });
     canvas.addEventListener('pointercancel',function(){dragging=false;canvas.classList.remove('is-dragging');});
