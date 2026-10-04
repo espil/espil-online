@@ -3,34 +3,293 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Character Customization Test</title>
+<title>Character Custom — Hybrid 2.5D</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:sans-serif; background:#1a1a2e; color:#eee; overflow:hidden; }
-  #app { display:flex; height:100vh; }
-  #preview {
-    flex:1; display:flex; align-items:center; justify-content:center;
-    background:repeating-conic-gradient(#222 0% 25%, #1a1a1a 0% 50%) 50% / 40px 40px;
+  body { font-family:sans-serif; overflow:hidden; background:#1a1a2e; }
+  #canvas-wrap { position:fixed; inset:0; }
+  #canvas-wrap canvas { display:block; }
+  #nametag {
+    position:fixed; top:18px; left:50%; transform:translateX(-50%);
+    background:rgba(0,0,0,0.55); color:#fff; padding:6px 18px; border-radius:14px;
+    font-size:15px; font-weight:bold; pointer-events:none; z-index:10;
   }
-  #preview .placeholder { color:#555; font-size:14px; }
+  #anims { position:fixed; top:16px; left:16px; z-index:10; display:flex; gap:6px; }
+  #anims button {
+    background:rgba(255,255,255,0.12); color:#ddd; border:1px solid rgba(255,255,255,0.2);
+    border-radius:8px; padding:7px 14px; cursor:pointer; font-size:13px; backdrop-filter:blur(4px);
+  }
+  #anims button.active { background:#0e6e6e; color:#fff; border-color:#0e6e6e; }
   #panel {
-    width:300px; background:rgba(20,20,35,0.95);
-    border-left:1px solid rgba(255,255,255,0.1); padding:16px;
+    position:fixed; top:0; right:0; width:300px; height:100%;
+    background:rgba(20,20,35,0.92); backdrop-filter:blur(8px);
+    border-left:1px solid rgba(255,255,255,0.1); z-index:10;
+    display:flex; flex-direction:column; color:#eee;
   }
-  #panel h2 { font-size:15px; margin-bottom:12px; }
-  #panel p { font-size:12px; color:#888; }
+  #tabs { display:flex; border-bottom:1px solid rgba(255,255,255,0.1); }
+  #tabs button {
+    flex:1; background:none; border:none; color:#888; padding:14px;
+    font-size:15px; cursor:pointer; border-bottom:2px solid transparent;
+  }
+  #tabs button.active { color:#fff; border-bottom-color:#0e6e6e; }
+  #tab-content { flex:1; overflow-y:auto; padding:16px; }
+  .section-label { font-size:12px; color:#888; margin:14px 0 8px; }
+  .section-label:first-child { margin-top:0; }
+  .style-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .style-btn {
+    background:rgba(255,255,255,0.07); border:2px solid transparent; border-radius:10px;
+    padding:10px 4px; cursor:pointer; color:#ddd; font-size:12px; text-align:center;
+  }
+  .style-btn.active { border-color:#0e6e6e; background:rgba(14,110,110,0.25); }
+  .thumb { width:100%; height:48px; object-fit:contain; margin-bottom:4px; }
   @media (max-width:640px) { #panel { width:220px; } }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
-<div id="app">
-  <div id="preview">
-    <div class="placeholder">character preview</div>
+<div id="canvas-wrap"></div>
+<div id="nametag">Espil</div>
+<div id="anims">
+  <button data-anim="tpose" class="active">T-포즈</button>
+  <button data-anim="idle">Idle</button>
+  <button data-anim="walk">걷기</button>
+</div>
+<div id="panel">
+  <div id="tabs">
+    <button data-tab="hair" class="active">헤어</button>
+    <button data-tab="eyes">눈</button>
   </div>
-  <div id="panel">
-    <h2>Character Custom</h2>
-    <p>cctest — work in progress</p>
+  <div id="tab-content">
+    <div id="tab-hair">
+      <div class="section-label">스타일</div>
+      <div class="style-grid" id="hair-styles"></div>
+    </div>
+    <div id="tab-eyes" style="display:none;">
+      <div class="section-label">스타일</div>
+      <div class="style-grid" id="eye-styles"></div>
+      <div class="section-label">색상</div>
+      <div class="style-grid" id="eye-colors"></div>
+    </div>
   </div>
 </div>
+<script>
+// Hybrid 2.5D: 3D rigged base + 2D sprite overlays pinned to bones
+const EYE_L = [-0.2273, 1.2773, 0.3066], EYE_R = [0.2280, 1.2773, 0.3007];
+const HEAD_C = [0.0003, 1.2936, -0.0011];
+
+const HAIRS = {
+  bob:   {name:'단발', file:'assets/hair_bob_t.png'},
+  spiky: {name:'스파이키', file:'assets/hair_spiky_t.png'},
+  long:  {name:'긴머리', file:'assets/hair_long_t.png'},
+};
+const EYES = {
+  round: {name:'둥근', files:{blue:'assets/eye_round_blue.png', red:'assets/eye_round_red.png', green:'assets/eye_round_green.png'}},
+  soft:  {name:'순한', files:{blue:'assets/eye_soft_blue.png'}},
+  sharp: {name:'날카로운', files:{blue:'assets/eye_sharp_blue.png'}},
+};
+const EYE_COLORS = {blue:'파랑', red:'빨강', green:'초록'};
+
+let curHair='bob', curEye='round', curEyeColor='blue';
+
+const wrap = document.getElementById('canvas-wrap');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1a2e);
+const camera = new THREE.PerspectiveCamera(40, innerWidth/innerHeight, 0.1, 100);
+camera.position.set(0, 1.1, 3.2);
+const renderer = new THREE.WebGLRenderer({antialias:true, alpha:false});
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.outputEncoding = THREE.sRGBEncoding;
+wrap.appendChild(renderer.domElement);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.85, 0);
+controls.enableDamping = true;
+controls.minDistance = 1.2; controls.maxDistance = 8;
+controls.maxPolarAngle = Math.PI * 0.55;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x334455, 0.8));
+const key = new THREE.DirectionalLight(0xfff2e6, 1.0);
+key.position.set(3,6,5); key.castShadow = true;
+key.shadow.mapSize.set(1024,1024);
+scene.add(key);
+const fill = new THREE.DirectionalLight(0xdde8ff, 0.45);
+fill.position.set(-4,3,3); scene.add(fill);
+
+const ground = new THREE.Mesh(new THREE.CircleGeometry(4,48),
+  new THREE.ShadowMaterial({opacity:0.3}));
+ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
+
+const texLoader = new THREE.TextureLoader();
+const texCache = {};
+function tex(path) {
+  if (!texCache[path]) {
+    const t = texLoader.load(path);
+    t.encoding = THREE.sRGBEncoding;
+    texCache[path] = t;
+  }
+  return texCache[path];
+}
+
+let model, mixer, walkClip, headBone;
+let bindPose = new Map();
+let animMode = 'tpose';
+let hairMesh = null, eyeLMesh = null, eyeRMesh = null;
+
+new THREE.GLTFLoader().load('assets/character.glb', (gltf) => {
+  model = gltf.scene; scene.add(model);
+  model.traverse(o => {
+    if (o.isMesh) {
+      o.castShadow = true;
+      if (o.material && o.material.isMeshStandardMaterial) {
+        o.material.color.setHex(0xf2c9a8); o.material.roughness = 0.65;
+      }
+    }
+    if (o.isBone) bindPose.set(o, {pos:o.position.clone(), quat:o.quaternion.clone()});
+  });
+  headBone = model.getObjectByName('mixamorig:Head');
+  mixer = new THREE.AnimationMixer(model);
+  if (gltf.animations.length) walkClip = gltf.animations[0];
+  buildHair(curHair);
+  buildEyes(curEye, curEyeColor);
+  setAnim('tpose');
+  animate();
+}, undefined, (e)=>console.error(e));
+
+// --- 2D sprite overlays pinned to head bone ---
+function makeSpritePlane(w, h, texture) {
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(w, h),
+    new THREE.MeshBasicMaterial({map:texture, transparent:true, depthWrite:false})
+  );
+  m.renderOrder = 10;
+  return m;
+}
+
+function buildHair(style) {
+  curHair = style;
+  if (hairMesh && headBone) headBone.remove(hairMesh);
+  const t = tex(HAIRS[style].file);
+  // hair plane sized to cover head (head ~0.78 wide)
+  hairMesh = makeSpritePlane(1.05, 1.05, t);
+  // position at head center, slightly forward
+  hairMesh.position.set(HEAD_C[0], HEAD_C[1]+0.06, HEAD_C[2]+0.10);
+  scene.add(hairMesh);
+  hairMesh.updateMatrixWorld(true);
+  if (headBone) headBone.attach(hairMesh);
+  refreshHairUI();
+}
+
+function buildEyes(style, color) {
+  curEye = style; curEyeColor = color;
+  if (eyeLMesh && headBone) { headBone.remove(eyeLMesh); headBone.remove(eyeRMesh); }
+  const files = EYES[style].files;
+  const f = files[color] || files.blue;
+  const t = tex(f);
+  eyeLMesh = makeSpritePlane(0.20, 0.20, t);
+  eyeRMesh = makeSpritePlane(0.20, 0.20, t.clone());
+  eyeRMesh.material = eyeLMesh.material.clone();
+  eyeRMesh.material.map = tex(f);
+  eyeLMesh.position.set(EYE_L[0], EYE_L[1], EYE_L[2]+0.012);
+  eyeRMesh.position.set(EYE_R[0], EYE_R[1], EYE_R[2]+0.012);
+  // face slightly outward
+  eyeLMesh.rotation.y = EYE_L[0]*0.9;
+  eyeRMesh.rotation.y = EYE_R[0]*0.9;
+  scene.add(eyeLMesh); scene.add(eyeRMesh);
+  eyeLMesh.updateMatrixWorld(true); eyeRMesh.updateMatrixWorld(true);
+  if (headBone) { headBone.attach(eyeLMesh); headBone.attach(eyeRMesh); }
+  refreshEyeUI();
+}
+
+// --- animations ---
+function setAnim(mode) {
+  animMode = mode;
+  document.querySelectorAll('#anims button').forEach(b =>
+    b.classList.toggle('active', b.dataset.anim===mode));
+  if (!mixer) return;
+  mixer.stopAllAction();
+  if (mode==='walk' && walkClip) mixer.clipAction(walkClip).play();
+  else bindPose.forEach((v,bone)=>{ bone.position.copy(v.pos); bone.quaternion.copy(v.quat); });
+}
+const clock = new THREE.Clock();
+const _q = new THREE.Quaternion();
+const _X = new THREE.Vector3(1,0,0), _Z = new THREE.Vector3(0,0,1);
+function sway(bone, axis, amp, phase, t) {
+  if (!bone) return;
+  const b = bindPose.get(bone);
+  bone.position.copy(b.pos); bone.quaternion.copy(b.quat);
+  _q.setFromAxisAngle(axis, Math.sin(t*2.2+phase)*amp);
+  bone.quaternion.multiply(_q);
+}
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta(), t = clock.elapsedTime;
+  if (mixer) mixer.update(dt);
+  if (animMode==='idle' && model) {
+    const get = n => model.getObjectByName(n);
+    const h = get('mixamorig:Hips');
+    if (h) {
+      const b = bindPose.get(h);
+      h.position.copy(b.pos);
+      h.position.y = b.pos.y + Math.abs(Math.sin(t*2.2))*0.02;
+      h.position.x = b.pos.x + Math.sin(t*2.2)*0.015;
+    }
+    sway(get('mixamorig:Spine'), _Z, 0.03, 0, t);
+    sway(get('mixamorig:Neck'), _Z, 0.04, 0.4, t);
+    sway(get('mixamorig:Head'), _Z, 0.05, 0.7, t);
+    sway(get('mixamorig:LeftShoulder'), _X, 0.07, Math.PI/2, t);
+    sway(get('mixamorig:RightShoulder'), _X, 0.07, -Math.PI/2, t);
+  }
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// --- UI ---
+function el(id){ return document.getElementById(id); }
+function refreshHairUI() {
+  const c = el('hair-styles'); c.innerHTML='';
+  for (const [k,v] of Object.entries(HAIRS)) {
+    const b = document.createElement('div');
+    b.className = 'style-btn'+(k===curHair?' active':'');
+    b.innerHTML = `<img class="thumb" src="${v.file}"><div>${v.name}</div>`;
+    b.onclick = ()=>buildHair(k);
+    c.appendChild(b);
+  }
+}
+function refreshEyeUI() {
+  const c = el('eye-styles'); c.innerHTML='';
+  for (const [k,v] of Object.entries(EYES)) {
+    const b = document.createElement('div');
+    b.className = 'style-btn'+(k===curEye?' active':'');
+    b.innerHTML = `<img class="thumb" src="${v.files.blue}"><div>${v.name}</div>`;
+    b.onclick = ()=>buildEyes(k, curEyeColor);
+    c.appendChild(b);
+  }
+  const cc = el('eye-colors'); cc.innerHTML='';
+  for (const [k,name] of Object.entries(EYE_COLORS)) {
+    const b = document.createElement('div');
+    b.className = 'style-btn'+(k===curEyeColor?' active':'');
+    b.textContent = name;
+    b.onclick = ()=>buildEyes(curEye, k);
+    cc.appendChild(b);
+  }
+}
+document.querySelectorAll('#tabs button').forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll('#tabs button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    el('tab-hair').style.display = b.dataset.tab==='hair'?'':'none';
+    el('tab-eyes').style.display = b.dataset.tab==='eyes'?'':'none';
+  };
+});
+document.querySelectorAll('#anims button').forEach(b=>{ b.onclick=()=>setAnim(b.dataset.anim); });
+refreshHairUI(); refreshEyeUI();
+addEventListener('resize', ()=>{
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
 </body>
 </html>
