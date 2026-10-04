@@ -1369,8 +1369,9 @@
     var cont=document.getElementById('intro-continue');
     var canvas=document.getElementById('intro-stars');
     var WORD='Espil Online';
-    var TYPE_MIN=200,TYPE_JITTER=130; /* ~3s total with human-like uneven rhythm */
-    var done=false,continued=false,earthReady=false,typedDone=false,idx=0;
+    var TYPE_MIN=50,TYPE_JITTER=50; /* 50-100ms per char, natural rhythm */
+    var CARET_LINGER=2000; /* caret keeps blinking 2s after typing completes, then disappears */
+    var done=false,continued=false,earthReady=false,typedDone=false,caretGone=false,idx=0;
     var reduced=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     window.__espilIntroActive=true;
     /* Starfield */
@@ -1417,15 +1418,23 @@
       typed.appendChild(caret);
     }
     function maybeShowContinue(){
-      if(typedDone&&earthReady&&!done){
+      if(typedDone&&caretGone&&earthReady&&!done){
         done=true;
         if(logo)logo.classList.add('done');
-        if(caret&&caret.parentNode)caret.parentNode.removeChild(caret);
         if(cont)cont.classList.add('show');
       }
     }
     function typeStep(){
-      if(idx>=spans.length){typedDone=true;maybeShowContinue();return;}
+      if(idx>=spans.length){
+        typedDone=true;
+        /* Caret blinks on for 2s after the last letter, then disappears. */
+        setTimeout(function(){
+          if(caret&&caret.parentNode)caret.parentNode.removeChild(caret);
+          caretGone=true;
+          maybeShowContinue();
+        },CARET_LINGER);
+        return;
+      }
       spans[idx].classList.add('on');
       typed.insertBefore(caret,spans[idx+1]||null);
       idx++;
@@ -1455,7 +1464,8 @@
       buildTyped();
       if(reduced){
         for(var i=0;i<spans.length;i++)spans[i].classList.add('on');
-        typedDone=true;maybeShowContinue();
+        if(caret&&caret.parentNode)caret.parentNode.removeChild(caret);
+        typedDone=true;caretGone=true;maybeShowContinue();
       }else setTimeout(typeStep,600);
       if(window.__espilEarthReady){earthReady=true;maybeShowContinue();}
       else window.addEventListener('espil-earth-ready',function(){earthReady=true;maybeShowContinue();});
