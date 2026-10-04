@@ -59,6 +59,7 @@
     .geo-panel{position:absolute;right:max(14px,env(safe-area-inset-right));top:87px;width:240px;height:150px;background:#24332c;border:1px solid rgba(190,231,211,.35);box-shadow:0 8px 26px rgba(0,0,0,.28);overflow:hidden}
     #metaMap{position:absolute;inset:0}.geo-label{position:absolute;z-index:3;left:7px;top:7px;background:rgba(7,20,15,.86);color:#b9ead3;padding:5px 7px;font:500 9px "IBM Plex Mono",monospace;pointer-events:none}.map-fallback{display:grid;place-items:center;text-align:center;color:#b8c8bf;padding:22px;font-size:12px;line-height:1.5;height:100%;background:repeating-linear-gradient(45deg,#182b23,#182b23 10px,#1d332a 10px,#1d332a 20px)}
     .state-pill{position:absolute;top:94px;left:max(14px,env(safe-area-inset-left));background:rgba(7,20,15,.82);color:#bfe9d3;border:1px solid rgba(145,215,184,.2);padding:7px 10px;font:500 10px "IBM Plex Mono",monospace;pointer-events:none}
+    .world-loader{position:absolute;z-index:10;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:10px;background:rgba(7,20,15,.9);border:1px solid rgba(145,215,184,.34);color:#eafff3;padding:12px 15px;font:500 11px/1.4 "IBM Plex Mono",monospace;box-shadow:0 12px 32px rgba(0,0,0,.28);pointer-events:none;transition:opacity .25s}.world-loader.hidden{opacity:0}.world-loader i{width:14px;height:14px;border-radius:50%;border:2px solid rgba(180,232,207,.25);border-top-color:#87e7be;animation:worldSpin .8s linear infinite}@keyframes worldSpin{to{transform:rotate(360deg)}}
     .quest{position:absolute;left:50%;top:22px;transform:translateX(-50%);background:rgba(10,28,21,.88);border:1px solid rgba(166,230,201,.3);color:#eafff3;padding:9px 16px;font-size:12px;pointer-events:none;text-align:center}
     .event-log{position:absolute;left:max(14px,env(safe-area-inset-left));bottom:130px;color:#cae5d6;font:10px/1.55 "IBM Plex Mono",monospace;text-shadow:0 2px 4px #000;pointer-events:none;max-width:300px}.event-log div{opacity:.78}.event-log div:last-child{opacity:1;color:#fff}
     .controls{position:absolute;inset:auto 0 max(14px,env(safe-area-inset-bottom));display:flex;align-items:flex-end;justify-content:center;pointer-events:none;padding:0 16px}.skill-dock{display:grid;grid-template-columns:repeat(12,52px);gap:6px;background:rgba(7,18,14,.72);padding:8px;border:1px solid rgba(155,215,188,.24);backdrop-filter:blur(7px);pointer-events:auto}
@@ -75,7 +76,7 @@
     @media(prefers-color-scheme:dark){
       .globe{background:#102a23}.globe-wash{background:radial-gradient(circle at 50% 48%,transparent 18%,rgba(117,173,153,.07) 66%,rgba(0,0,0,.34) 100%)}.globe-copy{text-shadow:none}.globe-copy .eyebrow,.globe-copy h1{color:#e9f4df}.globe-copy p:last-child,.globe-hint{color:#afd0bf}.city-rail{background:rgba(16,42,35,.84);border-color:rgba(207,238,222,.22)}.city-rail button{color:#d4eadf}.city-marker{color:#eff8e8}.city-marker span{background:#153c31;border-color:rgba(220,244,232,.35)}
     }
-    @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}.preview-wrap:before{background-image:none}.entering-card i{animation:none}}
+    @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}.preview-wrap:before{background-image:none}.entering-card i,.world-loader i{animation:none}}
   </style>
 </head>
 <body>
@@ -89,12 +90,13 @@
       </div>
       <div class="quest">방향키 또는 조이스틱으로 신호탑에 접근하세요</div>
       <div class="state-pill">STATE · <span id="animState">IDLE</span></div>
+      <div class="world-loader" id="worldLoader" role="status" aria-live="polite"><i aria-hidden="true"></i><span>Loading real world...</span></div>
       <div class="curvature-control">
         <div class="curve-axis"><label for="curveControl">X-곡률 (좌우) <output id="curveValue">50</output></label><input id="curveControl" type="range" min="0" max="100" value="50" aria-label="좌우 방향 월드 곡률 강도"></div>
         <div class="curve-axis"><label for="yCurveControl">Y-곡률 (상하) <output id="yCurveValue">55</output></label><input id="yCurveControl" type="range" min="0" max="100" value="55" aria-label="상하 방향 월드 곡률 강도"></div>
       </div>
       <div class="geo-panel"><div class="geo-label" id="geoLabel">META GEO · VANCOUVER</div><div id="metaMap"></div></div>
-      <div class="event-log" id="eventLog"><div>RPGWorld initialized</div><div>30km tile metadata generated</div></div>
+      <div class="event-log" id="eventLog"><div>RPGWorld initialized</div><div>Waiting for OpenStreetMap raster</div></div>
       <div class="controls">
         <div class="joystick" id="joystick" aria-label="이동 조이스틱"><div class="stick" id="stick"></div></div>
         <div class="skill-dock" id="skillDock"></div>
@@ -128,7 +130,10 @@
       {id:'seoul',name:'Seoul',region:'South Korea',lat:37.5665,lng:126.9780,seed:11},
       {id:'auckland',name:'Auckland',region:'New Zealand',lat:-36.8509,lng:174.7645,seed:19}
     ];
-    let selectedCity=CITIES[0];
+    const urlParams=new URLSearchParams(location.search);
+    const requestedLat=Number(urlParams.get('lat')),requestedLon=Number(urlParams.get('lon'));
+    const hasRequestedLocation=urlParams.has('lat')&&urlParams.has('lon')&&Number.isFinite(requestedLat)&&Number.isFinite(requestedLon)&&requestedLat>=-85&&requestedLat<=85&&requestedLon>=-180&&requestedLon<=180;
+    let selectedCity=hasRequestedLocation?{id:'coordinates',name:'Coordinates',region:requestedLat.toFixed(4)+', '+requestedLon.toFixed(4),lat:requestedLat,lng:requestedLon,seed:Math.abs(Math.round((requestedLat+requestedLon)*100))%97}:CITIES[0];
 
     class CharacterAnimator{
       constructor(){this.state='idle';this.t=0;this.flash=0;this.direction='front'}
@@ -165,20 +170,55 @@
     const renderer=new CharacterRenderer();
 
 
-    // engine/map
-    const tileClassifier={classify(x,y,seed){const river=Math.abs(x-(26+seed%9)+Math.sin((y+seed)*.22)*5)<2;const road=Math.abs(y-(27+seed%8))<1||Math.abs(x-y+(seed%7)-3)<.65;const n=Math.sin((x+seed)*.31)*Math.cos((y-seed)*.27)+Math.sin((x+y+seed)*.11);if(river)return'water';if(road)return'road';if(Math.hypot(x-(34+seed%5),y-(27+seed%6))<6&&((x+y+seed)%4<2))return'urban';if(n>.72)return'forest';if(n<-.78)return'dirt';return'grass'}};
-    const tileGenerator={generate(w,h,seed){const tiles=[];for(let y=0;y<h;y++)for(let x=0;x<w;x++){const type=tileClassifier.classify(x,y,seed);tiles.push({x,y,type,blocked:type==='urban'&&((x*7+y*3+seed)%5<2),swim:type==='water'})}return tiles}};
+    // engine/map — the procedural classifier remains only as an offline fallback.
+    const tileClassifier={
+      classify(x,y,seed){const river=Math.abs(x-(26+seed%9)+Math.sin((y+seed)*.22)*5)<2;const road=Math.abs(y-(27+seed%8))<1||Math.abs(x-y+(seed%7)-3)<.65;const n=Math.sin((x+seed)*.31)*Math.cos((y-seed)*.27)+Math.sin((x+y+seed)*.11);if(river)return'water';if(road)return'road';if(Math.hypot(x-(34+seed%5),y-(27+seed%6))<6&&((x+y+seed)%4<2))return'urban';if(n>.72)return'forest';if(n<-.78)return'dirt';return'grass'},
+      fromColor(r,g,b){
+        const max=Math.max(r,g,b),min=Math.min(r,g,b),spread=max-min,light=(r+g+b)/3;
+        if(b>r+18&&b>g+4&&b>145)return'water';
+        if(r>205&&g>190&&b<185&&r>b+28)return'sand';
+        if(g>r+9&&g>b+7)return light<166?'forest':'grass';
+        if(spread<13&&light>232)return'road';
+        if(spread<24&&light>178)return'urban';
+        if(r>g+12&&g>b-4&&light<185)return'dirt';
+        if(light<112)return'mountain';
+        return light>215?'road':'grass';
+      }
+    };
+    const tileGenerator={generate(w,h,seed){const tiles=[];for(let y=0;y<h;y++)for(let x=0;x<w;x++){const type=tileClassifier.classify(x,y,seed);tiles.push({x,y,type,blocked:type==='water'||(type==='urban'&&((x*7+y*3+seed)%5<2)),swim:false,source:'procedural'})}return tiles}};
+    const OSM={zoom:14,radiusMeters:30000,tileSize:256,gridSize:64,sampleSpan:8};
+    function latLonToPixel(lat,lon,z){const n=Math.pow(2,z)*OSM.tileSize,s=Math.sin(lat*Math.PI/180);return{x:(lon+180)/360*n,y:(.5-Math.log((1+s)/(1-s))/(4*Math.PI))*n}}
+    function loadOSMTile(z,x,y){return new Promise((resolve,reject)=>{const img=new Image();img.crossOrigin='anonymous';img.referrerPolicy='no-referrer';img.onload=()=>resolve({img,x,y});img.onerror=()=>reject(new Error('OSM tile failed'));img.src='https://tile.openstreetmap.org/'+z+'/'+x+'/'+y+'.png'})}
+    async function loadRealWorldTiles(lat,lon){
+      const z=OSM.zoom,size=OSM.tileSize,center=latLonToPixel(lat,lon,z),metersPerPixel=156543.03392*Math.cos(lat*Math.PI/180)/Math.pow(2,z),radiusPx=OSM.radiusMeters/metersPerPixel;
+      const minX=center.x-radiusPx,maxX=center.x+radiusPx,minY=center.y-radiusPx,maxY=center.y+radiusPx;
+      const firstX=Math.floor(minX/size),lastX=Math.floor(maxX/size),firstY=Math.floor(minY/size),lastY=Math.floor(maxY/size),worldTiles=Math.pow(2,z),span=OSM.sampleSpan;
+      // At z14 a continuous 60km square contains thousands of tiles. Sample an even 8×8 lattice
+      // across the entire radius instead, preserving the requested extent without bulk-downloading OSM.
+      const samples=[];for(let sy=0;sy<span;sy++)for(let sx=0;sx<span;sx++){const tx=Math.round(firstX+(lastX-firstX)*sx/(span-1)),ty=Math.round(firstY+(lastY-firstY)*sy/(span-1)),wrappedX=((tx%worldTiles)+worldTiles)%worldTiles;samples.push(loadOSMTile(z,wrappedX,ty).then(v=>({img:v.img,sx,sy,tx,ty})))}
+      const loaded=await Promise.all(samples),canvas=document.createElement('canvas');canvas.width=span*size;canvas.height=span*size;const ctx=canvas.getContext('2d',{willReadFrequently:true});
+      loaded.forEach(t=>ctx.drawImage(t.img,t.sx*size,t.sy*size));
+      const data=ctx.getImageData(0,0,canvas.width,canvas.height).data,tiles=[],grid=OSM.gridSize;
+      const cropX=0,cropY=0,cropW=canvas.width,cropH=canvas.height;
+      for(let gy=0;gy<grid;gy++)for(let gx=0;gx<grid;gx++){
+        const left=cropX+gx*cropW/grid,top=cropY+gy*cropH/grid,right=cropX+(gx+1)*cropW/grid,bottom=cropY+(gy+1)*cropH/grid;
+        let r=0,g=0,b=0,count=0;const stepX=Math.max(1,Math.floor((right-left)/4)),stepY=Math.max(1,Math.floor((bottom-top)/4));
+        for(let py=Math.floor(top);py<bottom;py+=stepY)for(let px=Math.floor(left);px<right;px+=stepX){const i=(Math.min(canvas.height-1,py)*canvas.width+Math.min(canvas.width-1,px))*4;r+=data[i];g+=data[i+1];b+=data[i+2];count++}
+        r/=count;g/=count;b/=count;const type=tileClassifier.fromColor(r,g,b);tiles.push({x:gx,y:gy,type,blocked:type==='water'||type==='urban',swim:false,source:'openstreetmap',rgb:[Math.round(r),Math.round(g),Math.round(b)]});
+      }
+      return{tiles,zoom:z,tileCount:loaded.length,lat,lon};
+    }
     // engine/rpg
     class TileLayer{
-      constructor(w,h,seed){this.w=w;this.h=h;this.tiles=tileGenerator.generate(w,h,seed)}
-      at(x,y){x=Math.floor(x);y=Math.floor(y);return this.tiles[y*this.w+x]}
+      constructor(w,h,seed,tiles){this.w=w;this.h=h;this.tiles=tiles||tileGenerator.generate(w,h,seed);this.source=tiles?'openstreetmap':'procedural'}
+      at(x,y){x=Math.floor(x);y=Math.floor(y);if(x<0||y<0||x>=this.w||y>=this.h)return null;return this.tiles[y*this.w+x]}
       draw(ctx,world,size,vw,vh){
         const cam=world.camera,cols=Math.ceil(vw/size/2)+5,rows=Math.ceil(vh/(size*.7)/2)+7;
         const sx=Math.max(0,Math.floor(cam.x-cols)),ex=Math.min(this.w,Math.ceil(cam.x+cols));
         // The forward edge is deliberately finite: its projected top edge becomes the curved horizon.
         const horizonRows=Math.min(rows,Math.max(12,Math.round(vh/(size*.7)*.70)));
         const sy=Math.max(0,Math.floor(cam.y-horizonRows)),ey=Math.min(this.h,Math.ceil(cam.y+rows));
-        const colors={grass:'#5f9960',forest:'#397454',water:'#3a88aa',road:'#98a39d',dirt:'#9a744d',urban:'#d2c9ad'};
+        const colors={grass:'#5f9960',forest:'#397454',water:'#3a88aa',road:'#98a39d',dirt:'#9a744d',urban:'#d2c9ad',sand:'#d8c27b',mountain:'#615b50'};
         ctx.lineJoin='round';
         for(let y=sy;y<ey;y++)for(let x=sx;x<ex;x++){
           const t=this.at(x,y),p00=world.project(x,y,vw,vh),p10=world.project(x+1,y,vw,vh),p11=world.project(x+1,y+1,vw,vh),p01=world.project(x,y+1,vw,vh);
@@ -196,6 +236,7 @@
     class ObjectLayer{draw(ctx,world,size,vw,vh){const p=world.project(40,22,vw,vh),scale=world.scaleAt(40,22,vw);ctx.fillStyle='rgba(240,198,79,.18)';ctx.beginPath();ctx.ellipse(p.x,p.y,22*scale,7*scale,0,0,Math.PI*2);ctx.fill();ctx.save();ctx.translate(p.x,p.y);ctx.fillStyle='#173f30';ctx.fillRect(-3*scale,-13*scale,6*scale,25*scale);ctx.fillStyle='#f0c64f';ctx.beginPath();ctx.arc(0,-24*scale,13*scale+Math.sin(world.time*3)*2,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#fff4a4';ctx.lineWidth=3*scale;ctx.stroke();ctx.restore()}}
     class RPGWorld{
       constructor(canvas,cfg,city){this.canvas=canvas;this.ctx=canvas.getContext('2d');this.cfg=cfg;this.city=city;this.layer=new TileLayer(64,64,city.seed);this.collision=new CollisionLayer(this.layer);this.objects=new ObjectLayer();this.player={x:32,y:34};this.camera={x:32,y:34};this.animator=new CharacterAnimator();this.keys={};this.joy={x:0,y:0};this.time=0;this.last=performance.now();this.effects=[];this.size=46;this.xCurvature=.50;this.yCurvature=.55;this.running=true;this.resize();addEventListener('resize',()=>this.resize())}
+      useRealTiles(result){this.layer=new TileLayer(OSM.gridSize,OSM.gridSize,this.city.seed,result.tiles);this.collision=new CollisionLayer(this.layer);if(!this.collision.canEnter(this.player.x,this.player.y)){outer:for(let radius=1;radius<16;radius++)for(let y=32-radius;y<=32+radius;y++)for(let x=32-radius;x<=32+radius;x++)if(this.collision.canEnter(x,y)){this.player.x=x+.5;this.player.y=y+.5;this.camera.x=this.player.x;this.camera.y=this.player.y;break outer}}}
       resize(){const d=Math.min(devicePixelRatio||1,2),r=this.canvas.getBoundingClientRect();this.canvas.width=Math.floor(r.width*d);this.canvas.height=Math.floor(r.height*d);this.dpr=d}
       anchorY(vh){return vh*.72}
       project(wx,wy,vw,vh){
@@ -233,13 +274,15 @@
     function bindInput(){addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#equip').classList.contains('open')){e.preventDefault();closeEquip();return}if(!world||!$('#gameScene').classList.contains('active')||$('#equip').classList.contains('open'))return;if(e.key.startsWith('Arrow')){e.preventDefault();world.keys[e.key]=true}else{const i=skills.findIndex(s=>s.key===e.key.toLowerCase());if(i>=0&&!e.repeat){e.preventDefault();triggerSkill(i)}}});addEventListener('keyup',e=>{if(world&&e.key.startsWith('Arrow'))world.keys[e.key]=false});
       const joy=$('#joystick'),stick=$('#stick');let active=false;function move(e){if(!active||!world)return;const p=e.touches?e.touches[0]:e,r=joy.getBoundingClientRect(),dx=p.clientX-(r.left+r.width/2),dy=p.clientY-(r.top+r.height/2),len=Math.hypot(dx,dy),max=38,k=Math.min(max,len)/(len||1);stick.style.transform='translate('+(dx*k)+'px,'+(dy*k)+'px)';world.joy={x:dx/max,y:dy/max};const l=Math.hypot(world.joy.x,world.joy.y);if(l>1){world.joy.x/=l;world.joy.y/=l}}
       function end(){active=false;stick.style.transform='';if(world)world.joy={x:0,y:0}}joy.addEventListener('pointerdown',e=>{active=true;joy.setPointerCapture(e.pointerId);move(e)});joy.addEventListener('pointermove',move);joy.addEventListener('pointerup',end);joy.addEventListener('pointercancel',end)}
-    function mountGeo(city){const el=$('#metaMap');el.innerHTML='';function fallback(){el.innerHTML='<div class="map-fallback">지리 배경을 불러오지 못했습니다.<br>RPG 레이어는 계속 작동합니다.</div>'}try{MapHelpers.mountMap(el,{places:[{label:city.name+' 30km origin',locality:city.name,region:city.region,lat:city.lat,lng:city.lng}],baseStyle:matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light',marker:()=>'<span style="display:none"></span>',zoom:9,interactive:false},fallback)}catch(e){fallback()}}
+    function mountGeo(city){const el=$('#metaMap');el.innerHTML='';function fallback(){el.innerHTML='<div class="map-fallback">지리 배경을 불러오지 못했습니다.<br>RPG 레이어는 계속 작동합니다.</div>'}try{MapHelpers.mountMap(el,{places:[{label:city.name+' 30km origin',locality:city.name,region:city.region,lat:city.lat,lng:city.lng}],baseStyle:matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light',marker:()=>'<span style="display:none"></span>',zoom:14,interactive:false},fallback)}catch(e){fallback()}}
+    function setWorldLoading(message,done){const loader=$('#worldLoader');loader.querySelector('span').textContent=message;loader.classList.toggle('hidden',!!done);if(done)setTimeout(()=>{if(loader.querySelector('span').textContent===message)loader.setAttribute('aria-hidden','true')},300);else loader.removeAttribute('aria-hidden')}
     function startGame(city){
-      selectedCity=city;$('#playerName').textContent=config.name;$('#zone').textContent=city.name.toUpperCase()+' / 30KM';$('#geoLabel').textContent='META GEO · '+city.name.toUpperCase();
+      selectedCity=city;$('#playerName').textContent=config.name;$('#zone').textContent=city.name.toUpperCase()+' / 30KM';$('#geoLabel').textContent='OSM GEO · '+city.name.toUpperCase();
       if(!controlsBuilt){buildControls();controlsBuilt=true}if(!inputBound){bindInput();inputBound=true}
-      if(world)world.running=false;world=new RPGWorld($('#worldCanvas'),config,city);mountGeo(city);
+      if(world)world.running=false;world=new RPGWorld($('#worldCanvas'),config,city);const activeWorld=world;mountGeo(city);
       spritesReady.then(()=>log('4-direction porcelain sprite ready'));
-      requestAnimationFrame(t=>world.loop(t));log(city.name+' 30km RPG layer initialized');
+      requestAnimationFrame(t=>world.loop(t));log('Procedural fallback ready');setWorldLoading('Loading real world...',false);
+      loadRealWorldTiles(city.lat,city.lng).then(result=>{if(world!==activeWorld)return;activeWorld.useRealTiles(result);$('#geoLabel').textContent='OSM RASTER · Z'+result.zoom+' · 30KM';log(result.tileCount+' OSM tiles sampled into RPG terrain');setWorldLoading('Real world ready',true)}).catch(()=>{if(world!==activeWorld)return;$('#geoLabel').textContent='OSM OFFLINE · PROCEDURAL';log('OSM unavailable · procedural map retained');setWorldLoading('Offline map loaded',true)});
     }
     const curveControl=$('#curveControl'),curveValue=$('#curveValue'),yCurveControl=$('#yCurveControl'),yCurveValue=$('#yCurveValue');
     curveControl.addEventListener('input',()=>{curveValue.textContent=curveControl.value;if(world)world.xCurvature=Number(curveControl.value)/100});
