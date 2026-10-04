@@ -1429,7 +1429,7 @@
     }
     function hideCityInfo(){ infoShown=false; if(infoPanel)infoPanel.setAttribute('aria-hidden','true'); }
     var infoEnter=document.getElementById('city-info-enter'),infoBack=document.getElementById('city-info-back');
-    if(infoEnter)infoEnter.addEventListener('click',function(){if(window.EspilAudio&&window.EspilAudio.pop)window.EspilAudio.pop();hideCityInfo();activateCityPhase();});
+    if(infoEnter)infoEnter.addEventListener('click',function(){if(window.EspilAudio&&window.EspilAudio.pop)window.EspilAudio.pop();if(selected&&typeof cityData!=='undefined'){var cd=cityData[selected.userData.index];var slug=String(cd[0]).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');window.location.href='/test?city='+slug+'&lat='+cd[1]+'&lon='+cd[2];}else{hideCityInfo();activateCityPhase();}});
     if(infoBack)infoBack.addEventListener('click',function(){if(window.EspilAudio&&window.EspilAudio.pop)window.EspilAudio.pop();clearSelection(true);});
     function zoomBy(delta){
       hasInteracted=true;
