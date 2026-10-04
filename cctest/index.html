@@ -85,13 +85,11 @@ const HAIRS = {
   long:  {name:'긴머리', file:'assets/hair_long_t.png'},
 };
 const EYES = {
-  round: {name:'둥근', files:{blue:'assets/eye_round_blue.png', red:'assets/eye_round_red.png', green:'assets/eye_round_green.png'}},
-  soft:  {name:'순한', files:{blue:'assets/eye_soft_blue.png'}},
-  sharp: {name:'날카로운', files:{blue:'assets/eye_sharp_blue.png'}},
+  red: {name:'빨강', file:'assets/eyes_red_pair.png'},
 };
-const EYE_COLORS = {blue:'파랑', red:'빨강', green:'초록'};
+const EYE_COLORS = {red:'빨강'};
 
-let curHair='bob', curEye='round', curEyeColor='blue';
+let curHair='bob', curEye='red', curEyeColor='red';
 
 const wrap = document.getElementById('canvas-wrap');
 const scene = new THREE.Scene();
@@ -135,7 +133,7 @@ function tex(path) {
 let model, mixer, walkClip, headBone;
 let bindPose = new Map();
 let animMode = 'tpose';
-let hairMesh = null, eyeLMesh = null, eyeRMesh = null;
+let hairMesh = null, eyeMesh = null;
 
 new THREE.GLTFLoader().load('assets/character.glb', (gltf) => {
   model = gltf.scene; scene.add(model);
@@ -171,10 +169,10 @@ function buildHair(style) {
   curHair = style;
   if (hairMesh && headBone) headBone.remove(hairMesh);
   const t = tex(HAIRS[style].file);
-  // hair plane sized to cover head (head ~0.78 wide)
-  hairMesh = makeSpritePlane(1.05, 1.05, t);
-  // position at head center, slightly forward
-  hairMesh.position.set(HEAD_C[0], HEAD_C[1]+0.06, HEAD_C[2]+0.10);
+  // hair plane: 1.1x1.1, positioned to frame the head
+  hairMesh = makeSpritePlane(1.1, 1.1, t);
+  hairMesh.position.set(HEAD_C[0], HEAD_C[1]+0.03, 0.37);
+  hairMesh.renderOrder = 11; // hair in front of eyes
   scene.add(hairMesh);
   hairMesh.updateMatrixWorld(true);
   if (headBone) headBone.attach(hairMesh);
@@ -183,22 +181,16 @@ function buildHair(style) {
 
 function buildEyes(style, color) {
   curEye = style; curEyeColor = color;
-  if (eyeLMesh && headBone) { headBone.remove(eyeLMesh); headBone.remove(eyeRMesh); }
-  const files = EYES[style].files;
-  const f = files[color] || files.blue;
+  if (eyeMesh && headBone) headBone.remove(eyeMesh);
+  const f = EYES[style].file;
   const t = tex(f);
-  eyeLMesh = makeSpritePlane(0.20, 0.20, t);
-  eyeRMesh = makeSpritePlane(0.20, 0.20, t.clone());
-  eyeRMesh.material = eyeLMesh.material.clone();
-  eyeRMesh.material.map = tex(f);
-  eyeLMesh.position.set(EYE_L[0], EYE_L[1], EYE_L[2]+0.012);
-  eyeRMesh.position.set(EYE_R[0], EYE_R[1], EYE_R[2]+0.012);
-  // face slightly outward
-  eyeLMesh.rotation.y = EYE_L[0]*0.9;
-  eyeRMesh.rotation.y = EYE_R[0]*0.9;
-  scene.add(eyeLMesh); scene.add(eyeRMesh);
-  eyeLMesh.updateMatrixWorld(true); eyeRMesh.updateMatrixWorld(true);
-  if (headBone) { headBone.attach(eyeLMesh); headBone.attach(eyeRMesh); }
+  // eye pair: single plane, 0.62 wide (aspect 2.18:1)
+  eyeMesh = makeSpritePlane(0.62, 0.284, t);
+  eyeMesh.position.set(0, 1.28, 0.36);
+  eyeMesh.renderOrder = 10; // eyes behind hair (which is 11)
+  scene.add(eyeMesh);
+  eyeMesh.updateMatrixWorld(true);
+  if (headBone) headBone.attach(eyeMesh);
   refreshEyeUI();
 }
 
@@ -262,7 +254,7 @@ function refreshEyeUI() {
   for (const [k,v] of Object.entries(EYES)) {
     const b = document.createElement('div');
     b.className = 'style-btn'+(k===curEye?' active':'');
-    b.innerHTML = `<img class="thumb" src="${v.files.blue}"><div>${v.name}</div>`;
+    b.innerHTML = `<img class="thumb" src="${v.file}"><div>${v.name}</div>`;
     b.onclick = ()=>buildEyes(k, curEyeColor);
     c.appendChild(b);
   }
