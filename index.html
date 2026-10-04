@@ -302,9 +302,31 @@
       .brand-letter,.brand-sub { animation-duration:.01s; animation-delay:0s; }
       .brand-word .brand-letter { animation:brand-in .01s forwards; }
     }
+    .splash {
+      position:fixed; inset:0; z-index:60; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; gap:26px; cursor:pointer;
+      background:radial-gradient(120% 120% at 50% 18%, #062b31 0%, #02090c 55%, #010405 100%);
+      transition:opacity .6s ease, visibility .6s ease;
+    }
+    .splash.hide { opacity:0; visibility:hidden; pointer-events:none; }
+    .splash-lottie {
+      width:min(88vw,720px);
+      filter:drop-shadow(0 0 22px rgba(64,255,205,.55)) drop-shadow(0 0 64px rgba(64,255,205,.25));
+    }
+    .splash-hint {
+      font:700 .78rem/1 "Manrope",sans-serif; letter-spacing:.42em; text-indent:.42em;
+      color:#9ff5e4; animation:splash-pulse 1.7s ease-in-out infinite; user-select:none;
+    }
+    @keyframes splash-pulse { 0%,100% { opacity:.35; } 50% { opacity:.95; } }
+    @media (prefers-reduced-motion:reduce) { .splash-hint { animation:none; opacity:.9; } }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js" defer></script>
 </head>
 <body>
+  <div class="splash" id="splash" role="button" tabindex="0" aria-label="Enter Espil Online">
+    <div class="splash-lottie" id="splash-lottie" aria-hidden="true"></div>
+    <div class="splash-hint">TAP TO ENTER</div>
+  </div>
   <main class="earth-frame" id="earth-frame">
     <canvas id="globe-canvas" role="application" tabindex="0" aria-label="Interactive fixed Earth with selectable city landmarks. Drag to orbit the camera, scroll to zoom, or choose a city for a tilted navigation view."></canvas>
     <header class="topbar">
@@ -1028,13 +1050,53 @@
   }());
   </script>
   <script>
+  /* ESPIL Online splash: Lottie popping letters, tap to enter. */
+  (function(){
+    "use strict";
+    var splash=document.getElementById('splash');
+    var done=false;
+    function enter(){
+      if(done||!splash)return; done=true;
+      splash.classList.add('hide');
+      if(window.EspilAudio&&window.EspilAudio.onReturnToOrbit)window.EspilAudio.onReturnToOrbit();
+      setTimeout(function(){ if(splash.parentNode)splash.parentNode.removeChild(splash); },700);
+    }
+    function boot(){
+      if(!splash)return;
+      splash.addEventListener('click',enter);
+      splash.addEventListener('keydown',function(e){
+        if(e.key==='Enter'||e.key===' '){e.preventDefault();enter();}
+      });
+      setTimeout(enter,8000); /* auto-enter fallback */
+      if(window.lottie){
+        var box=document.getElementById('splash-lottie');
+        var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        try{
+          var anim=window.lottie.loadAnimation({container:box,renderer:'svg',loop:false,autoplay:!reduce,path:'assets/espil-online-logo.json'});
+          if(reduce)anim.addEventListener('DOMLoaded',function(){anim.goToAndStop(anim.totalFrames-1,true);});
+        }catch(err){ /* static fallback: splash still tappable */ }
+      }
+    }
+    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);
+    else boot();
+  }());
+  </script>
+  <script>
   /* ESPIL Online landing UI: theme BGM, sign-in modal, guest flow. */
   (function(){
     "use strict";
     var audio=document.getElementById('bgm');
     var toggle=document.getElementById('bgm-toggle');
     var started=false, muted=false, userPaused=false;
-    if(audio){ audio.volume=0.5; }
+    if(audio){
+      audio.volume=0.5;
+      /* Theme song file not uploaded yet: show OFF instead of pretending. */
+      audio.addEventListener('error',function(){
+        if(audio.networkState===3||(audio.error&&audio.error.code===4)){
+          muted=true; userPaused=true; paintToggle();
+        }
+      });
+    }
     function paintToggle(){
       if(!toggle)return;
       toggle.innerHTML=muted?'&#9834; OFF':'&#9834; ON';
