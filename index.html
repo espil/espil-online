@@ -716,7 +716,7 @@
       ['Vancouver',49.2827,-123.1207,'sails','Canada Place sails'],['San Francisco',37.7749,-122.4194,'bridge','Golden Gate Bridge'],['Los Angeles',34.0522,-118.2437,'star','Hollywood star'],['Chicago',41.8781,-87.6298,'tower','Willis Tower'],['Mexico City',19.4326,-99.1332,'pyramid','Sun Pyramid'],['New York',40.7128,-74.006,'liberty','Statue of Liberty'],['Toronto',43.6532,-79.3832,'needle','CN Tower'],
       ['Rio de Janeiro',-22.9068,-43.1729,'christ','Christ the Redeemer'],['São Paulo',-23.5505,-46.6333,'beam','MASP'],['Buenos Aires',-34.6037,-58.3816,'obelisk','Obelisk'],['London',51.5072,-.1276,'clock','Big Ben'],['Paris',48.8566,2.3522,'eiffel','Eiffel Tower'],['Madrid',40.4168,-3.7038,'tree','Bear and strawberry tree'],['Rome',41.9028,12.4964,'colosseum','Colosseum'],['Berlin',52.52,13.405,'gate','Brandenburg Gate'],['Moscow',55.7558,37.6173,'domes','Saint Basil domes'],
       ['Lagos',6.5244,3.3792,'theatre','National Theatre'],['Nairobi',-1.2921,36.8219,'spire','KICC'],['Cairo',30.0444,31.2357,'pyramid','Great Pyramid'],['Cape Town',-33.9249,18.4241,'mountain','Table Mountain'],['Istanbul',41.0082,28.9784,'mosque','Blue Mosque'],['Dubai',25.2048,55.2708,'burj','Burj Khalifa'],['Mumbai',19.076,72.8777,'gateway','Gateway of India'],['Delhi',28.6139,77.209,'arch','India Gate'],
-      ['Singapore',1.3521,103.8198,'merlion','Merlion'],['Bangkok',13.7563,100.5018,'temple','Wat Arun'],['Shanghai',31.2304,121.4737,'pearl','Oriental Pearl Tower'],['Hong Kong',22.3193,114.1694,'junk','Harbour junk'],['Beijing',39.9042,116.4074,'temple','Temple of Heaven'],['Seoul',37.5665,126.978,'needle','N Seoul Tower'],['Tokyo',35.6762,139.6503,'torii','Torii gate'],['Manila',14.5995,120.9842,'sun','Philippine sun'],['Jakarta',-6.2088,106.8456,'obelisk','National Monument'],['Sydney',-33.8688,151.2093,'sails','Sydney Opera House'],['Melbourne',-37.8136,144.9631,'station','Flinders Street Station'],['Auckland',-36.8509,174.7645,'needle','Sky Tower']
+      ['Singapore',1.3521,103.8198,'merlion','Merlion'],['Bangkok',13.7563,100.5018,'temple','Wat Arun'],['Shanghai',31.2304,121.4737,'pearl','Oriental Pearl Tower'],['Hong Kong',22.3193,114.1694,'junk','Harbour junk'],['Beijing',39.9042,116.4074,'hall','Temple of Heaven'],['Seoul',37.5665,126.978,'needle','N Seoul Tower'],['Tokyo',35.6762,139.6503,'torii','Torii gate'],['Manila',14.5995,120.9842,'sun','Philippine sun'],['Jakarta',-6.2088,106.8456,'obelisk','National Monument'],['Sydney',-33.8688,151.2093,'sails','Sydney Opera House'],['Melbourne',-37.8136,144.9631,'station','Flinders Street Station'],['Auckland',-36.8509,174.7645,'needle','Sky Tower']
     ];
     var markers=[],markerGroup=new THREE.Group();
     earthSpin.add(markerGroup);
@@ -730,6 +730,10 @@
       dark:new THREE.MeshPhongMaterial({color:0x17262b,specular:0x7feadd,shininess:76}),
       gold:new THREE.MeshPhongMaterial({color:0xd3a83c,emissive:0x2d1900,specular:0xffe7a3,shininess:105}),
       green:new THREE.MeshPhongMaterial({color:0x537f69,specular:0xa5d0bd,shininess:42}),
+      vermillion:new THREE.MeshPhongMaterial({color:0xb5432f,specular:0xff9a7a,shininess:60}),
+      marble:new THREE.MeshPhongMaterial({color:0xe9e4d8,specular:0xffffff,shininess:48}),
+      rust:new THREE.MeshPhongMaterial({color:0xa8503a,specular:0xd88a63,shininess:55}),
+      white:new THREE.MeshPhongMaterial({color:0xf2efe6,specular:0xffffff,shininess:60}),
       glow:new THREE.MeshBasicMaterial({color:0x8ff4e8,transparent:true,opacity:.82,depthWrite:false})
     };
     function landmarkModel(type){
@@ -749,53 +753,233 @@
       }
       var base=cylinder(.46,.5,.12,0,.06,0,landmarkMats.dark,24);
       var ring=add(new THREE.TorusGeometry(.41,.028,8,32),landmarkMats.glow,0,.125,0,Math.PI/2,0,0);
-      if(type==='pyramid'||type==='mountain'){
-        cone(.34,.82,0,.53,0,type==='mountain'?landmarkMats.stone:landmarkMats.pale,type==='mountain'?7:4);
-        if(type==='mountain'){cone(.22,.52,-.3,.35,.06,landmarkMats.stone,7);cone(.2,.46,.29,.32,.08,landmarkMats.stone,7);}
+      if(type==='pyramid'){
+        /* Stepped pyramid: five tiers + capstone */
+        var w=.72;
+        for(var pi=0;pi<5;pi++){box(w,.13,w,0,.19+pi*.13,0,landmarkMats.pale);w-=.115;}
+        box(.09,.09,.09,0,.87,0,landmarkMats.gold);
+      }else if(type==='mountain'){
+        /* Table Mountain: flat-topped mesa + tablecloth cloud */
+        cylinder(.42,.5,.36,0,.3,0,landmarkMats.stone,9);
+        cylinder(.34,.42,.1,0,.5,0,landmarkMats.stone,9);
+        add(new THREE.CylinderGeometry(.4,.44,.07,24),new THREE.MeshBasicMaterial({color:0xe6edef,transparent:true,opacity:.88}),0,.56,0);
       }else if(type==='sails'){
-        var sailA=cone(.28,.88,-.12,.56,0,landmarkMats.pale,4);sailA.scale.z=.23;sailA.rotation.z=-.22;
-        var sailB=cone(.34,1.06,.16,.64,.02,landmarkMats.pale,4);sailB.scale.z=.2;sailB.rotation.z=.26;
-        box(.75,.07,.3,0,.18,0,landmarkMats.steel);
+        /* Shell roofs in a rising row on a stepped podium */
+        box(.84,.09,.44,0,.165,0,landmarkMats.steel);box(.7,.08,.38,0,.25,0,landmarkMats.pale);
+        var sh=[[-.3,.42],[ -.1,.58],[.12,.74],[.32,.58]],si;
+        for(si=0;si<sh.length;si++){
+          var s=cone(.15,sh[si][1],sh[si][0],.29+sh[si][1]/2,0,landmarkMats.pale,10);
+          s.scale.z=.38;s.rotation.z=-.12;
+        }
       }else if(type==='bridge'){
-        box(.12,.72,.13,-.27,.52,0,landmarkMats.bronze);box(.12,.72,.13,.27,.52,0,landmarkMats.bronze);
-        box(.8,.07,.16,0,.28,0,landmarkMats.steel);rod(-.42,.62,0,-.27,.84,0,.018,landmarkMats.pale);rod(-.27,.84,0,0,.34,0,.018,landmarkMats.pale);rod(0,.34,0,.27,.84,0,.018,landmarkMats.pale);rod(.27,.84,0,.42,.62,0,.018,landmarkMats.pale);
+        /* Golden Gate: two art-deco towers, deck, cables + suspenders */
+        var bx;
+        for(bx=-1;bx<=1;bx+=2){
+          box(.07,.82,.1,bx*.27,.62,-.07,landmarkMats.rust);box(.07,.82,.1,bx*.27,.62,.07,landmarkMats.rust);
+          box(.09,.07,.24,bx*.27,.9,0,landmarkMats.rust);box(.09,.07,.24,bx*.27,.62,0,landmarkMats.rust);box(.09,.07,.24,bx*.27,.38,0,landmarkMats.rust);
+        }
+        box(1.02,.06,.24,0,.3,0,landmarkMats.steel);
+        rod(-.52,.52,0,-.27,1.02,0,.02,landmarkMats.pale);rod(-.27,1.02,0,.27,1.02,0,.02,landmarkMats.pale);rod(.27,1.02,0,.52,.52,0,.02,landmarkMats.pale);
+        var su;
+        for(su=-2;su<=2;su++){rod(su*.2,.98,0,su*.2,.33,0,.012,landmarkMats.pale);}
+      }else if(type==='star'){
+        /* Hollywood star: extruded five-point star */
+        var starShape=new THREE.Shape();
+        for(var sti=0;sti<10;sti++){
+          var ang=sti*Math.PI/5-Math.PI/2,rr=sti%2?.13:.3;
+          var px=Math.cos(ang)*rr,py=Math.sin(ang)*rr;
+          if(sti)starShape.lineTo(px,py);else starShape.moveTo(px,py);
+        }
+        starShape.closePath();
+        add(new THREE.ExtrudeGeometry(starShape,{depth:.1,bevelEnabled:false}),landmarkMats.gold,0,.5,-.05);
+        cylinder(.34,.38,.1,0,.16,0,landmarkMats.dark,5);
+      }else if(type==='tower'){
+        /* Willis Tower: bundled tubes of varying heights */
+        box(.3,.92,.3,-.08,.58,0,landmarkMats.glass);box(.24,.74,.24,.14,.49,.02,landmarkMats.glass);
+        box(.2,.58,.2,-.02,.41,-.14,landmarkMats.glass);
+        rod(-.08,1.04,0,-.08,1.3,0,.02,landmarkMats.gold);rod(.14,.86,.02,.14,1.12,.02,.015,landmarkMats.steel);
+      }else if(type==='needle'||type==='spire'){
+        /* CN / N Seoul / Sky Tower: shaft, pod, mast */
+        cylinder(.3,.34,.1,0,.17,0,landmarkMats.dark,16);
+        cylinder(.055,.11,.8,0,.6,0,landmarkMats.steel,12);
+        cylinder(.2,.2,.13,0,.92,0,landmarkMats.pale,16);
+        cylinder(.2,.16,.06,0,1.0,0,landmarkMats.glass,16);
+        cylinder(.035,.05,.34,0,1.2,0,landmarkMats.steel,8);
+        sphere(.035,0,1.39,0,landmarkMats.gold);
+        if(type==='spire')cylinder(.15,.15,.03,0,1.06,0,landmarkMats.dark,12);
+      }else if(type==='burj'){
+        /* Burj Khalifa: tiered stepped spire */
+        var bw=.2,by=.22,bi;
+        for(bi=0;bi<6;bi++){cylinder(bw*.82,bw,.2,0,by,0,bi%2?landmarkMats.glass:landmarkMats.steel,10);by+=.2;bw*=.8;}
+        rod(0,by-.05,0,0,by+.28,0,.018,landmarkMats.gold);
+      }else if(type==='pearl'){
+        /* Oriental Pearl: three spheres on a shaft */
+        cylinder(.3,.34,.1,0,.17,0,landmarkMats.dark,14);
+        cylinder(.05,.08,.9,0,.62,0,landmarkMats.steel,10);
+        sphere(.19,0,.48,0,landmarkMats.glass);sphere(.13,0,.76,0,landmarkMats.glass);sphere(.09,0,.99,0,landmarkMats.glass);
+        rod(0,1.04,0,0,1.26,0,.015,landmarkMats.gold);
+      }else if(type==='obelisk'){
+        /* Tapered shaft on stepped base, gold orb */
+        box(.4,.09,.4,0,.165,0,landmarkMats.pale);box(.3,.09,.3,0,.25,0,landmarkMats.pale);
+        cylinder(.09,.14,.8,0,.7,0,landmarkMats.pale,4);
+        cone(.09,.12,0,1.16,0,landmarkMats.pale,4);
+        sphere(.05,0,1.26,0,landmarkMats.gold);
+      }else if(type==='clock'){
+        /* Big Ben: tower, clock face with hands, spire */
+        box(.3,.1,.3,0,.17,0,landmarkMats.stone);
+        box(.24,.8,.24,0,.57,0,landmarkMats.stone);
+        box(.3,.2,.3,0,1.02,0,landmarkMats.marble);
+        var face=cylinder(.085,.085,.03,0,1.02,.16,landmarkMats.white,20);face.rotation.x=Math.PI/2;
+        box(.012,.07,.012,0,1.03,.18,landmarkMats.dark);var hand=box(.012,.05,.012,.02,1.02,.18,landmarkMats.dark);hand.rotation.z=-1.1;
+        cone(.17,.3,0,1.27,0,landmarkMats.dark,4);
       }else if(type==='eiffel'){
-        rod(-.3,.18,-.12,0,.98,0,.045,landmarkMats.bronze);rod(.3,.18,-.12,0,.98,0,.045,landmarkMats.bronze);rod(-.3,.18,.12,0,.98,0,.045,landmarkMats.bronze);rod(.3,.18,.12,0,.98,0,.045,landmarkMats.bronze);
-        box(.5,.06,.32,0,.42,0,landmarkMats.bronze);box(.28,.05,.24,0,.67,0,landmarkMats.bronze);
-      }else if(type==='needle'||type==='spire'||type==='burj'||type==='tower'||type==='pearl'||type==='obelisk'){
-        if(type==='tower'){box(.34,.72,.28,0,.54,0,landmarkMats.glass);box(.42,.08,.34,0,.89,0,landmarkMats.steel);rod(0,.91,0,0,1.13,0,.022,landmarkMats.gold);}
-        else if(type==='obelisk'){cone(.18,.95,0,.64,0,landmarkMats.pale,4);}
-        else if(type==='pearl'){cylinder(.045,.07,.96,0,.63,0,landmarkMats.steel,10);sphere(.19,0,.52,0,landmarkMats.glass);sphere(.12,0,.82,0,landmarkMats.glass);}
-        else {cone(type==='burj'?.2:.15,type==='burj'?1.28:1.02,0,type==='burj'?.78:.65,0,type==='burj'?landmarkMats.glass:landmarkMats.steel,type==='burj'?8:12);cylinder(.02,.025,.28,0,1.28,0,landmarkMats.gold,8);if(type==='needle')sphere(.2,0,.72,0,landmarkMats.glass);}
-      }else if(type==='liberty'||type==='christ'){
-        cylinder(.18,.24,.42,0,.34,0,landmarkMats.stone,10);box(.24,.43,.14,0,.69,0,type==='liberty'?landmarkMats.green:landmarkMats.pale);sphere(.12,0,.98,0,type==='liberty'?landmarkMats.green:landmarkMats.pale);
-        if(type==='christ'){rod(-.48,.82,0,.48,.82,0,.065,landmarkMats.pale);}else{rod(.08,.84,0,.28,1.18,0,.045,landmarkMats.green);cone(.07,.18,.31,1.25,0,landmarkMats.gold,8);}
-      }else if(type==='mosque'||type==='domes'||type==='temple'){
-        box(.62,.34,.46,0,.34,0,landmarkMats.pale);
-        if(type==='temple'){cone(.46,.28,0,.68,0,landmarkMats.bronze,6);cone(.36,.24,0,.87,0,landmarkMats.gold,6);}
-        else {sphere(.28,0,.58,0,landmarkMats.gold);box(.58,.18,.42,0,.42,0,landmarkMats.pale);for(var mi=-1;mi<=1;mi+=2){cylinder(.045,.06,.72,mi*.4,.51,0,landmarkMats.pale,10);cone(.09,.2,mi*.4,.96,0,landmarkMats.gold,10);}}
-      }else if(type==='colosseum'||type==='theatre'||type==='station'||type==='beam'||type==='gate'||type==='gateway'||type==='arch'){
-        if(type==='colosseum'){
-          cylinder(.46,.5,.52,0,.39,0,landmarkMats.stone,28);cylinder(.35,.35,.6,0,.44,0,new THREE.MeshBasicMaterial({color:0x071013}),28);
-        }else if(type==='theatre'){cylinder(.46,.46,.46,0,.37,0,landmarkMats.pale,24);sphere(.45,0,.57,0,landmarkMats.gold);box(.96,.48,.52,0,.72,.14,new THREE.MeshBasicMaterial({color:0x071013}));}
-        else if(type==='station'){box(.84,.47,.42,0,.4,0,landmarkMats.bronze);sphere(.22,0,.72,0,landmarkMats.gold);cylinder(.05,.05,.24,0,.92,0,landmarkMats.steel,8);}
-        else {box(.82,.72,.2,0,.52,0,landmarkMats.stone);box(.28,.48,.28,0,.42,.02,new THREE.MeshBasicMaterial({color:0x061014}));if(type==='gate'){for(var gi=-1;gi<=1;gi++)box(.09,.54,.3,gi*.25,.48,0,landmarkMats.stone);box(.95,.14,.34,0,.82,0,landmarkMats.bronze);}if(type==='beam')box(.9,.2,.36,0,.67,0,landmarkMats.glass);}
+        /* Eiffel Tower: four arched legs, two platforms, spire */
+        var ex,ez;
+        for(ex=-1;ex<=1;ex+=2)for(ez=-1;ez<=1;ez+=2)rod(ex*.28,.14,ez*.13,ex*.1,.56,ez*.05,.042,landmarkMats.bronze);
+        box(.42,.06,.3,0,.56,0,landmarkMats.bronze);
+        for(ex=-1;ex<=1;ex+=2)for(ez=-1;ez<=1;ez+=2)rod(ex*.1,.56,ez*.05,ex*.03,.94,0,.03,landmarkMats.bronze);
+        box(.2,.05,.17,0,.94,0,landmarkMats.bronze);
+        rod(0,.94,0,0,1.22,0,.022,landmarkMats.bronze);
+      }else if(type==='liberty'){
+        /* Statue of Liberty: robe, crown spikes, raised torch */
+        cylinder(.2,.27,.28,0,.26,0,landmarkMats.stone,12);
+        cylinder(.12,.19,.5,0,.62,0,landmarkMats.green,10);
+        sphere(.11,0,.95,0,landmarkMats.green);
+        var ci;
+        for(ci=0;ci<7;ci++){var ca=ci*Math.PI*2/7;cone(.025,.12,Math.cos(ca)*.11,1.06,Math.sin(ca)*.11,landmarkMats.green,6);}
+        rod(.1,.78,0,.3,1.12,0,.04,landmarkMats.green);
+        cylinder(.045,.045,.12,.32,1.2,0,landmarkMats.gold,8);
+        cone(.05,.12,.32,1.32,0,landmarkMats.glow,8);
+      }else if(type==='christ'){
+        /* Christ the Redeemer on its peak, arms outstretched */
+        cone(.32,.3,0,.27,0,landmarkMats.stone,8);
+        box(.2,.22,.2,0,.5,0,landmarkMats.stone);
+        cylinder(.11,.19,.52,0,.85,0,landmarkMats.pale,10);
+        sphere(.1,0,1.16,0,landmarkMats.pale);
+        rod(-.36,1.02,0,.36,1.02,0,.055,landmarkMats.pale);
+      }else if(type==='mosque'){
+        /* Blue Mosque: grand dome, half domes, four minarets */
+        box(.62,.28,.46,0,.26,0,landmarkMats.marble);
+        var md=sphere(.27,0,.58,0,landmarkMats.marble);md.scale.y=.78;
+        cone(.04,.16,0,.82,0,landmarkMats.gold,8);
+        var hx,hz;
+        for(hx=-1;hx<=1;hx+=2)for(hz=-1;hz<=1;hz+=2){var hd=sphere(.13,hx*.2,.42,hz*.15,landmarkMats.marble);hd.scale.y=.7;}
+        var mx,mz;
+        for(mx=-1;mx<=1;mx+=2)for(mz=-1;mz<=1;mz+=2){
+          cylinder(.032,.042,.85,mx*.4,.6,mz*.3,landmarkMats.marble,8);
+          cylinder(.05,.05,.04,mx*.4,.82,mz*.3,landmarkMats.marble,8);
+          cone(.05,.14,mx*.4,1.1,mz*.3,landmarkMats.marble,8);
+        }
+      }else if(type==='domes'){
+        /* Saint Basil's: clustered onion domes */
+        box(.58,.3,.44,0,.27,0,landmarkMats.marble);
+        cylinder(.13,.15,.3,0,.55,0,landmarkMats.marble,12);
+        var od=sphere(.17,0,.82,0,landmarkMats.gold);od.scale.y=1.35;cone(.04,.14,0,1.1,0,landmarkMats.gold,8);
+        var dm=[[-.2,-.12,'green'],[.2,-.12,'bronze'],[-.2,.12,'bronze'],[.2,.12,'green']],di;
+        for(di=0;di<dm.length;di++){
+          cylinder(.08,.09,.2,dm[di][0],.5,dm[di][1],landmarkMats.marble,10);
+          var so=sphere(.11,dm[di][0],.68,dm[di][1],landmarkMats[dm[di][2]]);so.scale.y=1.3;
+          cone(.03,.1,dm[di][0],.86,dm[di][1],landmarkMats.gold,8);
+        }
+      }else if(type==='temple'){
+        /* Wat Arun: tall prang with satellite prangs */
+        var tw=.17,ty=.2,ti;
+        for(ti=0;ti<5;ti++){cylinder(tw*.8,tw,.16,0,ty,0,landmarkMats.pale,10);ty+=.16;tw*=.78;}
+        cone(.05,.16,0,ty+.06,0,landmarkMats.gold,8);
+        var sx,sz;
+        for(sx=-1;sx<=1;sx+=2)for(sz=-1;sz<=1;sz+=2){cylinder(.05,.07,.3,sx*.3,.3,sz*.2,landmarkMats.pale,8);cone(.05,.14,sx*.3,.52,sz*.2,landmarkMats.gold,8);}
+      }else if(type==='hall'){
+        /* Temple of Heaven: triple-eaved round hall */
+        cylinder(.42,.46,.09,0,.165,0,landmarkMats.marble,20);
+        cylinder(.36,.4,.08,0,.24,0,landmarkMats.marble,20);
+        var hi;
+        for(hi=0;hi<8;hi++){var ha=hi*Math.PI/4;cylinder(.03,.03,.22,Math.cos(ha)*.28,.4,Math.sin(ha)*.28,landmarkMats.bronze,6);}
+        cone(.4,.17,0,.55,0,landmarkMats.bronze,16);
+        cone(.28,.15,0,.7,0,landmarkMats.bronze,14);
+        cone(.16,.13,0,.83,0,landmarkMats.bronze,12);
+        sphere(.05,0,.93,0,landmarkMats.gold);
+      }else if(type==='colosseum'){
+        /* Elliptical tiers */
+        var c1=cylinder(.46,.48,.17,0,.2,0,landmarkMats.stone,28);c1.scale.z=.78;
+        var c2=cylinder(.4,.43,.17,0,.37,0,landmarkMats.stone,28);c2.scale.z=.78;
+        var c3=cylinder(.33,.37,.16,0,.53,0,landmarkMats.stone,28);c3.scale.z=.78;
+        add(new THREE.CylinderGeometry(.3,.3,.2,24),new THREE.MeshBasicMaterial({color:0x071013}),0,.5,0).scale.z=.78;
+      }else if(type==='theatre'){
+        cylinder(.46,.5,.4,0,.32,0,landmarkMats.pale,24);
+        var td=sphere(.3,0,.55,0,landmarkMats.gold);td.scale.y=.62;
+        box(.3,.22,.06,0,.3,.44,landmarkMats.dark);
+      }else if(type==='station'){
+        /* Flinders Street: long facade, central dome, arched entry */
+        box(.88,.36,.34,0,.34,0,landmarkMats.bronze);
+        box(.92,.08,.38,0,.55,0,landmarkMats.marble);
+        sphere(.16,0,.66,0,landmarkMats.gold);
+        box(.2,.26,.06,0,.28,.17,landmarkMats.dark);
+        var wf=cylinder(.06,.06,.02,-.28,.42,.18,landmarkMats.white,12);wf.rotation.x=Math.PI/2;
+      }else if(type==='gate'){
+        /* Brandenburg Gate: six columns, entablature, quadriga */
+        var gi;
+        for(gi=0;gi<6;gi++)cylinder(.05,.06,.58,-.29+gi*.116,.46,0,landmarkMats.stone,10);
+        box(.78,.11,.3,0,.8,0,landmarkMats.stone);
+        box(.5,.13,.24,0,.92,0,landmarkMats.bronze);
+        box(.14,.07,.1,0,1.02,0,landmarkMats.bronze);
+        box(.1,.09,.16,.12,1.06,0,landmarkMats.gold);
+      }else if(type==='gateway'){
+        /* Gateway of India: grand arch, corner turrets, central dome */
+        box(.7,.52,.3,0,.42,0,landmarkMats.pale);
+        box(.24,.38,.32,0,.36,0,new THREE.MeshBasicMaterial({color:0x061014}));
+        box(.76,.1,.34,0,.72,0,landmarkMats.bronze);
+        var gx,gz;
+        for(gx=-1;gx<=1;gx+=2)for(gz=-1;gz<=1;gz+=2){
+          cylinder(.06,.07,.22,gx*.3,.86,gz*.1,landmarkMats.pale,8);
+          sphere(.06,gx*.3,1.0,gz*.1,landmarkMats.bronze);
+        }
+        sphere(.13,0,.82,0,landmarkMats.bronze);
+      }else if(type==='arch'){
+        /* India Gate: piers, arch band, attic dome */
+        box(.15,.58,.3,-.2,.45,0,landmarkMats.pale);box(.15,.58,.3,.2,.45,0,landmarkMats.pale);
+        box(.62,.15,.34,0,.8,0,landmarkMats.pale);
+        box(.26,.4,.32,0,.5,0,new THREE.MeshBasicMaterial({color:0x061014}));
+        box(.4,.11,.3,0,.93,0,landmarkMats.bronze);
+        sphere(.09,0,1.03,0,landmarkMats.bronze);
+      }else if(type==='beam'){
+        /* MASP: concrete beam on four red pillars, glass hall beneath */
+        var px2,pz2;
+        for(px2=-1;px2<=1;px2+=2)for(pz2=-1;pz2<=1;pz2+=2)box(.08,.68,.08,px2*.3,.5,pz2*.12,landmarkMats.vermillion);
+        box(.76,.17,.36,0,.92,0,landmarkMats.pale);
+        box(.42,.3,.22,0,.55,0,landmarkMats.glass);
       }else if(type==='junk'){
-        cylinder(.04,.04,.78,0,.59,0,landmarkMats.bronze,8);box(.78,.18,.3,0,.24,0,landmarkMats.bronze);var sail=cone(.33,.72,.2,.65,0,landmarkMats.pale,3);sail.rotation.z=-.2;sail.scale.z=.16;
+        /* Harbour junk: hull, raised prow, masted sails */
+        var hull=box(.72,.15,.26,0,.22,0,landmarkMats.bronze);
+        var prow=box(.14,.24,.24,.4,.3,0,landmarkMats.bronze);prow.rotation.z=-.5;
+        cylinder(.035,.035,.8,-.12,.62,0,landmarkMats.bronze,8);
+        cylinder(.035,.035,.66,.22,.55,0,landmarkMats.bronze,8);
+        var js1=box(.34,.4,.02,-.12,.72,0,landmarkMats.pale);js1.rotation.y=.15;
+        var js2=box(.28,.32,.02,.22,.62,0,landmarkMats.pale);js2.rotation.y=.15;
       }else if(type==='torii'){
-        box(.1,.88,.12,-.3,.57,0,landmarkMats.bronze);box(.1,.88,.12,.3,.57,0,landmarkMats.bronze);box(.84,.1,.16,0,.91,0,landmarkMats.bronze);box(1,.08,.14,0,1.05,0,landmarkMats.bronze);
+        box(.1,.88,.12,-.3,.57,0,landmarkMats.vermillion);box(.1,.88,.12,.3,.57,0,landmarkMats.vermillion);
+        box(.84,.1,.16,0,.91,0,landmarkMats.vermillion);box(1,.08,.14,0,1.05,0,landmarkMats.vermillion);
+        box(.12,.14,.14,0,.8,0,landmarkMats.dark);
       }else if(type==='tree'){
-        cylinder(.08,.12,.52,0,.39,0,landmarkMats.bronze,10);sphere(.38,0,.79,0,landmarkMats.green);sphere(.2,-.25,.68,.05,landmarkMats.green);sphere(.2,.27,.7,-.03,landmarkMats.green);
-      }else if(type==='sun'||type==='star'){
-        sphere(.31,0,.54,0,landmarkMats.gold);for(var sr=0;sr<8;sr++){var sa=sr*Math.PI/4;rod(Math.cos(sa)*.34,.54+Math.sin(sa)*.34,0,Math.cos(sa)*.5,.54+Math.sin(sa)*.5,0,.025,landmarkMats.gold);}
+        /* Strawberry tree + bronze bear */
+        cylinder(.07,.11,.5,0,.37,0,landmarkMats.bronze,10);
+        sphere(.36,0,.78,0,landmarkMats.green);sphere(.19,-.24,.66,.05,landmarkMats.green);sphere(.19,.26,.68,-.04,landmarkMats.green);
+        sphere(.11,.3,.28,0,landmarkMats.bronze);sphere(.075,.3,.44,0,landmarkMats.bronze);
+        sphere(.032,.3,.44,.07,landmarkMats.dark);
+        sphere(.028,.26,.5,0,landmarkMats.bronze);sphere(.028,.34,.5,0,landmarkMats.bronze);
+      }else if(type==='sun'){
+        /* Philippine sun: faceted rays */
+        sphere(.3,0,.54,0,landmarkMats.gold);
+        for(var sr=0;sr<8;sr++){var sa=sr*Math.PI/4;cone(.05,.22,Math.cos(sa)*.44,.54+Math.sin(sa)*.44,0,landmarkMats.gold,6);}
       }else if(type==='merlion'){
-        cylinder(.18,.28,.5,0,.39,0,landmarkMats.pale,12);sphere(.24,0,.78,0,landmarkMats.pale);cone(.16,.34,.2,.8,0,landmarkMats.pale,8);cylinder(.03,.03,.45,.36,.78,0,landmarkMats.glow,6).rotation.z=Math.PI/2;
+        cylinder(.17,.27,.5,0,.39,0,landmarkMats.pale,12);
+        sphere(.23,0,.78,0,landmarkMats.pale);
+        cone(.15,.32,.2,.8,0,landmarkMats.pale,8);
+        var spout=cylinder(.028,.028,.45,.38,.78,0,landmarkMats.glow,6);spout.rotation.z=Math.PI/2;
       }else {
         box(.5,.64,.38,0,.47,0,landmarkMats.glass);cone(.34,.35,0,.95,0,landmarkMats.gold,8);
       }
       return model;
     }
-
     var cityStage=null,cityPhaseActive=false,cityPhaseFade=0,cityApproachStarted=0;
     var approachSlow=false,infoShown=false;
     function destroyCityStage(){
@@ -1062,7 +1246,7 @@
            toward the skyline. Every offset scales together from city to street level. */
         var zoomProgress=Math.max(0,Math.min(1,(targetDistance-minDistance)/(3.38-minDistance)));
         navigationViewScale=.16+.84*zoomProgress;
-        desiredCameraPosition.copy(navigationNormal).multiplyScalar(2.04+.30*navigationViewScale).addScaledVector(navigationHeading,-.62*navigationViewScale);
+        desiredCameraPosition.copy(navigationNormal).multiplyScalar(2.04+1.4*navigationViewScale).addScaledVector(navigationHeading,-1.8*navigationViewScale);
         desiredCameraLook.copy(navigationNormal).multiplyScalar(2.04).addScaledVector(navigationHeading,.80*navigationViewScale);
         boundary.scale.setScalar(navigationViewScale);
       }else{
