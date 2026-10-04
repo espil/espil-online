@@ -80,16 +80,17 @@ const EYE_L = [-0.2273, 1.2773, 0.3066], EYE_R = [0.2280, 1.2773, 0.3007];
 const HEAD_C = [0.0003, 1.2936, -0.0011];
 
 const HAIRS = {
-  bob:   {name:'단발', file:'assets/hair_bob_t.png'},
-  spiky: {name:'스파이키', file:'assets/hair_spiky_t.png'},
-  long:  {name:'긴머리', file:'assets/hair_long_t.png'},
+  bob: {name:'단발', front:'assets/hair_bob_front.png', side:'assets/hair_bob_side.png', back:'assets/hair_bob_back.png'},
+  spiky: {name:'스파이키', front:'assets/hair_spiky_t.png', side:'assets/hair_spiky_t.png', back:'assets/hair_spiky_t.png'},
+  long: {name:'긴머리', front:'assets/hair_long_t.png', side:'assets/hair_long_t.png', back:'assets/hair_long_t.png'},
 };
 const EYES = {
-  red: {name:'빨강', file:'assets/eyes_red_pair.png'},
+  soft: {name:'소프트', front:'assets/eyes_soft_front.png', side:'assets/eyes_soft_side.png'},
 };
-const EYE_COLORS = {red:'빨강'};
+const EYE_COLORS = {};
 
-let curHair='bob', curEye='red', curEyeColor='red';
+let curHair='bob', curEye='soft', curEyeColor='soft';
+let hairSprite=null, eyeSprite=null, curView='front';
 
 const wrap = document.getElementById('canvas-wrap');
 const scene = new THREE.Scene();
@@ -133,7 +134,6 @@ function tex(path) {
 let model, mixer, walkClip, headBone;
 let bindPose = new Map();
 let animMode = 'tpose';
-let hairMesh = null, eyeMesh = null;
 
 new THREE.GLTFLoader().load('assets/character.glb', (gltf) => {
   model = gltf.scene; scene.add(model);
@@ -155,43 +155,87 @@ new THREE.GLTFLoader().load('assets/character.glb', (gltf) => {
   animate();
 }, undefined, (e)=>console.error(e));
 
-// --- 2D sprite overlays pinned to head bone ---
-function makeSpritePlane(w, h, texture) {
-  const m = new THREE.Mesh(
-    new THREE.PlaneGeometry(w, h),
-    new THREE.MeshBasicMaterial({map:texture, transparent:true, depthWrite:false})
+// --- 2D billboard sprites that follow head bone, swap by camera view ---
+function makeBillboard(w, h, texture) {
+  const m = new THREE.Sprite(
+    new THREE.SpriteMaterial({map:texture, transparent:true, depthTest:false})
   );
+  m.scale.set(w, h, 1);
   m.renderOrder = 10;
   return m;
 }
 
+const HAIR_SIZE = {
+  front:[1.1,1.1], side:[1.1,1.04], back:[1.1,0.90]
+};
+const EYE_SIZE = {
+  front:[0.62,0.185], side:[0.35,0.26]
+};
+
 function buildHair(style) {
   curHair = style;
-  if (hairMesh && headBone) headBone.remove(hairMesh);
-  const t = tex(HAIRS[style].file);
-  // hair plane: 1.1x1.1, positioned to frame the head
-  hairMesh = makeSpritePlane(1.1, 1.1, t);
-  hairMesh.position.set(HEAD_C[0], HEAD_C[1]+0.03, 0.37);
-  hairMesh.renderOrder = 11; // hair in front of eyes
-  scene.add(hairMesh);
-  hairMesh.updateMatrixWorld(true);
-  if (headBone) headBone.attach(hairMesh);
+  if (hairSprite) scene.remove(hairSprite);
+  const t = tex(HAIRS[style].front);
+  hairSprite = makeBillboard(HAIR_SIZE.front[0], HAIR_SIZE.front[1], t);
+  hairSprite.renderOrder = 11;
+  scene.add(hairSprite);
+  curView = ''; // force texture refresh
   refreshHairUI();
 }
 
 function buildEyes(style, color) {
-  curEye = style; curEyeColor = color;
-  if (eyeMesh && headBone) headBone.remove(eyeMesh);
-  const f = EYES[style].file;
-  const t = tex(f);
-  // eye pair: single plane, 0.62 wide (aspect 2.18:1)
-  eyeMesh = makeSpritePlane(0.62, 0.284, t);
-  eyeMesh.position.set(0, 1.28, 0.36);
-  eyeMesh.renderOrder = 10; // eyes behind hair (which is 11)
-  scene.add(eyeMesh);
-  eyeMesh.updateMatrixWorld(true);
-  if (headBone) headBone.attach(eyeMesh);
+  curEye = style;
+  if (eyeSprite) scene.remove(eyeSprite);
+  const t = tex(EYES[style].front);
+  eyeSprite = makeBillboard(EYE_SIZE.front[0], EYE_SIZE.front[1], t);
+  eyeSprite.renderOrder = 10;
+  scene.add(eyeSprite);
+  curView = ''; // force texture refresh
   refreshEyeUI();
+}
+
+const _hp = new THREE.Vector3();
+function updateSprites() {
+  if (!headBone || !hairSprite) return;
+  headBone.getWorldPosition(_hp);
+  // hair slightly above head center, eyes at face level
+  hairSprite.position.set(_hp.x, _hp.y+0.05, _hp.z);
+  if (eyeSprite) eyeSprite.position.set(_hp.x, _hp.y-0.02, _hp.z);
+
+  // camera azimuth: 0=front, ±90°=side, 180°=back
+  const dx = camera.position.x - controls.target.x;
+  const dz = camera.position.z - controls.target.z;
+  const az = Math.atan2(dx, dz);
+  const aaz = Math.abs(az);
+  let view = 'front';
+  if (aaz > Math.PI*0.75) view = 'back';
+  else if (aaz > Math.PI*0.25) view = 'side';
+
+  if (view !== curView) {
+    curView = view;
+    const ht = tex(HAIRS[curHair][view]);
+    hairSprite.material.map = ht;
+    hairSprite.material.needsUpdate = true;
+    hairSprite.scale.set(HAIR_SIZE[view][0], HAIR_SIZE[view][1], 1);
+    if (eyeSprite) {
+      if (view === 'back') {
+        eyeSprite.visible = false;
+      } else {
+        eyeSprite.visible = true;
+        const et = tex(EYES[curEye][view]);
+        eyeSprite.material.map = et;
+        eyeSprite.material.needsUpdate = true;
+        eyeSprite.scale.set(EYE_SIZE[view][0], EYE_SIZE[view][1], 1);
+      }
+    }
+  }
+  // mirror for right-side view (az<0 means camera on right)
+  if (curView === 'side') {
+    const flip = az < 0 ? -1 : 1;
+    hairSprite.scale.x = Math.abs(HAIR_SIZE.side[0]) * flip;
+    if (eyeSprite && eyeSprite.visible)
+      eyeSprite.scale.x = Math.abs(EYE_SIZE.side[0]) * flip;
+  }
 }
 
 // --- animations ---
@@ -234,6 +278,7 @@ function animate() {
     sway(get('mixamorig:RightShoulder'), _X, 0.07, -Math.PI/2, t);
   }
   controls.update();
+  updateSprites();
   renderer.render(scene, camera);
 }
 
@@ -244,7 +289,7 @@ function refreshHairUI() {
   for (const [k,v] of Object.entries(HAIRS)) {
     const b = document.createElement('div');
     b.className = 'style-btn'+(k===curHair?' active':'');
-    b.innerHTML = `<img class="thumb" src="${v.file}"><div>${v.name}</div>`;
+    b.innerHTML = `<img class="thumb" src="${v.front}"><div>${v.name}</div>`;
     b.onclick = ()=>buildHair(k);
     c.appendChild(b);
   }
@@ -254,18 +299,11 @@ function refreshEyeUI() {
   for (const [k,v] of Object.entries(EYES)) {
     const b = document.createElement('div');
     b.className = 'style-btn'+(k===curEye?' active':'');
-    b.innerHTML = `<img class="thumb" src="${v.file}"><div>${v.name}</div>`;
+    b.innerHTML = `<img class="thumb" src="${v.front}"><div>${v.name}</div>`;
     b.onclick = ()=>buildEyes(k, curEyeColor);
     c.appendChild(b);
   }
-  const cc = el('eye-colors'); cc.innerHTML='';
-  for (const [k,name] of Object.entries(EYE_COLORS)) {
-    const b = document.createElement('div');
-    b.className = 'style-btn'+(k===curEyeColor?' active':'');
-    b.textContent = name;
-    b.onclick = ()=>buildEyes(curEye, k);
-    cc.appendChild(b);
-  }
+  el('eye-colors').innerHTML='';
 }
 document.querySelectorAll('#tabs button').forEach(b=>{
   b.onclick=()=>{
