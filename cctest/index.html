@@ -117,7 +117,7 @@ function buildGrid(elId, data, cur, onPick) {
     if (!k.startsWith(elId.includes('hair')?'':'')) {}
     const b = document.createElement('div');
     b.className = 'style-btn'+(k===cur?' active':'');
-    b.innerHTML = `<img class="thumb" loading="lazy" src="assets/thumb/${file}.png"><div>${name}</div>`;
+    b.innerHTML = `<img class="thumb" src="assets/t_${file}.png"><div>${name}</div>`;
     b.onclick = ()=>{ onPick(k); buildGrid(elId, data, k, onPick); };
     c.appendChild(b);
   }
