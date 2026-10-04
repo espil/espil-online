@@ -200,8 +200,8 @@
       anchorY(vh){return vh*.72}
       project(wx,wy,vw,vh){
         const dx=(wx-this.camera.x)*this.size,dy=(wy-this.camera.y)*this.size*.70;
-        // Keep the ground immediately around the player level, then curl distant tiles upward.
-        // Circular-arc lift avoids the old downward parabola / bowl effect.
+        // Keep the ground immediately around the player level, then let distant tiles fall away.
+        // Circular-arc drop makes the player feel centered on top of a small planet.
         const lateral=Math.max(0,Math.abs(dx)-this.size*1.45);
         const forward=Math.max(0,-dy-this.size*.72);
         const radiusX=Math.max(460,vw*.68),radiusY=Math.max(420,vh*.72);
@@ -209,7 +209,7 @@
         const liftX=this.xCurvature*radiusX*(1-Math.cos(thetaX))*.82;
         const liftY=this.yCurvature*radiusY*(1-Math.cos(thetaY))*1.85;
         const depthNarrow=1-Math.min(.15,forward/(radiusY*3.3))*this.yCurvature;
-        return{x:vw/2+dx*depthNarrow,y:this.anchorY(vh)+dy-liftX-liftY}
+        return{x:vw/2+dx*depthNarrow,y:this.anchorY(vh)+dy+liftX+liftY}
       }
       scaleAt(wx,wy,vw){const dx=Math.abs((wx-this.camera.x)*this.size),forward=Math.max(0,(this.camera.y-wy)*this.size*.70);return Math.max(.68,1-Math.min(.32,(dx/Math.max(760,vw)*.18)+(forward/620*.22)))}
       input(){let x=(this.keys.ArrowRight?1:0)-(this.keys.ArrowLeft?1:0)+this.joy.x,y=(this.keys.ArrowDown?1:0)-(this.keys.ArrowUp?1:0)+this.joy.y;const l=Math.hypot(x,y);return l>.05?{x:x/l,y:y/l,mag:Math.min(1,l)}:{x:0,y:0,mag:0}}
