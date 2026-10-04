@@ -303,42 +303,43 @@
       .brand-letter,.brand-sub { animation-duration:.01s; animation-delay:0s; }
       .brand-word .brand-letter { animation:brand-in .01s forwards; }
     }
-    .splash {
+    /* Intro: starfield canvas, typewriter logo over its black shadow. */
+    .intro {
       position:fixed; inset:0; z-index:60; display:flex; flex-direction:column;
-      align-items:center; justify-content:center; gap:26px; cursor:pointer;
-      background:radial-gradient(120% 120% at 50% 18%, #062b31 0%, #02090c 55%, #010405 100%);
-      transition:opacity .6s ease, visibility .6s ease;
+      align-items:center; justify-content:center; gap:38px; cursor:pointer;
+      background:#010409; overflow:hidden;
+      transition:opacity .9s ease, visibility .9s ease;
     }
-    .splash.hide { opacity:0; visibility:hidden; pointer-events:none; }
-    .splash-lottie {
-      width:min(94vw,920px);
-      filter:drop-shadow(0 0 22px rgba(64,255,205,.55)) drop-shadow(0 0 64px rgba(64,255,205,.25));
+    .intro.hide { opacity:0; visibility:hidden; pointer-events:none; }
+    .intro-stars { position:absolute; inset:0; width:100%; height:100%; display:block; }
+    .intro-logo { position:relative; text-align:center; user-select:none; margin:0 12px; }
+    .intro-logo .shadow-layer, .intro-logo .typed-layer {
+      font:900 clamp(2.6rem,11vw,6.4rem)/1 "Arial Black","Arial",sans-serif;
+      letter-spacing:.08em; white-space:nowrap; margin:0;
     }
-    .splash-fallback {
-      font:900 clamp(2.4rem,9vw,5.2rem)/1 "Arial Black",sans-serif; letter-spacing:.06em;
-      color:#6bffdf; text-align:center;
+    .intro-logo .shadow-layer { color:#05070a; text-shadow:0 6px 44px rgba(0,0,0,.95); }
+    .intro-logo .typed-layer {
+      position:absolute; inset:0; color:#7dfce6;
+      text-shadow:0 0 22px rgba(64,255,205,.85),0 0 72px rgba(64,255,205,.35);
     }
-    .splash-hint {
-      font:700 .78rem/1 "Manrope",sans-serif; letter-spacing:.42em; text-indent:.42em;
-      color:#9ff5e4; animation:splash-pulse 1.7s ease-in-out infinite; user-select:none;
-      min-height:1em; text-align:center; padding:0 12px;
+    .intro-logo .typed-layer .ch { visibility:hidden; }
+    .intro-logo .typed-layer .ch.on { visibility:visible; }
+    .intro-logo .caret {
+      display:inline-block; width:.5em; height:.92em; margin-left:.1em; vertical-align:-.1em;
+      background:#7dfce6; box-shadow:0 0 18px rgba(64,255,205,.9);
+      animation:caret-blink .8s steps(1) infinite;
     }
-    .splash-hint.ready { color:#e6fffa; text-shadow:0 0 18px rgba(64,255,205,.8); }
-    @keyframes splash-pulse { 0%,100% { opacity:.35; } 50% { opacity:.95; } }
-    @media (prefers-reduced-motion:reduce) { .splash-hint { animation:none; opacity:.9; } }
-    /* Intro cinematic: hide the city selector while the globe spins with its text ring. */
-    .city-readout.intro-hidden { opacity:0; visibility:hidden; pointer-events:none; }
-    .city-readout { transition:opacity .8s ease, visibility .8s ease; }
-    .intro-prompt {
-      position:absolute; z-index:25; left:50%; bottom:9%; transform:translateX(-50%);
-      padding:14px 26px; border-radius:999px; cursor:pointer; user-select:none;
-      border:1px solid rgba(134,238,228,.45); background:rgba(2,12,15,.72);
-      font:700 .78rem/1 "Manrope",sans-serif; letter-spacing:.32em; text-indent:.32em;
-      color:#eafffb; text-shadow:0 0 16px rgba(64,255,205,.8); white-space:nowrap;
-      opacity:0; visibility:hidden; pointer-events:none; transition:opacity .6s ease, visibility .6s ease;
-      animation:splash-pulse 1.8s ease-in-out infinite;
+    @keyframes caret-blink { 0%,55% { opacity:1; } 56%,100% { opacity:0; } }
+    .intro.zoom .intro-logo { transform:scale(9); opacity:0; transition:transform 1.15s ease-in, opacity 1.15s ease-in; }
+    .intro-continue {
+      position:relative; font:700 .8rem/1.6 "Manrope",sans-serif; letter-spacing:.34em; text-indent:.34em;
+      color:#eafffb; text-shadow:0 0 16px rgba(64,255,205,.8); text-align:center; padding:0 16px;
+      opacity:0; visibility:hidden; transition:opacity .6s ease, visibility .6s ease;
+      animation:intro-pulse 1.8s ease-in-out infinite; user-select:none;
     }
-    .intro-prompt.show { opacity:1; visibility:visible; pointer-events:auto; }
+    .intro-continue.show { opacity:1; visibility:visible; }
+    @keyframes intro-pulse { 0%,100% { opacity:.4; } 50% { opacity:1; } }
+    @media (prefers-reduced-motion:reduce) { .intro-logo .caret { animation:none; } .intro-continue { animation:none; opacity:1; } }
     /* City info panel: details before entering. */
     .city-info {
       position:absolute; z-index:28; top:50%; right:26px; transform:translateY(-50%) translateX(0);
@@ -381,15 +382,18 @@
       }
       .city-info[aria-hidden="true"] { transform:translateX(50%) translateY(26px); }
       .city-info-img { height:120px; }
-      .intro-prompt { bottom:6%; font-size:.66rem; }
+      .intro-continue { font-size:.68rem; }
     }
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js" defer></script>
 </head>
 <body>
-  <div class="splash" id="splash" role="button" tabindex="0" aria-label="Enter Espil Online">
-    <div class="splash-lottie" id="splash-lottie" aria-hidden="true"></div>
-    <div class="splash-hint" id="splash-hint">LOADING EARTH…</div>
+  <div class="intro" id="intro" role="button" tabindex="0" aria-label="Enter Espil Online">
+    <canvas class="intro-stars" id="intro-stars" aria-hidden="true"></canvas>
+    <div class="intro-logo" id="intro-logo" aria-label="ESPIL ONLINE">
+      <p class="shadow-layer" aria-hidden="true">ESPIL ONLINE</p>
+      <p class="typed-layer" id="intro-typed" aria-hidden="true"></p>
+    </div>
+    <div class="intro-continue" id="intro-continue">TAP OR PRESS ANY KEY TO CONTINUE</div>
   </div>
   <main class="earth-frame" id="earth-frame">
     <canvas id="globe-canvas" role="application" tabindex="0" aria-label="Interactive fixed Earth with selectable city landmarks. Drag to orbit the camera, scroll to zoom, or choose a city for a tilted navigation view."></canvas>
@@ -424,7 +428,7 @@
       </div>
     </div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <audio id="bgm" loop preload="auto" src="assets/bgm.mp3"></audio>
+    <audio id="bgm" loop preload="auto" src="assets/Green_bgm_landing.mp3"></audio>
     <div class="city-readout" id="city-status">
       <time class="city-clock" id="city-clock" aria-label="Local time"></time>
       <div class="city-list" id="city-list" aria-label="City selector. Scroll the reel and choose the centered city."></div>
@@ -442,9 +446,6 @@
       <p class="city-info-brands-label">POPULAR BRANDS</p>
       <ul class="city-info-brands" id="city-info-brands"></ul>
       <button class="city-info-enter" id="city-info-enter" type="button">ENTER CITY &#8594;</button>
-    </div>
-    <div class="intro-prompt" id="intro-prompt" aria-hidden="true">
-      <span class="intro-prompt-text">PRESS ANY KEY OR TAP TO CONTINUE</span>
     </div>
     <span class="sr-only">Drag to orbit the camera around the fixed Earth. Scroll to move closer or farther away. Select a city landmark or city name to approach its boundary in a tilted, forward-looking navigation view.</span>
   </main>
@@ -790,7 +791,7 @@
     }
 
     var cityStage=null,cityPhaseActive=false,cityPhaseFade=0,cityApproachStarted=0;
-    var introSpin=false,approachSlow=false,infoShown=false;
+    var approachSlow=false,infoShown=false;
     function destroyCityStage(){
       if(!cityStage)return;
       earthSpin.remove(cityStage);
@@ -943,13 +944,12 @@
     function updateCameraView(){
       var ease=reduced?1:.075;
       if(selected&&navigationReady){
-        /* EverPlanet-like navigation framing: a low horizon and a thin, stable band of sky.
-           Every camera offset scales together as the viewer moves from city to near-street level,
-           preserving the landscape-to-sky ratio instead of tilting toward a top-down view. */
+        /* iPhone-Maps-flyover framing: camera near the land, low horizon, long view
+           toward the skyline. Every offset scales together from city to street level. */
         var zoomProgress=Math.max(0,Math.min(1,(targetDistance-minDistance)/(3.38-minDistance)));
         navigationViewScale=.16+.84*zoomProgress;
-        desiredCameraPosition.copy(navigationNormal).multiplyScalar(2.06+.37*navigationViewScale).addScaledVector(navigationHeading,-.72*navigationViewScale);
-        desiredCameraLook.copy(navigationNormal).multiplyScalar(2.06).addScaledVector(navigationHeading,.68*navigationViewScale);
+        desiredCameraPosition.copy(navigationNormal).multiplyScalar(2.04+.30*navigationViewScale).addScaledVector(navigationHeading,-.62*navigationViewScale);
+        desiredCameraLook.copy(navigationNormal).multiplyScalar(2.04).addScaledVector(navigationHeading,.80*navigationViewScale);
         boundary.scale.setScalar(navigationViewScale);
       }else{
         navigationViewScale=1;
@@ -1168,7 +1168,6 @@
     function shortestAngle(from,to){return Math.atan2(Math.sin(to-from),Math.cos(to-from));}
     function animate(){
       requestAnimationFrame(animate);
-      if(introSpin){earthSpin.rotation.y+=.0016;targetYaw+=.0011;}
       yaw+=shortestAngle(yaw,targetYaw)*(reduced?1:.075);
       pitch+=(targetPitch-pitch)*(reduced?1:.075);
       orbitDistance+=(targetDistance-orbitDistance)*(reduced?1:(selected&&approachSlow&&!cityPhaseActive?.03:.075));
@@ -1193,141 +1192,126 @@
       }
       renderer.render(scene,camera);
     }
-    /* Hooks for the intro cinematic + city info panel scripts. */
+    /* Hooks for the intro + city info panel scripts. */
     window.__espilGlobe={
-      scene:scene,earthSpin:earthSpin,
-      beginIntro:function(){introSpin=true;},
-      endIntro:function(){introSpin=false;}
+      beginEarthReveal:function(){
+        /* Cinematic pull-back: snap close to the planet, drift out to orbit. */
+        orbitDistance=2.7;targetDistance=2.7;placeCamera();
+        targetYaw+=.38;
+        targetDistance=Math.max(6.6,2.12/(Math.tan(camera.fov*Math.PI/360)*camera.aspect));
+      }
     };
     animate();
   }());
   </script>
   <script>
-  /* ESPIL Online splash: loading gate. Lottie popping letters stay huge and centered
-     until the Earth model finishes loading, then the visitor presses any key or taps to continue. */
+  /* ESPIL Online intro: starfield canvas, ESPIL ONLINE typed letter-by-letter over its
+     black shadow (3.6s). When typing completes and Earth is ready: tap or press any key
+     to continue -> the logo zooms through, the camera pulls back to Earth, BGM starts. */
   (function(){
     "use strict";
-    var splash=document.getElementById('splash');
-    var hint=document.getElementById('splash-hint');
-    var box=document.getElementById('splash-lottie');
-    var done=false, ready=false;
-    function onReady(){
-      if(ready)return; ready=true;
-      if(hint){ hint.textContent='PRESS ANY KEY OR TAP TO CONTINUE'; hint.classList.add('ready'); }
-      if(splash)splash.classList.add('ready');
+    var intro=document.getElementById('intro');
+    var logo=document.getElementById('intro-logo');
+    var typed=document.getElementById('intro-typed');
+    var cont=document.getElementById('intro-continue');
+    var canvas=document.getElementById('intro-stars');
+    var WORD='ESPIL ONLINE';
+    var TYPE_MS=300; /* 12 chars -> 3.6s */
+    var done=false,continued=false,earthReady=false,typedDone=false,idx=0;
+    var reduced=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.__espilIntroActive=true;
+    /* Starfield */
+    var stars=[],ctx=null,W=0,H=0,lastT=0;
+    function sizeStars(){
+      if(!canvas)return;
+      var dpr=Math.min(2,window.devicePixelRatio||1);
+      W=canvas.clientWidth;H=canvas.clientHeight;
+      canvas.width=W*dpr;canvas.height=H*dpr;
+      ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
     }
-    function enter(){
-      if(done||!ready||!splash)return; done=true;
-      splash.classList.add('hide');
-      window.__espilSplashDone=true;
-      try{window.dispatchEvent(new Event('espil-intro-begin'));}catch(e){}
+    function initStars(){
+      stars=[];
+      var n=Math.min(260,Math.floor(W*H/4500)),i;
+      for(i=0;i<n;i++)stars.push({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.3+.3,p:Math.random()*6.28,s:.4+Math.random()*1.2});
+    }
+    function drawStars(t){
+      if(!ctx)return;
+      ctx.clearRect(0,0,W,H);
+      var dt=Math.min(.05,(t-lastT)/1000||0);lastT=t;
+      for(var i=0;i<stars.length;i++){
+        var s=stars[i];
+        s.y+=s.s*4*dt;if(s.y>H+2){s.y=-2;s.x=Math.random()*W;}
+        ctx.globalAlpha=.55+.45*Math.sin(t*.0012+s.p);
+        ctx.fillStyle='#cfefff';
+        ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,6.283);ctx.fill();
+      }
+      ctx.globalAlpha=1;
+      if(!continued)requestAnimationFrame(drawStars);
+    }
+    /* Typewriter over the black shadow */
+    var spans=[],caret=null;
+    function buildTyped(){
+      if(!typed)return;
+      typed.innerHTML='';spans=[];
+      for(var i=0;i<WORD.length;i++){
+        var sp=document.createElement('span');
+        sp.className='ch';
+        sp.textContent=WORD[i]===' '?'\u00a0':WORD[i];
+        typed.appendChild(sp);spans.push(sp);
+      }
+      caret=document.createElement('span');
+      caret.className='caret';
+      typed.appendChild(caret);
+    }
+    function maybeShowContinue(){
+      if(typedDone&&earthReady&&!done){
+        done=true;
+        if(caret&&caret.parentNode)caret.parentNode.removeChild(caret);
+        if(cont)cont.classList.add('show');
+      }
+    }
+    function typeStep(){
+      if(idx>=spans.length){typedDone=true;maybeShowContinue();return;}
+      spans[idx].classList.add('on');
+      typed.insertBefore(caret,spans[idx+1]||null);
+      idx++;
+      setTimeout(typeStep,TYPE_MS);
+    }
+    function beginEarth(){
+      var G=window.__espilGlobe;
+      if(G&&G.beginEarthReveal)G.beginEarthReveal();
       if(window.EspilAudio&&window.EspilAudio.onReturnToOrbit)window.EspilAudio.onReturnToOrbit();
-      setTimeout(function(){ if(splash.parentNode)splash.parentNode.removeChild(splash); },700);
+    }
+    function contFn(){
+      if(continued||!done||!intro)return;continued=true;
+      window.__espilIntroActive=false;
+      intro.classList.add('zoom');
+      setTimeout(function(){
+        intro.classList.add('hide');
+        beginEarth();
+        setTimeout(function(){if(intro.parentNode)intro.parentNode.removeChild(intro);},1000);
+      },1150);
     }
     function boot(){
-      if(!splash)return;
-      splash.addEventListener('click',enter);
-      splash.addEventListener('touchend',enter,{passive:true});
-      document.addEventListener('keydown',function(e){
-        if(e.key==='Enter'||e.key===' '){ if(splash&&!splash.classList.contains('hide'))e.preventDefault(); }
-        enter();
-      });
-      if(window.__espilEarthReady)onReady();
-      else window.addEventListener('espil-earth-ready',onReady);
-      setTimeout(onReady,45000); /* failsafe: never trap the visitor */
-      if(window.lottie&&box){
-        var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        try{
-          var anim=window.lottie.loadAnimation({container:box,renderer:'svg',loop:false,autoplay:!reduce,path:'assets/espil-online-logo.json'});
-          if(reduce)anim.addEventListener('DOMLoaded',function(){anim.goToAndStop(anim.totalFrames-1,true);});
-        }catch(err){ box.innerHTML='<div class="splash-fallback">ESPIL ONLINE</div>'; }
-      }else if(box){
-        box.innerHTML='<div class="splash-fallback">ESPIL ONLINE</div>';
-      }
+      if(!intro)return;
+      sizeStars();initStars();
+      requestAnimationFrame(drawStars);
+      window.addEventListener('resize',function(){sizeStars();initStars();});
+      buildTyped();
+      if(reduced){
+        for(var i=0;i<spans.length;i++)spans[i].classList.add('on');
+        typedDone=true;maybeShowContinue();
+      }else setTimeout(typeStep,600);
+      if(window.__espilEarthReady){earthReady=true;maybeShowContinue();}
+      else window.addEventListener('espil-earth-ready',function(){earthReady=true;maybeShowContinue();});
+      setTimeout(function(){earthReady=true;maybeShowContinue();},45000);
+      intro.addEventListener('click',contFn);
+      intro.addEventListener('touchend',function(e){e.preventDefault();contFn();},{passive:false});
+      intro.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' ')e.preventDefault();contFn();});
+      document.addEventListener('keydown',function(){contFn();});
     }
     if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);
     else boot();
-  }());
-  </script>
-  <script>
-  /* ESPIL Online intro cinematic: the globe spins like a terrestrial globe with an
-     ESPIL ONLINE letter ring anchored to it, over the starfield. When the animation
-     finishes, the visitor presses any key or taps to reach the city screen. */
-  (function(){
-    "use strict";
-    var prompt=document.getElementById('intro-prompt');
-    var cityUI=document.getElementById('city-status');
-    var begun=false,ended=false,ring=null,ringMats=[];
-    var INTRO_MS=10000;
-    var reduced=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    function letterTexture(ch){
-      var c=document.createElement('canvas');c.width=c.height=256;
-      var x=c.getContext('2d');
-      x.font='900 150px "Arial Black","Arial",sans-serif';
-      x.textAlign='center';x.textBaseline='middle';
-      x.shadowColor='rgba(64,255,205,.95)';x.shadowBlur=34;
-      x.fillStyle='#7dfce6';x.fillText(ch,128,142);
-      x.shadowBlur=0;x.fillStyle='#f2fffc';x.fillText(ch,128,142);
-      var t=new THREE.CanvasTexture(c);t.anisotropy=4;return t;
-    }
-    function buildRing(){
-      var G=window.__espilGlobe;
-      if(!G||!window.THREE||ring)return;
-      var word='ESPIL ONLINE',n=word.length,R=3.4;
-      ring=new THREE.Group();
-      var a0=Math.PI/2-(2.5/n)*Math.PI*2;
-      for(var i=0;i<n;i++){
-        var ch=word[i];if(ch===' ')continue;
-        var m=new THREE.SpriteMaterial({map:letterTexture(ch),transparent:true,opacity:0,depthWrite:false});
-        var sp=new THREE.Sprite(m);sp.scale.set(.66,.66,1);
-        var a=a0+(i/n)*Math.PI*2;
-        sp.position.set(Math.cos(a)*R,0,Math.sin(a)*R);
-        ring.add(sp);ringMats.push(m);
-      }
-      ring.rotation.x=-.35;ring.rotation.z=.12;
-      G.earthSpin.add(ring);
-    }
-    function fadeRing(dir,done){
-      var start=performance.now();
-      (function step(){
-        var t=Math.min(1,(performance.now()-start)/1200);
-        var v=dir>0?t:1-t,i;
-        for(i=0;i<ringMats.length;i++)ringMats[i].opacity=v;
-        if(t<1)requestAnimationFrame(step);else if(done)done();
-      }());
-    }
-    function showPrompt(){
-      if(ended||!prompt)return;
-      prompt.setAttribute('aria-hidden','false');
-      prompt.classList.add('show');
-    }
-    function begin(){
-      if(begun)return;begun=true;
-      window.__espilIntroActive=true;
-      var G=window.__espilGlobe;
-      if(cityUI)cityUI.classList.add('intro-hidden');
-      if(reduced){showPrompt();return;}
-      buildRing();
-      if(G)G.beginIntro();
-      fadeRing(1);
-      setTimeout(showPrompt,INTRO_MS);
-    }
-    function end(){
-      if(ended||!begun)return;ended=true;
-      window.__espilIntroActive=false;
-      var G=window.__espilGlobe;
-      if(prompt){prompt.classList.remove('show');prompt.setAttribute('aria-hidden','true');}
-      if(cityUI)cityUI.classList.remove('intro-hidden');
-      if(G)G.endIntro();
-      if(ring)fadeRing(-1,function(){if(ring.parentNode)ring.parentNode.removeChild(ring);ring=null;});
-    }
-    window.addEventListener('espil-intro-begin',begin);
-    if(window.__espilSplashDone)begin();
-    if(prompt){
-      prompt.addEventListener('click',end);
-      prompt.addEventListener('touchend',function(e){e.preventDefault();end();},{passive:false});
-    }
-    document.addEventListener('keydown',function(){end();});
   }());
   </script>
   <script>
