@@ -734,6 +734,9 @@
       marble:new THREE.MeshPhongMaterial({color:0xe9e4d8,specular:0xffffff,shininess:48}),
       rust:new THREE.MeshPhongMaterial({color:0xa8503a,specular:0xd88a63,shininess:55}),
       white:new THREE.MeshPhongMaterial({color:0xf2efe6,specular:0xffffff,shininess:60}),
+      terracotta:new THREE.MeshPhongMaterial({color:0xb5654a,specular:0xd89a7a,shininess:40}),
+      crimson:new THREE.MeshPhongMaterial({color:0xc0392b,specular:0xff8a70,shininess:55}),
+      deepTeal:new THREE.MeshPhongMaterial({color:0x1f6f6b,specular:0x7fd4d0,shininess:70}),
       glow:new THREE.MeshBasicMaterial({color:0x8ff4e8,transparent:true,opacity:.82,depthWrite:false})
     };
     function landmarkModel(type){
@@ -754,21 +757,22 @@
       var base=cylinder(.46,.5,.12,0,.06,0,landmarkMats.dark,24);
       var ring=add(new THREE.TorusGeometry(.41,.028,8,32),landmarkMats.glow,0,.125,0,Math.PI/2,0,0);
       if(type==='pyramid'){
-        /* Stepped pyramid: five tiers + capstone */
+        /* Stepped pyramid: five tiers in alternating stone tones + gold capstone */
         var w=.72;
-        for(var pi=0;pi<5;pi++){box(w,.13,w,0,.19+pi*.13,0,landmarkMats.pale);w-=.115;}
+        for(var pi=0;pi<5;pi++){box(w,.13,w,0,.19+pi*.13,0,pi%2?landmarkMats.marble:landmarkMats.pale);w-=.115;}
         box(.09,.09,.09,0,.87,0,landmarkMats.gold);
       }else if(type==='mountain'){
-        /* Table Mountain: flat-topped mesa + tablecloth cloud */
-        cylinder(.42,.5,.36,0,.3,0,landmarkMats.stone,9);
-        cylinder(.34,.42,.1,0,.5,0,landmarkMats.stone,9);
+        /* Table Mountain: flat-topped mesa, terracotta strata + tablecloth cloud */
+        cylinder(.42,.5,.3,0,.27,0,landmarkMats.stone,9);
+        cylinder(.36,.44,.09,0,.44,0,landmarkMats.terracotta,9);
+        cylinder(.34,.36,.08,0,.52,0,landmarkMats.stone,9);
         add(new THREE.CylinderGeometry(.4,.44,.07,24),new THREE.MeshBasicMaterial({color:0xe6edef,transparent:true,opacity:.88}),0,.56,0);
       }else if(type==='sails'){
         /* Shell roofs in a rising row on a stepped podium */
         box(.84,.09,.44,0,.165,0,landmarkMats.steel);box(.7,.08,.38,0,.25,0,landmarkMats.pale);
         var sh=[[-.3,.42],[ -.1,.58],[.12,.74],[.32,.58]],si;
         for(si=0;si<sh.length;si++){
-          var s=cone(.15,sh[si][1],sh[si][0],.29+sh[si][1]/2,0,landmarkMats.pale,10);
+          var s=cone(.15,sh[si][1],sh[si][0],.29+sh[si][1]/2,0,si%2?landmarkMats.white:landmarkMats.pale,10);
           s.scale.z=.38;s.rotation.z=-.12;
         }
       }else if(type==='bridge'){
@@ -795,7 +799,7 @@
         cylinder(.34,.38,.1,0,.16,0,landmarkMats.dark,5);
       }else if(type==='tower'){
         /* Willis Tower: bundled tubes of varying heights */
-        box(.3,.92,.3,-.08,.58,0,landmarkMats.glass);box(.24,.74,.24,.14,.49,.02,landmarkMats.glass);
+        box(.3,.92,.3,-.08,.58,0,landmarkMats.glass);box(.24,.74,.24,.14,.49,.02,landmarkMats.deepTeal);
         box(.2,.58,.2,-.02,.41,-.14,landmarkMats.glass);
         rod(-.08,1.04,0,-.08,1.3,0,.02,landmarkMats.gold);rod(.14,.86,.02,.14,1.12,.02,.015,landmarkMats.steel);
       }else if(type==='needle'||type==='spire'){
@@ -822,7 +826,7 @@
         /* Tapered shaft on stepped base, gold orb */
         box(.4,.09,.4,0,.165,0,landmarkMats.pale);box(.3,.09,.3,0,.25,0,landmarkMats.pale);
         cylinder(.09,.14,.8,0,.7,0,landmarkMats.pale,4);
-        cone(.09,.12,0,1.16,0,landmarkMats.pale,4);
+        cone(.09,.12,0,1.16,0,landmarkMats.gold,4);
         sphere(.05,0,1.26,0,landmarkMats.gold);
       }else if(type==='clock'){
         /* Big Ben: tower, clock face with hands, spire */
@@ -836,10 +840,10 @@
         /* Eiffel Tower: four arched legs, two platforms, spire */
         var ex,ez;
         for(ex=-1;ex<=1;ex+=2)for(ez=-1;ez<=1;ez+=2)rod(ex*.28,.14,ez*.13,ex*.1,.56,ez*.05,.042,landmarkMats.bronze);
-        box(.42,.06,.3,0,.56,0,landmarkMats.bronze);
+        box(.42,.06,.3,0,.56,0,landmarkMats.dark);
         for(ex=-1;ex<=1;ex+=2)for(ez=-1;ez<=1;ez+=2)rod(ex*.1,.56,ez*.05,ex*.03,.94,0,.03,landmarkMats.bronze);
-        box(.2,.05,.17,0,.94,0,landmarkMats.bronze);
-        rod(0,.94,0,0,1.22,0,.022,landmarkMats.bronze);
+        box(.2,.05,.17,0,.94,0,landmarkMats.dark);
+        rod(0,.94,0,0,1.22,0,.022,landmarkMats.gold);
       }else if(type==='liberty'){
         /* Statue of Liberty: robe, crown spikes, raised torch */
         cylinder(.2,.27,.28,0,.26,0,landmarkMats.stone,12);
@@ -901,7 +905,7 @@
       }else if(type==='colosseum'){
         /* Elliptical tiers */
         var c1=cylinder(.46,.48,.17,0,.2,0,landmarkMats.stone,28);c1.scale.z=.78;
-        var c2=cylinder(.4,.43,.17,0,.37,0,landmarkMats.stone,28);c2.scale.z=.78;
+        var c2=cylinder(.4,.43,.17,0,.37,0,landmarkMats.terracotta,28);c2.scale.z=.78;
         var c3=cylinder(.33,.37,.16,0,.53,0,landmarkMats.stone,28);c3.scale.z=.78;
         add(new THREE.CylinderGeometry(.3,.3,.2,24),new THREE.MeshBasicMaterial({color:0x071013}),0,.5,0).scale.z=.78;
       }else if(type==='theatre'){
@@ -953,8 +957,8 @@
         var prow=box(.14,.24,.24,.4,.3,0,landmarkMats.bronze);prow.rotation.z=-.5;
         cylinder(.035,.035,.8,-.12,.62,0,landmarkMats.bronze,8);
         cylinder(.035,.035,.66,.22,.55,0,landmarkMats.bronze,8);
-        var js1=box(.34,.4,.02,-.12,.72,0,landmarkMats.pale);js1.rotation.y=.15;
-        var js2=box(.28,.32,.02,.22,.62,0,landmarkMats.pale);js2.rotation.y=.15;
+        var js1=box(.34,.4,.02,-.12,.72,0,landmarkMats.terracotta);js1.rotation.y=.15;
+        var js2=box(.28,.32,.02,.22,.62,0,landmarkMats.terracotta);js2.rotation.y=.15;
       }else if(type==='torii'){
         box(.1,.88,.12,-.3,.57,0,landmarkMats.vermillion);box(.1,.88,.12,.3,.57,0,landmarkMats.vermillion);
         box(.84,.1,.16,0,.91,0,landmarkMats.vermillion);box(1,.08,.14,0,1.05,0,landmarkMats.vermillion);
@@ -1214,6 +1218,7 @@
       var halo=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,transparent:true,opacity:.5,blending:THREE.AdditiveBlending,depthWrite:false}));
       halo.scale.setScalar(.38);
       halo.position.copy(marker.position);
+      marker.userData.halo=halo;
       markerGroup.add(halo);
     });
 
@@ -1428,9 +1433,9 @@
     if(infoBack)infoBack.addEventListener('click',function(){if(window.EspilAudio&&window.EspilAudio.pop)window.EspilAudio.pop();clearSelection(true);});
     function zoomBy(delta){
       hasInteracted=true;
-      /* While a city zoom is applied, manual zoom-out is locked: only ESC backs out. */
-      if(selected&&delta>0){
-        if(window.__espilToast)window.__espilToast('City zoom is locked \u2014 press ESC to zoom out');
+      /* During city zoom, all manual zoom is locked: arrows switch city, Enter confirms, ESC exits. */
+      if(selected&&!cityPhaseActive){
+        if(window.__espilToast)window.__espilToast('Zoom locked \u2014 arrows switch city, ESC exits');
         return;
       }
       targetDistance=Math.max(minDistance,Math.min(maxDistance,targetDistance+delta));
@@ -1455,8 +1460,9 @@
           if(selected&&cityPhaseActive){
             navigationHeading.applyAxisAngle(navigationNormal,-dx*.0045).normalize();
             targetDistance=Math.max(minDistance,Math.min(3.38,targetDistance+dy*.004));
+          }else if(selected){
+            /* City zoom is locked: swipes don't change the view. Arrows switch city, Enter confirms, ESC exits. */
           }else{
-            if(selected)clearSelection();
             targetYaw-=dx*.006;
             targetPitch=Math.max(-1.28,Math.min(1.28,targetPitch+dy*.0045));
           }
@@ -1467,7 +1473,7 @@
     canvas.addEventListener('pointerup',function(event){
       dragging=false;canvas.classList.remove('is-dragging');canvas.releasePointerCapture(event.pointerId);
       if(!moved){if(window.__espilIntroActive)return;var hit=pick(event);if(hit)selectCity(hit.object);}
-      else if(!window.__espilIntroActive&&!cityPhaseActive){
+      else if(!window.__espilIntroActive&&!cityPhaseActive&&!selected){
         /* The text div always matches the map: after a manual rotate, re-sync the reel. */
         var facing=nearestFacingMarker();
         if(facing&&facing!==centeredMarker){centerReel(facing,false);navIndex=markers.indexOf(facing);}
@@ -1503,8 +1509,9 @@
         marker.getWorldPosition(worldPoint);
         var facing=worldPoint.clone().normalize().dot(cameraDirection)>.08;
         marker.visible=!cityPhaseActive&&facing;
-        /* Constant landmark size regardless of zoom; hover keeps a touch of feedback. */
-        if(marker!==hovered)marker.scale.setScalar(marker.userData.baseScale);
+        /* Constant landmark size regardless of zoom; half size while its city is zoomed. */
+        if(marker!==hovered)marker.scale.setScalar(marker.userData.baseScale*(marker===selected?.5:1));
+        if(marker.userData.halo)marker.userData.halo.scale.setScalar(marker===selected?.19:.38);
       });
       if(aurora.visible){
         var at=performance.now()*.001;
