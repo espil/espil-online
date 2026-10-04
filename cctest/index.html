@@ -178,6 +178,7 @@ function buildHair(style) {
   const t = tex(HAIRS[style].front);
   hairSprite = makeBillboard(HAIR_SIZE.front[0], HAIR_SIZE.front[1], t);
   hairSprite.renderOrder = 11;
+  hairSprite.position.set(HEAD_C[0], HEAD_C[1]+0.05, HEAD_C[2]);
   scene.add(hairSprite);
   curView = ''; // force texture refresh
   refreshHairUI();
@@ -189,6 +190,7 @@ function buildEyes(style, color) {
   const t = tex(EYES[style].front);
   eyeSprite = makeBillboard(EYE_SIZE.front[0], EYE_SIZE.front[1], t);
   eyeSprite.renderOrder = 10;
+  eyeSprite.position.set(HEAD_C[0], HEAD_C[1]-0.02, HEAD_C[2]);
   scene.add(eyeSprite);
   curView = ''; // force texture refresh
   refreshEyeUI();
@@ -196,8 +198,9 @@ function buildEyes(style, color) {
 
 const _hp = new THREE.Vector3();
 function updateSprites() {
-  if (!headBone || !hairSprite) return;
-  headBone.getWorldPosition(_hp);
+  if (!hairSprite) return;
+  // Use fixed head position (HEAD_C) instead of bone - more reliable
+  _hp.set(HEAD_C[0], HEAD_C[1], HEAD_C[2]);
   // hair slightly above head center, eyes at face level
   hairSprite.position.set(_hp.x, _hp.y+0.05, _hp.z);
   if (eyeSprite) eyeSprite.position.set(_hp.x, _hp.y-0.02, _hp.z);
