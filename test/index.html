@@ -90,8 +90,8 @@
       <div class="quest">방향키 또는 조이스틱으로 신호탑에 접근하세요</div>
       <div class="state-pill">STATE · <span id="animState">IDLE</span></div>
       <div class="curvature-control">
-        <div class="curve-axis"><label for="curveControl">XZ-곡률 <output id="curveValue">55</output></label><input id="curveControl" type="range" min="0" max="100" value="55" aria-label="XZ 평면 곡률 강도"></div>
-        <div class="curve-axis"><label for="yCurveControl">Y-곡률 <output id="yCurveValue">55</output></label><input id="yCurveControl" type="range" min="0" max="100" value="55" aria-label="수직 오브젝트 Y축 곡률 강도"></div>
+        <div class="curve-axis"><label for="curveControl">X-곡률 (좌우) <output id="curveValue">55</output></label><input id="curveControl" type="range" min="0" max="100" value="55" aria-label="좌우 방향 월드 곡률 강도"></div>
+        <div class="curve-axis"><label for="yCurveControl">Y-곡률 (상하) <output id="yCurveValue">55</output></label><input id="yCurveControl" type="range" min="0" max="100" value="55" aria-label="상하 방향 월드 곡률 강도"></div>
       </div>
       <div class="geo-panel"><div class="geo-label" id="geoLabel">META GEO · VANCOUVER</div><div id="metaMap"></div></div>
       <div class="event-log" id="eventLog"><div>RPGWorld initialized</div><div>30km tile metadata generated</div></div>
@@ -175,7 +175,9 @@
       draw(ctx,world,size,vw,vh){
         const cam=world.camera,cols=Math.ceil(vw/size/2)+5,rows=Math.ceil(vh/(size*.7)/2)+7;
         const sx=Math.max(0,Math.floor(cam.x-cols)),ex=Math.min(this.w,Math.ceil(cam.x+cols));
-        const sy=Math.max(0,Math.floor(cam.y-rows)),ey=Math.min(this.h,Math.ceil(cam.y+rows));
+        // The forward edge is deliberately finite: its projected top edge becomes the curved horizon.
+        const horizonRows=Math.min(rows,Math.max(10,Math.round(vh/(size*.7)*.46)));
+        const sy=Math.max(0,Math.floor(cam.y-horizonRows)),ey=Math.min(this.h,Math.ceil(cam.y+rows));
         const colors={grass:'#5f9960',forest:'#397454',water:'#3a88aa',road:'#98a39d',dirt:'#9a744d',urban:'#d2c9ad'};
         ctx.lineJoin='round';
         for(let y=sy;y<ey;y++)for(let x=sx;x<ex;x++){
@@ -183,24 +185,36 @@
           ctx.beginPath();ctx.moveTo(p00.x,p00.y);ctx.lineTo(p10.x,p10.y);ctx.lineTo(p11.x,p11.y);ctx.lineTo(p01.x,p01.y);ctx.closePath();ctx.fillStyle=colors[t.type];ctx.fill();ctx.strokeStyle='rgba(20,47,37,.13)';ctx.lineWidth=1;ctx.stroke();
           const v=(x*13+y*17)%7,center=world.project(x+.5,y+.5,vw,vh),scale=world.scaleAt(x+.5,y+.5,vw);
           if(t.type==='water'){const a=world.project(x+.18,y+.38,vw,vh),b=world.project(x+.82,y+.38,vw,vh);ctx.strokeStyle='rgba(208,244,255,.36)';ctx.beginPath();ctx.moveTo(a.x,a.y+v*.25);ctx.lineTo(b.x,b.y+v*.25);ctx.stroke()}
-          else if(t.type==='forest'&&v<3){ctx.fillStyle='rgba(20,55,38,.2)';ctx.beginPath();ctx.ellipse(center.x,center.y+5*scale,9*scale,3.5*scale,0,0,Math.PI*2);ctx.fill();ctx.save();world.applyVerticalTilt(ctx,center,.78);ctx.fillStyle='#684c32';ctx.fillRect(-1.8*scale,-12*scale,3.6*scale,13*scale);ctx.fillStyle='#22583d';ctx.beginPath();ctx.arc(0,-14*scale,7*scale,0,Math.PI*2);ctx.fill();ctx.restore()}
+          else if(t.type==='forest'&&v<3){ctx.fillStyle='rgba(20,55,38,.2)';ctx.beginPath();ctx.ellipse(center.x,center.y+5*scale,9*scale,3.5*scale,0,0,Math.PI*2);ctx.fill();ctx.save();ctx.translate(center.x,center.y);ctx.fillStyle='#684c32';ctx.fillRect(-1.8*scale,-12*scale,3.6*scale,13*scale);ctx.fillStyle='#22583d';ctx.beginPath();ctx.arc(0,-14*scale,7*scale,0,Math.PI*2);ctx.fill();ctx.restore()}
           else if(t.type==='road'){const a=world.project(x,y+.5,vw,vh),b=world.project(x+1,y+.5,vw,vh);ctx.strokeStyle='rgba(246,232,181,.6)';ctx.setLineDash([6,7]);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.setLineDash([])}
-          else if(t.type==='urban'){const a=world.project(x+.16,y+.16,vw,vh),b=world.project(x+.84,y+.16,vw,vh),c=world.project(x+.84,y+.84,vw,vh),d=world.project(x+.16,y+.84,vw,vh);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineTo(c.x,c.y);ctx.lineTo(d.x,d.y);ctx.closePath();ctx.fillStyle=t.blocked?'#d5ccb4':'#b9b8a7';ctx.fill();if(t.blocked){ctx.strokeStyle='rgba(73,70,58,.28)';ctx.stroke();ctx.save();world.applyVerticalTilt(ctx,center,.68);const bw=21*scale,bh=(18+v*2)*scale;ctx.fillStyle='#b7aa8d';ctx.fillRect(-bw/2,-bh,bw,bh);ctx.fillStyle='#eee7d1';ctx.beginPath();ctx.moveTo(-bw/2,-bh);ctx.lineTo(0,-bh-6*scale);ctx.lineTo(bw/2,-bh);ctx.closePath();ctx.fill();ctx.strokeStyle='rgba(73,70,58,.26)';ctx.strokeRect(-bw/2,-bh,bw,bh);ctx.restore()}}
+          else if(t.type==='urban'){const a=world.project(x+.16,y+.16,vw,vh),b=world.project(x+.84,y+.16,vw,vh),c=world.project(x+.84,y+.84,vw,vh),d=world.project(x+.16,y+.84,vw,vh);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineTo(c.x,c.y);ctx.lineTo(d.x,d.y);ctx.closePath();ctx.fillStyle=t.blocked?'#d5ccb4':'#b9b8a7';ctx.fill();if(t.blocked){ctx.strokeStyle='rgba(73,70,58,.28)';ctx.stroke();ctx.save();ctx.translate(center.x,center.y);const bw=21*scale,bh=(18+v*2)*scale;ctx.fillStyle='#b7aa8d';ctx.fillRect(-bw/2,-bh,bw,bh);ctx.fillStyle='#eee7d1';ctx.beginPath();ctx.moveTo(-bw/2,-bh);ctx.lineTo(0,-bh-6*scale);ctx.lineTo(bw/2,-bh);ctx.closePath();ctx.fill();ctx.strokeStyle='rgba(73,70,58,.26)';ctx.strokeRect(-bw/2,-bh,bw,bh);ctx.restore()}}
           else if(t.type==='dirt'&&v<2){ctx.fillStyle='rgba(83,55,33,.26)';ctx.beginPath();ctx.arc(center.x,center.y,2.2*scale,0,Math.PI*2);ctx.fill()}
         }
       }
     }
     class CollisionLayer{constructor(layer){this.layer=layer}canEnter(x,y){const t=this.layer.at(x,y);return !!t&&!t.blocked}metadata(x,y){const t=this.layer.at(x,y);return t?{blocked:t.blocked,terrain:t.type,swimmable:t.swim}:null}}
-    class ObjectLayer{draw(ctx,world,size,vw,vh){const p=world.project(40,22,vw,vh,world.yCurvature),scale=world.scaleAt(40,22,vw);ctx.fillStyle='rgba(240,198,79,.18)';ctx.beginPath();ctx.ellipse(p.x,p.y,22*scale,7*scale,0,0,Math.PI*2);ctx.fill();ctx.save();world.applyVerticalTilt(ctx,p,.88);ctx.fillStyle='#173f30';ctx.fillRect(-3*scale,-13*scale,6*scale,25*scale);ctx.fillStyle='#f0c64f';ctx.beginPath();ctx.arc(0,-24*scale,13*scale+Math.sin(world.time*3)*2,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#fff4a4';ctx.lineWidth=3*scale;ctx.stroke();ctx.restore()}}
+    class ObjectLayer{draw(ctx,world,size,vw,vh){const p=world.project(40,22,vw,vh),scale=world.scaleAt(40,22,vw);ctx.fillStyle='rgba(240,198,79,.18)';ctx.beginPath();ctx.ellipse(p.x,p.y,22*scale,7*scale,0,0,Math.PI*2);ctx.fill();ctx.save();ctx.translate(p.x,p.y);ctx.fillStyle='#173f30';ctx.fillRect(-3*scale,-13*scale,6*scale,25*scale);ctx.fillStyle='#f0c64f';ctx.beginPath();ctx.arc(0,-24*scale,13*scale+Math.sin(world.time*3)*2,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#fff4a4';ctx.lineWidth=3*scale;ctx.stroke();ctx.restore()}}
     class RPGWorld{
-      constructor(canvas,cfg,city){this.canvas=canvas;this.ctx=canvas.getContext('2d');this.cfg=cfg;this.city=city;this.layer=new TileLayer(64,64,city.seed);this.collision=new CollisionLayer(this.layer);this.objects=new ObjectLayer();this.player={x:32,y:34};this.camera={x:32,y:34};this.animator=new CharacterAnimator();this.keys={};this.joy={x:0,y:0};this.time=0;this.last=performance.now();this.effects=[];this.size=46;this.curvature=.55;this.yCurvature=.55;this.running=true;this.resize();addEventListener('resize',()=>this.resize())}
+      constructor(canvas,cfg,city){this.canvas=canvas;this.ctx=canvas.getContext('2d');this.cfg=cfg;this.city=city;this.layer=new TileLayer(64,64,city.seed);this.collision=new CollisionLayer(this.layer);this.objects=new ObjectLayer();this.player={x:32,y:34};this.camera={x:32,y:34};this.animator=new CharacterAnimator();this.keys={};this.joy={x:0,y:0};this.time=0;this.last=performance.now();this.effects=[];this.size=46;this.xCurvature=.55;this.yCurvature=.55;this.running=true;this.resize();addEventListener('resize',()=>this.resize())}
       resize(){const d=Math.min(devicePixelRatio||1,2),r=this.canvas.getBoundingClientRect();this.canvas.width=Math.floor(r.width*d);this.canvas.height=Math.floor(r.height*d);this.dpr=d}
-      project(wx,wy,vw,vh,yCurve=this.yCurvature){const dx=(wx-this.camera.x)*this.size,dy=(wy-this.camera.y)*this.size;const bend=this.curvature*((dx*dx)/(Math.max(540,vw)*1.12)+(dy*dy)/(Math.max(480,vh)*5.1));const x=vw/2+dx,y=vh*.52+dy*.70+bend,cx=vw/2,cy=vh*.52,rx=x-cx,ry=y-cy,maxDist=Math.max(1,Math.hypot(vw/2,vh*.52)),dist=Math.min(maxDist,Math.hypot(rx,ry)),tilt=(Math.max(0,Math.min(1,yCurve)))*(dist/maxDist),inv=dist?1/dist:0;return{x,y,yTiltX:tilt*rx*inv,yTiltY:tilt*ry*inv}}
-      applyVerticalTilt(ctx,p,strength){ctx.translate(p.x,p.y);const amount=strength==null?1:strength;ctx.transform(1,0,-p.yTiltX*amount,1-p.yTiltY*amount*.42,0,0)}
-      scaleAt(wx,wy,vw){const dx=Math.abs((wx-this.camera.x)*this.size);return Math.max(.72,1-Math.min(.28,dx/Math.max(700,vw)*.3))}
+      anchorY(vh){return vh*.72}
+      project(wx,wy,vw,vh){
+        const dx=(wx-this.camera.x)*this.size,dy=(wy-this.camera.y)*this.size*.70;
+        // Keep the ground immediately around the player level, then curl distant tiles upward.
+        // Circular-arc lift avoids the old downward parabola / bowl effect.
+        const lateral=Math.max(0,Math.abs(dx)-this.size*1.45);
+        const forward=Math.max(0,-dy-this.size*.72);
+        const radiusX=Math.max(460,vw*.68),radiusY=Math.max(420,vh*.72);
+        const thetaX=Math.min(1.18,lateral/radiusX),thetaY=Math.min(1.22,forward/radiusY);
+        const liftX=this.xCurvature*radiusX*(1-Math.cos(thetaX))*.82;
+        const liftY=this.yCurvature*radiusY*(1-Math.cos(thetaY))*1.85;
+        const depthNarrow=1-Math.min(.15,forward/(radiusY*3.3))*this.yCurvature;
+        return{x:vw/2+dx*depthNarrow,y:this.anchorY(vh)+dy-liftX-liftY}
+      }
+      scaleAt(wx,wy,vw){const dx=Math.abs((wx-this.camera.x)*this.size),forward=Math.max(0,(this.camera.y-wy)*this.size*.70);return Math.max(.68,1-Math.min(.32,(dx/Math.max(760,vw)*.18)+(forward/620*.22)))}
       input(){let x=(this.keys.ArrowRight?1:0)-(this.keys.ArrowLeft?1:0)+this.joy.x,y=(this.keys.ArrowDown?1:0)-(this.keys.ArrowUp?1:0)+this.joy.y;const l=Math.hypot(x,y);return l>.05?{x:x/l,y:y/l,mag:Math.min(1,l)}:{x:0,y:0,mag:0}}
-      update(dt){this.time+=dt;const i=this.input();if(i.mag){const held=this.moveSince?(performance.now()-this.moveSince):0;if(!this.moveSince)this.moveSince=performance.now();const running=held>700,speed=running?4.2:2.6,nx=this.player.x+i.x*speed*dt,ny=this.player.y+i.y*speed*dt;if(this.collision.canEnter(nx,ny)){this.player.x=nx;this.player.y=ny}if(Math.abs(i.x)>Math.abs(i.y)){this.animator.direction=i.x<0?'left':'right'}else if(Math.abs(i.y)>.05){this.animator.direction=i.y<0?'back':'front'}const meta=this.collision.metadata(this.player.x,this.player.y);this.animator.state=meta&&meta.swimmable?'swim':running?'run':'walk'}else{this.moveSince=0;if(!['attack','jump','down'].includes(this.animator.state)||this.animator.t>.55)this.animator.state='idle'}this.animator.update(dt);this.camera.x+=(this.player.x-this.camera.x)*Math.min(1,dt*4);this.camera.y+=(this.player.y-this.camera.y)*Math.min(1,dt*4);this.effects=this.effects.filter(e=>(e.t-=dt)>0)}
-      draw(){const c=this.ctx,d=this.dpr,vw=this.canvas.width/d,vh=this.canvas.height/d;c.setTransform(d,0,0,d,0,0);c.clearRect(0,0,vw,vh);const sky=c.createLinearGradient(0,0,0,vh);sky.addColorStop(0,'#b9d8cc');sky.addColorStop(.42,'#6f9f89');sky.addColorStop(1,'#274a3a');c.fillStyle=sky;c.fillRect(0,0,vw,vh);c.strokeStyle='rgba(226,249,237,.22)';c.lineWidth=2;c.beginPath();c.moveTo(-20,vh*.31);c.quadraticCurveTo(vw/2,vh*.13,vw+20,vh*.31);c.stroke();this.layer.draw(c,this,this.size,vw,vh);this.objects.draw(c,this,this.size,vw,vh);const playerPoint=this.project(this.player.x,this.player.y,vw,vh),px=playerPoint.x,py=playerPoint.y;renderer.draw(c,px,py-14,.62,this.cfg,this.animator);this.effects.forEach(e=>{c.globalAlpha=e.t/.55;c.strokeStyle=e.color;c.lineWidth=6;c.beginPath();c.arc(px,py,35+(1-e.t/.55)*90,0,Math.PI*2);c.stroke();c.globalAlpha=1});const edge=c.createRadialGradient(vw/2,vh*.48,Math.min(vw,vh)*.22,vw/2,vh*.5,Math.max(vw,vh)*.72);edge.addColorStop(0,'rgba(5,20,14,0)');edge.addColorStop(1,'rgba(5,20,14,.18)');c.fillStyle=edge;c.fillRect(0,0,vw,vh)}
+      update(dt){this.time+=dt;const i=this.input();if(i.mag){const held=this.moveSince?(performance.now()-this.moveSince):0;if(!this.moveSince)this.moveSince=performance.now();const running=held>700,speed=running?4.2:2.6,nx=this.player.x+i.x*speed*dt,ny=this.player.y+i.y*speed*dt;if(this.collision.canEnter(nx,ny)){this.player.x=nx;this.player.y=ny}if(Math.abs(i.x)>Math.abs(i.y)){this.animator.direction=i.x<0?'left':'right'}else if(Math.abs(i.y)>.05){this.animator.direction=i.y<0?'back':'front'}const meta=this.collision.metadata(this.player.x,this.player.y);this.animator.state=meta&&meta.swimmable?'swim':running?'run':'walk'}else{this.moveSince=0;if(!['attack','jump','down'].includes(this.animator.state)||this.animator.t>.55)this.animator.state='idle'}this.animator.update(dt);this.camera.x=this.player.x;this.camera.y=this.player.y;this.effects=this.effects.filter(e=>(e.t-=dt)>0)}
+      draw(){const c=this.ctx,d=this.dpr,vw=this.canvas.width/d,vh=this.canvas.height/d;c.setTransform(d,0,0,d,0,0);c.clearRect(0,0,vw,vh);const sky=c.createLinearGradient(0,0,0,vh);sky.addColorStop(0,'#b9d8cc');sky.addColorStop(.42,'#6f9f89');sky.addColorStop(1,'#274a3a');c.fillStyle=sky;c.fillRect(0,0,vw,vh);this.layer.draw(c,this,this.size,vw,vh);this.objects.draw(c,this,this.size,vw,vh);const px=vw/2,py=this.anchorY(vh);renderer.draw(c,px,py-14,.62,this.cfg,this.animator);this.effects.forEach(e=>{c.globalAlpha=e.t/.55;c.strokeStyle=e.color;c.lineWidth=6;c.beginPath();c.arc(px,py,35+(1-e.t/.55)*90,0,Math.PI*2);c.stroke();c.globalAlpha=1});const edge=c.createRadialGradient(vw/2,vh*.56,Math.min(vw,vh)*.2,vw/2,vh*.56,Math.max(vw,vh)*.75);edge.addColorStop(0,'rgba(5,20,14,0)');edge.addColorStop(1,'rgba(5,20,14,.18)');c.fillStyle=edge;c.fillRect(0,0,vw,vh)}
       loop(now){if(!this.running)return;const dt=Math.min(.034,(now-this.last)/1000);this.last=now;this.update(dt);this.draw();$('#coords').textContent=(this.player.x-32).toFixed(1)+' · '+(this.player.y-34).toFixed(1);$('#animState').textContent=this.animator.state.toUpperCase();requestAnimationFrame(t=>this.loop(t))}
       skill(name,color,state){this.animator.set(state);this.animator.flash=.28;this.effects.push({t:.55,color});log(name+' activated')}
     }
@@ -228,7 +242,7 @@
       requestAnimationFrame(t=>world.loop(t));log(city.name+' 30km RPG layer initialized');
     }
     const curveControl=$('#curveControl'),curveValue=$('#curveValue'),yCurveControl=$('#yCurveControl'),yCurveValue=$('#yCurveValue');
-    curveControl.addEventListener('input',()=>{curveValue.textContent=curveControl.value;if(world)world.curvature=Number(curveControl.value)/100});
+    curveControl.addEventListener('input',()=>{curveValue.textContent=curveControl.value;if(world)world.xCurvature=Number(curveControl.value)/100});
     yCurveControl.addEventListener('input',()=>{yCurveValue.textContent=yCurveControl.value;if(world)world.yCurvature=Number(yCurveControl.value)/100});
     startGame(selectedCity);
   })();

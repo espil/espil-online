@@ -1,7 +1,6 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <!-- espil-online deploy 2026-10-04 v12 full -->
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="color-scheme" content="dark" />
@@ -182,234 +181,11 @@
     @media (prefers-reduced-motion:reduce) {
       #globe-canvas { scroll-behavior:auto; }
     }
-
-    /* ---- Brand logo ---- */
-    .topbar {
-      position:absolute; z-index:10; top:0; left:0; right:0;
-      display:flex; align-items:flex-start; justify-content:flex-end;
-      padding:calc(14px + env(safe-area-inset-top)) 18px 0;
-      pointer-events:none;
-    }
-    .topbar-actions { display:flex; gap:10px; pointer-events:auto; }
-    .pill-btn {
-      appearance:none; border:1px solid rgba(134,238,228,.32); border-radius:999px;
-      padding:9px 16px; color:#ddfffc; background:rgba(4,16,20,.66);
-      font:700 .68rem/1 "Manrope",sans-serif; letter-spacing:.14em; cursor:pointer;
-      backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
-      transition:border-color .18s,background .18s,box-shadow .18s;
-    }
-    .pill-btn:hover,.pill-btn:focus-visible { border-color:var(--signal); background:rgba(14,42,47,.8); box-shadow:0 0 16px rgba(80,232,220,.25); outline:none; }
-
-    /* ---- Sign-in modal ---- */
-    .modal-backdrop {
-      position:absolute; z-index:20; inset:0;
-      display:flex; align-items:center; justify-content:center; padding:20px;
-      background:rgba(1,4,6,.72); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
-      opacity:0; pointer-events:none; transition:opacity .25s ease;
-    }
-    .modal-backdrop[aria-hidden="false"] { opacity:1; pointer-events:auto; }
-    .modal {
-      position:relative; width:min(400px,100%); max-height:calc(100% - 40px); overflow-y:auto;
-      border:1px solid rgba(134,238,228,.28); border-radius:20px;
-      background:linear-gradient(180deg,rgba(3,14,18,.97),rgba(2,8,11,.94));
-      box-shadow:0 24px 80px rgba(0,0,0,.6),0 0 40px rgba(80,232,220,.08);
-      padding:30px 26px 26px; text-align:center;
-      transform:translateY(12px) scale(.98); transition:transform .25s ease;
-    }
-    .modal-backdrop[aria-hidden="false"] .modal { transform:none; }
-    .modal h2 { margin:0 0 6px; font-size:1.25rem; font-weight:800; letter-spacing:.12em; color:#eafffd; text-shadow:0 0 18px rgba(80,232,220,.5); }
-    .modal-sub { margin:0 0 20px; font-size:.8rem; color:var(--muted); letter-spacing:.04em; }
-    .modal-close {
-      position:absolute; top:12px; right:14px; border:0; background:none;
-      color:var(--muted); font-size:1.5rem; line-height:1; cursor:pointer; padding:4px 8px;
-    }
-    .modal-close:hover { color:#fff; }
-    .provider-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
-    .provider {
-      position:relative; appearance:none; display:flex; align-items:center; gap:10px;
-      border:1px solid rgba(169,226,222,.18); border-radius:12px;
-      padding:11px 12px; background:rgba(10,26,31,.6); color:#e8f4f3;
-      font:700 .74rem/1 "Manrope",sans-serif; letter-spacing:.06em; cursor:pointer;
-      transition:border-color .18s,background .18s,transform .12s;
-    }
-    .provider:hover { border-color:rgba(134,238,228,.55); background:rgba(18,44,50,.75); transform:translateY(-1px); }
-    .provider:active { transform:none; }
-    .p-dot { width:11px; height:11px; border-radius:50%; flex:none; box-shadow:0 0 8px currentColor; }
-    .soon {
-      margin-left:auto; font-size:.58rem; font-weight:800; letter-spacing:.14em;
-      color:#0b1518; background:var(--signal); border-radius:999px; padding:3px 8px;
-      text-transform:uppercase;
-    }
-    .modal-divider { display:flex; align-items:center; gap:12px; margin:20px 0 12px; color:var(--muted); font-size:.66rem; letter-spacing:.22em; text-transform:uppercase; }
-    .modal-divider::before,.modal-divider::after { content:""; flex:1; height:1px; background:rgba(169,226,222,.18); }
-    .creator-link {
-      display:inline-block; color:var(--signal); font:800 .82rem/1.5 "Manrope",sans-serif;
-      letter-spacing:.1em; text-decoration:none; border-bottom:1px solid rgba(134,238,228,.4); padding-bottom:2px;
-    }
-    .creator-link:hover { text-shadow:0 0 14px rgba(134,238,228,.8); }
-    .toast {
-      position:absolute; z-index:30; left:50%; bottom:210px; transform:translateX(-50%) translateY(8px);
-      max-width:min(420px,calc(100% - 40px)); padding:11px 18px; border-radius:12px;
-      border:1px solid rgba(134,238,228,.35); background:rgba(3,14,18,.94); color:#eafffd;
-      font:600 .76rem/1.5 "Manrope",sans-serif; letter-spacing:.03em; text-align:center;
-      opacity:0; pointer-events:none; transition:opacity .25s,transform .25s;
-      box-shadow:0 12px 40px rgba(0,0,0,.5);
-    }
-    .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
-    @media (max-width:640px) {
-      .topbar { padding-left:12px; padding-right:12px; }
-      .pill-btn { padding:8px 12px; font-size:.62rem; }
-      .toast { bottom:190px; }
-    }
-    /* Intro: starfield canvas, typewriter logo over its black shadow. */
-    .intro {
-      position:fixed; inset:0; z-index:60; display:flex; flex-direction:column;
-      align-items:center; justify-content:center; gap:38px; cursor:pointer;
-      background:#010409; overflow:hidden;
-      transition:opacity .9s ease, visibility .9s ease;
-    }
-    .intro.hide { opacity:0; visibility:hidden; pointer-events:none; }
-    .intro-stars { position:absolute; inset:0; width:100%; height:100%; display:block; }
-    .intro-logo { position:relative; text-align:center; user-select:none; margin:0 12px; }
-    .intro-logo .shadow-layer, .intro-logo .typed-layer {
-      font:900 clamp(2.6rem,11vw,6.4rem)/1 "Arial Black","Arial",sans-serif;
-      letter-spacing:.08em; white-space:nowrap; margin:0;
-    }
-    .intro-logo .shadow-layer { color:transparent; text-shadow:none; } /* invisible: keeps the logo box sized so nothing jumps */
-    .intro-logo .typed-layer {
-      position:absolute; inset:0; color:#8ffce9;
-      text-shadow:0 1px 0 #0d7a68,0 2px 0 #0b6a5b,0 3px 0 #09594d,0 4px 0 #074840,0 5px 0 #053732,0 6px 0 #032722,0 9px 22px rgba(0,0,0,.65),0 0 24px rgba(64,255,205,.8),0 0 74px rgba(64,255,205,.32);
-    }
-    .intro-logo .typed-inner { position:relative; display:inline-block; }
-    .intro-logo .typed-layer .ch { visibility:hidden; display:inline-block; }
-    .intro-logo .typed-layer .ch.on { visibility:visible; animation:type-punch .22s ease-out; }
-    @keyframes type-punch {
-      0% { transform:scale(1.7) translateY(-.06em); opacity:.35; }
-      60% { transform:scale(.94) translateY(.01em); opacity:1; }
-      100% { transform:scale(1) translateY(0); opacity:1; }
-    }
-    .intro-logo.done .typed-layer { animation:neon-flicker 4.2s linear infinite; }
-    @keyframes neon-flicker {
-      0%,100% { opacity:1; } 3% { opacity:.55; } 5% { opacity:1; }
-      41% { opacity:1; } 43% { opacity:.3; } 45% { opacity:1; } 47% { opacity:.65; } 49% { opacity:1; }
-      77% { opacity:1; } 79% { opacity:.45; } 81% { opacity:1; }
-    }
-    .intro-logo .typed-layer .ch.on { visibility:visible; }
-    .intro-logo .caret {
-      position:absolute; left:100%; top:50%; width:.09em; height:1em; margin-left:.12em;
-      transform:translateY(-52%);
-      background:#7dfce6; box-shadow:0 0 18px rgba(64,255,205,.9);
-      animation:caret-blink .8s steps(1) infinite;
-    }
-    @keyframes caret-blink { 0%,55% { opacity:1; } 56%,100% { opacity:0; } }
-    .intro.zoom .intro-logo { transform:scale(9); opacity:0; transition:transform 1.15s ease-in, opacity 1.15s ease-in; }
-    .intro-continue {
-      position:relative; font:700 .8rem/1.6 "Manrope",sans-serif; letter-spacing:.34em; text-indent:.34em;
-      color:#eafffb; text-shadow:0 0 16px rgba(64,255,205,.8); text-align:center; padding:0 16px;
-      opacity:0; visibility:hidden; transition:opacity .6s ease, visibility .6s ease;
-      animation:intro-pulse 1.8s ease-in-out infinite; user-select:none;
-    }
-    .intro-continue.show { opacity:1; visibility:visible; }
-    @keyframes intro-pulse { 0%,100% { opacity:.4; } 50% { opacity:1; } }
-    @media (prefers-reduced-motion:reduce) { .intro-logo .caret { animation:none; } .intro-continue { animation:none; opacity:1; } }
-    /* Virtual joystick for city stepping on touch devices. */
-    .joystick {
-      position:absolute; z-index:20; left:18px; bottom:132px; width:104px; height:104px;
-      border-radius:50%; border:1px solid rgba(134,238,228,.4);
-      background:radial-gradient(circle,rgba(3,16,20,.55),rgba(3,16,20,.85));
-      box-shadow:0 0 24px rgba(64,255,205,.18);
-      display:none; touch-action:none; user-select:none; -webkit-user-select:none;
-    }
-    .joy-knob {
-      position:absolute; left:50%; top:50%; width:44px; height:44px; margin:-22px 0 0 -22px;
-      border-radius:50%; background:radial-gradient(circle at 35% 35%,rgba(125,252,230,.9),rgba(64,255,205,.35));
-      box-shadow:0 0 18px rgba(64,255,205,.5); pointer-events:none;
-    }
-    @media (pointer:coarse) { .joystick { display:block; } }
-    /* City info panel: details before entering. */
-    .city-info {
-      position:absolute; z-index:28; top:50%; right:26px; transform:translateY(-50%) translateX(0);
-      width:min(330px,calc(100vw - 52px)); max-height:calc(100% - 120px); overflow:auto;
-      border-radius:18px; border:1px solid rgba(134,238,228,.35);
-      background:linear-gradient(165deg,rgba(4,20,24,.96),rgba(2,10,13,.94));
-      box-shadow:0 24px 80px rgba(0,0,0,.55),0 0 42px rgba(64,255,205,.12);
-      padding:20px 20px 22px; color:#eafffd;
-      transition:opacity .45s ease, transform .45s ease, visibility .45s ease;
-    }
-    .city-info[aria-hidden="true"] { opacity:0; visibility:hidden; pointer-events:none; transform:translateY(-50%) translateX(26px); }
-    .city-info-back {
-      position:absolute; top:10px; left:10px; width:34px; height:34px; border-radius:50%;
-      border:1px solid rgba(134,238,228,.4); background:rgba(3,16,20,.8); color:#9ff5e4;
-      font-size:1rem; cursor:pointer; line-height:1;
-    }
-    .city-info-back:hover { background:rgba(64,255,205,.16); }
-    .city-info-img {
-      display:block; width:100%; height:168px; object-fit:cover; border-radius:12px;
-      border:1px solid rgba(134,238,228,.25); background:#061014; margin-bottom:14px;
-    }
-    .city-info-name { margin:0 0 4px; font:800 1.35rem/1.2 "Manrope",sans-serif; letter-spacing:.04em; color:#fff; text-shadow:0 0 18px rgba(64,255,205,.5); }
-    .city-info-pop { margin:0 0 12px; font:600 .74rem/1.5 "Manrope",sans-serif; letter-spacing:.06em; color:#9ff5e4; }
-    .city-info-brands-label { margin:0 0 6px; font:700 .62rem/1 "Manrope",sans-serif; letter-spacing:.28em; color:rgba(159,245,228,.75); }
-    .city-info-brands { margin:0 0 18px; padding:0; list-style:none; display:flex; flex-wrap:wrap; gap:8px; }
-    .city-info-brands li {
-      font:700 .72rem/1 "Manrope",sans-serif; letter-spacing:.04em; color:#eafffb;
-      border:1px solid rgba(134,238,228,.35); border-radius:999px; padding:8px 13px; background:rgba(64,255,205,.07);
-    }
-    .city-info-enter {
-      display:block; width:100%; padding:14px; border-radius:12px; cursor:pointer;
-      border:1px solid rgba(134,238,228,.55); background:linear-gradient(180deg,rgba(64,255,205,.22),rgba(64,255,205,.1));
-      color:#eafffb; font:800 .82rem/1 "Manrope",sans-serif; letter-spacing:.24em; text-indent:.24em;
-    }
-    .city-info-enter:hover { background:linear-gradient(180deg,rgba(64,255,205,.34),rgba(64,255,205,.16)); box-shadow:0 0 26px rgba(64,255,205,.35); }
-    @media (max-width:640px) {
-      .city-info {
-        top:auto; bottom:14px; right:50%; transform:translateX(50%);
-        width:calc(100vw - 28px); max-height:52%;
-      }
-      .city-info[aria-hidden="true"] { transform:translateX(50%) translateY(26px); }
-      .city-info-img { height:120px; }
-      .intro-continue { font-size:.68rem; }
-    }
   </style>
 </head>
 <body>
-  <div class="intro" id="intro" role="button" tabindex="0" aria-label="Enter Espil Online">
-    <canvas class="intro-stars" id="intro-stars" aria-hidden="true"></canvas>
-    <div class="intro-logo" id="intro-logo" aria-label="Espil Online">
-      <p class="shadow-layer" aria-hidden="true">Espil Online</p>
-      <p class="typed-layer" aria-hidden="true"><span class="typed-inner" id="intro-typed"></span></p>
-    </div>
-    <div class="intro-continue" id="intro-continue">TAP OR PRESS ANY KEY TO CONTINUE</div>
-  </div>
   <main class="earth-frame" id="earth-frame">
     <canvas id="globe-canvas" role="application" tabindex="0" aria-label="Interactive fixed Earth with selectable city landmarks. Drag to orbit the camera, scroll to zoom, or choose a city for a tilted navigation view."></canvas>
-    <header class="topbar">
-      <div class="topbar-actions">
-        <button class="pill-btn" id="bgm-toggle" type="button" aria-pressed="true" title="Toggle theme music">&#9834; ON</button>
-        <button class="pill-btn" id="signin-open" type="button">SIGN IN</button>
-      </div>
-    </header>
-    <div class="modal-backdrop" id="signin-modal" aria-hidden="true">
-      <div class="modal" role="dialog" aria-modal="true" aria-label="Sign in to ESPIL Online">
-        <button class="modal-close" id="signin-close" type="button" aria-label="Close sign in">&times;</button>
-        <h2>ENTER ESPIL ONLINE</h2>
-        <p class="modal-sub">Choose how you'd like to arrive.</p>
-        <div class="provider-grid">
-          <button class="provider" type="button" data-provider="Google"><span class="p-dot" style="background:#4285F4;color:#4285F4"></span>Google<span class="soon">soon</span></button>
-          <button class="provider" type="button" data-provider="Apple"><span class="p-dot" style="background:#e8e8e8;color:#e8e8e8"></span>Apple<span class="soon">soon</span></button>
-          <button class="provider" type="button" data-provider="Microsoft"><span class="p-dot" style="background:#00A4EF;color:#00A4EF"></span>Microsoft<span class="soon">soon</span></button>
-          <button class="provider" type="button" data-provider="GitHub"><span class="p-dot" style="background:#e8e8e8;color:#e8e8e8"></span>GitHub<span class="soon">soon</span></button>
-          <button class="provider" type="button" data-provider="Facebook"><span class="p-dot" style="background:#1877F2;color:#1877F2"></span>Facebook<span class="soon">soon</span></button>
-          <button class="provider" type="button" data-provider="Instagram"><span class="p-dot" style="background:#E4405F;color:#E4405F"></span>Instagram<span class="soon">soon</span></button>
-          <button class="provider" type="button" data-provider="X"><span class="p-dot" style="background:#e8e8e8;color:#e8e8e8"></span>X<span class="soon">soon</span></button>
-          <button class="provider" type="button" data-provider="Email"><span class="p-dot" style="background:#86eee4;color:#86eee4"></span>Email<span class="soon">soon</span></button>
-        </div>
-        <div class="modal-divider"><span>new here?</span></div>
-        <a class="creator-link" href="creator.html">Create your character &rarr;</a>
-      </div>
-    </div>
-    <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <audio id="bgm" loop preload="auto" src="assets/Green_bgm_landing.mp3"></audio>
     <div class="city-readout" id="city-status">
       <time class="city-clock" id="city-clock" aria-label="Local time"></time>
       <div class="city-list" id="city-list" aria-label="City selector. Scroll the reel and choose the centered city."></div>
@@ -418,18 +194,6 @@
         <button class="city-return" id="city-return" type="button">RETURN TO EARTH</button>
       </div>
       <div class="city-message" id="city-message" aria-live="polite">Loading Earth surface…</div>
-    </div>
-    <div class="city-info" id="city-info" aria-hidden="true" role="dialog" aria-label="City details">
-      <button class="city-info-back" id="city-info-back" type="button" aria-label="Back to globe">&#8592;</button>
-      <img class="city-info-img" id="city-info-img" alt="">
-      <h2 class="city-info-name" id="city-info-name"></h2>
-      <p class="city-info-pop" id="city-info-pop"></p>
-      <p class="city-info-brands-label">POPULAR BRANDS</p>
-      <ul class="city-info-brands" id="city-info-brands"></ul>
-      <button class="city-info-enter" id="city-info-enter" type="button">ENTER CITY &#8594;</button>
-    </div>
-    <div class="joystick" id="joystick" aria-hidden="true">
-      <div class="joy-knob" id="joy-knob"></div>
     </div>
     <span class="sr-only">Drag to orbit the camera around the fixed Earth. Scroll to move closer or farther away. Select a city landmark or city name to approach its boundary in a tilted, forward-looking navigation view.</span>
   </main>
@@ -446,33 +210,11 @@
     var cityReturn=document.getElementById('city-return');
     var frame=document.getElementById('earth-frame');
     var canvas=document.getElementById('globe-canvas');
-    /* IANA timezone per city for the reel clock. */
-    var cityTimezones={
-      'Vancouver':'America/Vancouver','San Francisco':'America/Los_Angeles','Los Angeles':'America/Los_Angeles',
-      'Chicago':'America/Chicago','Mexico City':'America/Mexico_City','New York':'America/New_York','Toronto':'America/Toronto',
-      'Rio de Janeiro':'America/Sao_Paulo','São Paulo':'America/Sao_Paulo','Buenos Aires':'America/Argentina/Buenos_Aires',
-      'London':'Europe/London','Paris':'Europe/Paris','Madrid':'Europe/Madrid','Rome':'Europe/Rome','Berlin':'Europe/Berlin',
-      'Moscow':'Europe/Moscow','Lagos':'Africa/Lagos','Nairobi':'Africa/Nairobi','Cairo':'Africa/Cairo',
-      'Cape Town':'Africa/Johannesburg','Istanbul':'Europe/Istanbul','Dubai':'Asia/Dubai','Mumbai':'Asia/Kolkata',
-      'Delhi':'Asia/Kolkata','Singapore':'Asia/Singapore','Bangkok':'Asia/Bangkok','Shanghai':'Asia/Shanghai',
-      'Hong Kong':'Asia/Hong_Kong','Beijing':'Asia/Shanghai','Seoul':'Asia/Seoul','Tokyo':'Asia/Tokyo','Manila':'Asia/Manila',
-      'Jakarta':'Asia/Jakarta','Sydney':'Australia/Sydney','Melbourne':'Australia/Melbourne','Auckland':'Pacific/Auckland'
-    };
     function updateClock(){
       var now=new Date();
-      /* Each city keeps its own timezone; the clock follows the centered city. */
-      var name=(typeof centeredMarker!=='undefined'&&centeredMarker)?centeredMarker.userData.name:null;
-      var tz=name?cityTimezones[name]:null;
-      var text,label='Local time';
-      try{
-        text=now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:tz||undefined});
-        if(name&&tz)label=name+' time';
-      }catch(e){
-        text=now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-      }
       clock.dateTime=now.toISOString();
-      clock.textContent=text;
-      clock.setAttribute('aria-label',label+' '+text);
+      clock.textContent=now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      clock.setAttribute('aria-label','Local time '+clock.textContent);
     }
     updateClock();
     window.setInterval(updateClock,1000);
@@ -588,13 +330,6 @@
       return '';
     }
     status.textContent=idleStatus();
-    function notifyEarthSettled(){
-      var settled=(textureReady||textureFailed)&&(reliefReady||reliefFailed);
-      if(settled&&!window.__espilEarthReady){
-        window.__espilEarthReady=true;
-        try{window.dispatchEvent(new Event('espil-earth-ready'));}catch(e){}
-      }
-    }
     function makeDataTexture(image){
       var texture=new THREE.Texture(image);
       texture.minFilter=THREE.LinearFilter;
@@ -613,7 +348,6 @@
       textureReady=true;
       textureFailed=false;
       status.textContent=idleStatus();
-      notifyEarthSettled();
     }
     function applyElevationImage(image){
       /* Bake elevation into the mesh positions: the silhouette and lighting come from real geometry. */
@@ -645,7 +379,6 @@
       reliefReady=true;
       reliefFailed=false;
       status.textContent=idleStatus();
-      notifyEarthSettled();
     }
     function loadEarthImage(url,onFailure){new THREE.ImageLoader().load(url,applyEarthImage,undefined,onFailure);}
     /* The revision query defeats a stale Edge cache; PNG avoids a failing JPEG decoder/upload path. */
@@ -653,13 +386,11 @@
       loadEarthImage('assets/earth-blue-marble-fallback.png?rev=edge-20261002-3',function(){
         textureFailed=true;
         status.textContent=idleStatus();
-        notifyEarthSettled();
       });
     });
     new THREE.ImageLoader().load('assets/earth-elevation-nasa.jpg?rev=terrain-20261002-1',applyElevationImage,undefined,function(){
       reliefFailed=true;
       status.textContent=idleStatus();
-      notifyEarthSettled();
     });
     var atmosphere=new THREE.Mesh(new THREE.SphereGeometry(2.105,96,64),new THREE.ShaderMaterial({transparent:true,side:THREE.BackSide,blending:THREE.AdditiveBlending,depthWrite:false,vertexShader:'varying vec3 vNormal;void main(){vNormal=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',fragmentShader:'varying vec3 vNormal;void main(){float f=pow(0.74-dot(vNormal,vec3(0.0,0.0,1.0)),2.7);gl_FragColor=vec4(0.20,0.69,0.92,0.42)*f;}'}));
     earthSpin.add(atmosphere);
@@ -797,7 +528,6 @@
     }
 
     var cityStage=null,cityPhaseActive=false,cityPhaseFade=0,cityApproachStarted=0;
-    var approachSlow=false,infoShown=false;
     function destroyCityStage(){
       if(!cityStage)return;
       earthSpin.remove(cityStage);
@@ -875,7 +605,6 @@
       if(!selected||cityPhaseActive)return;
       cityPhaseActive=true;cityPhaseFade=0;targetDistance=1.48;
       boundary.visible=false;
-      hideAurora();
       citySky.visible=true;
       if(cityStage)cityStage.visible=true;
       cityPhaseName.textContent=selected.userData.name;
@@ -891,7 +620,7 @@
       marker.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),pos.clone().normalize());
       marker.add(landmarkModel(city[3]));
       marker.scale.setScalar(.17);
-      marker.userData={name:city[0],normal:pos.clone().normalize(),landmark:city[4],type:city[3],baseScale:.11,index:index};
+      marker.userData={name:city[0],normal:pos.clone().normalize(),landmark:city[4],type:city[3],baseScale:.17,index:index};
       markerGroup.add(marker);markers.push(marker);
       var cityButton=document.createElement('button');
       cityButton.type='button';cityButton.className='city-name';cityButton.textContent=city[0];cityButton.title=city[0]+' — '+city[4];cityButton.setAttribute('aria-label',city[0]+', '+city[4]);
@@ -902,7 +631,7 @@
       cityButton.addEventListener('click',function(){centerReel(marker,true);selectCity(marker);});
       cityList.appendChild(cityButton);marker.userData.button=cityButton;
     });
-    var centeredMarker=null,reelFrame=0,reelQuietUntil=0;
+    var centeredMarker=null,reelFrame=0;
     function updateReelCenter(){
       reelFrame=0;
       var listRect=cityList.getBoundingClientRect(),center=listRect.top+listRect.height/2,closest=null,distance=Infinity;
@@ -910,131 +639,24 @@
         var rect=marker.userData.button.getBoundingClientRect(),next=Math.abs(rect.top+rect.height/2-center);
         if(next<distance){distance=next;closest=marker;}
       });
-      var prev=centeredMarker;
       centeredMarker=closest;
       markers.forEach(function(marker){marker.userData.button.classList.toggle('is-centered',marker===closest);});
-      /* Tick when the user swipes/scrolls the reel onto a new city — touch, wheel and drag alike. */
-      if(closest&&closest!==prev&&performance.now()>reelQuietUntil){
-        if(window.EspilAudio&&window.EspilAudio.tick)window.EspilAudio.tick();
-      }
     }
     function centerReel(marker,smooth){
       if(!marker||!marker.userData.button)return;
       centeredMarker=marker;
       markers.forEach(function(item){item.userData.button.classList.toggle('is-centered',item===marker);});
-      reelQuietUntil=performance.now()+450; /* programmatic scrolls stay silent; the caller ticks */
       var button=marker.userData.button;
       cityList.scrollTo({top:button.offsetTop-cityList.clientHeight/2+button.offsetHeight/2,behavior:smooth&&!reduced?'smooth':'auto'});
     }
     cityList.addEventListener('scroll',function(){if(!reelFrame)reelFrame=requestAnimationFrame(updateReelCenter);},{passive:true});
     cityList.addEventListener('wheel',function(event){event.stopPropagation();},{passive:true});
-    /* Arrow / joystick city navigation: recenter on the city at the CURRENT zoom, no zoom change. */
-    var navIndex=0;
-    function stepCity(dir){
-      if(window.__espilIntroActive||cityPhaseActive)return;
-      /* Stepping away from a zoomed-in city eases back out to orbit first. */
-      if(selected||infoShown)clearSelection(true);
-      var cur=markers.indexOf(centeredMarker);
-      if(cur<0)cur=navIndex;
-      navIndex=(cur+dir+markers.length)%markers.length;
-      var marker=markers[navIndex];
-      centerReel(marker,true);
-      var cityDirection=marker.position.clone().normalize().applyAxisAngle(new THREE.Vector3(0,1,0),earthSpin.rotation.y);
-      targetYaw=Math.atan2(cityDirection.x,cityDirection.z);
-      targetPitch=Math.asin(Math.max(-1,Math.min(1,cityDirection.y)));
-      status.textContent=marker.userData.name+' — '+marker.userData.landmark;
-      if(window.EspilAudio&&window.EspilAudio.tick)window.EspilAudio.tick();
-    }
-    function modalOpen(){
-      var m=document.getElementById('signin-modal');
-      return m&&m.getAttribute('aria-hidden')==='false';
-    }
-    document.addEventListener('keydown',function(e){
-      if(window.__espilIntroActive||modalOpen())return;
-      if(e.key==='ArrowDown'||e.key==='ArrowRight'){e.preventDefault();stepCity(1);}
-      else if(e.key==='ArrowUp'||e.key==='ArrowLeft'){e.preventDefault();stepCity(-1);}
-      else if(e.key==='Enter'){
-        if(infoShown||cityPhaseActive)return;
-        var m=centeredMarker||markers[navIndex];
-        if(m)selectCity(m);
-      }
-      else if(e.key==='Escape'&&selected){clearSelection(true);}
-    });
-    /* Virtual joystick (touch devices): push up/down/left/right to step through cities. */
-    (function(){
-      var joy=document.getElementById('joystick'),knob=document.getElementById('joy-knob');
-      if(!joy)return;
-      var joyActive=false,joyCX=0,joyCY=0,joyDir=0,joyTimer=null;
-      function joyStep(){if(joyDir)stepCity(joyDir);}
-      joy.addEventListener('pointerdown',function(e){
-        joyActive=true;
-        try{joy.setPointerCapture(e.pointerId);}catch(err){}
-        var r=joy.getBoundingClientRect();joyCX=r.left+r.width/2;joyCY=r.top+r.height/2;
-        e.preventDefault();
-      });
-      joy.addEventListener('pointermove',function(e){
-        if(!joyActive)return;
-        var dx=e.clientX-joyCX,dy=e.clientY-joyCY;
-        var adx=Math.abs(dx),ady=Math.abs(dy),nd=0;
-        if(ady>26&&ady>=adx)nd=dy>0?1:-1;
-        else if(adx>26)nd=dx>0?1:-1;
-        if(nd!==joyDir){
-          joyDir=nd;
-          if(knob)knob.style.transform='translate('+Math.max(-28,Math.min(28,dx))+'px,'+Math.max(-28,Math.min(28,dy))+'px)';
-          if(joyTimer){clearInterval(joyTimer);joyTimer=null;}
-          if(nd){joyStep();joyTimer=setInterval(joyStep,420);}
-        }
-      });
-      function joyEnd(){
-        joyActive=false;joyDir=0;
-        if(knob)knob.style.transform='';
-        if(joyTimer){clearInterval(joyTimer);joyTimer=null;}
-      }
-      joy.addEventListener('pointerup',joyEnd);
-      joy.addEventListener('pointercancel',joyEnd);
-    }());
     var boundary=new THREE.Mesh(new THREE.RingGeometry(.225,.243,80),new THREE.MeshBasicMaterial({color:0x8ff4e8,transparent:true,opacity:.9,side:THREE.DoubleSide,depthTest:false}));
     boundary.visible=false;
     markerGroup.add(boundary);
-    /* Aurora-borealis city-dimension outline: yellow-light bands shimmering around the city area. */
-    var aurora=new THREE.Group(),auroraMats=[];
-    (function buildAurora(){
-      var cols=[0xffe27a,0xd8f77a,0x7dfce6],radii=[[.30,.338],[.365,.38],[.425,.435]];
-      for(var i=0;i<3;i++){
-        var mat=new THREE.MeshBasicMaterial({color:cols[i],transparent:true,opacity:0,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false});
-        aurora.add(new THREE.Mesh(new THREE.RingGeometry(radii[i][0],radii[i][1],72),mat));
-        auroraMats.push(mat);
-      }
-      aurora.visible=false;
-      markerGroup.add(aurora);
-    }());
-    function showAurora(marker){
-      var n=marker.position.clone().normalize();
-      aurora.position.copy(n.clone().multiplyScalar(2.02));
-      aurora.lookAt(n.clone().multiplyScalar(4));
-      aurora.visible=true;
-    }
-    function hideAurora(){aurora.visible=false;}
-    /* Soft halo under every landmark miniature. */
-    var glowTex=(function(){
-      var c=document.createElement('canvas');c.width=c.height=128;
-      var x=c.getContext('2d');
-      var g=x.createRadialGradient(64,64,4,64,64,64);
-      g.addColorStop(0,'rgba(255,240,180,.8)');
-      g.addColorStop(.45,'rgba(255,220,130,.32)');
-      g.addColorStop(1,'rgba(255,220,130,0)');
-      x.fillStyle=g;x.fillRect(0,0,128,128);
-      return new THREE.CanvasTexture(c);
-    }());
-    markers.forEach(function(marker){
-      var halo=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,transparent:true,opacity:.5,blending:THREE.AdditiveBlending,depthWrite:false}));
-      halo.scale.setScalar(.38);
-      halo.position.copy(marker.position);
-      markerGroup.add(halo);
-    });
 
     var raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2(),hovered=null,selected=null;
-    var orbitDistance=6.6,targetDistance=6.6,minDistance=2.1,maxDistance=12.2; /* minDistance keeps the camera outside the globe: max zoom-in is the city zoom level */
+    var orbitDistance=6.6,targetDistance=6.6,minDistance=1.15,maxDistance=12.2;
     var yaw=0,pitch=0,targetYaw=0,targetPitch=0;
     var dragging=false,moved=false,lastX=0,lastY=0,hasInteracted=false;
     var cameraLook=new THREE.Vector3(),desiredCameraPosition=new THREE.Vector3(),desiredCameraLook=new THREE.Vector3();
@@ -1058,12 +680,13 @@
     function updateCameraView(){
       var ease=reduced?1:.075;
       if(selected&&navigationReady){
-        /* iPhone-Maps-flyover framing: camera near the land, low horizon, long view
-           toward the skyline. Every offset scales together from city to street level. */
+        /* EverPlanet-like navigation framing: a low horizon and a thin, stable band of sky.
+           Every camera offset scales together as the viewer moves from city to near-street level,
+           preserving the landscape-to-sky ratio instead of tilting toward a top-down view. */
         var zoomProgress=Math.max(0,Math.min(1,(targetDistance-minDistance)/(3.38-minDistance)));
         navigationViewScale=.16+.84*zoomProgress;
-        desiredCameraPosition.copy(navigationNormal).multiplyScalar(2.04+.30*navigationViewScale).addScaledVector(navigationHeading,-.62*navigationViewScale);
-        desiredCameraLook.copy(navigationNormal).multiplyScalar(2.04).addScaledVector(navigationHeading,.80*navigationViewScale);
+        desiredCameraPosition.copy(navigationNormal).multiplyScalar(2.06+.37*navigationViewScale).addScaledVector(navigationHeading,-.72*navigationViewScale);
+        desiredCameraLook.copy(navigationNormal).multiplyScalar(2.06).addScaledVector(navigationHeading,.68*navigationViewScale);
         boundary.scale.setScalar(navigationViewScale);
       }else{
         navigationViewScale=1;
@@ -1132,16 +755,12 @@
     }
     function selectCity(marker){
       selected=marker;setActiveButton(marker);centerReel(marker,true);
-      navIndex=markers.indexOf(marker);
-      approachSlow=true;infoShown=false;hideCityInfo();
-      if(window.EspilAudio){window.EspilAudio.onCitySelect();window.EspilAudio.pop();}
       cityPhaseActive=false;cityPhaseFade=0;cityApproachStarted=performance.now();
       citySky.visible=false;
       cityPhasePanel.setAttribute('aria-hidden','true');
       document.getElementById('city-status').classList.remove('is-city');
       buildCityStage(marker);
-      /* Slow zoom starts at the CURRENT zoom level and dives to the landmark. */
-      targetDistance=Math.min(orbitDistance,1.9);
+      targetDistance=3.38;
       var cityDirection=marker.position.clone().normalize().applyAxisAngle(new THREE.Vector3(0,1,0),earthSpin.rotation.y);
       targetYaw=Math.atan2(cityDirection.x,cityDirection.z);
       targetPitch=Math.asin(Math.max(-1,Math.min(1,cityDirection.y)));
@@ -1149,18 +768,7 @@
       boundary.position.copy(marker.position.clone().normalize().multiplyScalar(2.097));
       boundary.lookAt(marker.position.clone().normalize().multiplyScalar(4));
       boundary.visible=true;
-      showAurora(marker);
       status.textContent='Zooming in now — '+marker.userData.name;
-    }
-    function nearestFacingMarker(){
-      var dir=camera.position.clone().normalize(),best=null,bestDot=-2;
-      var w=new THREE.Vector3();
-      markers.forEach(function(m){
-        m.getWorldPosition(w);w.normalize();
-        var d=w.dot(dir);
-        if(d>bestDot){bestDot=d;best=m;}
-      });
-      return best;
     }
     function clearSelection(returnToOrbit){
       var direction=camera.position.clone().normalize();
@@ -1173,82 +781,14 @@
       citySky.visible=false;
       starMaterial.opacity=1;
       cityPhasePanel.setAttribute('aria-hidden','true');
-      if(typeof hideCityInfo==='function')hideCityInfo();
       document.getElementById('city-status').classList.remove('is-city');
       destroyCityStage();
       boundary.visible=false;
-      hideAurora();
-      /* Keep the text div honest: highlight the city the camera is facing. */
-      var facing=nearestFacingMarker();
-      if(facing){centerReel(facing,false);navIndex=markers.indexOf(facing);}
       status.textContent=idleStatus();
-      if(returnToOrbit&&window.EspilAudio)window.EspilAudio.onReturnToOrbit();
     }
     cityReturn.addEventListener('click',function(){clearSelection(true);});
-    /* City info panel: image, metro population, popular brands. ENTER dives into the street view. */
-    var cityFacts={
-      'Vancouver':{pop:'2.6M',brands:['Lululemon','Aritzia',"Arc'teryx"],img:'assets/cities/vancouver.webp'},
-      'San Francisco':{pop:'4.7M',brands:["Levi's",'Gap','Salesforce'],img:'assets/cities/san-francisco.webp'},
-      'Los Angeles':{pop:'12.5M',brands:['Disney','Warner Bros.','In-N-Out'],img:'assets/cities/los-angeles.webp'},
-      'Chicago':{pop:'9.5M',brands:["McDonald's",'Boeing','Kraft Heinz'],img:'assets/cities/chicago.webp'},
-      'Mexico City':{pop:'22M',brands:['Corona','Bimbo','Telcel'],img:'assets/cities/mexico-city.webp'},
-      'New York':{pop:'20M',brands:["Macy's",'Estée Lauder','HBO'],img:'assets/cities/new-york.webp'},
-      'Toronto':{pop:'6.4M',brands:['Tim Hortons','Canadian Tire','Loblaw'],img:'assets/cities/toronto.webp'},
-      'Rio de Janeiro':{pop:'13.5M',brands:['Havaianas','Petrobras','Brahma'],img:'assets/cities/rio-de-janeiro.webp'},
-      'São Paulo':{pop:'22M',brands:['Itaú','Natura','Embraer'],img:'assets/cities/sao-paulo.webp'},
-      'Buenos Aires':{pop:'15M',brands:['Mercado Libre','Globant','Quilmes'],img:'assets/cities/buenos-aires.webp'},
-      'London':{pop:'14.3M',brands:['Burberry','Harrods','BBC'],img:'assets/cities/london.webp'},
-      'Paris':{pop:'11.1M',brands:['Chanel','Louis Vuitton',"L'Oréal"],img:'assets/cities/paris.webp'},
-      'Madrid':{pop:'6.6M',brands:['El Corte Inglés','Real Madrid','Mahou'],img:'assets/cities/madrid.webp'},
-      'Rome':{pop:'4.3M',brands:['Fendi','Bulgari','Enel'],img:'assets/cities/rome.webp'},
-      'Berlin':{pop:'6M',brands:['Zalando','HelloFresh','N26'],img:'assets/cities/berlin.webp'},
-      'Moscow':{pop:'13M',brands:['Aeroflot','GUM','Kaspersky'],img:'assets/cities/moscow.webp'},
-      'Lagos':{pop:'16M',brands:['Dangote','Jumia','GTBank'],img:'assets/cities/lagos.webp'},
-      'Nairobi':{pop:'5.1M',brands:['M-Pesa','Safaricom','Kenya Airways'],img:'assets/cities/nairobi.webp'},
-      'Cairo':{pop:'21M',brands:['EgyptAir','Orascom','Juhayna'],img:'assets/cities/cairo.webp'},
-      'Cape Town':{pop:'4.9M',brands:['Woolworths','Pick n Pay','Castle Lager'],img:'assets/cities/cape-town.webp'},
-      'Istanbul':{pop:'16M',brands:['Turkish Airlines','Arçelik','Mavi'],img:'assets/cities/istanbul.webp'},
-      'Dubai':{pop:'3.6M',brands:['Emirates','Emaar','Jumeirah'],img:'assets/cities/dubai.webp'},
-      'Mumbai':{pop:'21M',brands:['Tata','Reliance','Bollywood'],img:'assets/cities/mumbai.webp'},
-      'Delhi':{pop:'33M',brands:['Air India',"Haldiram's",'DLF'],img:'assets/cities/delhi.webp'},
-      'Singapore':{pop:'6M',brands:['Singapore Airlines','DBS','Tiger Beer'],img:'assets/cities/singapore.webp'},
-      'Bangkok':{pop:'10.7M',brands:['Thai Airways','CP Group','Red Bull'],img:'assets/cities/bangkok.webp'},
-      'Shanghai':{pop:'29M',brands:['NIO','SAIC','Yum China'],img:'assets/cities/shanghai.webp'},
-      'Hong Kong':{pop:'7.5M',brands:['HSBC','Cathay Pacific','Giordano'],img:'assets/cities/hong-kong.webp'},
-      'Beijing':{pop:'22M',brands:['Lenovo','Baidu','Air China'],img:'assets/cities/beijing.webp'},
-      'Seoul':{pop:'25M',brands:['Samsung','Hyundai','Kakao'],img:'assets/cities/seoul.webp'},
-      'Tokyo':{pop:'37M',brands:['Sony','Uniqlo','Muji'],img:'assets/cities/tokyo.webp'},
-      'Manila':{pop:'14.5M',brands:['Jollibee','SM','San Miguel'],img:'assets/cities/manila.webp'},
-      'Jakarta':{pop:'33M',brands:['Garuda Indonesia','Tokopedia','Indomie'],img:'assets/cities/jakarta.webp'},
-      'Sydney':{pop:'5.3M',brands:['Qantas','Atlassian','Bonds'],img:'assets/cities/sydney.webp'},
-      'Melbourne':{pop:'5.2M',brands:['BHP','ANZ','Vegemite'],img:'assets/cities/melbourne.webp'},
-      'Auckland':{pop:'1.7M',brands:['Air New Zealand','Fonterra',"Whittaker's"],img:'assets/cities/auckland.webp'}
-    };
-    var infoPanel=document.getElementById('city-info'),infoImg=document.getElementById('city-info-img'),
-        infoName=document.getElementById('city-info-name'),infoPop=document.getElementById('city-info-pop'),
-        infoBrands=document.getElementById('city-info-brands');
-    function showCityInfo(marker){
-      infoShown=true;approachSlow=false;
-      var facts=cityFacts[marker.userData.name]||{pop:'—',brands:[],img:''};
-      if(infoImg){infoImg.src=facts.img;infoImg.alt=marker.userData.landmark;}
-      if(infoName)infoName.textContent=marker.userData.name;
-      if(infoPop)infoPop.textContent='Metro population · approx '+facts.pop;
-      if(infoBrands)infoBrands.innerHTML=facts.brands.map(function(b){return '<li>'+b+'</li>';}).join('');
-      if(infoPanel)infoPanel.setAttribute('aria-hidden','false');
-      status.textContent=marker.userData.name+' — '+marker.userData.landmark;
-      if(infoEnter)try{infoEnter.focus({preventScroll:true});}catch(e){}
-    }
-    function hideCityInfo(){ infoShown=false; if(infoPanel)infoPanel.setAttribute('aria-hidden','true'); }
-    var infoEnter=document.getElementById('city-info-enter'),infoBack=document.getElementById('city-info-back');
-    if(infoEnter)infoEnter.addEventListener('click',function(){if(window.EspilAudio&&window.EspilAudio.pop)window.EspilAudio.pop();hideCityInfo();activateCityPhase();});
-    if(infoBack)infoBack.addEventListener('click',function(){if(window.EspilAudio&&window.EspilAudio.pop)window.EspilAudio.pop();clearSelection(true);});
     function zoomBy(delta){
       hasInteracted=true;
-      /* While a city zoom is applied, manual zoom-out is locked: only ESC backs out. */
-      if(selected&&delta>0){
-        if(window.__espilToast)window.__espilToast('City zoom is locked \u2014 press ESC to zoom out');
-        return;
-      }
       targetDistance=Math.max(minDistance,Math.min(maxDistance,targetDistance+delta));
       if(selected&&targetDistance>5.7)clearSelection();
     }
@@ -1282,12 +822,7 @@
     });
     canvas.addEventListener('pointerup',function(event){
       dragging=false;canvas.classList.remove('is-dragging');canvas.releasePointerCapture(event.pointerId);
-      if(!moved){if(window.__espilIntroActive)return;var hit=pick(event);if(hit)selectCity(hit.object);}
-      else if(!window.__espilIntroActive&&!cityPhaseActive){
-        /* The text div always matches the map: after a manual rotate, re-sync the reel. */
-        var facing=nearestFacingMarker();
-        if(facing&&facing!==centeredMarker){centerReel(facing,false);navIndex=markers.indexOf(facing);}
-      }
+      if(!moved){var hit=pick(event);if(hit)selectCity(hit.object);}
       canvas.style.cursor='grab';
     });
     canvas.addEventListener('pointercancel',function(){dragging=false;canvas.classList.remove('is-dragging');});
@@ -1312,23 +847,19 @@
       requestAnimationFrame(animate);
       yaw+=shortestAngle(yaw,targetYaw)*(reduced?1:.075);
       pitch+=(targetPitch-pitch)*(reduced?1:.075);
-      orbitDistance+=(targetDistance-orbitDistance)*(reduced?1:(selected&&approachSlow&&!cityPhaseActive?.03:.075));
+      orbitDistance+=(targetDistance-orbitDistance)*(reduced?1:.075);
       updateCameraView();
       cameraDirection.copy(camera.position).normalize();
       markers.forEach(function(marker,index){
         marker.getWorldPosition(worldPoint);
         var facing=worldPoint.clone().normalize().dot(cameraDirection)>.08;
         marker.visible=!cityPhaseActive&&facing;
-        /* Constant landmark size regardless of zoom; hover keeps a touch of feedback. */
-        if(marker!==hovered)marker.scale.setScalar(marker.userData.baseScale);
+        var pulse=marker.userData.baseScale*(1+Math.sin(performance.now()*.0024+index)*.055);
+        if(marker!==hovered&&marker!==selected)marker.scale.setScalar(pulse);
+        if(marker===selected)marker.scale.setScalar(marker.userData.baseScale*1.34*Math.max(.22,navigationViewScale));
       });
-      if(aurora.visible){
-        var at=performance.now()*.001;
-        aurora.rotation.z+=.0016;
-        for(var ai=0;ai<auroraMats.length;ai++)auroraMats[ai].opacity=.34+.24*Math.sin(at*2.2+ai*2.1);
-      }
-      if(selected&&!cityPhaseActive&&!infoShown&&performance.now()-cityApproachStarted>1200&&(Math.abs(orbitDistance-targetDistance)<.09||performance.now()-cityApproachStarted>9000)){
-        showCityInfo(selected);
+      if(selected&&!cityPhaseActive&&(reduced||performance.now()-cityApproachStarted>2200)){
+        activateCityPhase();
       }
       if(cityPhaseActive&&cityStage){
         cityPhaseFade=Math.min(1,cityPhaseFade+(reduced?1:.028));
@@ -1338,280 +869,7 @@
       }
       renderer.render(scene,camera);
     }
-    /* Hooks for the intro + city info panel scripts. */
-    window.__espilGlobe={
-      beginEarthReveal:function(){
-        /* Cinematic pull-back: snap close to the planet, drift out to orbit. */
-        orbitDistance=2.7;targetDistance=2.7;placeCamera();
-        targetYaw+=.38;
-        targetDistance=Math.max(6.6,2.12/(Math.tan(camera.fov*Math.PI/360)*camera.aspect));
-      }
-    };
     animate();
-  }());
-  </script>
-  <script>
-  /* ESPIL Online intro: starfield canvas, ESPIL ONLINE typed letter-by-letter over its
-     black shadow (3.6s). When typing completes and Earth is ready: tap or press any key
-     to continue -> the logo zooms through, the camera pulls back to Earth, BGM starts. */
-  (function(){
-    "use strict";
-    var intro=document.getElementById('intro');
-    var logo=document.getElementById('intro-logo');
-    var typed=document.getElementById('intro-typed');
-    var cont=document.getElementById('intro-continue');
-    var canvas=document.getElementById('intro-stars');
-    var WORD='Espil Online';
-    var TYPE_MIN=50,TYPE_JITTER=50; /* 50-100ms per char: brisk, natural keystroke rhythm */
-    var CARET_LINGER=2000; /* caret keeps blinking 2s after typing completes, then disappears */
-    var done=false,continued=false,earthReady=false,typedDone=false,caretGone=false,idx=0;
-    var reduced=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    window.__espilIntroActive=true;
-    /* Starfield */
-    var stars=[],ctx=null,W=0,H=0,lastT=0;
-    function sizeStars(){
-      if(!canvas)return;
-      var dpr=Math.min(2,window.devicePixelRatio||1);
-      W=canvas.clientWidth;H=canvas.clientHeight;
-      canvas.width=W*dpr;canvas.height=H*dpr;
-      ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
-    }
-    function initStars(){
-      stars=[];
-      var n=Math.min(260,Math.floor(W*H/4500)),i;
-      for(i=0;i<n;i++)stars.push({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.3+.3,p:Math.random()*6.28,s:.4+Math.random()*1.2});
-    }
-    function drawStars(t){
-      if(!ctx)return;
-      ctx.clearRect(0,0,W,H);
-      var dt=Math.min(.05,(t-lastT)/1000||0);lastT=t;
-      for(var i=0;i<stars.length;i++){
-        var s=stars[i];
-        s.y+=s.s*4*dt;if(s.y>H+2){s.y=-2;s.x=Math.random()*W;}
-        ctx.globalAlpha=.55+.45*Math.sin(t*.0012+s.p);
-        ctx.fillStyle='#cfefff';
-        ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,6.283);ctx.fill();
-      }
-      ctx.globalAlpha=1;
-      if(!continued)requestAnimationFrame(drawStars);
-    }
-    /* Typewriter over the black shadow */
-    var spans=[],caret=null;
-    function buildTyped(){
-      if(!typed)return;
-      typed.innerHTML='';spans=[];
-      for(var i=0;i<WORD.length;i++){
-        var sp=document.createElement('span');
-        sp.className='ch';
-        sp.textContent=WORD[i]===' '?'\u00a0':WORD[i];
-        typed.appendChild(sp);spans.push(sp);
-      }
-      caret=document.createElement('span');
-      caret.className='caret';
-      typed.appendChild(caret);
-    }
-    function maybeShowContinue(){
-      if(typedDone&&caretGone&&earthReady&&!done){
-        done=true;
-        if(logo)logo.classList.add('done');
-        if(cont)cont.classList.add('show');
-      }
-    }
-    function typeStep(){
-      if(idx>=spans.length){
-        typedDone=true;
-        /* Caret blinks on for 2s after the last letter, then disappears. */
-        setTimeout(function(){
-          if(caret&&caret.parentNode)caret.parentNode.removeChild(caret);
-          caretGone=true;
-          maybeShowContinue();
-        },CARET_LINGER);
-        return;
-      }
-      spans[idx].classList.add('on');
-      typed.insertBefore(caret,spans[idx+1]||null);
-      idx++;
-      setTimeout(typeStep,TYPE_MIN+Math.random()*TYPE_JITTER);
-    }
-    function beginEarth(){
-      var G=window.__espilGlobe;
-      if(G&&G.beginEarthReveal)G.beginEarthReveal();
-      if(window.EspilAudio&&window.EspilAudio.onReturnToOrbit)window.EspilAudio.onReturnToOrbit();
-    }
-    function contFn(){
-      if(continued||!done||!intro)return;continued=true;
-      window.__espilIntroActive=false;
-      if(window.EspilAudio&&window.EspilAudio.pop)window.EspilAudio.pop();
-      intro.classList.add('zoom');
-      setTimeout(function(){
-        intro.classList.add('hide');
-        beginEarth();
-        setTimeout(function(){if(intro.parentNode)intro.parentNode.removeChild(intro);},1000);
-      },1150);
-    }
-    function boot(){
-      if(!intro)return;
-      sizeStars();initStars();
-      requestAnimationFrame(drawStars);
-      window.addEventListener('resize',function(){sizeStars();initStars();});
-      buildTyped();
-      /* The typewriter always plays, even when the OS requests reduced motion:
-         this is the signature brand moment and it's gentle (no large-scale motion). */
-      function startTyping(){
-        setTimeout(typeStep,600);
-      }
-      /* Don't let the typing play out in a hidden tab: wait until the page is visible. */
-      if(document.hidden){
-        var __visStart=function(){
-          if(!document.hidden){document.removeEventListener('visibilitychange',__visStart);startTyping();}
-        };
-        document.addEventListener('visibilitychange',__visStart);
-      }else startTyping();
-      if(window.__espilEarthReady){earthReady=true;maybeShowContinue();}
-      else window.addEventListener('espil-earth-ready',function(){earthReady=true;maybeShowContinue();});
-      setTimeout(function(){earthReady=true;maybeShowContinue();},45000);
-      intro.addEventListener('click',contFn);
-      intro.addEventListener('touchend',function(e){e.preventDefault();contFn();},{passive:false});
-      intro.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' ')e.preventDefault();contFn();});
-      document.addEventListener('keydown',function(){contFn();});
-    }
-    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);
-    else boot();
-  }());
-  </script>
-  <script>
-  /* ESPIL Online landing UI: theme BGM, sign-in modal, guest flow. */
-  (function(){
-    "use strict";
-    var audio=document.getElementById('bgm');
-    var toggle=document.getElementById('bgm-toggle');
-    var started=false, muted=false, userPaused=false;
-    if(audio){
-      audio.volume=0.5;
-      /* Theme song file not uploaded yet: show OFF instead of pretending. */
-      audio.addEventListener('error',function(){
-        if(audio.networkState===3||(audio.error&&audio.error.code===4)){
-          muted=true; userPaused=true; paintToggle();
-        }
-      });
-    }
-    function paintToggle(){
-      if(!toggle)return;
-      toggle.innerHTML=muted?'&#9834; OFF':'&#9834; ON';
-      toggle.setAttribute('aria-pressed',String(!muted));
-    }
-    function play(){
-      if(!audio||muted||userPaused)return;
-      var p=audio.play();
-      if(p&&p.catch)p.catch(function(){});
-    }
-    /* Lighter tick for moving through choices; pop stays for enter/confirm. */
-    var actx=null;
-    function tick(){
-      try{
-        var AC=window.AudioContext||window.webkitAudioContext;
-        if(!AC)return;
-        if(!actx)actx=new AC();
-        if(actx.state==='suspended')actx.resume();
-        var t=actx.currentTime;
-        var o=actx.createOscillator(),g=actx.createGain();
-        o.type='triangle';
-        o.frequency.setValueAtTime(880,t);
-        o.frequency.exponentialRampToValueAtTime(660,t+.05);
-        g.gain.setValueAtTime(.0001,t);
-        g.gain.exponentialRampToValueAtTime(.16,t+.008);
-        g.gain.exponentialRampToValueAtTime(.0001,t+.07);
-        o.connect(g);g.connect(actx.destination);
-        o.start(t);o.stop(t+.08);
-      }catch(e){}
-    }
-    function pop(){
-      try{
-        var AC=window.AudioContext||window.webkitAudioContext;
-        if(!AC)return;
-        if(!actx)actx=new AC();
-        if(actx.state==='suspended')actx.resume();
-        var t=actx.currentTime;
-        var o=actx.createOscillator(),g=actx.createGain();
-        o.type='sine';
-        o.frequency.setValueAtTime(540,t);
-        o.frequency.exponentialRampToValueAtTime(150,t+.11);
-        g.gain.setValueAtTime(.0001,t);
-        g.gain.exponentialRampToValueAtTime(.45,t+.012);
-        g.gain.exponentialRampToValueAtTime(.0001,t+.17);
-        o.connect(g);g.connect(actx.destination);
-        o.start(t);o.stop(t+.19);
-      }catch(e){}
-    }
-    /* Volume fade helper (~1.2s): slow fade-out on city enter, slow fade-in on return. */
-    var fadeTimer=null;
-    function fadeTo(target,done){
-      if(!audio)return;
-      if(fadeTimer){clearInterval(fadeTimer);fadeTimer=null;}
-      var step=(target-audio.volume)/20;
-      if(Math.abs(step)<.004){try{audio.volume=target;}catch(e){} if(done)done(); return;}
-      fadeTimer=setInterval(function(){
-        var v=audio.volume+step;
-        if((step>0&&v>=target)||(step<0&&v<=target))v=target;
-        try{audio.volume=Math.max(0,Math.min(1,v));}catch(e){}
-        if(v===target){clearInterval(fadeTimer);fadeTimer=null;if(done)done();}
-      },60);
-    }
-    function unlock(){
-      if(started)return; started=true; play();
-    }
-    document.addEventListener('pointerdown',unlock);
-    document.addEventListener('keydown',unlock);
-    document.addEventListener('touchstart',unlock,{passive:true});
-    window.EspilAudio={
-      onCitySelect:function(){
-        if(audio&&!audio.paused)fadeTo(0,function(){try{audio.pause();}catch(e){}});
-      },
-      onReturnToOrbit:function(){
-        if(!started||muted||userPaused||!audio)return;
-        try{audio.volume=0;}catch(e){}
-        var p=audio.play(); if(p&&p.catch)p.catch(function(){});
-        fadeTo(.5);
-      },
-      pop:pop,
-      tick:tick,
-      toggle:function(){
-        muted=!muted; userPaused=muted;
-        if(audio){ if(muted)audio.pause(); else play(); }
-        paintToggle();
-      }
-    };
-    if(toggle)toggle.addEventListener('click',function(e){e.stopPropagation();window.EspilAudio.toggle();});
-    paintToggle();
-
-    /* Toast */
-    var toast=document.getElementById('toast'), toastTimer=null;
-    function showToast(msg){
-      if(!toast)return;
-      toast.textContent=msg; toast.classList.add('show');
-      if(toastTimer)clearTimeout(toastTimer);
-      toastTimer=setTimeout(function(){toast.classList.remove('show');},3200);
-    }
-    window.__espilToast=showToast;
-
-    /* Sign-in modal */
-    var modal=document.getElementById('signin-modal');
-    var openBtn=document.getElementById('signin-open');
-    var closeBtn=document.getElementById('signin-close');
-    function openModal(){ if(modal)modal.setAttribute('aria-hidden','false'); }
-    function closeModal(){ if(modal)modal.setAttribute('aria-hidden','true'); }
-    if(openBtn)openBtn.addEventListener('click',function(e){e.stopPropagation();openModal();});
-    if(closeBtn)closeBtn.addEventListener('click',closeModal);
-    if(modal)modal.addEventListener('click',function(e){ if(e.target===modal)closeModal(); });
-    document.addEventListener('keydown',function(e){ if(e.key==='Escape')closeModal(); });
-    var providers=document.querySelectorAll('.provider');
-    Array.prototype.forEach.call(providers,function(btn){
-      btn.addEventListener('click',function(){
-        if(window.EspilAudio&&window.EspilAudio.pop)window.EspilAudio.pop();
-        var name=btn.getAttribute('data-provider')||'Sign-in';
-        showToast(name+' sign-in arrives with the game server.');
-      });
-    });
   }());
   </script>
 </body>
