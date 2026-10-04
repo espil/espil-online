@@ -902,7 +902,7 @@
       cityButton.addEventListener('click',function(){centerReel(marker,true);selectCity(marker);});
       cityList.appendChild(cityButton);marker.userData.button=cityButton;
     });
-    var centeredMarker=null,reelFrame=0;
+    var centeredMarker=null,reelFrame=0,reelQuietUntil=0;
     function updateReelCenter(){
       reelFrame=0;
       var listRect=cityList.getBoundingClientRect(),center=listRect.top+listRect.height/2,closest=null,distance=Infinity;
@@ -910,13 +910,19 @@
         var rect=marker.userData.button.getBoundingClientRect(),next=Math.abs(rect.top+rect.height/2-center);
         if(next<distance){distance=next;closest=marker;}
       });
+      var prev=centeredMarker;
       centeredMarker=closest;
       markers.forEach(function(marker){marker.userData.button.classList.toggle('is-centered',marker===closest);});
+      /* Tick when the user swipes/scrolls the reel onto a new city — touch, wheel and drag alike. */
+      if(closest&&closest!==prev&&performance.now()>reelQuietUntil){
+        if(window.EspilAudio&&window.EspilAudio.tick)window.EspilAudio.tick();
+      }
     }
     function centerReel(marker,smooth){
       if(!marker||!marker.userData.button)return;
       centeredMarker=marker;
       markers.forEach(function(item){item.userData.button.classList.toggle('is-centered',item===marker);});
+      reelQuietUntil=performance.now()+450; /* programmatic scrolls stay silent; the caller ticks */
       var button=marker.userData.button;
       cityList.scrollTo({top:button.offsetTop-cityList.clientHeight/2+button.offsetHeight/2,behavior:smooth&&!reduced?'smooth':'auto'});
     }
