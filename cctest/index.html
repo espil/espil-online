@@ -69,11 +69,11 @@
     <div id="nametag">Espil</div>
     <div id="char">
       <div id="shadow"></div>
-      <img id="img-body" src="assets/body_base.png?v=4" alt="">
-      <img id="img-bottom" src="assets/fitted_bottom_shorts.png?v=4" alt="" style="display:none">
-      <img id="img-top" src="assets/fitted_top_tshirt.png?v=4" alt="" style="display:none">
-      <img id="img-eyes" src="assets/eye_f1_big.png?v=4" alt="">
-      <img id="img-hair" src="assets/hair_m1_spiky.png?v=4" alt="">
+      <img id="img-body" src="assets/body_base.png?v=5" alt="">
+      <img id="img-bottom" src="assets/fitted_bottom_shorts.png?v=5" alt="" style="display:none">
+      <img id="img-top" src="assets/fitted_top_tshirt.png?v=5" alt="" style="display:none">
+      <img id="img-eyes" src="assets/eyes3d/f-eye-cute.webp?v=5" alt="">
+      <img id="img-hair" src="assets/hair3d/m-spiky.webp?v=5" alt="">
       <img id="img-hat" src="" alt="" style="display:none">
     </div>
   </div>
@@ -112,22 +112,22 @@
 </div>
 <script>
 const HAIRS = {
-  m1:['스파이키','hair_m1_spiky'], m2:['단정한숏','hair_m2_neat'],
-  m3:['내추럴','hair_m3_messy'], m4:['옆머리','hair_m4_swept'],
-  m5:['와일드','hair_m5_wild'],
-  f1:['단발','hair_f1_bob'], f2:['긴생머리','hair_f2_long'],
-  f3:['트윈테일','hair_f3_twintail'], f4:['포니테일','hair_f4_ponytail'],
-  f5:['웨이브','hair_f5_wavy'],
+  m1:['스파이키','hair3d/m-spiky'], m2:['단정한숏','hair3d/m-neat'],
+  m3:['내추럴','hair3d/m-messy'], m4:['버즈컷','hair3d/m-buzz'],
+  m5:['모호크','hair3d/m-mohawk'],
+  f1:['단발','hair3d/f-bob'], f2:['긴생머리','hair3d/f-long'],
+  f3:['트윈테일','hair3d/f-twintail'], f4:['포니테일','hair3d/f-pony'],
+  f5:['브레이드','hair3d/f-braids'],
 };
 const EYES = {
-  m1:['시크','eye_m1_cool'], m2:['순한','eye_m2_gentle'],
-  m3:['의지','eye_m3_determined'], m4:['밝은','eye_m4_bright'],
-  m5:['나른','eye_m5_sleepy'], m6:['진지','eye_m6_serious'],
-  m7:['장난','eye_m7_playful'],
-  f1:['왕눈이','eye_f1_big'], f2:['순한','eye_f2_gentle'],
-  f3:['반짝이','eye_f3_sparkle'], f4:['고양이','eye_f4_cat'],
-  f5:['처진눈','eye_f5_droopy'], f6:['밝은','eye_f6_bright'],
-  f7:['수줍은','eye_f7_shy'],
+  m1:['기본','eyes3d/m-eye-basic'], m2:['샤프','eyes3d/m-eye-sharp'],
+  m3:['나른','eyes3d/m-eye-sleepy'], m4:['강렬','eyes3d/m-eye-fierce'],
+  m5:['온화','eyes3d/m-eye-kind'], m6:['놀람','eyes3d/m-eye-surprised'],
+  m7:['미소','eyes3d/m-eye-smile'],
+  f1:['큐트','eyes3d/f-eye-cute'], f2:['해피','eyes3d/f-eye-happy'],
+  f3:['반짝이','eyes3d/f-eye-sparkle'], f4:['윙크','eyes3d/f-eye-wink'],
+  f5:['수줍음','eyes3d/f-eye-shy'], f6:['초롱','eyes3d/f-eye-doe'],
+  f7:['새시','eyes3d/f-eye-sassy'],
 };
 const HATS = {
   none:['없음',''], 
@@ -151,7 +151,8 @@ function buildGrid(elId, data, cur, onPick) {
   for (const [k,[name,file]] of Object.entries(data)) {
     const b = document.createElement('div');
     b.className = 'style-btn'+(k===cur?' active':'');
-    const thumb = file ? `assets/t_${file}.png?v=4` : '';
+    // Thumbnails: use the webp directly for hair3d/eyes3d
+    const thumb = file ? `assets/${file}.webp?v=5` : '';
     b.innerHTML = `${thumb?`<img class="thumb" src="${thumb}">`:''}<div>${name}</div>`;
     b.onclick = ()=>{ onPick(k); buildGrid(elId, data, k, onPick); };
     c.appendChild(b);
@@ -160,16 +161,20 @@ function buildGrid(elId, data, cur, onPick) {
 function setLayer(imgId, file) {
   const el = $(imgId);
   if (!file) { el.style.display='none'; el.src=''; }
-  else { el.style.display=''; el.src=`assets/${file}.png?v=4`; }
+  else {
+    // hair3d/eyes3d use webp, legacy fitted_* use png
+    const ext = (file.includes('hair3d') || file.includes('eyes3d')) ? 'webp' : 'png';
+    el.style.display=''; el.src=`assets/${file}.${ext}?v=5`;
+  }
 }
 function refreshAll() {
   const hm={}, hf={}, em={}, ef={};
   for (const [k,v] of Object.entries(HAIRS)) (k[0]==='m'?hm:hf)[k]=v;
   for (const [k,v] of Object.entries(EYES)) (k[0]==='m'?em:ef)[k]=v;
-  buildGrid('hair-m', hm, curH, k=>{ curH=k; $('img-hair').src=`assets/${HAIRS[k][1]}.png?v=4`; });
-  buildGrid('hair-f', hf, curH, k=>{ curH=k; $('img-hair').src=`assets/${HAIRS[k][1]}.png?v=4`; });
-  buildGrid('eye-m', em, curE, k=>{ curE=k; $('img-eyes').src=`assets/${EYES[k][1]}.png?v=4`; });
-  buildGrid('eye-f', ef, curE, k=>{ curE=k; $('img-eyes').src=`assets/${EYES[k][1]}.png?v=4`; });
+  buildGrid('hair-m', hm, curH, k=>{ curH=k; $('img-hair').src=`assets/${HAIRS[k][1]}.webp?v=5`; });
+  buildGrid('hair-f', hf, curH, k=>{ curH=k; $('img-hair').src=`assets/${HAIRS[k][1]}.webp?v=5`; });
+  buildGrid('eye-m', em, curE, k=>{ curE=k; $('img-eyes').src=`assets/${EYES[k][1]}.webp?v=5`; });
+  buildGrid('eye-f', ef, curE, k=>{ curE=k; $('img-eyes').src=`assets/${EYES[k][1]}.webp?v=5`; });
   buildGrid('hat-grid', HATS, curHat, k=>{ curHat=k; setLayer('img-hat', HATS[k][1]); });
   buildGrid('top-grid', TOPS, curTop, k=>{ curTop=k; setLayer('img-top', TOPS[k][1]); });
   buildGrid('bottom-grid', BOTTOMS, curBottom, k=>{ curBottom=k; setLayer('img-bottom', BOTTOMS[k][1]); });
