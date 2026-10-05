@@ -1031,6 +1031,23 @@
       holder.scale.setScalar(1/Math.max(size.x,size.y,size.z));
       return holder;
     }
+    /* Swap the street-view stage's landmark for the real model (once). */
+    function swapStageLandmark(fitted){
+      if(typeof cityStage==='undefined'||!cityStage||!selected)return;
+      if(cityStage.userData.cityName!==selected.userData.name)return;
+      var old=cityStage.userData.landmarkMesh;
+      if(!old||old.userData.isGLB)return;
+      var sm=fitted.clone();
+      sm.scale.setScalar(.054);sm.position.set(0,.004,.02);
+      sm.userData.isGLB=true;
+      cityStage.remove(old);cityStage.add(sm);
+      cityStage.userData.landmarkMesh=sm;
+    }
+    function refreshStageLandmark(){
+      if(!selected)return;
+      var url=landmarkGLBURL(selected.userData.name,selected.userData.type);
+      if(url&&glbCache[url])swapStageLandmark(glbCache[url]);
+    }
     function updateModelCredit(marker){
       var el=document.getElementById('city-info-credit');
       if(!el)return;
@@ -1054,15 +1071,7 @@
         marker.add(m);
         if(selected===marker)updateModelCredit(marker);
         /* If the street view is already showing this city, swap its landmark too. */
-        if(typeof cityStage!=='undefined'&&cityStage&&cityPhaseActive&&selected===marker&&cityStage.userData.cityName===marker.userData.name){
-          var old=cityStage.userData.landmarkMesh;
-          if(old){
-            var sm=fitted.clone();
-            sm.scale.setScalar(.054);sm.position.set(0,.004,.02);
-            cityStage.remove(old);cityStage.add(sm);
-            cityStage.userData.landmarkMesh=sm;
-          }
-        }
+        if(cityPhaseActive&&selected===marker)swapStageLandmark(fitted);
       };
       if(glbCache[url]){apply(glbCache[url]);return;}
       if(glbPending[url]){glbPending[url].push(apply);return;}
@@ -1173,6 +1182,7 @@
       boundary.visible=false;
       hideAurora();
       citySky.visible=true;
+      refreshStageLandmark(); /* the real model may have arrived while the dialog was open */
       if(cityStage)cityStage.visible=true;
       cityPhaseName.textContent=selected.userData.name;
       cityPhasePanel.setAttribute('aria-hidden','false');
