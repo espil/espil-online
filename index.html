@@ -361,6 +361,7 @@
       color:#eafffb; font:800 .82rem/1 "Manrope",sans-serif; letter-spacing:.24em; text-indent:.24em;
     }
     .city-info-enter:hover { background:linear-gradient(180deg,rgba(64,255,205,.34),rgba(64,255,205,.16)); box-shadow:0 0 26px rgba(64,255,205,.35); }
+    .city-info-credit { margin:12px 0 0; font:500 .6rem/1.6 "Manrope",sans-serif; letter-spacing:.03em; color:rgba(159,245,228,.5); }
     @media (max-width:640px) {
       .city-info {
         top:auto; bottom:14px; right:50%; transform:translateX(50%);
@@ -427,6 +428,7 @@
       <p class="city-info-brands-label">POPULAR BRANDS</p>
       <ul class="city-info-brands" id="city-info-brands"></ul>
       <button class="city-info-enter" id="city-info-enter" type="button">ENTER CITY &#8594;</button>
+      <p class="city-info-credit" id="city-info-credit" style="display:none"></p>
     </div>
     <div class="joystick" id="joystick" aria-hidden="true">
       <div class="joy-knob" id="joy-knob"></div>
@@ -435,6 +437,7 @@
   </main>
 
   <script src="assets/three.min.js"></script>
+  <script src="assets/GLTFLoader.js"></script>
   <script>
   (function(){
     var reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -984,6 +987,87 @@
       }
       return model;
     }
+    /* Free-to-use landmark GLB models (Poly Pizza, CC0/CC-BY — see assets/landmarks/CREDITS.json).
+       Loaded on demand when a city is selected so the intro stays fast; the procedural
+       miniature shows until the real model arrives, then stays cached on the marker. */
+    var LANDMARK_GLB={
+      arch:'assets/landmarks/arch.glb',bridge:'assets/landmarks/bridge.glb',
+      christ:'assets/landmarks/christ.glb',clock:'assets/landmarks/clock.glb',
+      colosseum:'assets/landmarks/colosseum.glb',eiffel:'assets/landmarks/eiffel.glb',
+      junk:'assets/landmarks/junk.glb',liberty:'assets/landmarks/liberty.glb',
+      needle:'assets/landmarks/needle.glb',obelisk:'assets/landmarks/obelisk.glb',
+      pearl:'assets/landmarks/pearl.glb',pyramid:'assets/landmarks/pyramid.glb',
+      star:'assets/landmarks/star.glb',sun:'assets/landmarks/sun.glb',
+      theatre:'assets/landmarks/theatre.glb',torii:'assets/landmarks/torii.glb'
+    };
+    /* One landmark type, two different real buildings: Cairo gets the Giza pyramid. */
+    var LANDMARK_GLB_CITY={Cairo:'assets/landmarks/pyramid_giza.glb'};
+    var LANDMARK_GLB_CREDIT={
+      'assets/landmarks/arch.glb':'"Archway" by Poly by Google · CC-BY 3.0',
+      'assets/landmarks/bridge.glb':'"Golden Gate Bridge" by Steren Giannini · CC-BY 3.0',
+      'assets/landmarks/christ.glb':'"Rio de Janeiro" by Alan Zimmerman · CC-BY 3.0',
+      'assets/landmarks/clock.glb':'"BigBen" by Daqian Dong · CC-BY 3.0',
+      'assets/landmarks/colosseum.glb':'"Colosseum" by CreativeTrio · CC0 1.0',
+      'assets/landmarks/eiffel.glb':'"Eiffel Tower" by Scott Marshall · CC-BY 3.0',
+      'assets/landmarks/junk.glb':'"Small Ship" by Quaternius · CC0 1.0',
+      'assets/landmarks/liberty.glb':'"Lady Liberty" by Anna M · CC-BY 3.0',
+      'assets/landmarks/needle.glb':'"Radio Tower" by Poly by Google · CC-BY 3.0',
+      'assets/landmarks/obelisk.glb':'"Fence Pillar" · CC0 1.0',
+      'assets/landmarks/pearl.glb':'"Oriental Pearl Tower" by sugamo · CC-BY 3.0',
+      'assets/landmarks/pyramid.glb':'"Mayan Temple" by Steve Atkins · CC-BY 3.0',
+      'assets/landmarks/pyramid_giza.glb':'"Pyramid" by Poly by Google · CC-BY 3.0',
+      'assets/landmarks/star.glb':'"Star" by Poly by Google · CC-BY 3.0',
+      'assets/landmarks/sun.glb':'"Sun" by Poly by Google · CC-BY 3.0',
+      'assets/landmarks/theatre.glb':'"Greek Temple" by Alexandre Thomas · CC-BY 3.0',
+      'assets/landmarks/torii.glb':'"Torii Gate" by Hattie Stroud · CC-BY 3.0'
+    };
+    var gltfLoader=null,glbCache={},glbPending={};
+    function landmarkGLBURL(cityName,type){return LANDMARK_GLB_CITY[cityName]||LANDMARK_GLB[type]||null;}
+    function fitLandmarkGLB(scene){
+      var box=new THREE.Box3().setFromObject(scene),size=new THREE.Vector3(),center=new THREE.Vector3();
+      box.getSize(size);box.getCenter(center);
+      var holder=new THREE.Group();
+      scene.position.set(-center.x,-box.min.y,-center.z);
+      holder.add(scene);
+      holder.scale.setScalar(1/Math.max(size.x,size.y,size.z));
+      return holder;
+    }
+    function updateModelCredit(marker){
+      var el=document.getElementById('city-info-credit');
+      if(!el)return;
+      var url=marker.userData.glbURL;
+      if(url&&marker.userData.glbApplied&&LANDMARK_GLB_CREDIT[url]){
+        el.textContent='3D landmark model · '+LANDMARK_GLB_CREDIT[url]+' · via poly.pizza';
+        el.style.display='block';
+      }else{el.style.display='none';}
+    }
+    function ensureLandmarkGLB(marker){
+      var url=landmarkGLBURL(marker.userData.name,marker.userData.type);
+      marker.userData.glbURL=url;
+      if(!url||typeof THREE.GLTFLoader==='undefined')return;
+      if(marker.userData.glbApplied)return;
+      var apply=function(fitted){
+        if(marker.userData.glbApplied)return;
+        marker.userData.glbApplied=true;
+        if(marker.userData.procModel){marker.remove(marker.userData.procModel);marker.userData.procModel=null;}
+        var m=fitted.clone();
+        m.position.set(0,.015,0);
+        marker.add(m);
+        if(selected===marker)updateModelCredit(marker);
+      };
+      if(glbCache[url]){apply(glbCache[url]);return;}
+      if(glbPending[url]){glbPending[url].push(apply);return;}
+      glbPending[url]=[apply];
+      try{
+        if(!gltfLoader)gltfLoader=new THREE.GLTFLoader();
+        gltfLoader.load(url,function(gltf){
+          var fitted=fitLandmarkGLB(gltf.scene);
+          glbCache[url]=fitted;
+          (glbPending[url]||[]).forEach(function(cb){cb(fitted);});
+          delete glbPending[url];
+        },undefined,function(){delete glbPending[url];});
+      }catch(e){delete glbPending[url];}
+    }
     var cityStage=null,cityPhaseActive=false,cityPhaseFade=0,cityApproachStarted=0;
     var approachSlow=false,infoShown=false;
     function destroyCityStage(){
@@ -1054,7 +1138,9 @@
           if(cityRandom()>.79)addBox(width*.35,.006,depth*.35,x,height+.006,z,roadMat);
         }
       }
-      var landmark=landmarkModel(marker.userData.type||cityData[marker.userData.index][3]);
+      var landmarkType=marker.userData.type||cityData[marker.userData.index][3];
+      var landmarkURL=landmarkGLBURL(marker.userData.name,landmarkType);
+      var landmark=(landmarkURL&&glbCache[landmarkURL])?glbCache[landmarkURL].clone():landmarkModel(landmarkType);
       landmark.scale.setScalar(.054);landmark.position.set(0,.004,.02);stage.add(landmark);
       var plaza=new THREE.Mesh(new THREE.CylinderGeometry(.052,.052,.002,32),roadMat);plaza.position.set(0,.002,.02);stage.add(plaza);
       earthSpin.add(stage);cityStage=stage;
@@ -1077,9 +1163,10 @@
       var marker=new THREE.Mesh(new THREE.SphereGeometry(.72,10,8),new THREE.MeshBasicMaterial({transparent:true,opacity:.001,depthWrite:false}));
       marker.position.copy(pos);
       marker.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),pos.clone().normalize());
-      marker.add(landmarkModel(city[3]));
+      var procModel=landmarkModel(city[3]);
+      marker.add(procModel);
       marker.scale.setScalar(.17);
-      marker.userData={name:city[0],normal:pos.clone().normalize(),landmark:city[4],type:city[3],baseScale:.11,index:index};
+      marker.userData={name:city[0],normal:pos.clone().normalize(),landmark:city[4],type:city[3],baseScale:.11,index:index,procModel:procModel,glbApplied:false,glbURL:null};
       markerGroup.add(marker);markers.push(marker);
       var cityButton=document.createElement('button');
       cityButton.type='button';cityButton.className='city-name';cityButton.textContent=city[0];cityButton.title=city[0]+' — '+city[4];cityButton.setAttribute('aria-label',city[0]+', '+city[4]);
@@ -1321,6 +1408,7 @@
     }
     function selectCity(marker){
       selected=marker;setActiveButton(marker);centerReel(marker,true);
+      ensureLandmarkGLB(marker); /* start fetching the real 3D model; swaps in when ready */
       navIndex=markers.indexOf(marker);
       approachSlow=true;infoShown=false;hideCityInfo();
       if(window.EspilAudio){window.EspilAudio.onCitySelect();window.EspilAudio.pop();}
@@ -1424,12 +1512,13 @@
       if(infoPop)infoPop.textContent='Metro population · approx '+facts.pop;
       if(infoBrands)infoBrands.innerHTML=facts.brands.map(function(b){return '<li>'+b+'</li>';}).join('');
       if(infoPanel)infoPanel.setAttribute('aria-hidden','false');
+      updateModelCredit(marker);
       status.textContent=marker.userData.name+' — '+marker.userData.landmark;
       if(infoEnter)try{infoEnter.focus({preventScroll:true});}catch(e){}
     }
     function hideCityInfo(){ infoShown=false; if(infoPanel)infoPanel.setAttribute('aria-hidden','true'); }
     var infoEnter=document.getElementById('city-info-enter'),infoBack=document.getElementById('city-info-back');
-    if(infoEnter)infoEnter.addEventListener('click',function(){if(window.EspilAudio&&window.EspilAudio.pop)window.EspilAudio.pop();if(selected&&typeof cityData!=='undefined'){var cd=cityData[selected.userData.index];var slug=String(cd[0]).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');window.location.href='/test?city='+slug+'&lat='+cd[1]+'&lon='+cd[2];}else{hideCityInfo();activateCityPhase();}});
+    if(infoEnter)infoEnter.addEventListener('click',function(){if(window.EspilAudio&&window.EspilAudio.pop)window.EspilAudio.pop();hideCityInfo();activateCityPhase();});
     if(infoBack)infoBack.addEventListener('click',function(){if(window.EspilAudio&&window.EspilAudio.pop)window.EspilAudio.pop();clearSelection(true);});
     function zoomBy(delta){
       hasInteracted=true;
