@@ -69,11 +69,11 @@
     <div id="nametag">Espil</div>
     <div id="char">
       <div id="shadow"></div>
-      <img id="img-body" src="/cctest/assets/body_base.png?v=4" alt="">
-      <img id="img-bottom" src="/cctest/assets/fitted_bottom_shorts.png?v=4" alt="" style="display:none">
-      <img id="img-top" src="/cctest/assets/fitted_top_tshirt.png?v=4" alt="" style="display:none">
-      <img id="img-eyes" src="/cctest/assets/eye_f1_big.png?v=4" alt="">
-      <img id="img-hair" src="/cctest/assets/hair_m1_spiky.png?v=4" alt="">
+      <img id="img-body" src="assets/body_base.png?v=4" alt="">
+      <img id="img-bottom" src="assets/fitted_bottom_shorts.png?v=4" alt="" style="display:none">
+      <img id="img-top" src="assets/fitted_top_tshirt.png?v=4" alt="" style="display:none">
+      <img id="img-eyes" src="assets/eye_f1_big.png?v=4" alt="">
+      <img id="img-hair" src="assets/hair_m1_spiky.png?v=4" alt="">
       <img id="img-hat" src="" alt="" style="display:none">
     </div>
   </div>
@@ -151,7 +151,7 @@ function buildGrid(elId, data, cur, onPick) {
   for (const [k,[name,file]] of Object.entries(data)) {
     const b = document.createElement('div');
     b.className = 'style-btn'+(k===cur?' active':'');
-    const thumb = file ? `/cctest/assets/t_${file}.png?v=4` : '';
+    const thumb = file ? `assets/t_${file}.png?v=4` : '';
     b.innerHTML = `${thumb?`<img class="thumb" src="${thumb}">`:''}<div>${name}</div>`;
     b.onclick = ()=>{ onPick(k); buildGrid(elId, data, k, onPick); };
     c.appendChild(b);
@@ -160,16 +160,16 @@ function buildGrid(elId, data, cur, onPick) {
 function setLayer(imgId, file) {
   const el = $(imgId);
   if (!file) { el.style.display='none'; el.src=''; }
-  else { el.style.display=''; el.src=`/cctest/assets/${file}.png?v=4`; }
+  else { el.style.display=''; el.src=`assets/${file}.png?v=4`; }
 }
 function refreshAll() {
   const hm={}, hf={}, em={}, ef={};
   for (const [k,v] of Object.entries(HAIRS)) (k[0]==='m'?hm:hf)[k]=v;
   for (const [k,v] of Object.entries(EYES)) (k[0]==='m'?em:ef)[k]=v;
-  buildGrid('hair-m', hm, curH, k=>{ curH=k; $('img-hair').src=`/cctest/assets/${HAIRS[k][1]}.png?v=4`; });
-  buildGrid('hair-f', hf, curH, k=>{ curH=k; $('img-hair').src=`/cctest/assets/${HAIRS[k][1]}.png?v=4`; });
-  buildGrid('eye-m', em, curE, k=>{ curE=k; $('img-eyes').src=`/cctest/assets/${EYES[k][1]}.png?v=4`; });
-  buildGrid('eye-f', ef, curE, k=>{ curE=k; $('img-eyes').src=`/cctest/assets/${EYES[k][1]}.png?v=4`; });
+  buildGrid('hair-m', hm, curH, k=>{ curH=k; $('img-hair').src=`assets/${HAIRS[k][1]}.png?v=4`; });
+  buildGrid('hair-f', hf, curH, k=>{ curH=k; $('img-hair').src=`assets/${HAIRS[k][1]}.png?v=4`; });
+  buildGrid('eye-m', em, curE, k=>{ curE=k; $('img-eyes').src=`assets/${EYES[k][1]}.png?v=4`; });
+  buildGrid('eye-f', ef, curE, k=>{ curE=k; $('img-eyes').src=`assets/${EYES[k][1]}.png?v=4`; });
   buildGrid('hat-grid', HATS, curHat, k=>{ curHat=k; setLayer('img-hat', HATS[k][1]); });
   buildGrid('top-grid', TOPS, curTop, k=>{ curTop=k; setLayer('img-top', TOPS[k][1]); });
   buildGrid('bottom-grid', BOTTOMS, curBottom, k=>{ curBottom=k; setLayer('img-bottom', BOTTOMS[k][1]); });
