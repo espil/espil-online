@@ -66,9 +66,9 @@
     <div id="nametag">Espil</div>
     <div id="char">
       <div id="shadow"></div>
-      <img id="img-body" src="/cctest/assets/body_base.png" alt="">
-      <img id="img-eyes" src="/cctest/assets/eye_f1_big.png" alt="">
-      <img id="img-hair" src="/cctest/assets/hair_m1_spiky.png" alt="">
+      <img id="img-body" src="/cctest/assets/body_base.png?v=4?v=3" alt="">
+      <img id="img-eyes" src="/cctest/assets/eye_f1_big.png?v=4?v=3" alt="">
+      <img id="img-hair" src="/cctest/assets/hair_m1_spiky.png?v=4?v=3" alt="">
     </div>
   </div>
   <div id="panel">
@@ -120,7 +120,7 @@ function buildGrid(elId, data, cur, onPick) {
     if (!k.startsWith(elId.includes('hair')?'':'')) {}
     const b = document.createElement('div');
     b.className = 'style-btn'+(k===cur?' active':'');
-    b.innerHTML = `<img class="thumb" src="/cctest/assets/t_${file}.png"><div>${name}</div>`;
+    b.innerHTML = `<img class="thumb" src="/cctest/assets/t_${file}.png?v=4?v=3"><div>${name}</div>`;
     b.onclick = ()=>{ onPick(k); buildGrid(elId, data, k, onPick); };
     c.appendChild(b);
   }
@@ -129,10 +129,10 @@ function refreshAll() {
   const hm={}, hf={}, em={}, ef={};
   for (const [k,v] of Object.entries(HAIRS)) (k[0]==='m'?hm:hf)[k]=v;
   for (const [k,v] of Object.entries(EYES)) (k[0]==='m'?em:ef)[k]=v;
-  buildGrid('hair-m', hm, curH, k=>{ curH=k; $('img-hair').src=`/cctest/assets/${HAIRS[k][1]}.png`; });
-  buildGrid('hair-f', hf, curH, k=>{ curH=k; $('img-hair').src=`/cctest/assets/${HAIRS[k][1]}.png`; });
-  buildGrid('eye-m', em, curE, k=>{ curE=k; $('img-eyes').src=`/cctest/assets/${EYES[k][1]}.png`; });
-  buildGrid('eye-f', ef, curE, k=>{ curE=k; $('img-eyes').src=`/cctest/assets/${EYES[k][1]}.png`; });
+  buildGrid('hair-m', hm, curH, k=>{ curH=k; $('img-hair').src=`/cctest/assets/${HAIRS[k][1]}.png?v=4?v=3`; });
+  buildGrid('hair-f', hf, curH, k=>{ curH=k; $('img-hair').src=`/cctest/assets/${HAIRS[k][1]}.png?v=4?v=3`; });
+  buildGrid('eye-m', em, curE, k=>{ curE=k; $('img-eyes').src=`/cctest/assets/${EYES[k][1]}.png?v=4?v=3`; });
+  buildGrid('eye-f', ef, curE, k=>{ curE=k; $('img-eyes').src=`/cctest/assets/${EYES[k][1]}.png?v=4?v=3`; });
 }
 document.querySelectorAll('#tabs button').forEach(b=>{
   b.onclick=()=>{
