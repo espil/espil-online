@@ -255,8 +255,8 @@ class MeshyClient {
         lastStatus = status;
       }
       if (status === 'SUCCEEDED') {
-        const url = pickUrl(s);
-        if (!url) throw new Error(`${label}: SUCCEEDED but no download URL in response`);
+        const url = pickUrl ? pickUrl(s) : null;
+        // pickUrl may be null/return null for preview steps (no download needed)
         return { statusJson: s, downloadUrl: url };
       }
       if (status === 'FAILED' || status === 'CANCELED' || status === 'EXPIRED') {
@@ -284,13 +284,18 @@ async function downloadFile(url, destPath) {
   return destPath;
 }
 
-async function run3DTask(client, task) {
-  const previewId = await client.createPreviewTask(task);
-  await client.pollUntilDone(
-    () => client.getTextTo3DStatus(previewId),
-    () => null, // preview has no final download; we just wait for SUCCEEDED
-    `preview:${task.id}`
-  );
+async function run3DTask(client, task, opts = {}) {
+  // Allow reusing an existing preview task ID (saves credits on retry)
+  const previewId = opts.previewId || await client.createPreviewTask(task);
+  if (!opts.previewId) {
+    await client.pollUntilDone(
+      () => client.getTextTo3DStatus(previewId),
+      null, // preview has no download; just wait for SUCCEEDED
+      `preview:${task.id}`
+    );
+  } else {
+    console.log(`  [A] Reusing preview task: ${previewId}`);
+  }
   const refineId = await client.createRefineTask(previewId, task);
   const { downloadUrl } = await client.pollUntilDone(
     () => client.getTextTo3DStatus(refineId),
@@ -375,10 +380,10 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function processTask(client, task) {
+async function processTask(client, task, opts = {}) {
   console.log(`\n▶ [${task.layer}] ${task.id} — "${task.name}"`);
   const assetPath = is3DLayer(task.layer)
-    ? await run3DTask(client, task)
+    ? await run3DTask(client, task, opts)
     : await runTextureTask(client, task);
   const entry = toItemsJsonEntry(task, assetPath);
   console.log(`✔ Done: ${task.id} → ${assetPath}`);
@@ -390,9 +395,19 @@ async function main() {
   const dryRun = args.includes('--dry-run');
   const onlyIdx = args.indexOf('--only');
   const onlyLayer = onlyIdx >= 0 ? args[onlyIdx + 1] : null;
+  const taskIdx = args.indexOf('--task');
+  const onlyTaskId = taskIdx >= 0 ? args[taskIdx + 1] : null;
+  const previewIdx = args.indexOf('--preview-id');
+  const reusePreviewId = previewIdx >= 0 ? args[previewIdx + 1] : null;
 
   let tasks = TASKS;
-  if (onlyLayer) {
+  if (onlyTaskId) {
+    tasks = tasks.filter((t) => t.id === onlyTaskId);
+    if (tasks.length === 0) {
+      console.error(`No task with id "${onlyTaskId}".`);
+      process.exit(1);
+    }
+  } else if (onlyLayer) {
     tasks = tasks.filter((t) => t.layer === onlyLayer);
     if (tasks.length === 0) {
       console.error(`No tasks for layer "${onlyLayer}". Available: hair, hat, cape, top, bottom`);
@@ -425,7 +440,7 @@ async function main() {
     while (queue.length > 0) {
       const task = queue.shift();
       try {
-        const entry = await processTask(client, task);
+        const entry = await processTask(client, task, { previewId: reusePreviewId });
         completed.push(entry);
         // Patch incrementally so progress survives crashes
         patchItemsJson([entry]);
