@@ -15,16 +15,18 @@
   }
   #char {
     position:relative; width:min(70vw, 340px); aspect-ratio:969/1690;
-    animation:bob 2.4s ease-in-out infinite;
+    transform-style:preserve-3d;
   }
-  @keyframes bob {
-    0%,100% { transform:translateY(0); }
-    50% { transform:translateY(-8px); }
+  #char img { position:absolute; pointer-events:none; }
+  #img-body { z-index:1; left:0; top:0; width:100%; height:100%; object-fit:contain; }
+  #img-hair { z-index:3; left:50%; top:-2%; width:62%; transform:translateX(-50%); }
+  #img-eyes { z-index:2; left:50%; top:16.5%; width:34%; transform:translateX(-50%); }
+  #shadow {
+    position:absolute; bottom:6%; left:50%; transform:translateX(-50%);
+    width:55%; height:24px; z-index:0;
+    background:radial-gradient(ellipse at center, rgba(0,0,0,0.35) 0%, transparent 70%);
+    border-radius:50%;
   }
-  #char img { position:absolute; left:0; top:0; width:100%; height:100%; object-fit:contain; pointer-events:none; }
-  #img-body { z-index:1; }
-  #img-hair { z-index:3; }
-  #img-eyes { z-index:2; }
   #nametag {
     position:absolute; top:14px; left:50%; transform:translateX(-50%);
     background:rgba(0,0,0,0.55); color:#fff; padding:6px 18px; border-radius:14px;
@@ -63,6 +65,7 @@
   <div id="stage">
     <div id="nametag">Espil</div>
     <div id="char">
+      <div id="shadow"></div>
       <img id="img-body" src="/cctest/assets/body_base.png" alt="">
       <img id="img-eyes" src="/cctest/assets/eye_f1_big.png" alt="">
       <img id="img-hair" src="/cctest/assets/hair_m1_spiky.png" alt="">
@@ -140,6 +143,24 @@ document.querySelectorAll('#tabs button').forEach(b=>{
   };
 });
 refreshAll();
+
+// 2.5D tilt: subtle 3D rotation following pointer
+const stage = $('stage'), charEl = $('char');
+let tiltX = 0, tiltY = 0, targetTX = 0, targetTY = 0;
+stage.addEventListener('pointermove', e => {
+  const r = stage.getBoundingClientRect();
+  const px = (e.clientX - r.left) / r.width - 0.5;
+  const py = (e.clientY - r.top) / r.height - 0.5;
+  targetTY = px * 10; targetTX = -py * 8;
+});
+stage.addEventListener('pointerleave', () => { targetTX = 0; targetTY = 0; });
+(function tiltLoop(){
+  tiltX += (targetTX - tiltX) * 0.08;
+  tiltY += (targetTY - tiltY) * 0.08;
+  const bobY = Math.sin(Date.now()/1000 * 2.6) * -5;
+  charEl.style.transform = `translateY(${bobY}px) rotateX(${tiltX}deg) rotateY(${tiltY}deg)`;
+  requestAnimationFrame(tiltLoop);
+})();
 </script>
 </body>
 </html>
