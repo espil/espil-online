@@ -172,7 +172,7 @@ class MeshyClient {
       model_url: modelUrl,
       text_style_prompt: task.prompt,
       negative_prompt: task.negative_prompt || undefined,
-      art_style: 'stylized',
+      art_style: 'cartoon',
       ai_model: 'meshy-5',
       enable_original_uv: true,
       enable_pbr: false,
