@@ -134,26 +134,26 @@ function buildHair(style, color) {
       geo = new THREE.SphereGeometry(0.34, 24, 18);
       hairMesh = new THREE.Mesh(geo, mat);
       hairMesh.scale.set(1.05, 1.3, 1.0);
-      hairMesh.position.set(0, 0.1, -0.05);
+      hairMesh.position.set(0, 0.22, -0.1);
       break;
     case 'spiky':
       geo = new THREE.ConeGeometry(0.3, 0.5, 8);
       hairMesh = new THREE.Mesh(geo, mat);
-      hairMesh.position.set(0, 0.35, 0);
+      hairMesh.position.set(0, 0.45, -0.05);
       break;
     case 'twintail':
       // Main cap + two tails
       const group = new THREE.Group();
       const cap = new THREE.Mesh(new THREE.SphereGeometry(0.32, 24, 18), mat);
-      cap.scale.set(1.1, 0.9, 1.05);
-      cap.position.set(0, 0.15, -0.02);
+      cap.scale.set(1.15, 1.0, 1.1);
+      cap.position.set(0, 0.28, -0.08);
       group.add(cap);
       const tailGeo = new THREE.ConeGeometry(0.12, 0.5, 12);
       const tailL = new THREE.Mesh(tailGeo, mat);
-      tailL.position.set(-0.35, 0.05, -0.1);
+      tailL.position.set(-0.35, 0.15, -0.15);
       tailL.rotation.z = 0.4;
       const tailR = new THREE.Mesh(tailGeo, mat);
-      tailR.position.set(0.35, 0.05, -0.1);
+      tailR.position.set(0.35, 0.15, -0.15);
       tailR.rotation.z = -0.4;
       group.add(tailL); group.add(tailR);
       hairMesh = group;
@@ -161,14 +161,14 @@ function buildHair(style, color) {
     case 'buzz':
       geo = new THREE.SphereGeometry(0.3, 24, 18);
       hairMesh = new THREE.Mesh(geo, mat);
-      hairMesh.scale.set(1.02, 0.75, 1.0);
-      hairMesh.position.set(0, 0.18, -0.02);
+      hairMesh.scale.set(1.05, 0.8, 1.02);
+      hairMesh.position.set(0, 0.3, -0.08);
       break;
     default: // bob
       geo = new THREE.SphereGeometry(0.32, 24, 18);
       hairMesh = new THREE.Mesh(geo, mat);
-      hairMesh.scale.set(1.1, 0.9, 1.05);
-      hairMesh.position.set(0, 0.15, -0.02);
+      hairMesh.scale.set(1.15, 1.0, 1.1);
+      hairMesh.position.set(0, 0.28, -0.08);
   }
   if (headBone) headBone.add(hairMesh);
   else model.add(hairMesh);
