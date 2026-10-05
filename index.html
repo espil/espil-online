@@ -1038,7 +1038,7 @@
       var old=cityStage.userData.landmarkMesh;
       if(!old||old.userData.isGLB)return;
       var sm=fitted.clone();
-      sm.scale.setScalar(.054);sm.position.set(0,.004,.02);
+      sm.scale.multiplyScalar(.054);sm.position.set(0,.004,.02);
       sm.userData.isGLB=true;
       cityStage.remove(old);cityStage.add(sm);
       cityStage.userData.landmarkMesh=sm;
@@ -1171,7 +1171,7 @@
       var landmarkType=marker.userData.type||cityData[marker.userData.index][3];
       var landmarkURL=landmarkGLBURL(marker.userData.name,landmarkType);
       var landmark=(landmarkURL&&glbCache[landmarkURL])?glbCache[landmarkURL].clone():landmarkModel(landmarkType);
-      landmark.scale.setScalar(.054);landmark.position.set(0,.004,.02);stage.add(landmark);
+      landmark.scale.multiplyScalar(.054);landmark.position.set(0,.004,.02);stage.add(landmark);
       stage.userData.landmarkMesh=landmark;stage.userData.cityName=marker.userData.name;
       var plaza=new THREE.Mesh(new THREE.CylinderGeometry(.052,.052,.002,32),roadMat);plaza.position.set(0,.002,.02);stage.add(plaza);
       earthSpin.add(stage);cityStage=stage;
