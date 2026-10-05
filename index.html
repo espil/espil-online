@@ -296,8 +296,7 @@
     }
     .intro-logo .typed-layer .ch.on { visibility:visible; }
     .intro-logo .caret {
-      position:absolute; left:100%; top:50%; width:.09em; height:1em; margin-left:.12em;
-      transform:translateY(-52%);
+      display:inline-block; width:.09em; height:1em; margin-left:.12em; vertical-align:-.06em;
       background:#7dfce6; box-shadow:0 0 18px rgba(64,255,205,.9);
       animation:caret-blink .8s steps(1) infinite;
     }
@@ -1393,10 +1392,8 @@
       markers.forEach(function(item){item.userData.button.classList.toggle('is-active',item===marker);});
     }
     function hoverCity(hit){
-      if(hovered&&hovered!==selected)hovered.scale.setScalar(hovered.userData.baseScale);
       hovered=hit?hit.object:null;
       if(hovered){
-        hovered.scale.setScalar(hovered.userData.baseScale*1.42);
         if(textureReady&&reliefReady)status.textContent=hovered.userData.name+' — '+hovered.userData.landmark;
         else status.textContent=idleStatus();
         canvas.style.cursor='pointer';
@@ -1598,8 +1595,8 @@
         marker.getWorldPosition(worldPoint);
         var facing=worldPoint.clone().normalize().dot(cameraDirection)>.08;
         marker.visible=!cityPhaseActive&&facing;
-        /* Constant landmark size regardless of zoom; half size while its city is zoomed. */
-        if(marker!==hovered)marker.scale.setScalar(marker.userData.baseScale*(marker===selected?.5:1));
+        /* Constant landmark size regardless of zoom; half size while its city is zoomed. No hover scaling. */
+        marker.scale.setScalar(marker.userData.baseScale*(marker===selected?.5:1));
         if(marker.userData.halo)marker.userData.halo.scale.setScalar(marker===selected?.19:.38);
       });
       if(aurora.visible){
