@@ -55,7 +55,7 @@ let rendering = false;
 
 const info = document.getElementById('info');
 
-new THREE.GLTFLoader().load('running.glb', function(gltf) {
+new THREE.GLTFLoader().load('https://raw.githubusercontent.com/espil/espil-online/main/cctest/sprites3d/running.glb', function(gltf) {
     model = gltf.scene;
     scene.add(model);
     
