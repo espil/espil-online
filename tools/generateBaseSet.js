@@ -64,7 +64,7 @@ const TASKS = [
     layer: 'bottom',
     prompt: 'Simple basic shorts for chibi character legs, unisex pants, soft medium grey color, flat 2D illustration style, hand-painted clean gaming texture, MapleStory 2 asset style, minimal cell-shading, solid color block',
     negative_prompt: 'Long jeans, realistic denim texture, pockets, belts, chains, realistic shadows, high-poly creases',
-    template: 'assets/base/chibi_base.fbx',
+    template: 'assets/base/chibi_base.glb',
   },
 ];
 
@@ -165,23 +165,26 @@ class MeshyClient {
     return this.request('GET', `/v2/text-to-3d/${taskId}`);
   }
 
-  // Text-to-Texture
+  // Retexture (the correct endpoint — /v1/text-to-texture does not exist)
   async createTextureTask(task, modelUrl) {
-    console.log(`  [TEX] Texture task for "${task.id}"...`);
-    const data = await this.request('POST', '/v1/text-to-texture', {
+    console.log(`  [TEX] Retexture task for "${task.id}"...`);
+    const data = await this.request('POST', '/v1/retexture', {
       model_url: modelUrl,
-      object_prompt: 'chibi character base template',
-      texture_prompt: task.prompt,
+      text_style_prompt: task.prompt,
       negative_prompt: task.negative_prompt || undefined,
       art_style: 'stylized',
       ai_model: 'meshy-5',
+      enable_original_uv: true,
+      enable_pbr: false,
+      texture_resolution: '2k',
+      remove_lighting: true,
     });
-    if (!data?.result) throw new Error('No texture task ID returned');
+    if (!data?.result) throw new Error('No retexture task ID returned');
     return data.result;
   }
 
   async getTextureStatus(taskId) {
-    return this.request('GET', `/v1/text-to-texture/${taskId}`);
+    return this.request('GET', `/v1/retexture/${taskId}`);
   }
 
   async pollUntilDone(statusFn, pickUrl, label) {
@@ -275,16 +278,26 @@ async function runTextureTask(client, task) {
   const modelUrl = resolveTemplateUrl(task);
   console.log(`  Template URL: ${modelUrl}`);
   const taskId = await client.createTextureTask(task, modelUrl);
-  const { downloadUrl } = await client.pollUntilDone(
+  const { statusJson, downloadUrl } = await client.pollUntilDone(
     () => client.getTextureStatus(taskId),
-    (s) => s.texture_urls?.[0]?.base_color || s.texture_url,
-    `texture:${task.id}`
+    (s) => s.texture_urls?.[0]?.base_color
+        || s.texture_urls?.[0]?.baseColor
+        || s.texture_urls?.[0]
+        || s.model_urls?.glb,
+    `retexture:${task.id}`
   );
-  if (!downloadUrl) throw new Error('No base_color URL in texture result');
+  if (!downloadUrl) {
+    console.log('  Response keys:', Object.keys(statusJson).join(', '));
+    throw new Error('No texture/model URL in retexture result');
+  }
+  // Save with appropriate extension based on URL
+  const isModel = downloadUrl.includes('.glb') || statusJson.model_urls?.glb === downloadUrl;
+  const ext = isModel ? '.glb' : '.png';
   const dir = path.resolve(CONFIG.projectRoot, CONFIG.assetsDir, task.layer);
   ensureDir(dir);
-  const dest = path.join(dir, `${task.id}.png`);
+  const dest = path.join(dir, `${task.id}${ext}`);
   await downloadFile(downloadUrl, dest);
+  if (isModel) console.log(`  ⚠️ Retexture returned full model (not standalone PNG)`);
   return path.relative(CONFIG.projectRoot, dest).replace(/\\/g, '/');
 }
 
@@ -294,7 +307,7 @@ async function runTextureTask(client, task) {
 
 function toItemEntry(task, assetPath) {
   const entry = { id: task.id, name: task.name, layer: task.layer };
-  if (is3DLayer(task.layer)) {
+  if (assetPath.endsWith('.glb')) {
     entry.prefabUrl = assetPath;
     entry.offset = task.offset || { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] };
   } else {
@@ -335,16 +348,27 @@ function patchItemsJson(entries) {
 
 async function main() {
   const dryRun = process.argv.includes('--dry-run');
+  const onlyIdx = process.argv.indexOf('--only');
+  const onlyIds = onlyIdx >= 0 ? process.argv[onlyIdx + 1].split(',') : null;
+
+  let tasks = TASKS;
+  if (onlyIds) {
+    tasks = TASKS.filter((t) => onlyIds.includes(t.id));
+    if (tasks.length === 0) {
+      console.error(`No tasks match: ${onlyIds.join(',')}`);
+      process.exit(1);
+    }
+  }
 
   console.log('═══════════════════════════════════════════');
-  console.log(' Base Set Generator — 4 starter items');
+  console.log(` Base Set Generator — ${tasks.length} item(s)`);
   console.log(` Root: ${CONFIG.projectRoot}`);
   console.log(' Mode: sequential (1 at a time), poll every 5s');
   if (dryRun) console.log(' DRY RUN — no API calls');
   console.log('═══════════════════════════════════════════');
 
   if (dryRun) {
-    TASKS.forEach((t, i) => {
+    tasks.forEach((t, i) => {
       console.log(`\n${i + 1}. [${t.layer}] ${t.id}`);
       console.log(`   prompt: ${t.prompt.slice(0, 80)}…`);
       console.log(`   negative: ${t.negative_prompt.slice(0, 60)}…`);
@@ -358,9 +382,9 @@ async function main() {
   const failed = [];
 
   // Sequential loop — one task at a time
-  for (let i = 0; i < TASKS.length; i++) {
-    const task = TASKS[i];
-    console.log(`\n▶ [${i + 1}/4] [${task.layer}] ${task.id} — "${task.name}"`);
+  for (let i = 0; i < tasks.length; i++) {
+    const task = tasks[i];
+    console.log(`\n▶ [${i + 1}/${tasks.length}] [${task.layer}] ${task.id} — "${task.name}"`);
     try {
       const assetPath = is3DLayer(task.layer)
         ? await runHairTask(client, task)
@@ -374,11 +398,11 @@ async function main() {
       failed.push({ id: task.id, error: err.message });
     }
     // Brief pause between tasks
-    if (i < TASKS.length - 1) await sleep(3000);
+    if (i < tasks.length - 1) await sleep(3000);
   }
 
   console.log('\n═══════════════════════════════════════════');
-  console.log(` Done. ✅ ${done.length}/4 succeeded, ❌ ${failed.length} failed`);
+  console.log(` Done. ✅ ${done.length}/${tasks.length} succeeded, ❌ ${failed.length} failed`);
   failed.forEach((f) => console.log(`  • ${f.id}: ${f.error}`));
   if (failed.length > 0) process.exitCode = 1;
 }
