@@ -1067,15 +1067,27 @@
       if(glbCache[url]){apply(glbCache[url]);return;}
       if(glbPending[url]){glbPending[url].push(apply);return;}
       glbPending[url]=[apply];
+      var loadFailed=function(reason){
+        delete glbPending[url];
+        try{ if(window.__espilToast)window.__espilToast('3D landmark failed to load ('+reason+')'); }catch(e){}
+        try{
+          if(selected&&selected.userData.glbURL===url){
+            var el=document.getElementById('city-info-credit');
+            if(el){ el.textContent='3D landmark model unavailable ('+reason+') · showing miniature'; el.style.display='block'; }
+          }
+        }catch(e){}
+      };
       try{
         if(!gltfLoader)gltfLoader=new THREE.GLTFLoader();
         gltfLoader.load(url,function(gltf){
-          var fitted=fitLandmarkGLB(gltf.scene);
+          var fitted;
+          try{ fitted=fitLandmarkGLB(gltf.scene); }
+          catch(e){ loadFailed('fit: '+e.message); return; }
           glbCache[url]=fitted;
-          (glbPending[url]||[]).forEach(function(cb){cb(fitted);});
+          (glbPending[url]||[]).forEach(function(cb){ try{cb(fitted);}catch(e){ loadFailed('apply: '+e.message); } });
           delete glbPending[url];
-        },undefined,function(){delete glbPending[url];});
-      }catch(e){delete glbPending[url];}
+        },undefined,function(err){ loadFailed((err&&(err.message||err.type))||'network'); });
+      }catch(e){ loadFailed(e.message); }
     }
     var cityStage=null,cityPhaseActive=false,cityPhaseFade=0,cityApproachStarted=0;
     var approachSlow=false,infoShown=false;
