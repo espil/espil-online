@@ -93,9 +93,9 @@ function renderAll() {
     }
     
     const angle = (currentDir / DIRS) * Math.PI * 2;
-    const radius = 4;
-    camera.position.set(Math.sin(angle) * radius, 1.2, Math.cos(angle) * radius);
-    camera.lookAt(0, 0.8, 0);
+    const radius = 6;
+    camera.position.set(Math.sin(angle) * radius, 1.0, Math.cos(angle) * radius);
+    camera.lookAt(0, 0.2, 0);
     
     // Set animation time for this frame
     const t = (currentFrame / FRAMES) * clip.duration;
