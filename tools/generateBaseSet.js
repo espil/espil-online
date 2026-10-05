@@ -40,7 +40,7 @@ const TASKS = [
     layer: 'face',
     prompt: 'Neutral chibi anime face, cute round dark brown eyes with soft highlights, friendly subtle smile, soft blushing cheeks, 2D flat hand-painted gaming texture, MapleStory 2 style, clean cell-shaded, high contrast eyes, no 3D lighting baked',
     negative_prompt: '3D embossed, realistic skin texture, realistic eyes, heavy makeup, masculine, feminine, shading, shadows, metallic, glossy, blurry',
-    template: 'assets/base/chibi_base.fbx',
+    template: 'assets/base/chibi_base.glb',
   },
   {
     id: 'base_hair_unisex',
@@ -56,7 +56,7 @@ const TASKS = [
     layer: 'top',
     prompt: 'Simple cozy casual t-shirt for chibi character, unisex apparel, soft pastel sky blue color, flat 2D vector illustration style, clean hand-painted gaming texture, MapleStory 2 clothing style, cell-shaded, no realistic fabric wrinkles, no baked environment shadows',
     negative_prompt: 'Realistic cloth folds, leather, metallic armor, photorealistic texture, 3D embossed details, logos, asymmetric patterns',
-    template: 'assets/base/chibi_base.fbx',
+    template: 'assets/base/chibi_base.glb',
   },
   {
     id: 'base_bottom_unisex',
@@ -218,21 +218,20 @@ function resolveTemplateUrl(task) {
   if (process.env.TEXTURE_MODEL_URL) return process.env.TEXTURE_MODEL_URL;
   // Priority 2: task-level URL
   if (task.templateUrl) return task.templateUrl;
+  // Priority 3: default GitHub raw URL (file is in the repo)
+  if (task.template) {
+    return `https://raw.githubusercontent.com/espil/espil-online/main/${task.template}`;
+  }
 
-  // Priority 3: check local file → guide user to host it
+  // Priority 4: check local file → guide user to host it
   const localPath = path.resolve(CONFIG.projectRoot, task.template);
   if (fs.existsSync(localPath)) {
     throw new Error(
       `Template found locally at ${task.template} but Meshy needs a public URL.\n` +
-      `  Upload it somewhere public (e.g. GitHub raw) and set:\n` +
-      `  TEXTURE_MODEL_URL=https://raw.githubusercontent.com/.../${task.template}`
+      `  Push it to GitHub or set TEXTURE_MODEL_URL to override.`
     );
   }
-  throw new Error(
-    `Template not found: ${task.template}\n` +
-    `  Place your chibi_base.fbx (or .obj) at assets/base/ and host it publicly,\n` +
-    `  then set TEXTURE_MODEL_URL to the public URL.`
-  );
+  throw new Error(`Template not found: ${task.template}`);
 }
 
 // ============================================================
