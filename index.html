@@ -122,7 +122,7 @@
       font:600 .66rem/1.2 "Manrope",sans-serif;
       letter-spacing:.1em;
     }
-    .city-message:empty::before { content:"SCROLL TO SELECT A CITY"; opacity:.62; }
+    .city-message:empty::before { content:"TAP VANCOUVER DOWNTOWN TO ENTER"; opacity:.62; }
     .city-clock {
       position:absolute;
       z-index:4;
@@ -167,6 +167,61 @@
       box-shadow:0 0 15px rgba(80,232,220,.12);
     }
     .city-return:hover,.city-return:focus-visible { border-color:var(--signal); background:rgba(22,65,68,.78); outline:none; }
+    /* Single-city mode: the 36-city reel is retired. */
+    .city-list { display:none !important; }
+    .city-readout::before,.city-readout::after { display:none; }
+    .single-city {
+      appearance:none;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      width:100%;
+      min-height:64px;
+      border:0;
+      background:none;
+      color:#eafffd;
+      font:800 clamp(1rem,3.2vw,1.34rem)/1.2 "Manrope",sans-serif;
+      letter-spacing:.16em;
+      text-shadow:0 0 7px rgba(181,255,248,.98),0 0 22px rgba(80,232,220,.78),0 0 42px rgba(25,174,164,.52);
+      cursor:pointer;
+      white-space:nowrap;
+    }
+    .single-city:hover,.single-city:focus-visible { outline:none; filter:brightness(1.15); }
+    .city-readout.is-city .single-city { display:none; }
+    .map-hint {
+      width:100%;
+      margin:0;
+      color:rgba(181,255,248,.66);
+      font:600 .62rem/1.5 "Manrope",sans-serif;
+      letter-spacing:.08em;
+      text-align:center;
+    }
+    .map-jump {
+      display:none;
+      position:fixed;
+      z-index:30;
+      right:22px;
+      bottom:96px;
+      width:76px;
+      height:76px;
+      border-radius:50%;
+      border:2px solid rgba(134,238,228,.55);
+      background:rgba(10,34,38,.6);
+      color:#ddfffc;
+      font:800 .68rem/1 "Manrope",sans-serif;
+      letter-spacing:.08em;
+      cursor:pointer;
+      box-shadow:0 0 18px rgba(80,232,220,.25);
+      touch-action:none;
+      user-select:none;
+      -webkit-user-select:none;
+    }
+    .map-jump:active { background:rgba(34,90,94,.8); }
+    @media (pointer:coarse) {
+      body.in-map .map-jump { display:block; }
+      body.in-map .joystick { display:block; }
+    }
+    body:not(.in-map) .joystick { display:none !important; }
     @media (max-width:640px) {
       .earth-frame { min-height:360px; }
       .city-readout { bottom:max(8px,env(safe-area-inset-bottom)); width:calc(100% - 18px); padding:8px 10px 8px; border-radius:14px; }
@@ -413,8 +468,10 @@
     <div class="city-readout" id="city-status">
       <time class="city-clock" id="city-clock" aria-label="Local time"></time>
       <div class="city-list" id="city-list" aria-label="City selector. Scroll the reel and choose the centered city."></div>
+      <button class="single-city" id="single-city" type="button" aria-label="Vancouver Downtown — select to enter">◆ VANCOUVER DOWNTOWN ◆</button>
       <div class="city-phase" id="city-phase" aria-hidden="true">
         <h2 class="city-phase-name" id="city-phase-name"></h2>
+        <p class="map-hint" id="map-hint"></p>
         <button class="city-return" id="city-return" type="button">RETURN TO EARTH</button>
       </div>
       <div class="city-message" id="city-message" aria-live="polite">Loading Earth surface…</div>
@@ -432,6 +489,7 @@
     <div class="joystick" id="joystick" aria-hidden="true">
       <div class="joy-knob" id="joy-knob"></div>
     </div>
+    <button class="map-jump" id="map-jump" type="button" aria-label="Jump">JUMP</button>
     <span class="sr-only">Drag to orbit the camera around the fixed Earth. Scroll to move closer or farther away. Select a city landmark or city name to approach its boundary in a tilted, forward-looking navigation view.</span>
   </main>
 
@@ -714,11 +772,9 @@
     updateSunPosition();
     window.setInterval(updateSunPosition,30000);
 
+    /* Single-city build: Vancouver Downtown only (for now). */
     var cityData=[
-      ['Vancouver',49.2827,-123.1207,'sails','Canada Place sails'],['San Francisco',37.7749,-122.4194,'bridge','Golden Gate Bridge'],['Los Angeles',34.0522,-118.2437,'star','Hollywood star'],['Chicago',41.8781,-87.6298,'tower','Willis Tower'],['Mexico City',19.4326,-99.1332,'pyramid','Sun Pyramid'],['New York',40.7128,-74.006,'liberty','Statue of Liberty'],['Toronto',43.6532,-79.3832,'needle','CN Tower'],
-      ['Rio de Janeiro',-22.9068,-43.1729,'christ','Christ the Redeemer'],['São Paulo',-23.5505,-46.6333,'beam','MASP'],['Buenos Aires',-34.6037,-58.3816,'obelisk','Obelisk'],['London',51.5072,-.1276,'clock','Big Ben'],['Paris',48.8566,2.3522,'eiffel','Eiffel Tower'],['Madrid',40.4168,-3.7038,'tree','Bear and strawberry tree'],['Rome',41.9028,12.4964,'colosseum','Colosseum'],['Berlin',52.52,13.405,'gate','Brandenburg Gate'],['Moscow',55.7558,37.6173,'domes','Saint Basil domes'],
-      ['Lagos',6.5244,3.3792,'theatre','National Theatre'],['Nairobi',-1.2921,36.8219,'spire','KICC'],['Cairo',30.0444,31.2357,'pyramid','Great Pyramid'],['Cape Town',-33.9249,18.4241,'mountain','Table Mountain'],['Istanbul',41.0082,28.9784,'mosque','Blue Mosque'],['Dubai',25.2048,55.2708,'burj','Burj Khalifa'],['Mumbai',19.076,72.8777,'gateway','Gateway of India'],['Delhi',28.6139,77.209,'arch','India Gate'],
-      ['Singapore',1.3521,103.8198,'merlion','Merlion'],['Bangkok',13.7563,100.5018,'temple','Wat Arun'],['Shanghai',31.2304,121.4737,'pearl','Oriental Pearl Tower'],['Hong Kong',22.3193,114.1694,'junk','Harbour junk'],['Beijing',39.9042,116.4074,'hall','Temple of Heaven'],['Seoul',37.5665,126.978,'needle','N Seoul Tower'],['Tokyo',35.6762,139.6503,'torii','Torii gate'],['Manila',14.5995,120.9842,'sun','Philippine sun'],['Jakarta',-6.2088,106.8456,'obelisk','National Monument'],['Sydney',-33.8688,151.2093,'sails','Sydney Opera House'],['Melbourne',-37.8136,144.9631,'station','Flinders Street Station'],['Auckland',-36.8509,174.7645,'needle','Sky Tower']
+      ['Vancouver',49.2827,-123.1207,'sails','Canada Place sails']
     ];
     var markers=[],markerGroup=new THREE.Group();
     earthSpin.add(markerGroup);
@@ -1031,23 +1087,9 @@
       holder.scale.setScalar(1/Math.max(size.x,size.y,size.z));
       return holder;
     }
-    /* Swap the street-view stage's landmark for the real model (once). */
-    function swapStageLandmark(fitted){
-      if(typeof cityStage==='undefined'||!cityStage||!selected)return;
-      if(cityStage.userData.cityName!==selected.userData.name)return;
-      var old=cityStage.userData.landmarkMesh;
-      if(!old||old.userData.isGLB)return;
-      var sm=fitted.clone();
-      sm.scale.multiplyScalar(.054);sm.position.set(0,.004,.02);
-      sm.userData.isGLB=true;
-      cityStage.remove(old);cityStage.add(sm);
-      cityStage.userData.landmarkMesh=sm;
-    }
-    function refreshStageLandmark(){
-      if(!selected)return;
-      var url=landmarkGLBURL(selected.userData.name,selected.userData.type);
-      if(url&&glbCache[url])swapStageLandmark(glbCache[url]);
-    }
+    /* The diorama street view is retired; the walkable map builds its own landmark. Kept as no-ops for old call sites. */
+    function swapStageLandmark(fitted){}
+    function refreshStageLandmark(){}
     function updateModelCredit(marker){
       var el=document.getElementById('city-info-credit');
       if(!el)return;
@@ -1098,97 +1140,347 @@
         },undefined,function(err){ loadFailed((err&&(err.message||err.type))||'network'); });
       }catch(e){ loadFailed(e.message); }
     }
-    var cityStage=null,cityPhaseActive=false,cityPhaseFade=0,cityApproachStarted=0;
+    var cityPhaseActive=false,cityApproachStarted=0;
     var approachSlow=false,infoShown=false;
-    function destroyCityStage(){
-      if(!cityStage)return;
-      earthSpin.remove(cityStage);
-      var geometries=[],materials=[];
-      cityStage.traverse(function(item){
-        if(item.geometry&&geometries.indexOf(item.geometry)<0)geometries.push(item.geometry);
-        if(item.material){
-          var list=Array.isArray(item.material)?item.material:[item.material];
-          list.forEach(function(material){
-            var shared=false;
-            Object.keys(landmarkMats).forEach(function(key){if(landmarkMats[key]===material)shared=true;});
-            if(!shared&&materials.indexOf(material)<0)materials.push(material);
-          });
-        }
-      });
-      geometries.forEach(function(geometry){geometry.dispose();});
-      materials.forEach(function(material){material.dispose();});
-      cityStage=null;
-    }
-    function buildCityStage(marker){
-      destroyCityStage();
-      var seed=2166136261;
-      for(var ci=0;ci<marker.userData.name.length;ci++){seed^=marker.userData.name.charCodeAt(ci);seed=Math.imul(seed,16777619);}
-      function cityRandom(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;}
-      var stage=new THREE.Group(),normal=marker.position.clone().normalize();
-      var north=new THREE.Vector3(0,1,0).addScaledVector(normal,-normal.y);
-      if(north.lengthSq()<.0001)north.set(0,0,-1).addScaledVector(normal,normal.z);
-      north.normalize();
-      var east=new THREE.Vector3().crossVectors(normal,north).normalize();
-      var basis=new THREE.Matrix4().makeBasis(east,normal,north);
-      stage.quaternion.setFromRotationMatrix(basis);
-      stage.position.copy(normal).multiplyScalar(2.067);
-      stage.visible=false;
-      stage.userData.fadeMaterials=[];
-      function material(color,emissive,shininess){
-        var mat=new THREE.MeshPhongMaterial({color:color,emissive:emissive||0x000000,specular:0x8ed3d4,shininess:shininess||35,transparent:true,opacity:0});
-        stage.userData.fadeMaterials.push(mat);return mat;
-      }
-      var roadMat=material(0x081216,0x020506,12);
-      var laneMat=material(0x6ad7cc,0x174b47,20);
-      var buildingMats=[material(0x263a42,0x071519,48),material(0x59666a,0x0a1518,32),material(0x233f4b,0x06191f,72),material(0x7a6e61,0x17120d,28)];
-      var windowMat=material(0x9adbd1,0x3a756f,96);
-      function addBox(w,h,d,x,y,z,mat){var mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);mesh.position.set(x,y,z);stage.add(mesh);return mesh;}
-      var roadWidth=.018,spanX=.48,spanZ=.62;
-      for(var road=-5;road<=5;road+=2){
-        var roadX=road*.043;
-        addBox(roadWidth,.0022,spanZ,roadX,0,0,roadMat);
-        addBox(.0014,.0028,spanZ,roadX,0.002,0,laneMat);
-      }
-      for(road=-6;road<=6;road+=2){
-        var roadZ=road*.043;
-        addBox(spanX,.0022,roadWidth,0,0,roadZ,roadMat);
-        addBox(spanX,.0028,.0014,0,0.002,roadZ,laneMat);
-      }
-      for(var gx=-5;gx<=4;gx++){
-        for(var gz=-7;gz<=6;gz++){
-          if(gx%2===0||gz%2===0||cityRandom()<.14)continue;
-          var width=.024+cityRandom()*.016,depth=.024+cityRandom()*.018;
-          var distance=Math.sqrt(gx*gx+gz*gz),height=.018+cityRandom()*.045+Math.max(0,1-distance/9)*.028;
-          var x=gx*.043+(cityRandom()-.5)*.008,z=gz*.043+(cityRandom()-.5)*.008;
-          addBox(width,height,depth,x,height*.5+.003,z,buildingMats[Math.floor(cityRandom()*buildingMats.length)]);
-          if(height>.038){
-            var windows=addBox(width*.72,.006,depth+.001,x,.009+height*.53,z,windowMat);
-            windows.scale.y=Math.min(2.6,height/.035);
-          }
-          if(cityRandom()>.79)addBox(width*.35,.006,depth*.35,x,height+.006,z,roadMat);
-        }
-      }
-      var landmarkType=marker.userData.type||cityData[marker.userData.index][3];
-      var landmarkURL=landmarkGLBURL(marker.userData.name,landmarkType);
-      var landmark=(landmarkURL&&glbCache[landmarkURL])?glbCache[landmarkURL].clone():landmarkModel(landmarkType);
-      landmark.scale.multiplyScalar(.054);landmark.position.set(0,.004,.02);stage.add(landmark);
-      stage.userData.landmarkMesh=landmark;stage.userData.cityName=marker.userData.name;
-      var plaza=new THREE.Mesh(new THREE.CylinderGeometry(.052,.052,.002,32),roadMat);plaza.position.set(0,.002,.02);stage.add(plaza);
-      earthSpin.add(stage);cityStage=stage;
-    }
+    /* ENTER CITY now drops into the walkable 3D downtown map (built on demand). */
     function activateCityPhase(){
       if(!selected||cityPhaseActive)return;
-      cityPhaseActive=true;cityPhaseFade=0;targetDistance=1.48;
-      boundary.visible=false;
-      hideAurora();
-      citySky.visible=true;
-      refreshStageLandmark(); /* the real model may have arrived while the dialog was open */
-      if(cityStage)cityStage.visible=true;
-      cityPhaseName.textContent=selected.userData.name;
+      enterWalkMap();
+    }
+    /* ================================================================
+       Walkable 3D downtown map — Vancouver Downtown (single city).
+       Google Earth / Apple Maps 3D look, small scale: a downtown grid
+       with real building obstacles, a placeholder walker avatar, jump +
+       double jump, and a third-person follow camera. Keyboard (WASD /
+       arrows + Space) and touch (stick + drag + JUMP button) parity.
+       The avatar is a placeholder: Han's finished character model drops
+       into `buildWalkerAvatar()` when the pipeline delivers it.
+       ================================================================ */
+    var mapScene=null,mapCamera=null,mapBuilt=false;
+    var walkPlayer=null,walkColliders=[];
+    var walkKeys={};
+    var walkCamYaw=0,walkCamPitch=.42,walkCamDist=11;
+    var mapDragId=null,mapLastX=0,mapLastY=0;
+    var MAP_BOUND=96,PLAYER_R=.55,PLAYER_H=1.9;
+    var walkAudioCtx=null;
+    function walkSfx(kind){
+      try{
+        if(!walkAudioCtx)walkAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
+        if(walkAudioCtx.state==='suspended')walkAudioCtx.resume();
+        var ctx=walkAudioCtx,t=ctx.currentTime;
+        var o=ctx.createOscillator(),g=ctx.createGain();
+        o.connect(g);g.connect(ctx.destination);
+        if(kind==='jump'){o.type='sine';o.frequency.setValueAtTime(300,t);o.frequency.exponentialRampToValueAtTime(640,t+.13);g.gain.setValueAtTime(.11,t);g.gain.exponentialRampToValueAtTime(.001,t+.17);}
+        else if(kind==='double'){o.type='sine';o.frequency.setValueAtTime(420,t);o.frequency.exponentialRampToValueAtTime(880,t+.13);g.gain.setValueAtTime(.1,t);g.gain.exponentialRampToValueAtTime(.001,t+.17);}
+        else{/* land */o.type='triangle';o.frequency.setValueAtTime(150,t);o.frequency.exponentialRampToValueAtTime(65,t+.1);g.gain.setValueAtTime(.09,t);g.gain.exponentialRampToValueAtTime(.001,t+.13);}
+        o.start(t);o.stop(t+.22);
+      }catch(e){}
+    }
+    function buildWalkerAvatar(){
+      /* Placeholder walker: capsule body, head, cap. Swap with the real character here. */
+      var g=new THREE.Group();
+      var teal=new THREE.MeshLambertMaterial({color:0x2f8f86});
+      var skin=new THREE.MeshLambertMaterial({color:0xf2c99b});
+      var dark=new THREE.MeshLambertMaterial({color:0x223035});
+      var body=new THREE.Mesh(new THREE.CylinderGeometry(.38,.46,.9,14),teal);
+      body.position.y=.95;body.castShadow=true;g.add(body);
+      var belt=new THREE.Mesh(new THREE.CylinderGeometry(.47,.47,.1,14),dark);
+      belt.position.y=.55;g.add(belt);
+      var head=new THREE.Mesh(new THREE.SphereGeometry(.32,16,12),skin);
+      head.position.y=1.66;head.castShadow=true;g.add(head);
+      var eyeL=new THREE.Mesh(new THREE.SphereGeometry(.055,8,6),dark);
+      eyeL.position.set(-.12,1.7,-.28);g.add(eyeL);
+      var eyeR=eyeL.clone();eyeR.position.x=.12;g.add(eyeR);
+      var cap=new THREE.Mesh(new THREE.CylinderGeometry(.34,.34,.16,14),teal);
+      cap.position.y=1.92;g.add(cap);
+      var brim=new THREE.Mesh(new THREE.BoxGeometry(.4,.05,.3),teal);
+      brim.position.set(0,1.86,-.4);g.add(brim);
+      /* Blob shadow (cheap, always faces down). */
+      var shadow=new THREE.Mesh(new THREE.CircleGeometry(.55,20),
+        new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.26,depthWrite:false}));
+      shadow.rotation.x=-Math.PI/2;
+      return {group:g,shadow:shadow,body:body,head:head};
+    }
+    function addCollider(x0,x1,z0,z1,bottom,top){
+      walkColliders.push({x0:x0,x1:x1,z0:z0,z1:z1,bottom:bottom,top:top});
+    }
+    function buildWalkMapOnce(){
+      if(mapBuilt)return;mapBuilt=true;
+      mapScene=new THREE.Scene();
+      mapScene.background=new THREE.Color(0x9ec8e8);
+      mapScene.fog=new THREE.Fog(0x9ec8e8,140,480);
+      var fw=frame.clientWidth||window.innerWidth,fh=frame.clientHeight||window.innerHeight;
+      mapCamera=new THREE.PerspectiveCamera(55,fw/Math.max(1,fh),.1,1200);
+      var hemi=new THREE.HemisphereLight(0xcfe4ff,0x8a9078,.95);mapScene.add(hemi);
+      var sun=new THREE.DirectionalLight(0xfff1d8,.95);
+      sun.position.set(70,110,40);sun.castShadow=true;
+      sun.shadow.mapSize.set(2048,2048);
+      sun.shadow.camera.left=-130;sun.shadow.camera.right=130;
+      sun.shadow.camera.top=130;sun.shadow.camera.bottom=-130;
+      sun.shadow.camera.far=420;sun.shadow.bias=-.0004;
+      mapScene.add(sun);mapScene.add(sun.target);
+      renderer.shadowMap.enabled=true;
+      renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+      /* Plain ground — no texture, no pattern. */
+      var ground=new THREE.Mesh(new THREE.PlaneGeometry(640,640),new THREE.MeshLambertMaterial({color:0xa7b198}));
+      ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;mapScene.add(ground);
+      var roadMat=new THREE.MeshLambertMaterial({color:0x3d444d});
+      var padMat=new THREE.MeshLambertMaterial({color:0xb9c1ac});
+      var BLOCK=26,STREET=12,HALF=101;
+      var streetC=[-95,-57,-19,19,57,95],blockC=[-76,-38,0,38,76];
+      var si;
+      for(si=0;si<streetC.length;si++){
+        var rz=new THREE.Mesh(new THREE.PlaneGeometry(HALF*2,STREET),roadMat);
+        rz.rotation.x=-Math.PI/2;rz.position.set(0,.02,streetC[si]);rz.receiveShadow=true;mapScene.add(rz);
+        var rx=new THREE.Mesh(new THREE.PlaneGeometry(STREET,HALF*2),roadMat);
+        rx.rotation.x=-Math.PI/2;rx.position.set(streetC[si],.021,0);rx.receiveShadow=true;mapScene.add(rx);
+      }
+      var bi,bj;
+      for(bi=0;bi<blockC.length;bi++)for(bj=0;bj<blockC.length;bj++){
+        var pad=new THREE.Mesh(new THREE.PlaneGeometry(BLOCK,BLOCK),padMat);
+        pad.rotation.x=-Math.PI/2;pad.position.set(blockC[bi],.04,blockC[bj]);pad.receiveShadow=true;mapScene.add(pad);
+      }
+      /* Deterministic pseudo-random for a stable downtown. */
+      var seed=1234567;
+      function rnd(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;}
+      var palette=[0x8fa3b8,0x9aa5a8,0xb0a897,0x7d8b99,0xa89a8c,0x6f7f8e,0x93a7bb,0x8794a0];
+      function boxAt(w,h,d,x,y,z,color){
+        var m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshLambertMaterial({color:color}));
+        m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;mapScene.add(m);return m;
+      }
+      /* Buildings: 2x2 lots per block, taller toward the center. */
+      for(bi=0;bi<blockC.length;bi++)for(bj=0;bj<blockC.length;bj++){
+        var bx=blockC[bi],bz=blockC[bj];
+        for(var li=0;li<2;li++)for(var lj=0;lj<2;lj++){
+          var lx=bx+(li?6.5:-6.5),lz=bz+(lj?6.5:-6.5);
+          if(rnd()>.7)continue; /* some lots stay empty */
+          var w=7+rnd()*5,d=7+rnd()*5;
+          var x=lx+(rnd()-.5)*3,z=lz+(rnd()-.5)*3;
+          /* Canada Place waterfront plaza stays clear. */
+          if(x+w/2>-26&&x-w/2<26&&z+d/2>-102&&z-d/2<-87)continue;
+          var distC=Math.sqrt(bx*bx+bz*bz);
+          var h=9+rnd()*13+(1-Math.min(1,distC/110))*16;
+          var color=palette[Math.floor(rnd()*palette.length)];
+          boxAt(w,h,d,x,.04+h/2,z,color);
+          if(rnd()>.6)boxAt(w*.38,1.3,d*.38,x,.04+h+.65,z,0x5d6a72); /* rooftop unit */
+          addCollider(x-w/2,x+w/2,z-d/2,z+d/2,.04,.04+h);
+        }
+      }
+      /* Street trees on block corners. */
+      var trunkMat=new THREE.MeshLambertMaterial({color:0x6b4a2f});
+      var leafMat=new THREE.MeshLambertMaterial({color:0x5d8f5f});
+      for(bi=0;bi<blockC.length;bi++)for(bj=0;bj<blockC.length;bj++){
+        if(rnd()>.5)continue;
+        var tx=blockC[bi]+(rnd()>.5?11:-11),tz=blockC[bj]+(rnd()>.5?11:-11);
+        var trunk=new THREE.Mesh(new THREE.CylinderGeometry(.16,.22,1.5,8),trunkMat);
+        trunk.position.set(tx,.75,tz);trunk.castShadow=true;mapScene.add(trunk);
+        var canopy=new THREE.Mesh(new THREE.IcosahedronGeometry(1.2,0),leafMat);
+        canopy.position.set(tx,2.2,tz);canopy.castShadow=true;mapScene.add(canopy);
+        addCollider(tx-.35,tx+.35,tz-.35,tz+.35,0,2.8);
+      }
+      /* Low planters around the plaza — hop-on-able (double jump reaches ~3). */
+      var planterMat=new THREE.MeshLambertMaterial({color:0x9aa08e});
+      [[-14,-84],[14,-84],[-18,-90],[18,-90]].forEach(function(p){
+        boxAt(2.2,1,2.2,p[0],.5,p[1],0x9aa08e);
+        addCollider(p[0]-1.1,p[0]+1.1,p[1]-1.1,p[1]+1.1,0,1);
+      });
+      /* Waterfront: water, seawall, Canada Place sails plaza. */
+      var water=new THREE.Mesh(new THREE.PlaneGeometry(640,170),new THREE.MeshLambertMaterial({color:0x3f7d90}));
+      water.rotation.x=-Math.PI/2;water.position.set(0,.03,-186);mapScene.add(water);
+      boxAt(208,1.6,2.4,0,-.2,-100,0x8b938a);
+      addCollider(-104,104,-102,-98.8,-1,1.2); /* seawall: solid, cannot be climbed */
+      var plaza=new THREE.Mesh(new THREE.CylinderGeometry(10,10,.12,36),new THREE.MeshLambertMaterial({color:0xc4cabd}));
+      plaza.position.set(0,.06,-95);plaza.receiveShadow=true;mapScene.add(plaza);
+      addCollider(-10,10,-101,-85,0,.12);
+      var sails=landmarkModel('sails');
+      sails.scale.setScalar(11);
+      sails.position.set(0,.12,-95);
+      sails.traverse(function(o){if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+      mapScene.add(sails);
+      addCollider(-5,5,-99.5,-90.5,.12,3.6);
+      /* Invisible walls at the map edge (the north side is guarded by the seawall). */
+      addCollider(-200,-MAP_BOUND,-200,200,0,50);addCollider(MAP_BOUND,200,-200,200,0,50);
+      addCollider(-200,200,-200,-MAP_BOUND-6,0,50);addCollider(-200,200,MAP_BOUND,200,0,50);
+      /* The walker. */
+      var av=buildWalkerAvatar();
+      mapScene.add(av.group);mapScene.add(av.shadow);
+      walkPlayer={av:av,pos:new THREE.Vector3(19,.05,-57),velY:0,onGround:true,jumps:0,faceY:.5,bobT:0,moving:false};
+      av.shadow.position.set(19,.03,-57);
+    }
+    function resetWalkPlayer(){
+      if(!walkPlayer)return;
+      walkPlayer.pos.set(19,.05,-57);walkPlayer.velY=0;walkPlayer.onGround=true;
+      walkPlayer.jumps=0;walkPlayer.faceY=.5;walkPlayer.bobT=0;
+      walkCamYaw=0;walkCamPitch=.42;walkCamDist=11;
+      walkPlayer.av.group.position.copy(walkPlayer.pos);
+      walkPlayer.av.group.rotation.y=.5;
+      /* Snap the follow camera behind the player on entry. */
+      var cp0=Math.cos(walkCamPitch),sp0=Math.sin(walkCamPitch);
+      mapCamera.position.set(
+        walkPlayer.pos.x+Math.sin(walkCamYaw)*cp0*walkCamDist,
+        walkPlayer.pos.y+sp0*walkCamDist+1.2,
+        walkPlayer.pos.z+Math.cos(walkCamYaw)*cp0*walkCamDist);
+      mapCamera.lookAt(walkPlayer.pos.x,walkPlayer.pos.y+1.7,walkPlayer.pos.z);
+    }
+    function enterWalkMap(){
+      if(cityPhaseActive)return;
+      buildWalkMapOnce();
+      resetWalkPlayer();
+      cityPhaseActive=true;
+      boundary.visible=false;hideAurora();
+      citySky.visible=false;
+      cityPhaseName.textContent='VANCOUVER DOWNTOWN';
+      var hint=document.getElementById('map-hint');
+      var coarse=window.matchMedia&&window.matchMedia('(pointer:coarse)').matches;
+      if(hint)hint.textContent=coarse?
+        'Left stick walks \u00B7 drag to look around \u00B7 JUMP to hop (twice = double jump)':
+        'WASD / arrows walk \u00B7 SPACE jumps (twice = double jump) \u00B7 drag to look \u00B7 ESC to leave';
       cityPhasePanel.setAttribute('aria-hidden','false');
       document.getElementById('city-status').classList.add('is-city');
-      status.textContent=selected.userData.landmark+' · real-time sky';
+      document.body.classList.add('in-map');
+      status.textContent='Vancouver Downtown \u2014 walk around';
+      if(window.EspilAudio&&window.EspilAudio.onCitySelect)window.EspilAudio.onCitySelect();
+      try{
+        if(!walkAudioCtx)walkAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
+        if(walkAudioCtx.state==='suspended')walkAudioCtx.resume();
+      }catch(e){}
       updateSunPosition();
+    }
+    function exitWalkMap(silent){
+      if(!cityPhaseActive)return;
+      cityPhaseActive=false;
+      document.body.classList.remove('in-map');
+      document.getElementById('city-status').classList.remove('is-city');
+      cityPhasePanel.setAttribute('aria-hidden','true');
+      walkKeys={};
+      if(window.__joyVec){window.__joyVec.x=0;window.__joyVec.y=0;}
+      mapDragId=null;
+      if(!silent&&window.EspilAudio&&window.EspilAudio.onReturnToOrbit)window.EspilAudio.onReturnToOrbit();
+    }
+    function tryJump(){
+      if(!cityPhaseActive||!walkPlayer)return;
+      var p=walkPlayer;
+      if(p.onGround||p.jumps<2){
+        p.velY=9;p.onGround=false;p.jumps++;
+        walkSfx(p.jumps>1?'double':'jump');
+      }
+    }
+    /* Camera-look drag + pinch/wheel zoom, only while the map is open. */
+    function mapPointerDown(e){
+      mapDragId=e.pointerId;mapLastX=e.clientX;mapLastY=e.clientY;
+      try{canvas.setPointerCapture(e.pointerId);}catch(err){}
+    }
+    function mapPointerMove(e){
+      if(e.pointerId!==mapDragId)return;
+      var dx=e.clientX-mapLastX,dy=e.clientY-mapLastY;
+      mapLastX=e.clientX;mapLastY=e.clientY;
+      walkCamYaw-=dx*.0052;
+      walkCamPitch=Math.max(.12,Math.min(1.15,walkCamPitch+dy*.004));
+    }
+    function mapPointerUp(e){
+      if(e.pointerId===mapDragId)mapDragId=null;
+      try{canvas.releasePointerCapture(e.pointerId);}catch(err){}
+    }
+    function mapZoom(d){walkCamDist=Math.max(6,Math.min(16,walkCamDist+d));}
+    /* Keyboard: tracked only while the map is open (globe keeps its own bindings). */
+    document.addEventListener('keydown',function(e){
+      if(!document.body.classList.contains('in-map'))return;
+      var k=e.key;
+      if(k===' '||k==='ArrowUp'||k==='ArrowDown'||k==='ArrowLeft'||k==='ArrowRight')e.preventDefault();
+      walkKeys[k.toLowerCase()]=true;
+      if(k===' '&&!e.repeat)tryJump();
+    });
+    document.addEventListener('keyup',function(e){
+      walkKeys[e.key.toLowerCase()]=false;
+    });
+    var jumpBtn=document.getElementById('map-jump');
+    if(jumpBtn)jumpBtn.addEventListener('pointerdown',function(e){e.preventDefault();tryJump();});
+    function collideCircleAxis(p,axis){
+      var r=PLAYER_R;
+      for(var i=0;i<walkColliders.length;i++){
+        var c=walkColliders[i];
+        if(p.pos.y+PLAYER_H<=c.bottom||p.pos.y>=c.top)continue; /* no vertical overlap */
+        if(c.top-p.pos.y<=.55)continue; /* low enough to step onto — the support logic lifts the player */
+        var cz=p.pos.z<c.z0?c.z0:(p.pos.z>c.z1?c.z1:p.pos.z);
+        var cx=p.pos.x<c.x0?c.x0:(p.pos.x>c.x1?c.x1:p.pos.x);
+        if(Math.abs(p.pos.z-cz)>=r||Math.abs(p.pos.x-cx)>=r)continue;
+        if(axis==='x'){
+          if(p._dx>0)p.pos.x=c.x0-r;else if(p._dx<0)p.pos.x=c.x1+r;
+          else p.pos.x=(Math.abs(p.pos.x-c.x0)<Math.abs(p.pos.x-c.x1))?c.x0-r:c.x1+r;
+        }else{
+          if(p._dz>0)p.pos.z=c.z0-r;else if(p._dz<0)p.pos.z=c.z1+r;
+          else p.pos.z=(Math.abs(p.pos.z-c.z0)<Math.abs(p.pos.z-c.z1))?c.z0-r:c.z1+r;
+        }
+      }
+    }
+    function updateWalkMap(dt,t){
+      var p=walkPlayer;
+      if(!p)return;
+      /* --- input: keys + touch stick, relative to camera yaw --- */
+      var ix=0,iz=0;
+      if(walkKeys['w']||walkKeys['arrowup'])iz-=1;
+      if(walkKeys['s']||walkKeys['arrowdown'])iz+=1;
+      if(walkKeys['a']||walkKeys['arrowleft'])ix-=1;
+      if(walkKeys['d']||walkKeys['arrowright'])ix+=1;
+      if(window.__joyVec){ix+=window.__joyVec.x;iz+=window.__joyVec.y;}
+      var il=Math.sqrt(ix*ix+iz*iz);
+      if(il>1){ix/=il;iz/=il;}
+      var fx=-Math.sin(walkCamYaw),fz=-Math.cos(walkCamYaw);
+      var rx=-fz,rz=fx;
+      var mx=fx*(-iz)+rx*ix,mz=fz*(-iz)+rz*ix;
+      var SPEED=7.5;
+      p._dx=mx*SPEED*dt;p._dz=mz*SPEED*dt;
+      p.moving=il>.12;
+      p.pos.x+=p._dx;collideCircleAxis(p,'x');
+      p.pos.z+=p._dz;collideCircleAxis(p,'z');
+      /* --- vertical: gravity + landing on tops (rooftops, planters, plaza) --- */
+      p.velY-=26*dt;
+      p.pos.y+=p.velY*dt;
+      var support=.05;
+      for(var i=0;i<walkColliders.length;i++){
+        var c=walkColliders[i];
+        var cz=p.pos.z<c.z0?c.z0:(p.pos.z>c.z1?c.z1:p.pos.z);
+        var cx=p.pos.x<c.x0?c.x0:(p.pos.x>c.x1?c.x1:p.pos.x);
+        if(Math.abs(p.pos.z-cz)>PLAYER_R||Math.abs(p.pos.x-cx)>PLAYER_R)continue;
+        if(c.top<=p.pos.y+.55&&c.top>support)support=c.top;
+      }
+      if(p.pos.y<=support){
+        if(!p.onGround&&p.velY<-9)walkSfx('land');
+        p.pos.y=support;p.velY=0;p.onGround=true;p.jumps=0;
+      }else if(p.pos.y>support+.02){
+        p.onGround=false;
+      }
+      /* --- avatar pose --- */
+      var g=p.av.group;
+      g.position.copy(p.pos);
+      if(p.moving){
+        var targetFace=Math.atan2(-mx,-mz);
+        var d=targetFace-p.faceY;
+        while(d>Math.PI)d-=Math.PI*2;while(d<-Math.PI)d+=Math.PI*2;
+        p.faceY+=d*Math.min(1,dt*12);
+        p.bobT+=dt*11;
+      }
+      g.rotation.y=p.faceY;
+      if(p.moving){
+        p.av.body.position.y=.95+Math.abs(Math.sin(p.bobT))*.07;
+        p.av.head.position.y=1.66+Math.abs(Math.sin(p.bobT))*.07;
+      }else if(p.onGround){
+        p.av.body.position.y=.95;p.av.head.position.y=1.66;
+      }
+      if(!p.onGround){p.av.body.position.y=1.02;p.av.head.position.y=1.73;}
+      p.av.shadow.position.set(p.pos.x,.03,p.pos.z);
+      p.av.shadow.material.opacity=Math.max(.08,.26-Math.max(0,p.pos.y-.05)*.05);
+      /* --- follow camera --- */
+      var cp=Math.cos(walkCamPitch),sp=Math.sin(walkCamPitch);
+      var want=new THREE.Vector3(
+        p.pos.x+Math.sin(walkCamYaw)*cp*walkCamDist,
+        p.pos.y+sp*walkCamDist+1.2,
+        p.pos.z+Math.cos(walkCamYaw)*cp*walkCamDist
+      );
+      if(want.y<1.4)want.y=1.4;
+      var k=Math.min(1,dt*7);
+      mapCamera.position.lerp(want,k);
+      mapCamera.lookAt(p.pos.x,p.pos.y+1.7,p.pos.z);
     }
     cityData.forEach(function(city,index){
       var pos=latLon(city[1],city[2],2.035);
@@ -1209,7 +1501,7 @@
       cityButton.addEventListener('click',function(){centerReel(marker,true);selectCity(marker);});
       cityList.appendChild(cityButton);marker.userData.button=cityButton;
     });
-    var centeredMarker=null,reelFrame=0,reelQuietUntil=0;
+    var centeredMarker=markers[0]||null,reelFrame=0,reelQuietUntil=0; /* single city: always Vancouver */
     function updateReelCenter(){
       reelFrame=0;
       var listRect=cityList.getBoundingClientRect(),center=listRect.top+listRect.height/2,closest=null,distance=Infinity;
@@ -1235,23 +1527,9 @@
     }
     cityList.addEventListener('scroll',function(){if(!reelFrame)reelFrame=requestAnimationFrame(updateReelCenter);},{passive:true});
     cityList.addEventListener('wheel',function(event){event.stopPropagation();},{passive:true});
-    /* Arrow / joystick city navigation: recenter on the city at the CURRENT zoom, no zoom change. */
+    /* Arrow / joystick city navigation: retired — single-city build has nothing to step through. */
     var navIndex=0;
-    function stepCity(dir){
-      if(window.__espilIntroActive||cityPhaseActive)return;
-      /* Stepping away from a zoomed-in city eases back out to orbit first. */
-      if(selected||infoShown)clearSelection(true);
-      var cur=markers.indexOf(centeredMarker);
-      if(cur<0)cur=navIndex;
-      navIndex=(cur+dir+markers.length)%markers.length;
-      var marker=markers[navIndex];
-      centerReel(marker,true);
-      var cityDirection=marker.position.clone().normalize().applyAxisAngle(new THREE.Vector3(0,1,0),earthSpin.rotation.y);
-      targetYaw=Math.atan2(cityDirection.x,cityDirection.z);
-      targetPitch=Math.asin(Math.max(-1,Math.min(1,cityDirection.y)));
-      status.textContent=marker.userData.name+' — '+marker.userData.landmark;
-      if(window.EspilAudio&&window.EspilAudio.tick)window.EspilAudio.tick();
-    }
+    function stepCity(dir){}
     function modalOpen(){
       var m=document.getElementById('signin-modal');
       return m&&m.getAttribute('aria-hidden')==='false';
@@ -1267,35 +1545,36 @@
       }
       else if(e.key==='Escape'&&selected){clearSelection(true);}
     });
-    /* Virtual joystick (touch devices): push up/down/left/right to step through cities. */
+    /* Virtual joystick (touch devices): analog movement stick for the walkable map.
+       Only live while the map is open; exposes a normalized -1..1 vector. */
+    window.__joyVec={x:0,y:0};
     (function(){
       var joy=document.getElementById('joystick'),knob=document.getElementById('joy-knob');
       if(!joy)return;
-      var joyActive=false,joyCX=0,joyCY=0,joyDir=0,joyTimer=null;
-      function joyStep(){if(joyDir)stepCity(joyDir);}
+      var joyActive=false,joyCX=0,joyCY=0;
+      function setKnob(dx,dy){
+        if(knob)knob.style.transform='translate('+Math.max(-28,Math.min(28,dx))+'px,'+Math.max(-28,Math.min(28,dy))+'px)';
+      }
       joy.addEventListener('pointerdown',function(e){
+        if(!document.body.classList.contains('in-map'))return;
         joyActive=true;
         try{joy.setPointerCapture(e.pointerId);}catch(err){}
         var r=joy.getBoundingClientRect();joyCX=r.left+r.width/2;joyCY=r.top+r.height/2;
         e.preventDefault();
       });
       joy.addEventListener('pointermove',function(e){
-        if(!joyActive)return;
+        if(!joyActive||!document.body.classList.contains('in-map'))return;
         var dx=e.clientX-joyCX,dy=e.clientY-joyCY;
-        var adx=Math.abs(dx),ady=Math.abs(dy),nd=0;
-        if(ady>26&&ady>=adx)nd=dy>0?1:-1;
-        else if(adx>26)nd=dx>0?1:-1;
-        if(nd!==joyDir){
-          joyDir=nd;
-          if(knob)knob.style.transform='translate('+Math.max(-28,Math.min(28,dx))+'px,'+Math.max(-28,Math.min(28,dy))+'px)';
-          if(joyTimer){clearInterval(joyTimer);joyTimer=null;}
-          if(nd){joyStep();joyTimer=setInterval(joyStep,420);}
-        }
+        var len=Math.sqrt(dx*dx+dy*dy),max=44;
+        if(len>max){dx=dx/len*max;dy=dy/len*max;}
+        setKnob(dx,dy);
+        window.__joyVec.x=dx/max;window.__joyVec.y=dy/max;
+        e.preventDefault();
       });
       function joyEnd(){
-        joyActive=false;joyDir=0;
+        joyActive=false;
+        window.__joyVec.x=0;window.__joyVec.y=0;
         if(knob)knob.style.transform='';
-        if(joyTimer){clearInterval(joyTimer);joyTimer=null;}
       }
       joy.addEventListener('pointerup',joyEnd);
       joy.addEventListener('pointercancel',joyEnd);
@@ -1389,6 +1668,7 @@
     function resize(){
       var w=frame.clientWidth,h=frame.clientHeight,oldDefault=Math.max(6.6,2.12/(Math.tan(camera.fov*Math.PI/360)*camera.aspect));
       renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();
+      if(typeof mapCamera!=='undefined'&&mapCamera){mapCamera.aspect=w/h;mapCamera.updateProjectionMatrix();}
       var nextDefault=Math.max(6.6,2.12/(Math.tan(camera.fov*Math.PI/360)*camera.aspect));
       maxDistance=Math.max(12.2,nextDefault*1.5);
       if(!hasInteracted||Math.abs(targetDistance-oldDefault)<.08){targetDistance=nextDefault;orbitDistance=nextDefault;placeCamera();}
@@ -1442,11 +1722,11 @@
       navIndex=markers.indexOf(marker);
       approachSlow=true;infoShown=false;hideCityInfo();
       if(window.EspilAudio){window.EspilAudio.onCitySelect();window.EspilAudio.pop();}
-      cityPhaseActive=false;cityPhaseFade=0;cityApproachStarted=performance.now();
+      exitWalkMap(true); /* silent: leaving any previous map visit */
+      cityPhaseActive=false;cityApproachStarted=performance.now();
       citySky.visible=false;
       cityPhasePanel.setAttribute('aria-hidden','true');
       document.getElementById('city-status').classList.remove('is-city');
-      buildCityStage(marker);
       /* Slow zoom starts at the CURRENT zoom level and dives to the landmark. */
       targetDistance=Math.min(orbitDistance,1.9);
       var cityDirection=marker.position.clone().normalize().applyAxisAngle(new THREE.Vector3(0,1,0),earthSpin.rotation.y);
@@ -1476,13 +1756,13 @@
       orbitDistance=camera.position.length();
       if(returnToOrbit)targetDistance=Math.max(6.6,2.12/(Math.tan(camera.fov*Math.PI/360)*camera.aspect));
       selected=null;navigationReady=false;setActiveButton(null);
-      cityPhaseActive=false;cityPhaseFade=0;
+      exitWalkMap(true); /* silent: back to the globe */
+      cityPhaseActive=false;
       citySky.visible=false;
       starMaterial.opacity=1;
       cityPhasePanel.setAttribute('aria-hidden','true');
       if(typeof hideCityInfo==='function')hideCityInfo();
       document.getElementById('city-status').classList.remove('is-city');
-      destroyCityStage();
       boundary.visible=false;
       hideAurora();
       /* Keep the text div honest: highlight the city the camera is facing. */
@@ -1492,6 +1772,11 @@
       if(returnToOrbit&&window.EspilAudio)window.EspilAudio.onReturnToOrbit();
     }
     cityReturn.addEventListener('click',function(){clearSelection(true);});
+    var singleCityBtn=document.getElementById('single-city');
+    if(singleCityBtn)singleCityBtn.addEventListener('click',function(){
+      if(window.__espilIntroActive||cityPhaseActive||!markers[0])return;
+      selectCity(markers[0]);
+    });
     /* City info panel: image, metro population, popular brands. ENTER dives into the street view. */
     var cityFacts={
       'Vancouver':{pop:'2.6M',brands:['Lululemon','Aritzia',"Arc'teryx"],img:'assets/cities/vancouver.webp'},
@@ -1554,23 +1839,25 @@
       hasInteracted=true;
       /* During city zoom, all manual zoom is locked: arrows switch city, Enter confirms, ESC exits. */
       if(selected&&!cityPhaseActive){
-        if(window.__espilToast)window.__espilToast('Zoom locked \u2014 arrows switch city, ESC exits');
+        if(window.__espilToast)window.__espilToast('Zoom locked \u2014 Enter confirms, ESC exits');
         return;
       }
       targetDistance=Math.max(minDistance,Math.min(maxDistance,targetDistance+delta));
       if(selected&&targetDistance>5.7)clearSelection();
     }
-    canvas.addEventListener('wheel',function(event){event.preventDefault();zoomBy(event.deltaY*.006);},{passive:false});
+    canvas.addEventListener('wheel',function(event){event.preventDefault();if(cityPhaseActive){mapZoom(event.deltaY*.01);return;}zoomBy(event.deltaY*.006);},{passive:false});
     canvas.addEventListener('keydown',function(event){
       if(event.key==='+'||event.key==='='){event.preventDefault();zoomBy(-.7);}
       if(event.key==='-'||event.key==='_'){event.preventDefault();zoomBy(.7);}
     });
     canvas.addEventListener('pointerdown',function(event){
+      if(cityPhaseActive){mapPointerDown(event);return;}
       if(event.cancelable)event.preventDefault();
       hasInteracted=true;dragging=true;moved=false;lastX=event.clientX;lastY=event.clientY;
       canvas.setPointerCapture(event.pointerId);canvas.classList.add('is-dragging');
     });
     canvas.addEventListener('pointermove',function(event){
+      if(cityPhaseActive){mapPointerMove(event);return;}
       if(dragging){
         if(event.cancelable)event.preventDefault();
         var dx=event.clientX-lastX,dy=event.clientY-lastY;
@@ -1580,7 +1867,7 @@
             navigationHeading.applyAxisAngle(navigationNormal,-dx*.0045).normalize();
             targetDistance=Math.max(minDistance,Math.min(3.38,targetDistance+dy*.004));
           }else if(selected){
-            /* City zoom is locked: swipes don't change the view. Arrows switch city, Enter confirms, ESC exits. */
+            /* City zoom is locked: swipes don't change the view. Enter confirms, ESC exits. */
           }else{
             targetYaw-=dx*.006;
             targetPitch=Math.max(-1.28,Math.min(1.28,targetPitch+dy*.0045));
@@ -1590,6 +1877,7 @@
       }else hoverCity(pick(event));
     });
     canvas.addEventListener('pointerup',function(event){
+      if(cityPhaseActive){mapPointerUp(event);return;}
       dragging=false;canvas.classList.remove('is-dragging');canvas.releasePointerCapture(event.pointerId);
       if(!moved){if(window.__espilIntroActive)return;var hit=pick(event);if(hit)selectCity(hit.object);}
       else if(!window.__espilIntroActive&&!cityPhaseActive&&!selected){
@@ -1612,13 +1900,22 @@
 
     var pinchDistance=0;
     frame.addEventListener('touchstart',function(event){if(event.touches.length===2){var dx=event.touches[0].clientX-event.touches[1].clientX,dy=event.touches[0].clientY-event.touches[1].clientY;pinchDistance=Math.sqrt(dx*dx+dy*dy);}}, {passive:true});
-    frame.addEventListener('touchmove',function(event){if(event.touches.length===2&&pinchDistance){event.preventDefault();hasInteracted=true;var dx=event.touches[0].clientX-event.touches[1].clientX,dy=event.touches[0].clientY-event.touches[1].clientY,next=Math.sqrt(dx*dx+dy*dy);zoomBy(-(next-pinchDistance)*.012);pinchDistance=next;}}, {passive:false});
+    frame.addEventListener('touchmove',function(event){if(event.touches.length===2&&pinchDistance){event.preventDefault();hasInteracted=true;var dx=event.touches[0].clientX-event.touches[1].clientX,dy=event.touches[0].clientY-event.touches[1].clientY,next=Math.sqrt(dx*dx+dy*dy);if(cityPhaseActive){mapZoom(-(next-pinchDistance)*.05);}else{zoomBy(-(next-pinchDistance)*.012);}pinchDistance=next;}}, {passive:false});
     frame.addEventListener('touchend',function(){pinchDistance=0;},{passive:true});
 
     var worldPoint=new THREE.Vector3(),cameraDirection=new THREE.Vector3();
     function shortestAngle(from,to){return Math.atan2(Math.sin(to-from),Math.cos(to-from));}
+    var lastFrameT=performance.now();
     function animate(){
       requestAnimationFrame(animate);
+      var nowMs=performance.now();
+      var dt=Math.min(.05,(nowMs-lastFrameT)/1000);lastFrameT=nowMs;
+      if(cityPhaseActive){
+        /* Walkable downtown map owns the frame. */
+        updateWalkMap(dt,nowMs/1000);
+        renderer.render(mapScene,mapCamera);
+        return;
+      }
       yaw+=shortestAngle(yaw,targetYaw)*(reduced?1:.075);
       pitch+=(targetPitch-pitch)*(reduced?1:.075);
       orbitDistance+=(targetDistance-orbitDistance)*(reduced?1:(selected&&approachSlow&&!cityPhaseActive?.03:.075));
@@ -1639,12 +1936,6 @@
       }
       if(selected&&!cityPhaseActive&&!infoShown&&performance.now()-cityApproachStarted>1200&&(Math.abs(orbitDistance-targetDistance)<.09||performance.now()-cityApproachStarted>9000)){
         showCityInfo(selected);
-      }
-      if(cityPhaseActive&&cityStage){
-        cityPhaseFade=Math.min(1,cityPhaseFade+(reduced?1:.028));
-        cityStage.userData.fadeMaterials.forEach(function(material){material.opacity=cityPhaseFade;});
-        var daylight=skyUniforms.daylight.value;
-        starMaterial.opacity=Math.max(.035,1-daylight*.94);
       }
       renderer.render(scene,camera);
     }
