@@ -177,7 +177,6 @@ class MeshyClient {
       enable_original_uv: true,
       enable_pbr: false,
       texture_resolution: '2k',
-      remove_lighting: true,
     });
     if (!data?.result) throw new Error('No retexture task ID returned');
     return data.result;
