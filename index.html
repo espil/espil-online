@@ -122,7 +122,7 @@
       font:600 .66rem/1.2 "Manrope",sans-serif;
       letter-spacing:.1em;
     }
-    .city-message:empty::before { content:"SCROLL TO SELECT A CITY"; opacity:.62; }
+    .city-message:empty::before { content:"TAP VANCOUVER DOWNTOWN TO ENTER"; opacity:.62; }
     .city-clock {
       position:absolute;
       z-index:4;
@@ -167,6 +167,280 @@
       box-shadow:0 0 15px rgba(80,232,220,.12);
     }
     .city-return:hover,.city-return:focus-visible { border-color:var(--signal); background:rgba(22,65,68,.78); outline:none; }
+    /* Single-city mode: the 36-city reel is retired. */
+    .city-list { display:none !important; }
+    .city-readout::before,.city-readout::after { display:none; }
+    .single-city {
+      appearance:none;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      width:100%;
+      min-height:64px;
+      border:0;
+      background:none;
+      color:#eafffd;
+      font:800 clamp(1rem,3.2vw,1.34rem)/1.2 "Manrope",sans-serif;
+      letter-spacing:.16em;
+      text-shadow:0 0 7px rgba(181,255,248,.98),0 0 22px rgba(80,232,220,.78),0 0 42px rgba(25,174,164,.52);
+      cursor:pointer;
+      white-space:nowrap;
+    }
+    .single-city:hover,.single-city:focus-visible { outline:none; filter:brightness(1.15); }
+    .city-readout.is-city .single-city { display:none; }
+    .map-hint {
+      width:100%;
+      margin:0;
+      color:rgba(181,255,248,.66);
+      font:600 .62rem/1.5 "Manrope",sans-serif;
+      letter-spacing:.08em;
+      text-align:center;
+    }
+    /* Building name pill — appears at top when near a building (Han 2026-10-05). */
+    .building-name {
+      position:fixed;
+      top:18px;
+      left:50%;
+      transform:translateX(-50%) translateY(0);
+      z-index:40;
+      background:rgba(8,16,26,.78);
+      color:#eaf6ff;
+      padding:10px 24px;
+      border-radius:999px;
+      font:600 .85rem/1.4 "Manrope",sans-serif;
+      letter-spacing:.1em;
+      border:1px solid rgba(140,220,255,.28);
+      backdrop-filter:blur(10px);
+      -webkit-backdrop-filter:blur(10px);
+      box-shadow:0 4px 24px rgba(0,0,0,.35);
+      opacity:1;
+      transition:opacity .3s ease, transform .3s ease;
+      pointer-events:none;
+      white-space:nowrap;
+      max-width:82vw;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .building-name.hidden {
+      opacity:0;
+      transform:translateX(-50%) translateY(-8px);
+    }
+    .building-name .loc-dot {
+      display:inline-block;
+      width:7px;height:7px;border-radius:50%;
+      background:#7fe3ff;margin-right:9px;
+      box-shadow:0 0 8px #7fe3ff;
+      vertical-align:1px;
+    }
+    /* QA #8: interact prompt when near a building. */
+    .interact-prompt {
+      position:fixed;
+      bottom:120px;
+      left:50%;
+      transform:translateX(-50%);
+      z-index:40;
+      background:rgba(8,16,26,.78);
+      color:#ffe9a8;
+      padding:8px 18px;
+      border-radius:12px;
+      font:600 .78rem/1.4 "Manrope",sans-serif;
+      letter-spacing:.08em;
+      border:1px solid rgba(255,220,120,.3);
+      backdrop-filter:blur(10px);
+      -webkit-backdrop-filter:blur(10px);
+      opacity:1;
+      transition:opacity .25s;
+      pointer-events:none;
+    }
+    .interact-prompt.hidden { opacity:0; }
+    .interact-prompt .key {
+      display:inline-block;
+      background:rgba(255,255,255,.15);
+      border:1px solid rgba(255,255,255,.3);
+      border-radius:4px;
+      padding:1px 7px;
+      margin-right:8px;
+      font-size:.72rem;
+    }
+    /* QA #15: sprint toggle button (touch) + indicator. */
+    #sprint-toggle {
+      display:none;
+      position:fixed;
+      z-index:30;
+      right:22px;
+      bottom:186px;
+      width:64px;
+      height:64px;
+      border-radius:50%;
+      border:2px solid rgba(134,238,228,.55);
+      background:rgba(10,34,38,.6);
+      color:#ddfffc;
+      font:700 .62rem/1.2 "Manrope",sans-serif;
+      letter-spacing:.06em;
+    }
+    #sprint-toggle.active {
+      background:rgba(20,80,70,.8);
+      border-color:#7fe3ff;
+      box-shadow:0 0 14px rgba(127,227,255,.5);
+    }
+    body.touch #sprint-toggle { display:block; }
+    #sprint-indicator {
+      position:fixed;
+      top:64px;
+      left:50%;
+      transform:translateX(-50%);
+      z-index:40;
+      color:#7fe3ff;
+      font:700 .68rem/1 "Manrope",sans-serif;
+      letter-spacing:.14em;
+      opacity:0;
+      transition:opacity .25s;
+      pointer-events:none;
+    }
+    #sprint-indicator.active { opacity:.9; }
+    .map-jump {
+      display:none;
+      position:fixed;
+      z-index:30;
+      right:22px;
+      bottom:96px;
+      width:76px;
+      height:76px;
+      border-radius:50%;
+      border:2px solid rgba(134,238,228,.55);
+      background:rgba(10,34,38,.6);
+      color:#ddfffc;
+      font:800 .68rem/1 "Manrope",sans-serif;
+      letter-spacing:.08em;
+      cursor:pointer;
+      box-shadow:0 0 18px rgba(80,232,220,.25);
+      touch-action:none;
+      user-select:none;
+      -webkit-user-select:none;
+    }
+    .map-jump:active { background:rgba(34,90,94,.8); }
+    @media (pointer:coarse) {
+      body.in-map .map-jump { display:block; }
+      body.in-map .joystick { display:block; }
+    }
+    body:not(.in-map) .joystick { display:none !important; }
+    /* ---- Skill system HUD: Keeper ---- */
+    body:not(.in-map) .map-status,
+    body:not(.in-map) .skill-bar,
+    body:not(.in-map) .map-attack,
+    body:not(.in-map) #tree-toggle { display:none !important; }
+    .map-status {
+      position:fixed; z-index:30; top:calc(14px + env(safe-area-inset-top)); left:14px;
+      width:212px; padding:10px 12px 12px;
+      border:1px solid rgba(134,238,228,.32); border-radius:12px;
+      background:rgba(4,16,20,.66); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+      color:#ddfffc; font-family:"Manrope",sans-serif; pointer-events:none;
+    }
+    .ms-level { display:flex; justify-content:space-between; align-items:center; font:800 .68rem/1.2 "Manrope",sans-serif; letter-spacing:.1em; color:#eafffd; text-shadow:0 0 8px rgba(80,232,220,.5); }
+    .ms-sp { color:#ffd97a; font-size:.68rem; }
+    .ms-label { display:flex; justify-content:space-between; margin-top:7px; font:700 .55rem/1 "Manrope",sans-serif; letter-spacing:.12em; color:rgba(181,255,248,.62); }
+    .ms-bar { height:8px; margin-top:4px; border-radius:99px; background:rgba(255,255,255,.09); overflow:hidden; }
+    .ms-bar > i { display:block; height:100%; border-radius:99px; transition:width .25s ease; }
+    .ms-hp > i { background:linear-gradient(90deg,#ff5f6d,#ff9a5a); width:100%; }
+    .ms-mp > i { background:linear-gradient(90deg,#3fa7ff,#7dfce6); width:100%; }
+    .ms-exp > i { background:linear-gradient(90deg,#b47dff,#e08cff); width:0%; }
+    .skill-bar {
+      position:fixed; z-index:30; left:50%; bottom:calc(128px + env(safe-area-inset-bottom));
+      transform:translateX(-50%); font-family:"Manrope",sans-serif;
+    }
+    .move-row { display:grid; grid-template-columns:repeat(4,62px); gap:8px; }
+    .move-slot {
+      position:relative; width:62px; height:62px; appearance:none; cursor:pointer;
+      border:2px solid rgba(134,238,228,.45); border-radius:10px;
+      background:rgba(8,20,24,.8); box-shadow:0 0 14px rgba(80,232,220,.18);
+      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+      color:#ddfffc; font-family:"Manrope",sans-serif;
+      touch-action:manipulation; user-select:none; -webkit-user-select:none;
+    }
+    .move-slot:active { border-color:var(--signal); }
+    .move-slot.is-locked { opacity:.5; cursor:default; border-style:dashed; }
+    .move-slot.is-locked:active { border-color:rgba(134,238,228,.45); }
+    .move-slot .sicon { font-size:1.4rem; line-height:1; }
+    .move-slot .key {
+      position:absolute; top:3px; left:6px;
+      font:800 .6rem/1 "Manrope",sans-serif; color:#9df2e8; text-shadow:0 1px 2px #000;
+    }
+    .move-slot .mn { font:700 .5rem/1 "Manrope",sans-serif; letter-spacing:.06em; color:#eafffd; }
+    .move-slot .cd {
+      position:absolute; inset:0; border-radius:8px; pointer-events:none;
+      background:conic-gradient(rgba(4,12,14,.78) var(--cdp,0%), transparent 0);
+    }
+
+    .map-attack {
+      display:none;
+      position:fixed; z-index:30; right:110px; bottom:96px;
+      width:76px; height:76px; border-radius:50%;
+      border:2px solid rgba(255,217,122,.55); background:rgba(34,22,8,.6);
+      color:#ffe9ad; font-size:1.6rem; cursor:pointer;
+      box-shadow:0 0 18px rgba(255,217,122,.25);
+      touch-action:none; user-select:none; -webkit-user-select:none;
+    }
+    .map-attack:active { background:rgba(90,60,20,.8); }
+    @media (pointer:coarse) {
+      body.in-map .map-attack { display:block; }
+      .map-status { width:172px; }
+      .skill-bar { bottom:calc(168px + env(safe-area-inset-bottom)); }
+    }
+    /* ---- Skill tree panel ---- */
+    .skill-tree { position:fixed; inset:0; z-index:50; display:none; align-items:center; justify-content:center; background:rgba(4,12,14,.74); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); }
+    .skill-tree[aria-hidden="false"] { display:flex; }
+    .st-card {
+      width:min(640px,calc(100% - 32px)); max-height:88vh; overflow-y:auto;
+      padding:22px; border:1px solid rgba(134,238,228,.3); border-radius:16px;
+      background:rgba(8,20,24,.96); box-shadow:0 0 44px rgba(80,232,220,.14);
+      color:#ddfffc; font-family:"Manrope",sans-serif;
+    }
+    .st-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+    .st-head h2 { margin:0; font:800 1.05rem/1.2 "Manrope",sans-serif; letter-spacing:.14em; color:#eafffd; text-shadow:0 0 12px rgba(80,232,220,.6); }
+    .st-sub { margin:6px 0 0; font:600 .7rem/1.5 "Manrope",sans-serif; color:rgba(181,255,248,.62); letter-spacing:.04em; }
+    .st-close { appearance:none; flex:none; width:34px; height:34px; border-radius:50%; border:1px solid rgba(134,238,228,.3); background:none; color:#ddfffc; font-size:.95rem; cursor:pointer; }
+    .st-close:hover { border-color:var(--signal); }
+    .st-sp { margin:14px 0 12px; font:800 .78rem/1 "Manrope",sans-serif; letter-spacing:.1em; color:#ffd97a; }
+    .st-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+    .st-node {
+      border:1px solid rgba(134,238,228,.25); border-radius:10px; padding:10px 9px;
+      background:rgba(14,32,38,.6); cursor:pointer;
+      transition:border-color .15s, box-shadow .15s;
+    }
+    .st-node:hover:not(.is-locked) { border-color:var(--signal); }
+    .st-node.is-maxed { border-color:var(--signal); box-shadow:0 0 14px rgba(80,232,220,.3); }
+    .st-node.is-locked { opacity:.45; cursor:not-allowed; }
+    .st-node.st-root { grid-column:1 / -1; border-color:rgba(255,217,122,.5); }
+    .st-node.st-wide { grid-column:span 2; }
+    .st-nm { font:800 .68rem/1.3 "Manrope",sans-serif; letter-spacing:.08em; color:#eafffd; }
+    .st-rk { margin-top:4px; font:800 .62rem/1 "Manrope",sans-serif; color:#9df2e8; letter-spacing:.1em; }
+    .st-node.is-locked .st-rk { color:#8a9494; }
+    .st-ds { margin-top:6px; font:600 .62rem/1.5 "Manrope",sans-serif; color:rgba(181,255,248,.66); }
+    .st-req { color:#ffd97a; }
+    .st-foot { margin:14px 0 0; font:600 .62rem/1.6 "Manrope",sans-serif; color:rgba(181,255,248,.55); letter-spacing:.03em; }
+    @media (max-width:640px) { .st-grid { grid-template-columns:repeat(2,1fr); } .st-node.st-wide { grid-column:span 2; } }
+    /* Testing-bypass note (auth + character gates). */
+    .bypass-note { margin:10px 0 0; color:#ffd97a; font:700 .68rem/1.5 "Manrope",sans-serif; letter-spacing:.08em; text-align:center; }
+    .bypass-note b { color:#ffe9ad; }
+    /* Character customization gate. */
+    .char-custom { position:fixed; inset:0; z-index:60; display:none; align-items:center; justify-content:center; background:rgba(4,12,14,.8); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
+    .char-custom[aria-hidden="false"] { display:flex; }
+    .char-card-wrap { position:relative; width:min(560px,calc(100% - 40px)); padding:34px 30px 28px; border:1px solid rgba(134,238,228,.28); border-radius:18px; background:rgba(8,20,24,.94); box-shadow:0 0 44px rgba(80,232,220,.12); text-align:center; }
+    .char-card-wrap h2 { margin:0 0 6px; color:#eafffd; font:800 1.12rem/1.2 "Manrope",sans-serif; letter-spacing:.14em; text-shadow:0 0 12px rgba(80,232,220,.6); }
+    .char-sub { margin:0 0 20px; color:rgba(181,255,248,.6); font:600 .72rem/1.4 "Manrope",sans-serif; letter-spacing:.06em; }
+    .char-grid { display:flex; gap:14px; justify-content:center; margin-bottom:6px; }
+    .char-card { appearance:none; flex:1; max-width:200px; padding:22px 10px 16px; border:1px solid rgba(134,238,228,.22); border-radius:14px; background:rgba(14,32,38,.6); color:#ddfffc; cursor:pointer; transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease; }
+    .char-card:hover:not(:disabled) { transform:translateY(-2px); }
+    .char-card:focus-visible { outline:2px solid var(--signal); outline-offset:2px; }
+    .char-card.is-selected { border-color:var(--signal); box-shadow:0 0 22px rgba(80,232,220,.28); }
+    .char-card.is-disabled { opacity:.45; cursor:not-allowed; }
+    .char-face { display:block; font-size:2.6rem; line-height:1; margin-bottom:10px; }
+    .char-name { display:block; font:800 .95rem/1.2 "Manrope",sans-serif; letter-spacing:.12em; }
+    .char-tag { display:inline-block; margin-top:8px; padding:3px 10px; border-radius:999px; border:1px solid rgba(134,238,228,.35); font:700 .6rem/1 "Manrope",sans-serif; letter-spacing:.1em; color:#9df2e8; }
+    .char-confirm { appearance:none; margin-top:14px; padding:13px 30px; border:0; border-radius:999px; background:linear-gradient(135deg,#1a7f78,#0e4f4c); color:#eafffd; font:800 .78rem/1 "Manrope",sans-serif; letter-spacing:.14em; cursor:pointer; box-shadow:0 0 24px rgba(80,232,220,.25); }
+    .char-confirm:hover,.char-confirm:focus-visible { filter:brightness(1.15); outline:none; }
+    .char-back { position:absolute; top:12px; left:12px; appearance:none; width:34px; height:34px; border-radius:50%; border:1px solid rgba(134,238,228,.3); background:none; color:#ddfffc; font-size:1rem; cursor:pointer; }
+    .char-back:hover { border-color:var(--signal); }
     @media (max-width:640px) {
       .earth-frame { min-height:360px; }
       .city-readout { bottom:max(8px,env(safe-area-inset-bottom)); width:calc(100% - 18px); padding:8px 10px 8px; border-radius:14px; }
@@ -192,13 +466,41 @@
     }
     .topbar-actions { display:flex; gap:10px; pointer-events:auto; }
     .pill-btn {
-      appearance:none; border:1px solid rgba(134,238,228,.32); border-radius:999px;
-      padding:9px 16px; color:#ddfffc; background:rgba(4,16,20,.66);
-      font:700 .68rem/1 "Manrope",sans-serif; letter-spacing:.14em; cursor:pointer;
-      backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
-      transition:border-color .18s,background .18s,box-shadow .18s;
+      appearance:none; border:1px solid #a8854f; border-radius:8px;
+      padding:9px 16px; color:#3b2f28; background:linear-gradient(180deg,#f8f3e6,#e6dabd);
+      font:700 .68rem/1 Georgia,"Times New Roman",serif; letter-spacing:.14em; cursor:pointer;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.75),0 2px 10px rgba(0,0,0,.35);
+      transition:border-color .18s,background .18s,box-shadow .18s,transform .12s;
     }
-    .pill-btn:hover,.pill-btn:focus-visible { border-color:var(--signal); background:rgba(14,42,47,.8); box-shadow:0 0 16px rgba(80,232,220,.25); outline:none; }
+    .pill-btn:hover,.pill-btn:focus-visible {
+      border-color:#d3ab63; background:linear-gradient(180deg,#fffaf0,#f1e7cd);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 2px 12px rgba(0,0,0,.4),0 0 16px rgba(211,171,99,.5);
+      outline:none; transform:translateY(-1px);
+    }
+    .pill-btn:active { transform:none; }
+    /* BGM song card: appears when hovering/focusing the BGM toggle (Genshin parchment style). */
+    .bgm-card {
+      position:absolute; z-index:40; top:calc(56px + env(safe-area-inset-top)); right:18px; width:236px;
+      background:linear-gradient(180deg,#f7f2e4,#e8dcc0);
+      border:1px solid #a8854f; border-radius:10px; color:#3b2f28;
+      padding:12px 14px 10px; pointer-events:none;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 14px 34px rgba(0,0,0,.5);
+      opacity:0; visibility:hidden; transform:translateY(-8px);
+      transition:opacity .22s ease,transform .22s ease,visibility .22s ease;
+    }
+    .bgm-card.show { opacity:1; visibility:visible; transform:none; }
+    .bgm-card-row { display:flex; align-items:center; gap:10px; }
+    .bgm-card-note {
+      flex:none; width:34px; height:34px; border-radius:50%;
+      border:1px solid #a8854f; background:radial-gradient(circle at 35% 30%,#fffaf0,#e2d3ae);
+      color:#7a5f36; font-size:1.05rem; line-height:32px; text-align:center;
+    }
+    .bgm-card-title { margin:0; font:700 .98rem/1.25 Georgia,"Times New Roman",serif; letter-spacing:.02em; color:#2f2620; }
+    .bgm-card-artist { margin:2px 0 0; font:italic 400 .78rem/1.3 Georgia,serif; color:#6f5b40; }
+    .bgm-card-hint {
+      margin:8px 0 0; padding-top:8px; border-top:1px solid rgba(168,133,79,.45);
+      font:700 .6rem/1.6 "Manrope",sans-serif; letter-spacing:.18em; color:#8a734f; text-transform:uppercase;
+    }
 
     /* ---- Sign-in modal ---- */
     .modal-backdrop {
@@ -325,9 +627,9 @@
       box-shadow:0 0 18px rgba(64,255,205,.5); pointer-events:none;
     }
     @media (pointer:coarse) { .joystick { display:block; } }
-    /* City info panel: details before entering. */
+    /* City info panel: details before entering. Centered on screen (2026-10-06 QA). */
     .city-info {
-      position:absolute; z-index:28; top:50%; right:26px; transform:translateY(-50%) translateX(0);
+      position:absolute; z-index:28; top:50%; left:50%; transform:translate(-50%,-50%);
       width:min(330px,calc(100vw - 52px)); max-height:calc(100% - 120px); overflow:auto;
       border-radius:18px; border:1px solid rgba(134,238,228,.35);
       background:linear-gradient(165deg,rgba(4,20,24,.96),rgba(2,10,13,.94));
@@ -335,13 +637,15 @@
       padding:20px 20px 22px; color:#eafffd;
       transition:opacity .45s ease, transform .45s ease, visibility .45s ease;
     }
-    .city-info[aria-hidden="true"] { opacity:0; visibility:hidden; pointer-events:none; transform:translateY(-50%) translateX(26px); }
+    .city-info[aria-hidden="true"] { opacity:0; visibility:hidden; pointer-events:none; transform:translate(-50%,-50%) translateY(26px); }
     .city-info-back {
-      position:absolute; top:10px; left:10px; width:34px; height:34px; border-radius:50%;
-      border:1px solid rgba(134,238,228,.4); background:rgba(3,16,20,.8); color:#9ff5e4;
-      font-size:1rem; cursor:pointer; line-height:1;
+      position:absolute; top:10px; left:10px; width:34px; height:34px; border-radius:8px;
+      border:1px solid #a8854f; background:linear-gradient(180deg,#f8f3e6,#e6dabd); color:#3b2f28;
+      font:700 1rem/1 Georgia,serif; cursor:pointer;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.75),0 2px 8px rgba(0,0,0,.35);
+      transition:border-color .18s,box-shadow .18s,transform .12s;
     }
-    .city-info-back:hover { background:rgba(64,255,205,.16); }
+    .city-info-back:hover { border-color:#d3ab63; box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 0 14px rgba(211,171,99,.5); transform:translateY(-1px); }
     .city-info-img {
       display:block; width:100%; height:168px; object-fit:cover; border-radius:12px;
       border:1px solid rgba(134,238,228,.25); background:#061014; margin-bottom:14px;
@@ -355,21 +659,53 @@
       border:1px solid rgba(134,238,228,.35); border-radius:999px; padding:8px 13px; background:rgba(64,255,205,.07);
     }
     .city-info-enter {
-      display:block; width:100%; padding:14px; border-radius:12px; cursor:pointer;
-      border:1px solid rgba(134,238,228,.55); background:linear-gradient(180deg,rgba(64,255,205,.22),rgba(64,255,205,.1));
-      color:#eafffb; font:800 .82rem/1 "Manrope",sans-serif; letter-spacing:.24em; text-indent:.24em;
+      display:block; width:100%; padding:14px; border-radius:10px; cursor:pointer;
+      border:1px solid #a8854f; background:linear-gradient(180deg,#f8f3e6,#e3d5b4);
+      color:#3b2f28; font:700 .82rem/1 Georgia,"Times New Roman",serif; letter-spacing:.24em; text-indent:.24em;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 3px 12px rgba(0,0,0,.4);
+      transition:border-color .18s,box-shadow .18s,transform .12s,background .18s;
     }
-    .city-info-enter:hover { background:linear-gradient(180deg,rgba(64,255,205,.34),rgba(64,255,205,.16)); box-shadow:0 0 26px rgba(64,255,205,.35); }
+    .city-info-enter:hover { border-color:#d3ab63; background:linear-gradient(180deg,#fffaf0,#efe3c6); box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 3px 14px rgba(0,0,0,.45),0 0 22px rgba(211,171,99,.55); transform:translateY(-1px); }
+    .city-info-enter:active { transform:none; }
     .city-info-credit { margin:12px 0 0; font:500 .6rem/1.6 "Manrope",sans-serif; letter-spacing:.03em; color:rgba(159,245,228,.5); }
     @media (max-width:640px) {
       .city-info {
-        top:auto; bottom:14px; right:50%; transform:translateX(50%);
+        top:auto; bottom:14px; left:50%; right:auto; transform:translateX(-50%);
         width:calc(100vw - 28px); max-height:52%;
       }
-      .city-info[aria-hidden="true"] { transform:translateX(50%) translateY(26px); }
+      .city-info[aria-hidden="true"] { transform:translateX(-50%) translateY(26px); }
       .city-info-img { height:120px; }
       .intro-continue { font-size:.68rem; }
     }
+    /* City entry sequence: slow zoom toward the city while its name types out,
+       then "press any key to enter" (2026-10-06 QA #4). */
+    .city-entry {
+      position:absolute; inset:0; z-index:26; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; gap:34px; cursor:pointer;
+      background:radial-gradient(ellipse at center,rgba(1,10,12,.42),rgba(1,4,6,.86));
+      opacity:1; visibility:visible; transition:opacity .7s ease,visibility .7s ease;
+      user-select:none; -webkit-user-select:none;
+    }
+    .city-entry[aria-hidden="true"] { opacity:0; visibility:hidden; pointer-events:none; }
+    .city-entry-name {
+      font:900 clamp(2.4rem,9vw,5rem)/1 "Arial Black","Arial",sans-serif;
+      letter-spacing:.1em; color:#8ffce9; text-align:center; white-space:nowrap; margin:0 16px;
+      text-shadow:0 1px 0 #0d7a68,0 2px 0 #0b6a5b,0 3px 0 #09594d,0 4px 0 #074840,0 5px 0 #053732,0 6px 0 #032722,0 9px 22px rgba(0,0,0,.65),0 0 24px rgba(64,255,205,.8),0 0 74px rgba(64,255,205,.32);
+    }
+    .city-entry-name .ch { visibility:hidden; display:inline-block; }
+    .city-entry-name .ch.on { visibility:visible; animation:type-punch .22s ease-out; }
+    .city-entry-caret {
+      display:inline-block; width:.09em; height:1em; margin-left:.12em; vertical-align:-.06em;
+      background:#7dfce6; box-shadow:0 0 18px rgba(64,255,205,.9);
+      animation:caret-blink .8s steps(1) infinite;
+    }
+    .city-entry-sub {
+      font:700 .8rem/1.6 "Manrope",sans-serif; letter-spacing:.34em; text-indent:.34em;
+      color:#eafffb; text-shadow:0 0 16px rgba(64,255,205,.8); text-align:center; padding:0 16px;
+      opacity:0; visibility:hidden; transition:opacity .6s ease,visibility .6s ease;
+      animation:intro-pulse 1.8s ease-in-out infinite;
+    }
+    .city-entry-sub.show { opacity:1; visibility:visible; }
   </style>
 </head>
 <body>
@@ -385,15 +721,27 @@
     <canvas id="globe-canvas" role="application" tabindex="0" aria-label="Interactive fixed Earth with selectable city landmarks. Drag to orbit the camera, scroll to zoom, or choose a city for a tilted navigation view."></canvas>
     <header class="topbar">
       <div class="topbar-actions">
-        <button class="pill-btn" id="bgm-toggle" type="button" aria-pressed="true" title="Toggle theme music">&#9834; ON</button>
+        <button class="pill-btn" id="bgm-toggle" type="button" aria-pressed="true" aria-label="Toggle theme music" aria-describedby="bgm-card">&#9834; ON</button>
+        <button class="pill-btn" id="tree-toggle" type="button" title="Skill tree (K)">SKILL TREE</button>
         <button class="pill-btn" id="signin-open" type="button">SIGN IN</button>
       </div>
     </header>
+    <div class="bgm-card" id="bgm-card" aria-hidden="true" role="status">
+      <div class="bgm-card-row">
+        <div class="bgm-card-note" aria-hidden="true">&#9834;</div>
+        <div>
+          <p class="bgm-card-title" id="bgm-card-title">Green</p>
+          <p class="bgm-card-artist" id="bgm-card-artist">Espil Ceil</p>
+        </div>
+      </div>
+      <p class="bgm-card-hint" id="bgm-card-state">Now playing &middot; loops forever</p>
+    </div>
     <div class="modal-backdrop" id="signin-modal" aria-hidden="true">
       <div class="modal" role="dialog" aria-modal="true" aria-label="Sign in to ESPIL Online">
         <button class="modal-close" id="signin-close" type="button" aria-label="Close sign in">&times;</button>
         <h2>ENTER ESPIL ONLINE</h2>
         <p class="modal-sub">Choose how you'd like to arrive.</p>
+        <p class="bypass-note" id="signin-bypass" hidden>TESTING BYPASS &mdash; continuing as guest&hellip;</p>
         <div class="provider-grid">
           <button class="provider" type="button" data-provider="Google"><span class="p-dot" style="background:#4285F4;color:#4285F4"></span>Google<span class="soon">soon</span></button>
           <button class="provider" type="button" data-provider="Apple"><span class="p-dot" style="background:#e8e8e8;color:#e8e8e8"></span>Apple<span class="soon">soon</span></button>
@@ -409,14 +757,41 @@
       </div>
     </div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <div class="char-custom" id="char-custom" aria-hidden="true" role="dialog" aria-label="Choose your character">
+      <div class="char-card-wrap">
+        <button class="char-back" id="char-back" type="button" aria-label="Back to city info">&#8592;</button>
+        <h2>CHOOSE YOUR CHARACTER</h2>
+        <p class="char-sub">Your traveler for Vancouver Downtown.</p>
+        <div class="char-grid">
+          <button class="char-card is-selected" id="char-male" type="button" data-gender="male" aria-label="Male character">
+            <span class="char-face" aria-hidden="true">&#9794;</span>
+            <span class="char-name">Male</span>
+            <span class="char-tag">Ready</span>
+          </button>
+          <button class="char-card is-disabled" id="char-female" type="button" data-gender="female" aria-label="Female character, coming soon" disabled>
+            <span class="char-face" aria-hidden="true">&#9792;</span>
+            <span class="char-name">Female</span>
+            <span class="char-tag">Soon</span>
+          </button>
+        </div>
+        <p class="bypass-note" id="char-bypass" hidden>TESTING BYPASS &mdash; entering as <b>Male</b>&hellip;</p>
+        <button class="char-confirm" id="char-confirm" type="button">ENTER AS MALE &rarr;</button>
+      </div>
+    </div>
     <audio id="bgm" loop preload="auto" src="assets/Green_bgm_landing.mp3"></audio>
     <div class="city-readout" id="city-status">
       <time class="city-clock" id="city-clock" aria-label="Local time"></time>
       <div class="city-list" id="city-list" aria-label="City selector. Scroll the reel and choose the centered city."></div>
+      <button class="single-city" id="single-city" type="button" aria-label="Vancouver Downtown — select to enter">◆ VANCOUVER DOWNTOWN ◆</button>
       <div class="city-phase" id="city-phase" aria-hidden="true">
         <h2 class="city-phase-name" id="city-phase-name"></h2>
+        <p class="map-hint" id="map-hint"></p>
         <button class="city-return" id="city-return" type="button">RETURN TO EARTH</button>
       </div>
+      <div class="building-name hidden" id="building-name" aria-live="polite"><span class="loc-dot"></span><span id="building-name-text"></span></div>
+      <div class="interact-prompt hidden" id="interact-prompt"><span class="key">SPACE</span>Interact</div>
+      <div id="sprint-indicator">SPRINT ON</div>
+      <button id="sprint-toggle" type="button" aria-label="Toggle sprint">SPRINT</button>
       <div class="city-message" id="city-message" aria-live="polite">Loading Earth surface…</div>
     </div>
     <div class="city-info" id="city-info" aria-hidden="true" role="dialog" aria-label="City details">
@@ -429,8 +804,68 @@
       <button class="city-info-enter" id="city-info-enter" type="button">ENTER CITY &#8594;</button>
       <p class="city-info-credit" id="city-info-credit" style="display:none"></p>
     </div>
+    <div class="city-entry" id="city-entry" aria-hidden="true" role="button" tabindex="0" aria-label="Enter the city">
+      <p class="city-entry-name" aria-hidden="true"><span id="city-entry-typed"></span><span class="city-entry-caret" id="city-entry-caret"></span></p>
+      <div class="city-entry-sub" id="city-entry-sub">TAP OR PRESS ANY KEY TO ENTER</div>
+    </div>
     <div class="joystick" id="joystick" aria-hidden="true">
       <div class="joy-knob" id="joy-knob"></div>
+    </div>
+    <button class="map-jump" id="map-jump" type="button" aria-label="Jump">JUMP</button>
+    <button class="map-attack" id="map-attack" type="button" aria-label="Attack">&#9876;&#65039;</button>
+    <div class="map-status" id="map-status" aria-hidden="true">
+      <div class="ms-level"><span id="ms-lv">LV 1 &middot; KEEPER</span><span class="ms-sp" id="ms-sp">SP 3</span></div>
+      <div class="ms-label"><span>HP</span><span id="ms-hp-t">100/100</span></div>
+      <div class="ms-bar ms-hp"><i id="ms-hp"></i></div>
+      <div class="ms-label"><span>MP</span><span id="ms-mp-t">50/50</span></div>
+      <div class="ms-bar ms-mp"><i id="ms-mp"></i></div>
+      <div class="ms-label"><span>EXP</span><span id="ms-exp-t">0%</span></div>
+      <div class="ms-bar ms-exp"><i id="ms-exp"></i></div>
+    </div>
+    <div class="skill-bar" id="skill-bar" aria-hidden="true">
+      <div class="move-row" id="move-row" aria-label="Attack moves"></div>
+      <!-- QA #13 (UI room, 2026-10-06): 1234 item bar. -->
+      <div class="move-row" id="item-row" aria-label="Item slots" style="margin-top:8px"></div>
+    </div>
+    <div class="skill-tree" id="skill-tree" aria-hidden="true" role="dialog" aria-label="Skill tree: Keeper">
+      <div class="st-card">
+        <div class="st-head">
+          <div>
+            <h2>KEEPER</h2>
+            <p class="st-sub">Espil&rsquo;s own craft &mdash; the cauldron is both forge and weapon.</p>
+          </div>
+          <button class="st-close" id="st-close" type="button" aria-label="Close skill tree">&#10005;</button>
+        </div>
+        <div class="st-sp" id="st-sp">Skill points: 3</div>
+        <div class="st-grid" id="st-grid"></div>
+        <p class="st-foot">No weapons yet &mdash; the keeper fights unarmed: punch slash, kick, ember throw. New moves plug into the same table later. EXP &amp; levels arrive with enemies.</p>
+      </div>
+    </div>
+    <!-- QA #14 (UI room, 2026-10-06): Inventory panel (I key). -->
+    <div class="skill-tree" id="inventory-panel" aria-hidden="true" role="dialog" aria-label="Inventory">
+      <div class="st-card">
+        <div class="st-head">
+          <div>
+            <h2>INVENTORY</h2>
+            <p class="st-sub">Your belongings. Press I to close.</p>
+          </div>
+          <button class="st-close" id="inv-close" type="button" aria-label="Close inventory">&#10005;</button>
+        </div>
+        <div class="st-grid" id="inv-grid"><p class="st-foot">Empty for now.</p></div>
+      </div>
+    </div>
+    <!-- QA #14 (UI room, 2026-10-06): Character status + outfit panel (P key). -->
+    <div class="skill-tree" id="character-panel" aria-hidden="true" role="dialog" aria-label="Character status and outfit">
+      <div class="st-card">
+        <div class="st-head">
+          <div>
+            <h2>CHARACTER</h2>
+            <p class="st-sub">Status and outfit. Press P to close.</p>
+          </div>
+          <button class="st-close" id="char-close" type="button" aria-label="Close character panel">&#10005;</button>
+        </div>
+        <div class="st-grid" id="char-grid"><p class="st-foot">Outfit system arrives with the character update.</p></div>
+      </div>
     </div>
     <span class="sr-only">Drag to orbit the camera around the fixed Earth. Scroll to move closer or farther away. Select a city landmark or city name to approach its boundary in a tilted, forward-looking navigation view.</span>
   </main>
@@ -450,15 +885,7 @@
     var canvas=document.getElementById('globe-canvas');
     /* IANA timezone per city for the reel clock. */
     var cityTimezones={
-      'Vancouver':'America/Vancouver','San Francisco':'America/Los_Angeles','Los Angeles':'America/Los_Angeles',
-      'Chicago':'America/Chicago','Mexico City':'America/Mexico_City','New York':'America/New_York','Toronto':'America/Toronto',
-      'Rio de Janeiro':'America/Sao_Paulo','São Paulo':'America/Sao_Paulo','Buenos Aires':'America/Argentina/Buenos_Aires',
-      'London':'Europe/London','Paris':'Europe/Paris','Madrid':'Europe/Madrid','Rome':'Europe/Rome','Berlin':'Europe/Berlin',
-      'Moscow':'Europe/Moscow','Lagos':'Africa/Lagos','Nairobi':'Africa/Nairobi','Cairo':'Africa/Cairo',
-      'Cape Town':'Africa/Johannesburg','Istanbul':'Europe/Istanbul','Dubai':'Asia/Dubai','Mumbai':'Asia/Kolkata',
-      'Delhi':'Asia/Kolkata','Singapore':'Asia/Singapore','Bangkok':'Asia/Bangkok','Shanghai':'Asia/Shanghai',
-      'Hong Kong':'Asia/Hong_Kong','Beijing':'Asia/Shanghai','Seoul':'Asia/Seoul','Tokyo':'Asia/Tokyo','Manila':'Asia/Manila',
-      'Jakarta':'Asia/Jakarta','Sydney':'Australia/Sydney','Melbourne':'Australia/Melbourne','Auckland':'Pacific/Auckland'
+      'Vancouver':'America/Vancouver'
     };
     function updateClock(){
       var now=new Date();
@@ -599,10 +1026,11 @@
     }
     function makeDataTexture(image){
       var texture=new THREE.Texture(image);
-      texture.minFilter=THREE.LinearFilter;
+      /* Mipmaps + high anisotropy keep the globe crisp while zooming in (2026-10-06 QA #3). */
+      texture.minFilter=THREE.LinearMipmapLinearFilter;
       texture.magFilter=THREE.LinearFilter;
-      texture.generateMipmaps=false;
-      texture.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());
+      texture.generateMipmaps=true;
+      texture.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
       texture.needsUpdate=true;
       return texture;
     }
@@ -650,9 +1078,10 @@
       notifyEarthSettled();
     }
     function loadEarthImage(url,onFailure){new THREE.ImageLoader().load(url,applyEarthImage,undefined,onFailure);}
-    /* The revision query defeats a stale Edge cache; PNG avoids a failing JPEG decoder/upload path. */
-    loadEarthImage('assets/earth-blue-marble-2026.jpg?rev=edge-20261002-3',function(){
-      loadEarthImage('assets/earth-blue-marble-fallback.png?rev=edge-20261002-3',function(){
+    /* The revision query defeats a stale Edge cache; PNG avoids a failing JPEG decoder/upload path.
+       2026-10-06: 4096x2048 texture (was 2048x1024) for the zoomed-in city views. */
+    loadEarthImage('assets/earth-blue-marble-2026.jpg?rev=edge-20261006-4k',function(){
+      loadEarthImage('assets/earth-blue-marble-fallback.png?rev=edge-20261006-4k',function(){
         textureFailed=true;
         status.textContent=idleStatus();
         notifyEarthSettled();
@@ -714,11 +1143,9 @@
     updateSunPosition();
     window.setInterval(updateSunPosition,30000);
 
+    /* Single-city build: Vancouver Downtown only (for now). */
     var cityData=[
-      ['Vancouver',49.2827,-123.1207,'sails','Canada Place sails'],['San Francisco',37.7749,-122.4194,'bridge','Golden Gate Bridge'],['Los Angeles',34.0522,-118.2437,'star','Hollywood star'],['Chicago',41.8781,-87.6298,'tower','Willis Tower'],['Mexico City',19.4326,-99.1332,'pyramid','Sun Pyramid'],['New York',40.7128,-74.006,'liberty','Statue of Liberty'],['Toronto',43.6532,-79.3832,'needle','CN Tower'],
-      ['Rio de Janeiro',-22.9068,-43.1729,'christ','Christ the Redeemer'],['São Paulo',-23.5505,-46.6333,'beam','MASP'],['Buenos Aires',-34.6037,-58.3816,'obelisk','Obelisk'],['London',51.5072,-.1276,'clock','Big Ben'],['Paris',48.8566,2.3522,'eiffel','Eiffel Tower'],['Madrid',40.4168,-3.7038,'tree','Bear and strawberry tree'],['Rome',41.9028,12.4964,'colosseum','Colosseum'],['Berlin',52.52,13.405,'gate','Brandenburg Gate'],['Moscow',55.7558,37.6173,'domes','Saint Basil domes'],
-      ['Lagos',6.5244,3.3792,'theatre','National Theatre'],['Nairobi',-1.2921,36.8219,'spire','KICC'],['Cairo',30.0444,31.2357,'pyramid','Great Pyramid'],['Cape Town',-33.9249,18.4241,'mountain','Table Mountain'],['Istanbul',41.0082,28.9784,'mosque','Blue Mosque'],['Dubai',25.2048,55.2708,'burj','Burj Khalifa'],['Mumbai',19.076,72.8777,'gateway','Gateway of India'],['Delhi',28.6139,77.209,'arch','India Gate'],
-      ['Singapore',1.3521,103.8198,'merlion','Merlion'],['Bangkok',13.7563,100.5018,'temple','Wat Arun'],['Shanghai',31.2304,121.4737,'pearl','Oriental Pearl Tower'],['Hong Kong',22.3193,114.1694,'junk','Harbour junk'],['Beijing',39.9042,116.4074,'hall','Temple of Heaven'],['Seoul',37.5665,126.978,'needle','N Seoul Tower'],['Tokyo',35.6762,139.6503,'torii','Torii gate'],['Manila',14.5995,120.9842,'sun','Philippine sun'],['Jakarta',-6.2088,106.8456,'obelisk','National Monument'],['Sydney',-33.8688,151.2093,'sails','Sydney Opera House'],['Melbourne',-37.8136,144.9631,'station','Flinders Street Station'],['Auckland',-36.8509,174.7645,'needle','Sky Tower']
+      ['Vancouver',49.2827,-123.1207,'sails','Canada Place sails']
     ];
     var markers=[],markerGroup=new THREE.Group();
     earthSpin.add(markerGroup);
@@ -757,7 +1184,7 @@
         mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir.normalize());return mesh;
       }
       var base=cylinder(.46,.5,.12,0,.06,0,landmarkMats.dark,24);
-      var ring=add(new THREE.TorusGeometry(.41,.028,8,32),landmarkMats.glow,0,.125,0,Math.PI/2,0,0);
+      /* The glowing base ring was removed (2026-10-06 QA #3). */
       if(type==='pyramid'){
         /* Stepped pyramid: five tiers in alternating stone tones + gold capstone */
         var w=.72;
@@ -1031,23 +1458,9 @@
       holder.scale.setScalar(1/Math.max(size.x,size.y,size.z));
       return holder;
     }
-    /* Swap the street-view stage's landmark for the real model (once). */
-    function swapStageLandmark(fitted){
-      if(typeof cityStage==='undefined'||!cityStage||!selected)return;
-      if(cityStage.userData.cityName!==selected.userData.name)return;
-      var old=cityStage.userData.landmarkMesh;
-      if(!old||old.userData.isGLB)return;
-      var sm=fitted.clone();
-      sm.scale.multiplyScalar(.054);sm.position.set(0,.004,.02);
-      sm.userData.isGLB=true;
-      cityStage.remove(old);cityStage.add(sm);
-      cityStage.userData.landmarkMesh=sm;
-    }
-    function refreshStageLandmark(){
-      if(!selected)return;
-      var url=landmarkGLBURL(selected.userData.name,selected.userData.type);
-      if(url&&glbCache[url])swapStageLandmark(glbCache[url]);
-    }
+    /* The diorama street view is retired; the walkable map builds its own landmark. Kept as no-ops for old call sites. */
+    function swapStageLandmark(fitted){}
+    function refreshStageLandmark(){}
     function updateModelCredit(marker){
       var el=document.getElementById('city-info-credit');
       if(!el)return;
@@ -1065,10 +1478,8 @@
       var apply=function(fitted){
         if(marker.userData.glbApplied)return;
         marker.userData.glbApplied=true;
-        if(marker.userData.procModel){marker.remove(marker.userData.procModel);marker.userData.procModel=null;}
-        var m=fitted.clone();
-        m.position.set(0,.015,0);
-        marker.add(m);
+        /* The globe marker keeps its 2D billboard (2026-10-06 QA #3): the real
+           model is only cached for the street-view stage. */
         if(selected===marker)updateModelCredit(marker);
         /* If the street view is already showing this city, swap its landmark too. */
         if(cityPhaseActive&&selected===marker)swapStageLandmark(fitted);
@@ -1098,107 +1509,1752 @@
         },undefined,function(err){ loadFailed((err&&(err.message||err.type))||'network'); });
       }catch(e){ loadFailed(e.message); }
     }
-    var cityStage=null,cityPhaseActive=false,cityPhaseFade=0,cityApproachStarted=0;
+    var cityPhaseActive=false,cityApproachStarted=0;
     var approachSlow=false,infoShown=false;
-    function destroyCityStage(){
-      if(!cityStage)return;
-      earthSpin.remove(cityStage);
-      var geometries=[],materials=[];
-      cityStage.traverse(function(item){
-        if(item.geometry&&geometries.indexOf(item.geometry)<0)geometries.push(item.geometry);
-        if(item.material){
-          var list=Array.isArray(item.material)?item.material:[item.material];
-          list.forEach(function(material){
-            var shared=false;
-            Object.keys(landmarkMats).forEach(function(key){if(landmarkMats[key]===material)shared=true;});
-            if(!shared&&materials.indexOf(material)<0)materials.push(material);
-          });
-        }
-      });
-      geometries.forEach(function(geometry){geometry.dispose();});
-      materials.forEach(function(material){material.dispose();});
-      cityStage=null;
-    }
-    function buildCityStage(marker){
-      destroyCityStage();
-      var seed=2166136261;
-      for(var ci=0;ci<marker.userData.name.length;ci++){seed^=marker.userData.name.charCodeAt(ci);seed=Math.imul(seed,16777619);}
-      function cityRandom(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;}
-      var stage=new THREE.Group(),normal=marker.position.clone().normalize();
-      var north=new THREE.Vector3(0,1,0).addScaledVector(normal,-normal.y);
-      if(north.lengthSq()<.0001)north.set(0,0,-1).addScaledVector(normal,normal.z);
-      north.normalize();
-      var east=new THREE.Vector3().crossVectors(normal,north).normalize();
-      var basis=new THREE.Matrix4().makeBasis(east,normal,north);
-      stage.quaternion.setFromRotationMatrix(basis);
-      stage.position.copy(normal).multiplyScalar(2.067);
-      stage.visible=false;
-      stage.userData.fadeMaterials=[];
-      function material(color,emissive,shininess){
-        var mat=new THREE.MeshPhongMaterial({color:color,emissive:emissive||0x000000,specular:0x8ed3d4,shininess:shininess||35,transparent:true,opacity:0});
-        stage.userData.fadeMaterials.push(mat);return mat;
-      }
-      var roadMat=material(0x081216,0x020506,12);
-      var laneMat=material(0x6ad7cc,0x174b47,20);
-      var buildingMats=[material(0x263a42,0x071519,48),material(0x59666a,0x0a1518,32),material(0x233f4b,0x06191f,72),material(0x7a6e61,0x17120d,28)];
-      var windowMat=material(0x9adbd1,0x3a756f,96);
-      function addBox(w,h,d,x,y,z,mat){var mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);mesh.position.set(x,y,z);stage.add(mesh);return mesh;}
-      var roadWidth=.018,spanX=.48,spanZ=.62;
-      for(var road=-5;road<=5;road+=2){
-        var roadX=road*.043;
-        addBox(roadWidth,.0022,spanZ,roadX,0,0,roadMat);
-        addBox(.0014,.0028,spanZ,roadX,0.002,0,laneMat);
-      }
-      for(road=-6;road<=6;road+=2){
-        var roadZ=road*.043;
-        addBox(spanX,.0022,roadWidth,0,0,roadZ,roadMat);
-        addBox(spanX,.0028,.0014,0,0.002,roadZ,laneMat);
-      }
-      for(var gx=-5;gx<=4;gx++){
-        for(var gz=-7;gz<=6;gz++){
-          if(gx%2===0||gz%2===0||cityRandom()<.14)continue;
-          var width=.024+cityRandom()*.016,depth=.024+cityRandom()*.018;
-          var distance=Math.sqrt(gx*gx+gz*gz),height=.018+cityRandom()*.045+Math.max(0,1-distance/9)*.028;
-          var x=gx*.043+(cityRandom()-.5)*.008,z=gz*.043+(cityRandom()-.5)*.008;
-          addBox(width,height,depth,x,height*.5+.003,z,buildingMats[Math.floor(cityRandom()*buildingMats.length)]);
-          if(height>.038){
-            var windows=addBox(width*.72,.006,depth+.001,x,.009+height*.53,z,windowMat);
-            windows.scale.y=Math.min(2.6,height/.035);
-          }
-          if(cityRandom()>.79)addBox(width*.35,.006,depth*.35,x,height+.006,z,roadMat);
-        }
-      }
-      var landmarkType=marker.userData.type||cityData[marker.userData.index][3];
-      var landmarkURL=landmarkGLBURL(marker.userData.name,landmarkType);
-      var landmark=(landmarkURL&&glbCache[landmarkURL])?glbCache[landmarkURL].clone():landmarkModel(landmarkType);
-      landmark.scale.multiplyScalar(.054);landmark.position.set(0,.004,.02);stage.add(landmark);
-      stage.userData.landmarkMesh=landmark;stage.userData.cityName=marker.userData.name;
-      var plaza=new THREE.Mesh(new THREE.CylinderGeometry(.052,.052,.002,32),roadMat);plaza.position.set(0,.002,.02);stage.add(plaza);
-      earthSpin.add(stage);cityStage=stage;
-    }
+    /* Staged zoom timers (2026-10-06 QA #3): cleared whenever the selection changes. */
+    var zoomStageTimers=[];
+    function clearZoomStages(){zoomStageTimers.forEach(function(t){clearTimeout(t);});zoomStageTimers=[];}
+    /* ENTER CITY now drops into the walkable 3D downtown map (built on demand). */
     function activateCityPhase(){
       if(!selected||cityPhaseActive)return;
-      cityPhaseActive=true;cityPhaseFade=0;targetDistance=1.48;
+      gateSignin(); /* entry sequence done -> gate flow -> walkable map */
+    }
+    /* Gate flow (testing bypasses ON): ENTER CITY -> sign-in prompt (shown 2s, auto-continues
+       as guest) -> character check (localStorage; none yet -> customization shown 2s, male
+       pre-selected, auto-confirms) -> walkable map. Every gate is visible so the process
+       can be reviewed; flip TEST_BYPASS off when real auth lands. */
+    var TEST_BYPASS=true,GATE_DELAY=2000,chosenGender='male',gateActive=false;
+    function gateSignin(){
+      var modal=document.getElementById('signin-modal');
+      var note=document.getElementById('signin-bypass');
+      if(window.EspilAudio&&window.EspilAudio.pop)window.EspilAudio.pop();
+      gateActive=true; /* keep the dive's auto info panel from re-showing during the gates */
+      if(!TEST_BYPASS){ if(modal)modal.setAttribute('aria-hidden','false'); return; }
+      if(note)note.hidden=false;
+      if(modal)modal.setAttribute('aria-hidden','false');
+      setTimeout(function(){
+        if(modal&&modal.getAttribute('aria-hidden')==='false'){
+          if(note)note.hidden=true;
+          modal.setAttribute('aria-hidden','true');
+          gateCharacter();
+        }else if(selected){
+          gateActive=false;
+          showCityInfo(selected); /* user closed it manually: back to the info panel */
+        }
+      },GATE_DELAY);
+    }
+    function gateCharacter(){
+      var saved=null;
+      try{saved=window.localStorage.getItem('espil_character');}catch(e){}
+      if(saved){ enterWalkMap(); return; } /* already has a character: skip customization */
+      var panel=document.getElementById('char-custom');
+      var note=document.getElementById('char-bypass');
+      setChosen('male');
+      if(note)note.hidden=false;
+      if(panel)panel.setAttribute('aria-hidden','false');
+      if(window.EspilAudio&&window.EspilAudio.pop)window.EspilAudio.pop();
+      if(!TEST_BYPASS)return;
+      setTimeout(function(){
+        if(panel&&panel.getAttribute('aria-hidden')==='false')confirmCharacter(chosenGender);
+      },GATE_DELAY);
+    }
+    function setChosen(g){
+      chosenGender=g;
+      var male=document.getElementById('char-male'),female=document.getElementById('char-female');
+      var confirm=document.getElementById('char-confirm'),note=document.getElementById('char-bypass');
+      if(male)male.classList.toggle('is-selected',g==='male');
+      if(female)female.classList.toggle('is-selected',g==='female');
+      if(confirm)confirm.innerHTML='ENTER AS '+g.toUpperCase()+' &rarr;';
+      if(note&&TEST_BYPASS)note.innerHTML='TESTING BYPASS &mdash; entering as <b>'+g.charAt(0).toUpperCase()+g.slice(1)+'</b>&hellip;';
+    }
+    function confirmCharacter(gender){
+      try{window.localStorage.setItem('espil_character',JSON.stringify({gender:gender,ts:Date.now()}));}catch(e){}
+      var panel=document.getElementById('char-custom');
+      var note=document.getElementById('char-bypass');
+      if(note)note.hidden=true;
+      if(panel)panel.setAttribute('aria-hidden','true');
+      enterWalkMap();
+    }
+    (function wireCharCustom(){
+      var male=document.getElementById('char-male');
+      var confirm=document.getElementById('char-confirm');
+      var back=document.getElementById('char-back');
+      if(male)male.addEventListener('click',function(){setChosen('male');if(window.EspilAudio&&window.EspilAudio.tick)window.EspilAudio.tick();});
+      if(confirm)confirm.addEventListener('click',function(){confirmCharacter(chosenGender);});
+      if(back)back.addEventListener('click',function(){
+        var panel=document.getElementById('char-custom');
+        var note=document.getElementById('char-bypass');
+        if(note)note.hidden=true;
+        if(panel)panel.setAttribute('aria-hidden','true');
+        gateActive=false;
+        if(selected)showCityInfo(selected);
+      });
+    }());
+    /* ================================================================
+       Walkable 3D downtown map — Vancouver Downtown (single city).
+       Google Earth / Apple Maps 3D look, small scale: a downtown grid
+       with real building obstacles, a placeholder walker avatar, jump +
+       double jump, and a third-person follow camera. Keyboard (arrow keys
+       move, Shift jump, Space interact, Ctrl sprint toggle, QWERASDF skills)
+       and touch (stick + drag + JUMP button) parity.
+       The avatar is a placeholder: Han's finished character model drops
+       into `buildWalkerAvatar()` when the pipeline delivers it.
+       ================================================================ */
+    var mapScene=null,mapCamera=null,mapBuilt=false;
+    var walkPlayer=null,walkColliders=[];
+    var walkKeys={};
+    var walkCamYaw=0,walkCamPitch=.42,walkCamDist=14;
+    /* QA #15 (2026-10-06): sprint is a Ctrl toggle, not hold-Shift. */
+    var sprintOn=false;
+    function updateSprintUI(){
+      var el=document.getElementById('sprint-indicator');
+      if(el)el.classList.toggle('active',sprintOn);
+      var btn=document.getElementById('sprint-toggle');
+      if(btn)btn.classList.toggle('active',sprintOn);
+    }
+    /* Building registry + proximity name lookup (Han 2026-10-05).
+       Stylized grid mapped to real downtown Vancouver lat/lng (1 unit = 1m).
+       Google Places API (New) for place names; OSM Overpass as fallback.
+       NOTE: API key is in-page for LOCAL TESTING only. Production must use
+       a backend proxy + server-side caching (per business model: fetch once,
+       never live-query per user). */
+    var GOOGLE_PLACES_KEY='AIzaSyCIAGbNUK-su1-evlX8DaX6Mhtgh5TnCb4';
+    var mapBuildings=[]; /* {x,z,w,d,name} — populated by buildWalkMapOnce */
+    var MAP_LAT0=49.2827,MAP_LNG0=-123.1207;
+    function mapToLatLng(x,z){
+      return {
+        lat:MAP_LAT0+(-z)/111320,
+        lng:MAP_LNG0+x/(111320*Math.cos(MAP_LAT0*Math.PI/180))
+      };
+    }
+    var bldgNameCache={};
+    function fetchBuildingName(b,cb){
+      if(b.name){cb(b.name);return;}
+      var ll=mapToLatLng(b.x,b.z);
+      var key=ll.lat.toFixed(4)+','+ll.lng.toFixed(4);
+      if(bldgNameCache[key]){b.name=bldgNameCache[key];cb(b.name);return;}
+      /* Google Places API (New) Nearby Search — closest place within 50m. */
+      if(GOOGLE_PLACES_KEY&&GOOGLE_PLACES_KEY.indexOf('__PUT_')!==0){
+        fetch('https://places.googleapis.com/v1/places:searchNearby',{
+          method:'POST',
+          headers:{
+            'Content-Type':'application/json',
+            'X-Goog-Api-Key':GOOGLE_PLACES_KEY,
+            'X-Goog-FieldMask':'places.displayName'
+          },
+          body:JSON.stringify({
+            locationRestriction:{circle:{center:{latitude:ll.lat,longitude:ll.lng},radius:50}},
+            maxResultCount:1,
+            rankPreference:'DISTANCE'
+          })
+        })
+        .then(function(r){return r.json();})
+        .then(function(j){
+          var nm=(j.places&&j.places[0]&&j.places[0].displayName&&j.places[0].displayName.text)||'Downtown Vancouver';
+          bldgNameCache[key]=nm;b.name=nm;cb(nm);
+        })
+        .catch(function(){fetchBuildingNameOSM(b,cb);});
+        return;
+      }
+      fetchBuildingNameOSM(b,cb);
+    }
+    function fetchBuildingNameOSM(b,cb){
+      var ll=mapToLatLng(b.x,b.z);
+      var key=ll.lat.toFixed(4)+','+ll.lng.toFixed(4);
+      var q='[out:json][timeout:10];node(around:50,'+ll.lat.toFixed(5)+','+ll.lng.toFixed(5)+')[name];out 1;';
+      fetch('https://overpass-api.de/api/interpreter?data='+encodeURIComponent(q))
+        .then(function(r){return r.json();})
+        .then(function(j){
+          var nm=(j.elements&&j.elements[0]&&j.elements[0].tags&&j.elements[0].tags.name)||'Downtown Vancouver';
+          bldgNameCache[key]=nm;b.name=nm;cb(nm);
+        })
+        .catch(function(){cb('Downtown Vancouver');});
+    }
+    var nearBldg=null,nearCheckT=0;
+    function updateBuildingProximity(px,pz,nowMs){
+      var bldgNameEl=document.getElementById('building-name');
+      var bldgNameText=document.getElementById('building-name-text');
+      var interactEl=document.getElementById('interact-prompt');
+      if(!bldgNameEl||!bldgNameText)return;
+      if(nowMs-nearCheckT<400)return; /* throttle: 2.5 checks/sec */
+      nearCheckT=nowMs;
+      var best=null,bestD=1e9;
+      for(var i=0;i<mapBuildings.length;i++){
+        var b=mapBuildings[i];
+        var dx=px-b.x,dz=pz-b.z;
+        var d=Math.sqrt(dx*dx+dz*dz)-Math.max(b.w,b.d)/2;
+        if(d<bestD){bestD=d;best=b;}
+      }
+      if(best&&bestD<14){
+        if(nearBldg!==best){
+          nearBldg=best;
+          bldgNameText.textContent='Locating…';
+          bldgNameEl.classList.remove('hidden');
+          if(interactEl)interactEl.classList.remove('hidden'); /* QA #8: interact active */
+          fetchBuildingName(best,function(nm){
+            if(nearBldg===best)bldgNameText.textContent=nm;
+          });
+        }
+      }else{
+        nearBldg=null;
+        bldgNameEl.classList.add('hidden');
+        if(interactEl)interactEl.classList.add('hidden');
+      }
+    }
+    var mapDragId=null,mapLastX=0,mapLastY=0;
+    var MAP_BOUND=96,PLAYER_R=.55,PLAYER_H=1.9;
+    var walkAudioCtx=null;
+    /* Tiny-planet curvature (x=50, y=55 — the EverPlanet look): a visual-only vertex-shader
+       drop applied to static map geometry, evaluated relative to the player every frame.
+       The ground stays flat under the player and curves down toward the horizon.
+       Physics, collision and the character stay on the flat plane. */
+    var curveStrength=new THREE.Vector2(70,80);
+    var curvePlayer=new THREE.Vector2(0,0);
+    var curvedMatCache={};
+    var CURVE_CHUNK=(
+      'vec4 cwp4=modelMatrix*vec4(transformed,1.0);\n'+
+      'float cdx=cwp4.x-uCurvePlayer.x;\n'+
+      'float cdz=cwp4.z-uCurvePlayer.y;\n'+
+      'cwp4.y-=min((cdx*cdx*uCurveStrength.x+cdz*cdz*uCurveStrength.y)/120000.0,1000.0);\n'+
+      'vec4 mvPosition=viewMatrix*cwp4;\n'+
+      'gl_Position=projectionMatrix*mvPosition;'
+    );
+    function curveShader(shader){
+      shader.uniforms.uCurvePlayer={value:curvePlayer};
+      shader.uniforms.uCurveStrength={value:curveStrength};
+      shader.vertexShader=('uniform vec2 uCurvePlayer;\nuniform vec2 uCurveStrength;\n'+shader.vertexShader).replace('#include <project_vertex>',CURVE_CHUNK);
+    }
+    function curvedMat(color){
+      var key='c'+color, m=curvedMatCache[key];
+      if(!m){
+        m=new THREE.MeshLambertMaterial({color:color});
+        m.onBeforeCompile=curveShader;
+        m.customProgramCacheKey=function(){return 'espil-curved-lambert';};
+        curvedMatCache[key]=m;
+      }
+      return m;
+    }
+    /* Patch an already-created material in place (procedural landmark meshes). */
+    var curvedPatched=[];
+    function curvePatch(mat){
+      if(!mat||curvedPatched.indexOf(mat)!==-1)return mat;
+      var prev=mat.onBeforeCompile;
+      mat.onBeforeCompile=function(shader){ if(prev)prev(shader); curveShader(shader); };
+      mat.customProgramCacheKey=function(){return 'espil-curved-patched';};
+      curvedPatched.push(mat);
+      mat.needsUpdate=true;
+      return mat;
+    }
+    /* Real sky for the map: shares the landing's astronomical sun vector; daylight is the
+       solar altitude over Vancouver, same formula as the landing's sky dome. */
+    var mapSkyU=null,mapSkyDome=null,mapSunL=null,mapHemiL=null;
+    var vanLocalN=null,vanWorldN=new THREE.Vector3(0,1,0),UPV=new THREE.Vector3(0,1,0);
+    var sunEastW=new THREE.Vector3(1,0,0),sunNorthW=new THREE.Vector3(0,0,1),sunMapD=new THREE.Vector3(0,1,0);
+    var fogDay=new THREE.Color(.42,.68,.82),fogNight=new THREE.Color(.018,.045,.09),fogTmp=new THREE.Color();
+    function mapDaylight(){
+      if(!vanLocalN)vanLocalN=latLon(49.2827,-123.1207,1).normalize();
+      vanWorldN.copy(vanLocalN).applyAxisAngle(UPV,earthSpin.rotation.y);
+      var alt=worldSunDirection.dot(vanWorldN);
+      /* Sun direction in Vancouver's east/north/up frame, mapped to map space
+         (map +x=east, +y=up, -z=north toward the waterfront). */
+      sunEastW.crossVectors(UPV,vanWorldN).normalize();
+      sunNorthW.crossVectors(vanWorldN,sunEastW).normalize();
+      sunMapD.set(worldSunDirection.dot(sunEastW),alt,-worldSunDirection.dot(sunNorthW)).normalize();
+      return Math.max(0,Math.min(1,(alt+.13)/.34));
+    }
+    function updateMapSky(){
+      if(!mapBuilt||!mapSkyU)return;
+      var dl=mapDaylight();
+      mapSkyU.sunDirection.value.copy(sunMapD);
+      /* Moon: opposite the sun (full moon) — rises at sunset, sets at sunrise, real-time. */
+      mapSkyU.moonDirection.value.copy(sunMapD).multiplyScalar(-1);
+      mapSkyU.daylight.value=dl;
+      mapSkyDome.position.copy(mapCamera.position);
+      if(sunMapD.y>-.05){
+        mapSunL.position.copy(sunMapD).multiplyScalar(220);
+        mapSunL.intensity=.12+.88*dl;
+        mapSunL.color.setHex(dl>.25?0xfff1d8:0xcfd8ff);
+      }else{
+        /* Night: moonlight from the moon's direction — brighter when the moon is high. */
+        var moonD=mapSkyU.moonDirection.value;
+        mapSunL.position.copy(moonD).multiplyScalar(220);
+        mapSunL.intensity=.1+.3*Math.max(0,moonD.y);
+        mapSunL.color.setHex(0xa8c0ff);
+      }
+      mapHemiL.intensity=.18+.8*dl;
+      fogTmp.copy(fogNight).lerp(fogDay,dl);
+      mapScene.fog.color.copy(fogTmp);
+    }
+    /* 2D billboard prop system — Han's art direction: trees, lamps, traffic lights and
+       other environmental props are camera-facing sprite planes, NOT 3D models.
+       Characters stay 3D; buildings stay 3D. Placeholder canvas art marks positions
+       until Han supplies real sprite images (then use setPropSprite to swap them in). */
+    var billboardProps=[];
+    function propTexture(kind){
+      var c=document.createElement('canvas');c.width=64;c.height=96;
+      var g=c.getContext('2d');g.clearRect(0,0,64,96);
+      if(kind==='tree'){
+        g.fillStyle='#6b4a2f';g.fillRect(29,60,6,36);
+        g.fillStyle='#5d8f5f';g.beginPath();g.arc(32,34,22,0,7);g.fill();
+        g.fillStyle='#79b879';g.beginPath();g.arc(24,26,10,0,7);g.fill();
+      }else if(kind==='lamp'){
+        g.fillStyle='#3a3f45';g.fillRect(30,14,4,82);
+        g.fillRect(30,10,14,4);
+        g.fillStyle='#ffe9a8';g.beginPath();g.arc(46,16,6,0,7);g.fill();
+      }else{ /* signal */
+        g.fillStyle='#2a2d33';g.fillRect(29,30,6,66);
+        g.fillStyle='#16181c';g.fillRect(20,4,24,30);
+        g.fillStyle='#e5484d';g.beginPath();g.arc(32,11,4.5,0,7);g.fill();
+        g.fillStyle='#f5b301';g.beginPath();g.arc(32,19,4.5,0,7);g.fill();
+        g.fillStyle='#46c46a';g.beginPath();g.arc(32,27,4.5,0,7);g.fill();
+      }
+      var t=new THREE.CanvasTexture(c);t.anisotropy=4;return t;
+    }
+    function addProp(kind,x,z,w,h,texUrl){
+      var mat=new THREE.MeshBasicMaterial({map:texUrl?new THREE.TextureLoader().load(texUrl):propTexture(kind),transparent:true,side:THREE.DoubleSide,fog:true,depthWrite:false});
+      var mesh=new THREE.Mesh(new THREE.PlaneGeometry(w,h),mat);
+      mesh.userData.prop={kind:kind,x:x,z:z,h:h};
+      mesh.renderOrder=2;
+      mesh.frustumCulled=false;
+      mapScene.add(mesh);
+      billboardProps.push(mesh);
+      return mesh;
+    }
+    /* Swap placeholder art for Han's real sprite images when they arrive. */
+    function setPropSprite(kind,url){
+      var tex=new THREE.TextureLoader().load(url);
+      for(var i=0;i<billboardProps.length;i++){
+        var m=billboardProps[i];
+        if(m.userData.prop.kind===kind){m.material.map=tex;m.material.needsUpdate=true;}
+      }
+    }
+    function curveDropAt(x,z){
+      var dx=x-curvePlayer.x,dz=z-curvePlayer.y;
+      return Math.min((dx*dx*curveStrength.x+dz*dz*curveStrength.y)/120000,1000);
+    }
+    /* Real-time navigation-style traffic engine — DATA ONLY (Han 2026-10-05).
+       No visual overlay. Segment flow values simulate for navigation use. */
+    var trafficSegs=[];
+    var trafficTimer=0;
+    function trafficLevel(flow){
+      if(flow>.75)return 'clear';
+      if(flow>.5)return 'slow';
+      if(flow>.3)return 'heavy';
+      return 'stopped';
+    }
+    function updateTraffic(dt){
+      if(!trafficSegs.length)return;
+      trafficTimer+=dt;
+      if(trafficTimer<3)return;
+      trafficTimer=0;
+      var now=new Date(),hr=now.getHours()+now.getMinutes()/60;
+      var rush=((hr>=7.5&&hr<=9.5)||(hr>=16.5&&hr<=18.5))?.22:0;
+      for(var i=0;i<trafficSegs.length;i++){
+        var s=trafficSegs[i];
+        s.flow+=(Math.random()-.5)*.16-rush*.05;
+        var nf=0;
+        for(var j=0;j<s.nb.length;j++)nf+=trafficSegs[s.nb[j]].flow;
+        if(s.nb.length)nf/=s.nb.length;
+        s.flow+=(nf-s.flow)*.2;
+        if(Math.random()<.012)s.flow-=.35; /* incident */
+        if(s.flow<.05)s.flow=.05;
+        if(s.flow>1)s.flow=1;
+        /* Data-only: flow value simulates; no visual update (Han 2026-10-05). */
+      }
+    }
+    function updateProps(){
+      for(var i=0;i<billboardProps.length;i++){
+        var m=billboardProps[i],u=m.userData.prop;
+        m.position.set(u.x,u.h/2-curveDropAt(u.x,u.z),u.z);
+        m.quaternion.copy(mapCamera.quaternion);
+      }
+    }
+    function walkSfx(kind){
+      try{
+        if(!walkAudioCtx)walkAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
+        if(walkAudioCtx.state==='suspended')walkAudioCtx.resume();
+        var ctx=walkAudioCtx,t=ctx.currentTime;
+        var o=ctx.createOscillator(),g=ctx.createGain();
+        o.connect(g);g.connect(ctx.destination);
+        if(kind==='jump'){o.type='sine';o.frequency.setValueAtTime(300,t);o.frequency.exponentialRampToValueAtTime(640,t+.13);g.gain.setValueAtTime(.11,t);g.gain.exponentialRampToValueAtTime(.001,t+.17);}
+        else if(kind==='double'){o.type='sine';o.frequency.setValueAtTime(420,t);o.frequency.exponentialRampToValueAtTime(880,t+.13);g.gain.setValueAtTime(.1,t);g.gain.exponentialRampToValueAtTime(.001,t+.17);}
+        else{/* land */o.type='triangle';o.frequency.setValueAtTime(150,t);o.frequency.exponentialRampToValueAtTime(65,t+.1);g.gain.setValueAtTime(.09,t);g.gain.exponentialRampToValueAtTime(.001,t+.13);}
+        o.start(t);o.stop(t+.22);
+      }catch(e){}
+    }
+    /* QA #12 (2026-10-06): footstep SFX — walk=snow crunch, run=leaves crunch.
+       Files: assets/sfx/footsteps/walk_snow.wav, run_leaves.wav */
+    var stepAudioWalk=null, stepAudioRun=null;
+    function ensureStepAudio(){
+      if(!stepAudioWalk){
+        stepAudioWalk=new Audio('assets/sfx/footsteps/walk_snow.wav');
+        stepAudioWalk.preload='auto'; stepAudioWalk.volume=.5;
+      }
+      if(!stepAudioRun){
+        stepAudioRun=new Audio('assets/sfx/footsteps/run_leaves.wav');
+        stepAudioRun.preload='auto'; stepAudioRun.volume=.5;
+      }
+    }
+    function playFootstep(running){
+      try{
+        ensureStepAudio();
+        var a=running?stepAudioRun:stepAudioWalk;
+        /* Clone for overlap (rapid steps). */
+        var c=a.cloneNode(); c.volume=a.volume; c.play().catch(function(){});
+      }catch(e){}
+    }
+    function buildWalkerAvatar(){
+      /* Han's male character (assets/character/male.glb): Mixamo 22-bone rig, 1.2 units,
+         faces +z, textures embedded. Clips: idle 'Armature|clip0|baselayer', 'Walking', 'Running'.
+         Female clips (female_run.glb / female_walk.glb) are staged in the same folder for later. */
+      var g=new THREE.Group();
+      var shadow=new THREE.Mesh(new THREE.CircleGeometry(.55,20),
+        new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.26,depthWrite:false}));
+      shadow.rotation.x=-Math.PI/2;
+      var av={group:g,shadow:shadow,ready:false,mixer:null,actions:{},curAnim:null};
+      av.playAnim=function(name){
+        if(!av.mixer||!av.actions[name]||av.curAnim===name)return;
+        var prev=av.actions[av.curAnim],next=av.actions[name];
+        av.curAnim=name;
+        next.reset().fadeIn(.18).play();
+        if(prev&&prev!==next){prev.fadeOut(.18);(function(pp){setTimeout(function(){pp.stop();},220);})(prev);}
+      };
+      try{
+        if(typeof THREE.GLTFLoader==='undefined')throw new Error('no GLTFLoader');
+        new THREE.GLTFLoader().load('assets/character/male.glb',function(gltf){
+          var model=gltf.scene;
+          /* The animation clips carry a baked-in half-turn on the hips vs the bind pose,
+           so the model needs a PI counter-rotation to face the movement direction. */
+        model.rotation.y=Math.PI;
+          model.scale.setScalar(1.5); /* 1.2 -> 1.8 units, reads as a person in this downtown */
+          var bbox=new THREE.Box3().setFromObject(model);
+          model.position.y-=bbox.min.y; /* feet exactly on the ground */
+          model.traverse(function(o){if(o.isMesh){o.castShadow=true;}});
+          g.add(model);
+          var mixer=new THREE.AnimationMixer(model);
+          av.mixer=mixer;
+          var clips=gltf.animations||[];
+          function findClip(rx){for(var i=0;i<clips.length;i++){if(rx.test(clips[i].name))return clips[i];}return null;}
+          var idleClip=findClip(/baselayer|idle/i)||clips[0];
+          var walkClip=findClip(/walking/i),runClip=findClip(/running/i);
+          if(idleClip)av.actions.idle=mixer.clipAction(idleClip);
+          if(walkClip)av.actions.walk=mixer.clipAction(walkClip);
+          if(runClip)av.actions.run=mixer.clipAction(runClip);
+          av.ready=true;
+          av.playAnim('idle');
+        },undefined,function(err){
+          if(window.__espilToast)window.__espilToast('Character failed to load');
+        });
+      }catch(e){
+        if(window.__espilToast)window.__espilToast('Character failed to load');
+      }
+      return av;
+    }
+    function addCollider(x0,x1,z0,z1,bottom,top){
+      walkColliders.push({x0:x0,x1:x1,z0:z0,z1:z1,bottom:bottom,top:top});
+    }
+    function buildWalkMapOnce(){
+      if(mapBuilt)return;mapBuilt=true;
+      mapScene=new THREE.Scene();
+      mapScene.fog=new THREE.Fog(0x9ec8e8,140,480);
+      /* The landing's real sky: sun-driven shader dome (daylight through twilight to night).
+         Plus real-time moon (opposite the sun = full moon, rises at sunset) and
+         procedural stars that fade in at night (Han 2026-10-05). */
+      mapSkyU={
+        sunDirection:{value:new THREE.Vector3(0,1,0)},
+        moonDirection:{value:new THREE.Vector3(0,-1,0)},
+        upDirection:{value:new THREE.Vector3(0,1,0)},
+        daylight:{value:1}
+      };
+      mapSkyDome=new THREE.Mesh(new THREE.SphereGeometry(700,40,24),new THREE.ShaderMaterial({
+        side:THREE.BackSide,depthWrite:false,fog:false,uniforms:mapSkyU,
+        vertexShader:'varying vec3 vWorld;void main(){vec4 world=modelMatrix*vec4(position,1.0);vWorld=world.xyz;gl_Position=projectionMatrix*viewMatrix*world;}',
+        fragmentShader:'uniform vec3 sunDirection;uniform vec3 moonDirection;uniform vec3 upDirection;uniform float daylight;varying vec3 vWorld;float hash13(vec3 p){p=fract(p*.3183099+.1);p*=17.0;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}void main(){vec3 ray=normalize(vWorld-cameraPosition);float h=clamp(dot(ray,normalize(upDirection)),0.0,1.0);vec3 nightH=vec3(.018,.045,.09);vec3 nightT=vec3(.004,.009,.025);vec3 dayH=vec3(.42,.68,.82);vec3 dayT=vec3(.035,.22,.48);vec3 base=mix(mix(nightH,nightT,pow(h,.55)),mix(dayH,dayT,pow(h,.48)),daylight);float sun=max(dot(ray,normalize(sunDirection)),0.0);base+=vec3(1.0,.56,.28)*pow(sun,56.0)*(1.0-daylight*.35);base+=vec3(1.0,.92,.7)*pow(sun,420.0);float nightF=1.0-daylight;'
+        +'vec3 sc=ray*220.0;vec3 cellId=floor(sc);float sh=hash13(cellId);float star=smoothstep(.992,1.0,sh);vec3 cellPos=fract(sc)-.5;star*=smoothstep(.35,.08,length(cellPos));float tw=.75+.25*sin(sh*91.7);base+=vec3(.88,.93,1.0)*star*tw*nightF*smoothstep(.02,.25,h);'
+        +'vec3 moonDir=normalize(moonDirection);float moonCos=dot(ray,moonDir);float moonAng=.032;float disk=smoothstep(cos(moonAng),cos(moonAng*.82),moonCos);vec3 mUp=abs(moonDir.y)>.9?vec3(1.,0.,0.):vec3(0.,1.,0.);vec3 mRight=normalize(cross(moonDir,mUp));vec3 mUp2=cross(mRight,moonDir);vec2 mUV=vec2(dot(ray,mRight),dot(ray,mUp2))/moonAng;float maria=hash13(vec3(floor(mUV*7.0),3.7));float maria2=hash13(vec3(floor(mUV*13.0),9.1));vec3 moonCol=vec3(.93,.95,.98)*(.82+.18*smoothstep(.25,.75,maria));moonCol*= .9+.1*smoothstep(.3,.7,maria2);float limb=smoothstep(1.0,.55,length(mUV));moonCol*=.75+.25*limb;base=mix(base,moonCol,disk*nightF);base+=vec3(.75,.82,.95)*pow(max(moonCos,0.0),900.0)*.55*nightF;'
+        +'gl_FragColor=vec4(base,1.0);}'
+      }));
+      mapSkyDome.frustumCulled=false;
+      mapSkyDome.renderOrder=-10;
+      mapScene.add(mapSkyDome);
+      var fw=frame.clientWidth||window.innerWidth,fh=frame.clientHeight||window.innerHeight;
+      mapCamera=new THREE.PerspectiveCamera(55,fw/Math.max(1,fh),.1,1200);
+      var hemi=new THREE.HemisphereLight(0xcfe4ff,0x8a9078,.95);mapScene.add(hemi);
+      var sun=new THREE.DirectionalLight(0xfff1d8,.95);
+      mapHemiL=hemi;mapSunL=sun;
+      sun.position.set(70,110,40);sun.castShadow=true;
+      sun.shadow.mapSize.set(2048,2048);
+      sun.shadow.camera.left=-130;sun.shadow.camera.right=130;
+      sun.shadow.camera.top=130;sun.shadow.camera.bottom=-130;
+      sun.shadow.camera.far=420;sun.shadow.bias=-.0004;
+      mapScene.add(sun);mapScene.add(sun.target);
+      renderer.shadowMap.enabled=true;
+      renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+      /* Plain ground — no texture, no pattern. Segmented so the vertex-shader curve stays smooth. */
+      /* Han's real facades. Facade: mostly modern, sometimes art_deco/shop_terrace. */
+      var facadeFiles=[
+        {f:'081_modern.png',w:30},{f:'082_modern.png',w:30},
+        {f:'031_art_deco.png',w:15},{f:'032_art_deco.png',w:10},
+        {f:'091_shop_terrace.png',w:15}
+      ];
+      function pickFacade(){
+        var r=rnd()*100,acc=0;
+        for(var fi=0;fi<facadeFiles.length;fi++){acc+=facadeFiles[fi].w;if(r<acc)return facadeFiles[fi].f;}
+        return facadeFiles[0].f;
+      }
+      var facadeMatCache={};
+      function facadeMats(file,roofColor){
+        var key=file+'_'+roofColor;
+        var fm=facadeMatCache[key];
+        if(!fm){
+          var ftex=new THREE.TextureLoader().load('assets/props/facades/'+file);
+          var fside=new THREE.MeshLambertMaterial({map:ftex});
+          curvePatch(fside);
+          var froof=curvedMat(roofColor);
+          fm=[fside,fside,froof,froof,fside,fside]; /* +x,-x,+y,-y,+z,-z */
+          facadeMatCache[key]=fm;
+        }
+        return fm;
+      }
+      function buildingAt(w,h,d,x,y,z,color){
+        var bm=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),facadeMats(pickFacade(),color));
+        bm.position.set(x,y,z);bm.castShadow=true;bm.receiveShadow=true;mapScene.add(bm);return bm;
+      }
+      var ground=new THREE.Mesh(new THREE.PlaneGeometry(640,640,64,64),curvedMat(0xa7b198));
+      ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;mapScene.add(ground);
+      /* Han's modern-city road tiles: asphalt with lane dashes + curb edges. */
+      function roadTexture(rot, plain, fourLane){
+        var rt=new THREE.TextureLoader().load('assets/props/ground/'+(plain?'road_plain.png':(fourLane?'road_4lane.png':'road_lane.png')));
+        /* QA #16 (2026-10-06): MirroredRepeat on the tiling axis hides seams between tiles. */
+        rt.wrapS=THREE.RepeatWrapping;
+        rt.wrapT=plain?THREE.RepeatWrapping:THREE.MirroredRepeatWrapping;
+        if(rot&&!plain){rt.center.set(.5,.5);rt.rotation=Math.PI/2;}
+        /* repeat applies after rotation in the UV transform, so rotated uses (1,22) */
+        rt.repeat.set(1,plain?1:22);
+        return rt;
+      }
+      var roadMatH4=new THREE.MeshLambertMaterial({map:roadTexture(true,false,true)});curvePatch(roadMatH4);
+      var roadMatV4=new THREE.MeshLambertMaterial({map:roadTexture(false,false,true)});curvePatch(roadMatV4);
+      var roadMatX=new THREE.MeshLambertMaterial({map:roadTexture(false,true,false)});curvePatch(roadMatX);
+      /* Han 2026-10-05 (corrected): minor streets are flat lawns, NOT asphalt.
+         Flat grass COLOR only — no tile texture (seams visible). */
+      var lawnMat=curvedMat(0x7fae62);
+      var padMat=curvedMat(0xb9c1ac);
+      var BLOCK=26,STREET=12,HALF=101;
+      var streetC=[-95,-57,-19,19,57,95],blockC=[-76,-38,0,38,76];
+      var si;
+      for(si=0;si<streetC.length;si++){
+        /* Major avenues only get 4-lane asphalt (Han 2026-10-05):
+           east-west "Georgia St" (z=19, idx 3), north-south "Kingsway" (x=-19, idx 2).
+           All other streets are flat grass lawns. */
+        var isMajorH=(si===3), isMajorV=(si===2);
+        var rz=new THREE.Mesh(new THREE.PlaneGeometry(HALF*2,STREET,48,4),isMajorH?roadMatH4:lawnMat);
+        rz.rotation.x=-Math.PI/2;rz.position.set(0,.02,streetC[si]);rz.receiveShadow=true;mapScene.add(rz);
+        var rx=new THREE.Mesh(new THREE.PlaneGeometry(STREET,HALF*2,4,48),isMajorV?roadMatV4:lawnMat);
+        rx.rotation.x=-Math.PI/2;rx.position.set(streetC[si],.021,0);rx.receiveShadow=true;mapScene.add(rx);
+      }
+      /* Intersection squares: asphalt only where a major avenue crosses (keeps it continuous);
+         all minor-minor crossings are lawn. */
+      for(var xi=0;xi<streetC.length;xi++)for(var xj=0;xj<streetC.length;xj++){
+        var majorXing=(xi===2||xj===3);
+        var ix=new THREE.Mesh(new THREE.PlaneGeometry(STREET,STREET,4,4),majorXing?roadMatX:lawnMat);
+        ix.rotation.x=-Math.PI/2;ix.position.set(streetC[xi],.022,streetC[xj]);
+        ix.receiveShadow=true;mapScene.add(ix);
+      }
+      /* Narrow alleys through block centers (Han 2026-10-05 — more interesting blocks).
+         4-unit plain asphalt strips; buildings may partially overlap (colliders handle it). */
+      var alleyMat=new THREE.MeshLambertMaterial({map:roadTexture(false,true,false)});
+      alleyMat.map.repeat.set(1,3);curvePatch(alleyMat);
+      for(bi=0;bi<blockC.length;bi++)for(bj=0;bj<blockC.length;bj++){
+        if(rnd()>.7)continue; /* not every block gets alleys */
+        var abx=blockC[bi],abz=blockC[bj];
+        var ah=new THREE.Mesh(new THREE.PlaneGeometry(26,4,8,2),alleyMat);
+        ah.rotation.x=-Math.PI/2;ah.position.set(abx,.025,abz);ah.receiveShadow=true;mapScene.add(ah);
+        var av=new THREE.Mesh(new THREE.PlaneGeometry(4,26,2,8),alleyMat);
+        av.rotation.x=-Math.PI/2;av.position.set(abx,.026,abz);av.receiveShadow=true;mapScene.add(av);
+      }
+      /* Real-time navigation-style traffic engine — DATA ONLY.
+         Road network -> segments between intersections. Each segment carries a
+         flow value (1 = free). updateTraffic() ticks every few seconds. */
+      function addTrafficSeg(x1,z1,x2,z2){
+        var len=Math.hypot(x2-x1,z2-z1);
+        var horiz=Math.abs(z2-z1)<.01;
+        var segW=horiz?len:STREET,segD=horiz?STREET:len;
+        /* Data-only: no visual mesh (Han 2026-10-05 — overlay looked off).
+           Segment flow data still simulates for navigation use. */
+        var seg={x1:x1,z1:z1,x2:x2,z2:z2,flow:.45+Math.random()*.55,mesh:null,nb:[]};
+        trafficSegs.push(seg);
+        return seg;
+      }
+      var tBounds=[-HALF].concat(streetC,[HALF]);
+      for(si=0;si<streetC.length;si++){
+        for(var tk=0;tk<tBounds.length-1;tk++){
+          addTrafficSeg(tBounds[tk],streetC[si],tBounds[tk+1],streetC[si]);
+          addTrafficSeg(streetC[si],tBounds[tk],streetC[si],tBounds[tk+1]);
+        }
+      }
+      for(var ta=0;ta<trafficSegs.length;ta++)for(var tb=ta+1;tb<trafficSegs.length;tb++){
+        var A=trafficSegs[ta],B=trafficSegs[tb];
+        var touch=(Math.abs(A.x2-B.x1)<.01&&Math.abs(A.z2-B.z1)<.01)||
+                   (Math.abs(A.x1-B.x2)<.01&&Math.abs(A.z1-B.z2)<.01)||
+                   (Math.abs(A.x2-B.x2)<.01&&Math.abs(A.z2-B.z2)<.01)||
+                   (Math.abs(A.x1-B.x1)<.01&&Math.abs(A.z1-B.z1)<.01);
+        if(touch){A.nb.push(tb);B.nb.push(ta);}
+      }
+      /* Grass + cobblestone ground tiles (Han 2026-10-05). */
+      function groundTexture(file,rx,ry){
+        var gt=new THREE.TextureLoader().load('assets/props/ground/'+file);
+        gt.wrapS=gt.wrapT=THREE.RepeatWrapping;
+        gt.repeat.set(rx,ry);
+        return gt;
+      }
+      var grassMat=new THREE.MeshLambertMaterial({map:groundTexture('grass_dark.png',3,3)});curvePatch(grassMat);
+      var cobbleMat=new THREE.MeshLambertMaterial({map:groundTexture('cobble.png',5,5)});curvePatch(cobbleMat);
+      var bi,bj;
+      /* Park blocks: (bi,bj) indices into blockC — grass instead of plain pad. */
+      var parkBlocks={ '2,1':1, '1,3':1 };
+      for(bi=0;bi<blockC.length;bi++)for(bj=0;bj<blockC.length;bj++){
+        var isPark=parkBlocks[bi+','+bj];
+        var pad=new THREE.Mesh(new THREE.PlaneGeometry(BLOCK,BLOCK,8,8),isPark?grassMat:padMat);
+        pad.rotation.x=-Math.PI/2;pad.position.set(blockC[bi],.04,blockC[bj]);pad.receiveShadow=true;mapScene.add(pad);
+      }
+      /* Deterministic pseudo-random for a stable downtown. */
+      var seed=1234567;
+      function rnd(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;}
+      var palette=[0x8fa3b8,0x9aa5a8,0xb0a897,0x7d8b99,0xa89a8c,0x6f7f8e,0x93a7bb,0x8794a0];
+      function boxAt(w,h,d,x,y,z,color){
+        var m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),curvedMat(color));
+        m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;mapScene.add(m);return m;
+      }
+      /* Buildings: 2x2 lots per block, taller toward the center. */
+      var buildingRects=[];
+      for(bi=0;bi<blockC.length;bi++)for(bj=0;bj<blockC.length;bj++){
+        if(parkBlocks[bi+','+bj])continue; /* park blocks stay green */
+        var bx=blockC[bi],bz=blockC[bj];
+        for(var li=0;li<2;li++)for(var lj=0;lj<2;lj++){
+          var lx=bx+(li?6.5:-6.5),lz=bz+(lj?6.5:-6.5);
+          if(rnd()>.7)continue; /* some lots stay empty */
+          var w=7+rnd()*5,d=7+rnd()*5;
+          var x=lx+(rnd()-.5)*3,z=lz+(rnd()-.5)*3;
+          /* Canada Place waterfront plaza stays clear. */
+          if(x+w/2>-26&&x-w/2<26&&z+d/2>-102&&z-d/2<-87)continue;
+          var distC=Math.sqrt(bx*bx+bz*bz);
+          var h=9+rnd()*13+(1-Math.min(1,distC/110))*16;
+          var color=palette[Math.floor(rnd()*palette.length)];
+          buildingAt(w,h,d,x,.04+h/2,z,color);
+          if(rnd()>.6)boxAt(w*.38,1.3,d*.38,x,.04+h+.65,z,0x5d6a72); /* rooftop unit */
+          addCollider(x-w/2,x+w/2,z-d/2,z+d/2,.04,.04+h);
+          buildingRects.push({x0:x-w/2,x1:x+w/2,z0:z-d/2,z1:z+d/2});
+          mapBuildings.push({x:x,z:z,w:w,d:d,name:null});
+        }
+      }
+      /* Grass patches in empty spaces inside building blocks (Han 2026-10-05).
+         Not under buildings (checked against buildingRects), not on alleys. */
+      function rectOverlap(a,b){return a.x0<b.x1&&a.x1>b.x0&&a.z0<b.z1&&a.z1>b.z0;}
+      for(bi=0;bi<blockC.length;bi++)for(bj=0;bj<blockC.length;bj++){
+        if(parkBlocks[bi+','+bj])continue;
+        var gbx=blockC[bi],gbz=blockC[bj];
+        var candidates=[[0,9],[0,-9],[9,0],[-9,0],[9,9],[9,-9],[-9,9],[-9,-9]];
+        for(var ci=0;ci<candidates.length;ci++){
+          if(rnd()>.6)continue;
+          var cx=gbx+candidates[ci][0],cz=gbz+candidates[ci][1];
+          var gr={x0:cx-2.2,x1:cx+2.2,z0:cz-2.2,z1:cz+2.2};
+          var clear=true;
+          for(var ri=0;ri<buildingRects.length;ri++){
+            if(rectOverlap(gr,buildingRects[ri])){clear=false;break;}
+          }
+          if(!clear)continue;
+          var gm=new THREE.Mesh(new THREE.PlaneGeometry(4.4,4.4,2,2),grassMat);
+          gm.rotation.x=-Math.PI/2;gm.position.set(cx,.045,cz);gm.receiveShadow=true;mapScene.add(gm);
+        }
+      }
+      /* Street trees on block corners — Han's real sprites (billboard). */      var treeVariants=[
+        {f:'assets/props/trees/pine_1.png',a:96/127},
+        {f:'assets/props/trees/pine_2.png',a:55/116},
+        {f:'assets/props/trees/pine_3.png',a:55/116}
+      ];
+      for(bi=0;bi<blockC.length;bi++)for(bj=0;bj<blockC.length;bj++){
+        if(rnd()>.5)continue;
+        var tx=blockC[bi]+(rnd()>.5?11:-11),tz=blockC[bj]+(rnd()>.5?11:-11);
+        var tv=treeVariants[Math.floor(rnd()*treeVariants.length)],th=3.0+rnd()*0.9;
+        addProp('tree',tx,tz,th*tv.a,th,tv.f);
+        addCollider(tx-.35,tx+.35,tz-.35,tz+.35,0,2.8);
+      }
+      /* Grass tufts and trees along the streets (Han 2026-10-05). */
+      var grassVariants=[
+        {f:'assets/props/trees/grass.png',a:101/89},
+        {f:'assets/props/trees/plant_leaf.png',a:100/77}
+      ];
+      for(si=0;si<streetC.length;si++){
+        for(var gp=-90;gp<=90;gp+=15){
+          if(rnd()>.55)continue;
+          /* Grass on sidewalk edge (just off the road). */
+          var side=rnd()>.5?1:-1;
+          var gx=streetC[si]+side*(7+rnd()*2), gz=gp+(rnd()-.5)*6;
+          if(Math.abs(gx)>MAP_BOUND||Math.abs(gz)>MAP_BOUND)continue;
+          var gv=grassVariants[Math.floor(rnd()*grassVariants.length)],gh=1.0+rnd()*.6;
+          addProp('grass',gx,gz,gh*gv.a,gh,gv.f);
+          /* Occasional street tree. */
+          if(rnd()>.75){
+            var stx=streetC[si]-side*(8+rnd()*2), stz=gp+(rnd()-.5)*8;
+            if(Math.abs(stx)>MAP_BOUND||Math.abs(stz)>MAP_BOUND)continue;
+            var stv=treeVariants[Math.floor(rnd()*treeVariants.length)],sth=2.8+rnd()*.8;
+            addProp('tree',stx,stz,sth*stv.a,sth,stv.f);
+            addCollider(stx-.35,stx+.35,stz-.35,stz+.35,0,2.6);
+          }
+        }
+        for(var gp2=-90;gp2<=90;gp2+=15){
+          if(rnd()>.55)continue;
+          var side2=rnd()>.5?1:-1;
+          var gz2=streetC[si]+side2*(7+rnd()*2), gx2=gp2+(rnd()-.5)*6;
+          if(Math.abs(gx2)>MAP_BOUND||Math.abs(gz2)>MAP_BOUND)continue;          var gv2=grassVariants[Math.floor(rnd()*grassVariants.length)],gh2=1.0+rnd()*.6;
+          addProp('grass',gx2,gz2,gh2*gv2.a,gh2,gv2.f);
+        }
+      }
+      /* QA #16 (2026-10-06): sparse grass tufts ON the lawn strips (former minor streets).
+         Lawns are at streetC except the 2 majors (si=3 H, si=2 V). Sparse, not dense. */
+      for(si=0;si<streetC.length;si++){
+        var isLawnH=(si!==3), isLawnV=(si!==2);
+        for(var lg=-95;lg<=95;lg+=7){
+          if(rnd()>.3)continue; /* sparse: 30% chance */
+          var gvx=grassVariants[Math.floor(rnd()*grassVariants.length)],ghx=.8+rnd()*.5;
+          if(isLawnH){
+            var lgx=lg+(rnd()-.5)*5, lgz=streetC[si]+(rnd()-.5)*8;
+            if(Math.abs(lgx)<=MAP_BOUND&&Math.abs(lgz)<=MAP_BOUND)
+              addProp('grass',lgx,lgz,ghx*gvx.a,ghx,gvx.f);
+          }
+          if(isLawnV){
+            var lgx2=streetC[si]+(rnd()-.5)*8, lgz2=lg+(rnd()-.5)*5;
+            if(Math.abs(lgx2)<=MAP_BOUND&&Math.abs(lgz2)<=MAP_BOUND)
+              addProp('grass',lgx2,lgz2,ghx*gvx.a,ghx,gvx.f);
+          }
+        }
+      }
+      /* Street lamps along the avenues (placeholder positions). */
+      for(si=0;si<streetC.length;si++)for(var sj=0;sj<streetC.length;sj++){
+        if((si+sj)%2)continue;
+        var lx=streetC[si]+7,lz=streetC[sj]+7;
+        if(Math.abs(lx)>MAP_BOUND||Math.abs(lz)>MAP_BOUND)continue;
+        addProp('lamp',lx,lz,1.0,4.2);
+      }
+      /* Traffic lights at major intersections (placeholder positions). */
+      for(si=0;si<streetC.length;si+=2)for(var sj2=0;sj2<streetC.length;sj2+=2){
+        var gx=streetC[si]-7,gz=streetC[sj2]-7;
+        addProp('signal',gx,gz,0.9,3.6);
+        addCollider(gx-.25,gx+.25,gz-.25,gz+.25,0,3.2);
+      }
+      /* Low planters around the plaza — hop-on-able (double jump reaches ~3). */
+      var planterMat=curvedMat(0x9aa08e);
+      [[-14,-84],[14,-84],[-18,-90],[18,-90]].forEach(function(p){
+        boxAt(2.2,1,2.2,p[0],.5,p[1],0x9aa08e);
+        addCollider(p[0]-1.1,p[0]+1.1,p[1]-1.1,p[1]+1.1,0,1);
+      });
+      /* Waterfront: water, seawall, Canada Place sails plaza. */
+      /* QA #17 (2026-10-06): water texture + swimming mode. */
+      var waterTex=new THREE.TextureLoader().load('assets/props/ground/water.png');
+      waterTex.wrapS=waterTex.wrapT=THREE.RepeatWrapping;
+      waterTex.repeat.set(8,2);
+      var waterMat=new THREE.MeshLambertMaterial({map:waterTex});
+      curvePatch(waterMat);
+      var water=new THREE.Mesh(new THREE.PlaneGeometry(640,170,64,16),waterMat);
+      water.rotation.x=-Math.PI/2;water.position.set(0,.03,-186);mapScene.add(water);
+      /* Swimming state — set in updateWalkMap when player enters water. */
+      var WATER_Z=-100, WATER_Y=.25;
+      boxAt(208,1.6,2.4,0,-.2,-100,0x8b938a);
+      addCollider(-104,104,-102,-98.8,-1,1.2); /* seawall: solid, cannot be climbed */
+      var plaza=new THREE.Mesh(new THREE.CylinderGeometry(10,10,.12,36),cobbleMat);
+      plaza.position.set(0,.06,-95);plaza.receiveShadow=true;mapScene.add(plaza);
+      addCollider(-10,10,-101,-85,0,.12);
+      var sails=landmarkModel('sails');
+      sails.scale.setScalar(11);
+      sails.position.set(0,.12,-95);
+      sails.traverse(function(o){if(o.isMesh){o.material=curvePatch(o.material);o.castShadow=true;o.receiveShadow=true;}});
+      mapScene.add(sails);
+      addCollider(-5,5,-99.5,-90.5,.12,3.6);
+      /* Invisible walls at the map edge (the north side is guarded by the seawall). */
+      /* QA #10 (2026-10-06): Genshin-style invisible walls — direct clamping instead of
+         huge collider boxes (which caused far-side teleport when moving inward). */
+      /* (Boundary walls removed; clamping applied in updateWalkMap after collision.) */
+      /* The walker. */
+      var av=buildWalkerAvatar();
+      mapScene.add(av.group);mapScene.add(av.shadow);
+      walkPlayer={av:av,pos:new THREE.Vector3(19,.05,-57),velY:0,onGround:true,jumps:0,faceY:.5,bobT:0,moving:false};
+      av.shadow.position.set(19,.03,-57);
+    }
+    /* QA #6 (2026-10-06): remember last location in localStorage (server sync later). */
+    var LAST_POS_KEY='espil_last_pos';
+    function saveLastPos(){
+      if(!walkPlayer)return;
+      try{
+        localStorage.setItem(LAST_POS_KEY,JSON.stringify({
+          x:walkPlayer.pos.x,y:walkPlayer.pos.y,z:walkPlayer.pos.z,
+          yaw:walkCamYaw,ts:Date.now()
+        }));
+      }catch(e){}
+    }
+    function loadLastPos(){
+      try{
+        var s=localStorage.getItem(LAST_POS_KEY);
+        if(!s)return null;
+        var d=JSON.parse(s);
+        /* Sanity: must be within playable bounds. */
+        if(Math.abs(d.x)>120||Math.abs(d.z)>120)return null;
+        return d;
+      }catch(e){return null;}
+    }
+    function resetWalkPlayer(){
+      if(!walkPlayer)return;
+      /* QA #6: restore last position if available, else default spawn. */
+      var last=loadLastPos();
+      if(last){
+        walkPlayer.pos.set(last.x,last.y,last.z);
+        if(typeof last.yaw==='number')walkCamYaw=last.yaw;
+      }else{
+        walkPlayer.pos.set(19,.05,-57);
+      }
+      walkPlayer.velY=0;walkPlayer.onGround=true;
+      walkPlayer.jumps=0;walkPlayer.faceY=.5;walkPlayer.bobT=0;
+      walkCamPitch=.42;walkCamDist=14;
+      walkPlayer.av.group.position.copy(walkPlayer.pos);
+      walkPlayer.av.group.rotation.y=.5;
+      /* Snap the follow camera behind the player on entry. */
+      var cp0=Math.cos(walkCamPitch),sp0=Math.sin(walkCamPitch);
+      mapCamera.position.set(
+        walkPlayer.pos.x+Math.sin(walkCamYaw)*cp0*walkCamDist,
+        walkPlayer.pos.y+sp0*walkCamDist+1.2,
+        walkPlayer.pos.z+Math.cos(walkCamYaw)*cp0*walkCamDist);
+      mapCamera.lookAt(walkPlayer.pos.x,walkPlayer.pos.y+1.7,walkPlayer.pos.z);
+    }
+    function enterWalkMap(){
+      if(cityPhaseActive)return;
+      gateActive=false;
+      buildWalkMapOnce();
+      resetWalkPlayer();
+      cityPhaseActive=true;
+      targetDistance=1.34; /* continue the entry dive (2026-10-06 QA #3) */
       boundary.visible=false;
-      hideAurora();
-      citySky.visible=true;
-      refreshStageLandmark(); /* the real model may have arrived while the dialog was open */
-      if(cityStage)cityStage.visible=true;
-      cityPhaseName.textContent=selected.userData.name;
+      citySky.visible=false;
+      cityPhaseName.textContent='VANCOUVER DOWNTOWN';
+      var hint=document.getElementById('map-hint');
+      var coarse=window.matchMedia&&window.matchMedia('(pointer:coarse)').matches;
+      if(hint)hint.textContent=coarse?
+        'Left stick walks (full tilt = run) \u00B7 drag to look around \u00B7 JUMP to hop (twice = double jump)':
+        'Arrow keys walk \u00B7 SHIFT jump (twice = double jump) \u00B7 SPACE interact \u00B7 CTRL sprint toggle \u00B7 Q punch \u00B7 W kick \u00B7 E throw \u00B7 K skills \u00B7 drag to look \u00B7 ESC to leave';
       cityPhasePanel.setAttribute('aria-hidden','false');
       document.getElementById('city-status').classList.add('is-city');
-      status.textContent=selected.userData.landmark+' · real-time sky';
+      document.body.classList.add('in-map');
+      initSkillHud();
+      status.textContent='Vancouver Downtown \u2014 walk around';
+      if(window.EspilAudio&&window.EspilAudio.onCitySelect)window.EspilAudio.onCitySelect();
+      if(window.EspilAudio&&window.EspilAudio.onMapEnter)window.EspilAudio.onMapEnter('vancouver');
+      if(selected&&selected.userData&&window.EspilAudio&&window.EspilAudio.onCityEnter)window.EspilAudio.onCityEnter(selected.userData.name);
+      try{
+        if(!walkAudioCtx)walkAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
+        if(walkAudioCtx.state==='suspended')walkAudioCtx.resume();
+      }catch(e){}
       updateSunPosition();
     }
+    function exitWalkMap(silent){
+      if(!cityPhaseActive)return;
+      saveLastPos(); /* QA #6: persist position on exit */
+      cityPhaseActive=false;
+      gateActive=false;
+      document.body.classList.remove('in-map');
+      hideSkillHud();
+      document.getElementById('city-status').classList.remove('is-city');
+      cityPhasePanel.setAttribute('aria-hidden','true');
+      walkKeys={};
+      if(window.__joyVec){window.__joyVec.x=0;window.__joyVec.y=0;}
+      mapDragId=null;
+      if(window.EspilAudio&&window.EspilAudio.onMapExit)window.EspilAudio.onMapExit();
+      if(!silent&&window.EspilAudio&&window.EspilAudio.onReturnToOrbit)window.EspilAudio.onReturnToOrbit();
+    }
+    function tryJump(){
+      if(!cityPhaseActive||!walkPlayer)return;
+      var p=walkPlayer;
+      if(p.swimming)return; /* QA #17: no jumping while swimming */
+      if(p.onGround||p.jumps<2){
+        p.velY=9;p.onGround=false;p.jumps++;
+        walkSfx(p.jumps>1?'double':'jump');
+        /* QA #7: Mixamo jump motion hooks here when assets arrive (male/female). */
+        if(p.av&&p.av.playJump)try{p.av.playJump(p.jumps>1);}catch(e){}
+      }
+    }
+    /* QA #8 (2026-10-06): Space = interact when near a building. */
+    function tryInteract(){
+      if(!cityPhaseActive||!walkPlayer)return;
+      if(nearBldg&&nearBldg.name){
+        /* Placeholder dialogue — real building interaction UI comes later. */
+        var t=document.getElementById('toast');
+        if(t){t.textContent='🏢 '+nearBldg.name; t.classList.add('show');
+          clearTimeout(t._it); t._it=setTimeout(function(){t.classList.remove('show');},2200);}
+        if(window.EspilAudio&&window.EspilAudio.tick)window.EspilAudio.tick();
+      }
+    }
+    /* ================================================================
+       Skill system — Keeper (the only class for now).
+       No weapons exist yet, so the whole kit is unarmed: punch slash,
+       kick, and an ember throw. Each move carries its own damage, range,
+       cooldown, arc effect and synthesized sound. MOVES is the single
+       table new moves plug into later (weapons included, once forged).
+       Skill points come from levels (EXP arrives with enemies); 3 starter
+       points are granted so the tree works today.
+       ================================================================ */
+    var MOVE_ORDER=['punch','kick','throw'];
+    var MOVES={
+      punch:{name:'Punch',key:'Q',icon:'👊',color:0xbfe9ff,css:'#bfe9ff',
+        dmg:8,range:2.2,cd:.45,arc:1.9,y:1.05,
+        desc:'A quick punch.'},
+      kick:{name:'Kick',key:'W',icon:'🦵',color:0x7dfce6,css:'#7dfce6',
+        dmg:13,range:2.8,cd:.65,arc:2.2,y:.6,
+        desc:'A heavy kick. Slower, longer reach.'},
+      throw:{name:'Throw',key:'E',icon:'🔥',color:0xffb35c,css:'#ffb35c',
+        dmg:10,range:8,cd:.9,arc:1.6,y:1.3,proj:true,
+        desc:'Throw an ember. Flies straight, bursts on arrival.'}
+    };
+    /* Skill bar slots, QWER row then ASDF row. Locked slots show a lock;
+       empty ones are inert placeholders for future skills. */
+    var SKILL_SLOTS=[
+      {key:'q',move:'punch'},
+      {key:'w',move:'kick'},
+      {key:'e',move:'throw'},
+      {key:'r',locked:'Cauldron Toss'},
+      {key:'a',locked:'Ember Guard'},
+      {key:'s',locked:null},
+      {key:'d',locked:null},
+      {key:'f',locked:null}
+    ];
+    function skillSlotForKey(key){
+      for(var i=0;i<SKILL_SLOTS.length;i++)if(SKILL_SLOTS[i].key===key)return SKILL_SLOTS[i];
+      return null;
+    }
+    var SKILL_NODES=[
+      {id:'slash',name:'Basic Moves',root:true,max:1,desc:''},
+      {id:'m_punch',name:'Punch Mastery',max:3,desc:'+12% Punch damage per rank.'},
+      {id:'m_kick',name:'Kick Mastery',max:3,desc:'+12% Kick damage per rank.'},
+      {id:'m_throw',name:'Throw Mastery',max:3,desc:'+12% Throw damage per rank.'},
+      {id:'swift',name:'Swift Forge',max:5,need:2,desc:'+5% attack speed per rank.'},
+      {id:'reach',name:'Long Reach',max:3,need:2,desc:'+7% range per rank.'},
+      {id:'toss',name:'Cauldron Toss',locked:true,desc:'Hurl a whole burning cauldron. Arrives with the combat update.'},
+      {id:'guard',name:'Ember Guard',locked:true,desc:'A ring of forge-fire around you. Arrives with the combat update.'}
+    ];
+    var skillState={points:3,alloc:{},level:1,exp:0,hp:100,maxhp:100,mp:50,maxmp:50,cd:{punch:0,kick:0,throw:0}};
+    try{
+      var _ss=JSON.parse(window.localStorage.getItem('espil_skills_v1')||'null');
+      if(_ss&&_ss.alloc){
+        /* Drop allocations for nodes that no longer exist (e.g. the old weapon masteries). */
+        var _na={};
+        for(var _k in _ss.alloc){
+          for(var _ni=0;_ni<SKILL_NODES.length;_ni++){
+            if(SKILL_NODES[_ni].id===_k){_na[_k]=_ss.alloc[_k];break;}
+          }
+        }
+        _ss.alloc=_na;
+        if(!_ss.cd||typeof _ss.cd!=='object')_ss.cd={punch:0,kick:0,throw:0};
+        skillState=_ss;
+      }
+    }catch(e){}
+    function saveSkills(){try{window.localStorage.setItem('espil_skills_v1',JSON.stringify(skillState));}catch(e){}}
+    function totalSpent(){var s=0;for(var k in skillState.alloc)s+=skillState.alloc[k];return s;}
+    function moveStats(id){
+      var m=MOVES[id];
+      var mr=skillState.alloc['m_'+id]||0;
+      return {
+        m:m,
+        dmg:Math.round(m.dmg*(1+.12*mr)),
+        range:m.range*(1+.07*(skillState.alloc.reach||0)),
+        cd:m.cd/(1+.05*(skillState.alloc.swift||0))
+      };
+    }
+    /* Synthesized swing / impact sounds — no audio assets needed. */
+    function skillSfx(kind){
+      try{
+        if(!walkAudioCtx)walkAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
+        if(walkAudioCtx.state==='suspended')walkAudioCtx.resume();
+        var ctx=walkAudioCtx,t=ctx.currentTime;
+        if(kind==='thud'){
+          var o=ctx.createOscillator(),g=ctx.createGain();
+          o.type='sine';o.frequency.setValueAtTime(95,t);o.frequency.exponentialRampToValueAtTime(48,t+.12);
+          g.gain.setValueAtTime(.28,t);g.gain.exponentialRampToValueAtTime(.001,t+.16);
+          o.connect(g);g.connect(ctx.destination);o.start(t);o.stop(t+.18);
+        }
+        var len=Math.floor(ctx.sampleRate*.25),buf=ctx.createBuffer(1,len,ctx.sampleRate),d=buf.getChannelData(0);
+        for(var i=0;i<len;i++)d[i]=(Math.random()*2-1)*(1-i/len);
+        var src=ctx.createBufferSource();src.buffer=buf;
+        var f=ctx.createBiquadFilter();f.type='bandpass';f.Q.value=1.1;
+        var base=kind==='whoosh-hi'?2600:(kind==='whoosh-lo'?520:(kind==='thud'?700:1400));
+        f.frequency.setValueAtTime(base,t);f.frequency.exponentialRampToValueAtTime(Math.max(80,base*.32),t+.2);
+        var g2=ctx.createGain();g2.gain.setValueAtTime(.22,t);g2.gain.exponentialRampToValueAtTime(.001,t+.24);
+        src.connect(f);f.connect(g2);g2.connect(ctx.destination);src.start(t);
+      }catch(e){}
+    }
+    /* Slash arc effect pool. Horizontal ring-sectors, additive, expanding +
+       fading; centered on the player's facing direction. */
+    var fxPool=[];
+    function spawnArc(colorHex,range,arc,y,life,s0,s1){
+      if(!mapScene||!walkPlayer)return;
+      var p=walkPlayer;
+      var geo=new THREE.RingGeometry(Math.max(.3,range*.45),range,40,1,0,arc);
+      var mat=new THREE.MeshBasicMaterial({color:colorHex,transparent:true,opacity:.9,
+        side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false,fog:false});
+      var mesh=new THREE.Mesh(geo,mat);
+      mesh.rotation.x=-Math.PI/2;
+      mesh.renderOrder=5;mesh.frustumCulled=false;
+      var grp=new THREE.Group();
+      grp.add(mesh);
+      grp.position.set(p.pos.x,y,p.pos.z);
+      /* Ring theta starts at local +X; this yaw centers the arc on the facing dir. */
+      grp.rotation.y=p.faceY+Math.PI/2-arc/2;
+      mapScene.add(grp);
+      fxPool.push({grp:grp,mat:mat,geo:geo,t:0,life:life,s0:s0,s1:s1,o0:.9,sprite:null});
+    }
+    function spawnFlash(colorHex,dist,px,pz,py){
+      if(!mapScene||!walkPlayer||typeof glowTex==='undefined')return;
+      var p=walkPlayer;
+      var sm=new THREE.SpriteMaterial({map:glowTex,color:colorHex,transparent:true,opacity:.85,
+        blending:THREE.AdditiveBlending,depthWrite:false});
+      var sp=new THREE.Sprite(sm);
+      var fx=-Math.sin(p.faceY),fz=-Math.cos(p.faceY);
+      sp.position.set(
+        (typeof px==='number')?px:p.pos.x+fx*dist,
+        (typeof py==='number')?py:1.25,
+        (typeof pz==='number')?pz:p.pos.z+fz*dist);
+      sp.scale.set(.9,.9,1);
+      mapScene.add(sp);
+      fxPool.push({grp:sp,mat:sm,geo:null,t:0,life:.18,s0:.9,s1:2.6,o0:.85,sprite:sp});
+    }
+    function spawnProjectile(m){
+      if(!mapScene||!walkPlayer||typeof glowTex==='undefined')return;
+      var p=walkPlayer;
+      var sm=new THREE.SpriteMaterial({map:glowTex,color:m.color,transparent:true,opacity:.95,
+        blending:THREE.AdditiveBlending,depthWrite:false});
+      var sp=new THREE.Sprite(sm);
+      var fx=-Math.sin(p.faceY),fz=-Math.cos(p.faceY);
+      sp.position.set(p.pos.x+fx*.8,m.y,p.pos.z+fz*.8);
+      sp.scale.set(.7,.7,1);
+      mapScene.add(sp);
+      var speed=14,life=m.range/speed;
+      fxPool.push({grp:sp,mat:sm,geo:null,t:0,life:life,s0:.7,s1:.7,o0:.95,sprite:sp,
+        proj:{vx:fx*speed,vz:fz*speed}});
+    }
+    function updateSkillFx(dt){
+      var i;
+      var anyCd=false;
+      for(i=0;i<MOVE_ORDER.length;i++){
+        var mid=MOVE_ORDER[i];
+        if(skillState.cd[mid]>0){skillState.cd[mid]=Math.max(0,skillState.cd[mid]-dt);anyCd=true;}
+      }
+      if(anyCd)paintCooldowns();
+      if(skillState.mp<skillState.maxmp){skillState.mp=Math.min(skillState.maxmp,skillState.mp+5*dt);paintStatus();}
+      for(i=fxPool.length-1;i>=0;i--){
+        var f=fxPool[i];f.t+=dt;var k=f.t/f.life;
+        if(k>=1){
+          /* Thrown ember bursts where it lands. */
+          if(f.proj)spawnFlash(f.mat.color,0,f.grp.position.x,f.grp.position.z,f.grp.position.y);
+          mapScene.remove(f.grp);
+          if(f.geo)f.geo.dispose();
+          if(f.mat)f.mat.dispose();
+          fxPool.splice(i,1);continue;
+        }
+        if(f.proj){f.grp.position.x+=f.proj.vx*dt;f.grp.position.z+=f.proj.vz*dt;}
+        var s=f.s0+(f.s1-f.s0)*k;
+        if(f.sprite){f.sprite.scale.set(s,s,1);}else{f.grp.scale.set(s,1,s);}
+        f.mat.opacity=f.o0*(1-k);
+      }
+    }
+    function doMove(id){
+      if(!cityPhaseActive||!walkPlayer||skillTreeOpen)return;
+      var m=MOVES[id];
+      if(!m)return;
+      if(skillState.cd[id]>0)return;
+      var st=moveStats(id),p=walkPlayer;
+      skillState.cd[id]=st.cd;
+      p.lungeT=(id==='throw'?.16:.22); /* procedural strike motion; the GLB has no attack clip */
+      if(m.proj){
+        spawnArc(m.color,2.2,m.arc,m.y,.2,.5,1.1);
+        spawnFlash(m.color,1.5);
+        spawnProjectile(m);
+        skillSfx('whoosh-hi');
+      }else{
+        spawnArc(m.color,st.range,m.arc,m.y,.24,.55,1.15);
+        spawnFlash(m.color,st.range*.6);
+        if(id==='kick'){skillSfx('whoosh-lo');skillSfx('thud');}
+        else{skillSfx('whoosh');}
+      }
+      paintCooldowns();
+    }
+    /* ---- HUD ---- */
+    function paintStatus(){
+      var lv=document.getElementById('ms-lv'),sp=document.getElementById('ms-sp');
+      if(lv)lv.innerHTML='LV '+skillState.level+' &middot; KEEPER';
+      if(sp)sp.textContent='SP '+skillState.points;
+      var hp=document.getElementById('ms-hp'),hpt=document.getElementById('ms-hp-t');
+      if(hp)hp.style.width=(100*skillState.hp/skillState.maxhp)+'%';
+      if(hpt)hpt.textContent=Math.round(skillState.hp)+'/'+skillState.maxhp;
+      var mp=document.getElementById('ms-mp'),mpt=document.getElementById('ms-mp-t');
+      if(mp)mp.style.width=(100*skillState.mp/skillState.maxmp)+'%';
+      if(mpt)mpt.textContent=Math.round(skillState.mp)+'/'+skillState.maxmp;
+      var ex=document.getElementById('ms-exp'),ext=document.getElementById('ms-exp-t');
+      var need=skillState.level*100,pct=Math.min(100,100*skillState.exp/need);
+      if(ex)ex.style.width=pct+'%';
+      if(ext)ext.textContent=Math.round(pct)+'%';
+    }
+    function paintMoveSlots(){
+      SKILL_SLOTS.forEach(function(s){
+        if(!s.move)return;
+        var st=moveStats(s.move);
+        var b=document.getElementById('slot-'+s.key);
+        if(b)b.title=st.m.name+' ('+s.key.toUpperCase()+'): '+st.dmg+' dmg · '+st.range.toFixed(1)+'m · '+st.cd.toFixed(2)+'s — '+st.m.desc;
+      });
+    }
+    function paintCooldowns(){
+      MOVE_ORDER.forEach(function(id){
+        var el=document.getElementById('move-cd-'+id);
+        if(!el)return;
+        var st=moveStats(id);
+        var pct=st.cd>0?Math.max(0,Math.min(1,skillState.cd[id]/st.cd))*100:0;
+        el.style.setProperty('--cdp',pct+'%');
+      });
+    }
+    function renderSkillTree(){
+      var grid=document.getElementById('st-grid');
+      if(!grid)return;
+      grid.innerHTML='';
+      var spent=totalSpent();
+      SKILL_NODES.forEach(function(n){
+        var rank=skillState.alloc[n.id]||0;
+        var div=document.createElement('div');
+        var needMet=!n.need||spent>=n.need;
+        var maxed=!n.locked&&rank>=n.max;
+        div.className='st-node'+(n.root?' st-root':'')+((n.id==='swift'||n.id==='reach'||n.locked)?' st-wide':'')+
+          (n.locked||!needMet?' is-locked':'')+(maxed?' is-maxed':'');
+        var desc=n.root?
+          ('Basic moves:<br>'+
+           MOVE_ORDER.map(function(id){
+             var s2=moveStats(id);
+             return '<b style="color:'+s2.m.css+'">'+s2.m.name+' ('+s2.m.key+')</b> '+s2.dmg+' dmg &middot; '+s2.range.toFixed(1)+'m &middot; '+s2.cd.toFixed(2)+'s';
+           }).join('<br>')):
+          n.desc;
+        div.innerHTML='<div class="st-nm">'+n.name+'</div>'+
+          '<div class="st-rk">'+(n.locked?'SOON':(n.root?'':rank+'/'+n.max))+'</div>'+
+          '<div class="st-ds">'+desc+(n.need&&!n.locked?'<br><span class="st-req">Requires '+n.need+' points spent</span>':'')+'</div>';
+        if(!n.locked&&!n.root&&needMet&&!maxed){
+          div.addEventListener('click',function(){
+            if(skillState.points<=0){
+              if(window.__espilToast)window.__espilToast('No skill points left.');
+              return;
+            }
+            skillState.alloc[n.id]=rank+1;skillState.points--;
+            saveSkills();
+            if(window.EspilAudio&&window.EspilAudio.tick)window.EspilAudio.tick();
+            renderSkillTree();paintStatus();paintMoveSlots();
+          });
+        }
+        grid.appendChild(div);
+      });
+      var ssp=document.getElementById('st-sp');
+      if(ssp)ssp.textContent='Skill points: '+skillState.points;
+    }
+    var skillTreeOpen=false;
+    function toggleSkillTree(force){
+      var panel=document.getElementById('skill-tree');
+      if(!panel)return;
+      var open=typeof force==='boolean'?force:!skillTreeOpen;
+      skillTreeOpen=open;
+      panel.setAttribute('aria-hidden',String(!open));
+      if(open){renderSkillTree();if(window.EspilAudio&&window.EspilAudio.tick)window.EspilAudio.tick();}
+    }
+    /* QA #14 (UI room, 2026-10-06): I/M/H/P hotkeys. K already bound above. */
+    var inventoryOpen=false,characterOpen=false;
+    function toggleInventory(force){
+      var panel=document.getElementById('inventory-panel');
+      if(!panel)return;
+      var open=typeof force==='boolean'?force:!inventoryOpen;
+      inventoryOpen=open;
+      panel.setAttribute('aria-hidden',String(!open));
+      if(open&&window.EspilAudio&&window.EspilAudio.tick)window.EspilAudio.tick();
+    }
+    function toggleCharacterPanel(force){
+      var panel=document.getElementById('character-panel');
+      if(!panel)return;
+      var open=typeof force==='boolean'?force:!characterOpen;
+      characterOpen=open;
+      panel.setAttribute('aria-hidden',String(!open));
+      if(open&&window.EspilAudio&&window.EspilAudio.tick)window.EspilAudio.tick();
+    }
+    function teleportHome(){
+      /* QA #14 placeholder: no home set yet → go to spawn, toast notice. */
+      if(window.__espilToast)window.__espilToast('집 위치가 아직 설정되지 않았어요');
+      if(typeof resetToSpawn==='function'){try{resetToSpawn();}catch(_){}}
+    }
+    function initSkillHud(){
+      var row=document.getElementById('move-row');
+      if(row&&!row.children.length){
+        SKILL_SLOTS.forEach(function(s){
+          var b=document.createElement('button');
+          b.type='button';b.className='move-slot'+(s.move?'':' is-locked');b.id='slot-'+s.key;
+          if(s.move){
+            var m=MOVES[s.move];
+            b.setAttribute('aria-label',m.name+', key '+s.key.toUpperCase());
+            b.innerHTML='<span class="key">'+s.key.toUpperCase()+'</span>'+
+              '<span class="sicon">'+m.icon+'</span>'+
+              '<span class="mn">'+m.name.toUpperCase()+'</span>'+
+              '<span class="cd" id="move-cd-'+s.move+'"></span>';
+            (function(mid){b.addEventListener('pointerdown',function(e){e.preventDefault();doMove(mid);});})(s.move);
+          }else{
+            var lbl=s.locked?s.locked.split(' ')[1].toUpperCase():'\u2014';
+            b.setAttribute('aria-label',(s.locked||'Empty')+' skill slot, key '+s.key.toUpperCase());
+            b.title=s.locked?s.locked+' \u2014 arrives with the combat update.':'Empty skill slot';
+            b.innerHTML='<span class="key">'+s.key.toUpperCase()+'</span>'+
+              '<span class="sicon">'+(s.locked?'\uD83D\uDD12':'')+'</span>'+
+              '<span class="mn">'+lbl+'</span>';
+            if(s.locked)(function(nm){b.addEventListener('pointerdown',function(e){e.preventDefault();if(window.__espilToast)window.__espilToast(nm+' arrives with the combat update.');});})(s.locked);
+          }
+          row.appendChild(b);
+        });
+      }
+      /* QA #13 (UI room, 2026-10-06): 1234 item slots. */
+      var irow=document.getElementById('item-row');
+      if(irow&&!irow.children.length){
+        ['1','2','3','4'].forEach(function(k){
+          var b=document.createElement('button');
+          b.type='button';b.className='move-slot is-locked';b.id='item-'+k;
+          b.setAttribute('aria-label','Empty item slot, key '+k);
+          b.title='Empty item slot';
+          b.innerHTML='<span class="key">'+k+'</span>'+
+            '<span class="sicon"></span>'+
+            '<span class="mn">\u2014</span>';
+          irow.appendChild(b);
+        });
+      }
+      ['map-status','skill-bar'].forEach(function(id){
+        var el=document.getElementById(id);
+        if(el)el.setAttribute('aria-hidden','false');
+      });
+      paintStatus();paintMoveSlots();paintCooldowns();
+    }
+    function hideSkillHud(){
+      skillTreeOpen=false;inventoryOpen=false;characterOpen=false;
+      ['map-status','skill-bar','skill-tree','inventory-panel','character-panel'].forEach(function(id){
+        var el=document.getElementById(id);
+        if(el)el.setAttribute('aria-hidden','true');
+      });
+    }
+    /* EXP hook for later (enemies grant EXP; levels grant skill points). */
+    function gainExp(n){
+      if(skillState.level>=99)return;
+      skillState.exp+=n;
+      var need=skillState.level*100;
+      while(skillState.exp>=need&&skillState.level<99){
+        skillState.exp-=need;skillState.level++;
+        skillState.points++;skillState.maxhp+=10;skillState.hp=skillState.maxhp;
+        skillState.maxmp+=5;skillState.mp=skillState.maxmp;
+        need=skillState.level*100;
+        if(window.__espilToast)window.__espilToast('Level up! LV '+skillState.level+' — +1 skill point');
+      }
+      saveSkills();paintStatus();
+    }
+    window.__espilSkills={state:skillState,gainExp:gainExp,
+      addSkillPoint:function(n){skillState.points+=(n||1);saveSkills();paintStatus();},
+      move:doMove,tree:toggleSkillTree};
+    (function wireSkillHud(){
+      var atk=document.getElementById('map-attack');
+      if(atk)atk.addEventListener('pointerdown',function(e){e.preventDefault();doMove('punch');});
+      var tt=document.getElementById('tree-toggle');
+      if(tt)tt.addEventListener('click',function(e){e.stopPropagation();toggleSkillTree();});
+      var sc=document.getElementById('st-close');
+      if(sc)sc.addEventListener('click',function(){toggleSkillTree(false);});
+      var st=document.getElementById('skill-tree');
+      if(st)st.addEventListener('click',function(e){if(e.target===st)toggleSkillTree(false);});
+      /* QA #14 (UI room): inventory + character panel close handlers. */
+      var ic=document.getElementById('inv-close');
+      if(ic)ic.addEventListener('click',function(){toggleInventory(false);});
+      var ip=document.getElementById('inventory-panel');
+      if(ip)ip.addEventListener('click',function(e){if(e.target===ip)toggleInventory(false);});
+      var cc=document.getElementById('char-close');
+      if(cc)cc.addEventListener('click',function(){toggleCharacterPanel(false);});
+      var cp=document.getElementById('character-panel');
+      if(cp)cp.addEventListener('click',function(e){if(e.target===cp)toggleCharacterPanel(false);});
+    }());
+    /* Camera-look drag + pinch/wheel zoom, only while the map is open. */
+    function mapPointerDown(e){
+      mapDragId=e.pointerId;mapLastX=e.clientX;mapLastY=e.clientY;
+      try{canvas.setPointerCapture(e.pointerId);}catch(err){}
+    }
+    function mapPointerMove(e){
+      if(e.pointerId!==mapDragId)return;
+      var dx=e.clientX-mapLastX,dy=e.clientY-mapLastY;
+      mapLastX=e.clientX;mapLastY=e.clientY;
+      walkCamYaw-=dx*.0052;
+      walkCamPitch=Math.max(.12,Math.min(1.15,walkCamPitch+dy*.004));
+    }
+    function mapPointerUp(e){
+      if(e.pointerId===mapDragId)mapDragId=null;
+      try{canvas.releasePointerCapture(e.pointerId);}catch(err){}
+    }
+    function mapZoom(d){walkCamDist=Math.max(6,Math.min(16,walkCamDist+d));}
+    /* Keyboard: tracked only while the map is open (globe keeps its own bindings). */
+    document.addEventListener('keydown',function(e){
+      if(!document.body.classList.contains('in-map'))return;
+      var k=e.key;
+      if(k===' '||k==='ArrowUp'||k==='ArrowDown'||k==='ArrowLeft'||k==='ArrowRight')e.preventDefault();
+      walkKeys[k.toLowerCase()]=true;
+      /* QA #8 (2026-10-06): Shift=jump, Space=interact. Shift-run deprecated. */
+      if((k==='Shift')&&!e.repeat)tryJump();
+      if(k===' '&&!e.repeat)tryInteract();
+      /* QA #15 (2026-10-06): Ctrl toggles sprint on/off. */
+      if(k==='Control'&&!e.repeat){sprintOn=!sprintOn;updateSprintUI();}
+      /* Skill slots: QWER row, then ASDF row (1-4 are item slots — UI room).
+         K opens the skill tree. */
+      var ae=document.activeElement,atag=(ae&&ae.tagName)||'';
+      if(!/INPUT|TEXTAREA|SELECT/.test(atag)){
+        var lk=k.toLowerCase(),sl=skillSlotForKey(lk);
+        if(sl){
+          if(!e.repeat){
+            if(sl.move)doMove(sl.move);
+            else if(sl.locked&&window.__espilToast)window.__espilToast(sl.locked+' arrives with the combat update.');
+          }
+        }else if(lk==='k'){
+          if(!e.repeat)toggleSkillTree();
+        }else if(lk==='i'){
+          /* QA #14 (UI room): I toggles inventory. */
+          if(!e.repeat)toggleInventory();
+        }else if(lk==='h'){
+          /* QA #14 (UI room): H teleports home (placeholder → spawn). */
+          if(!e.repeat)teleportHome();
+        }else if(lk==='p'){
+          /* QA #14 (UI room): P toggles character status + outfit. */
+          if(!e.repeat)toggleCharacterPanel();
+        }
+        /* Note: M (map cycle 1→2→3→1) not applied — shared copy has no 3-stage map. */
+      }
+    });
+    document.addEventListener('keyup',function(e){
+      walkKeys[e.key.toLowerCase()]=false;
+    });
+    var jumpBtn=document.getElementById('map-jump');
+    if(jumpBtn)jumpBtn.addEventListener('pointerdown',function(e){e.preventDefault();tryJump();});
+    /* QA #15: touch sprint toggle button. */
+    var sprintBtn=document.getElementById('sprint-toggle');
+    if(sprintBtn)sprintBtn.addEventListener('pointerdown',function(e){e.preventDefault();sprintOn=!sprintOn;updateSprintUI();});
+    function collideCircleAxis(p,axis){
+      var r=PLAYER_R;
+      for(var i=0;i<walkColliders.length;i++){
+        var c=walkColliders[i];
+        if(p.pos.y+PLAYER_H<=c.bottom||p.pos.y>=c.top)continue; /* no vertical overlap */
+        if(c.top-p.pos.y<=.55)continue; /* low enough to step onto — the support logic lifts the player */
+        var cz=p.pos.z<c.z0?c.z0:(p.pos.z>c.z1?c.z1:p.pos.z);
+        var cx=p.pos.x<c.x0?c.x0:(p.pos.x>c.x1?c.x1:p.pos.x);
+        if(Math.abs(p.pos.z-cz)>=r||Math.abs(p.pos.x-cx)>=r)continue;
+        /* QA #10: slide, don't bounce. Only push out along movement direction;
+           if not moving on this axis, leave position alone (avoid snap). */
+        if(axis==='x'){
+          if(p._dx>0)p.pos.x=c.x0-r;else if(p._dx<0)p.pos.x=c.x1+r;
+          /* else: no X movement — don't snap, prevents bounce */
+        }else{
+          if(p._dz>0)p.pos.z=c.z0-r;else if(p._dz<0)p.pos.z=c.z1+r;
+          /* else: no Z movement — don't snap, prevents bounce */
+        }
+      }
+    }
+    function updateWalkMap(dt,t){
+      var p=walkPlayer;
+      if(!p)return;
+      /* --- input: keys + touch stick, relative to camera yaw --- */
+      var ix=0,iz=0;
+      if(walkKeys['arrowup'])iz-=1;
+      if(walkKeys['arrowdown'])iz+=1;
+      if(walkKeys['arrowleft'])ix-=1;
+      if(walkKeys['arrowright'])ix+=1;
+      if(window.__joyVec){ix+=window.__joyVec.x;iz+=window.__joyVec.y;}
+      var il=Math.sqrt(ix*ix+iz*iz);
+      if(il>1){ix/=il;iz/=il;}
+      var fx=-Math.sin(walkCamYaw),fz=-Math.cos(walkCamYaw);
+      var rx=-fz,rz=fx;
+      var mx=fx*(-iz)+rx*ix,mz=fz*(-iz)+rz*ix;
+      var joyMag=window.__joyVec?Math.sqrt(window.__joyVec.x*window.__joyVec.x+window.__joyVec.y*window.__joyVec.y):0;
+      /* QA #15: sprintOn (Ctrl toggle) or full-tilt stick = run. Shift is jump now. */
+      p.running=p.moving&&(sprintOn||joyMag>.88);
+      /* QA #17: swimming mode when in water (north of WATER_Z). */
+      p.swimming=p.pos.z<WATER_Z&&p.pos.y<1.5;
+      var SPEED=p.swimming?4:(p.running?12:7.5);
+      p._dx=mx*SPEED*dt;p._dz=mz*SPEED*dt;
+      p.moving=il>.12;
+      p.pos.x+=p._dx;collideCircleAxis(p,'x');
+      p.pos.z+=p._dz;collideCircleAxis(p,'z');
+      /* QA #10: invisible boundary walls — clamp to playable area.
+         North extends to -115 for waterfront access (Task #17); else ±96. */
+      p.pos.x=Math.max(-MAP_BOUND,Math.min(MAP_BOUND,p.pos.x));
+      p.pos.z=Math.max(-115,Math.min(MAP_BOUND,p.pos.z));
+      /* QA #17: in water, float at surface; no gravity, no jump. */
+      if(p.swimming){
+        p.pos.y+=(WATER_Y-p.pos.y)*Math.min(1,dt*5);
+        p.velY=0;p.onGround=false;p.jumps=0;
+      }
+      /* --- vertical: gravity + landing on tops (rooftops, planters, plaza) --- */
+      p.velY-=26*dt;
+      p.pos.y+=p.velY*dt;
+      var support=.05;
+      for(var i=0;i<walkColliders.length;i++){
+        var c=walkColliders[i];
+        var cz=p.pos.z<c.z0?c.z0:(p.pos.z>c.z1?c.z1:p.pos.z);
+        var cx=p.pos.x<c.x0?c.x0:(p.pos.x>c.x1?c.x1:p.pos.x);
+        if(Math.abs(p.pos.z-cz)>PLAYER_R||Math.abs(p.pos.x-cx)>PLAYER_R)continue;
+        if(c.top<=p.pos.y+.55&&c.top>support)support=c.top;
+      }
+      if(p.pos.y<=support){
+        if(!p.onGround&&p.velY<-9)walkSfx('land');
+        p.pos.y=support;p.velY=0;p.onGround=true;p.jumps=0;
+      }else if(p.pos.y>support+.02){
+        p.onGround=false;
+      }
+      /* --- avatar pose --- */
+      var g=p.av.group;
+      g.position.copy(p.pos);
+      if(p.moving){
+        var targetFace=Math.atan2(-mx,-mz);
+        var d=targetFace-p.faceY;
+        while(d>Math.PI)d-=Math.PI*2;while(d<-Math.PI)d+=Math.PI*2;
+        p.faceY+=d*Math.min(1,dt*12);
+        p.bobT+=dt*11;
+      }
+      g.rotation.y=p.faceY;
+      /* Animation state machine: idle / walk / run follow the movement state. */
+      if(p.av.ready){
+        var wantAnim=!p.moving?'idle':(p.running?'run':'walk');
+        p.av.playAnim(wantAnim);
+      }
+      if(p.av.mixer)p.av.mixer.update(dt);
+      /* Procedural swing lunge — the GLB has no attack clip, so the slash
+         reads through a quick forward lunge + torso twist. */
+      if(p.lungeT>0){
+        p.lungeT-=dt;
+        var lq=1-Math.max(0,p.lungeT)/.22,ls=Math.sin(Math.min(1,lq)*Math.PI);
+        g.position.x+=-Math.sin(p.faceY)*ls*.55;
+        g.position.z+=-Math.cos(p.faceY)*ls*.55;
+        g.rotation.y=p.faceY+ls*.55;
+      }
+      updateSkillFx(dt);
+      p.av.shadow.position.set(p.pos.x,.03,p.pos.z);
+      p.av.shadow.material.opacity=Math.max(.08,.26-Math.max(0,p.pos.y-.05)*.05);
+      /* --- follow camera --- */
+      var cp=Math.cos(walkCamPitch),sp=Math.sin(walkCamPitch);
+      var want=new THREE.Vector3(
+        p.pos.x+Math.sin(walkCamYaw)*cp*walkCamDist,
+        p.pos.y+sp*walkCamDist+1.2,
+        p.pos.z+Math.cos(walkCamYaw)*cp*walkCamDist
+      );
+      if(want.y<1.4)want.y=1.4;
+      var k=Math.min(1,dt*7);
+      mapCamera.position.lerp(want,k);
+      mapCamera.lookAt(p.pos.x,p.pos.y+1.7,p.pos.z);
+      /* Building name pill when near a building. */
+      updateBuildingProximity(p.pos.x,p.pos.z,performance.now());
+      /* QA #6: save position every 5s (throttled). */
+      if(!p._lastSave||performance.now()-p._lastSave>5000){
+        p._lastSave=performance.now();
+        saveLastPos();
+      }
+      /* QA #12: footstep SFX — trigger by distance traveled (not while swimming/airborne). */
+      if(p.moving&&p.onGround&&!p.swimming){
+        var stepDist=Math.sqrt(p._dx*p._dx+p._dz*p._dz);
+        p._stepAcc=(p._stepAcc||0)+stepDist;
+        var stride=p.running?3.2:2.2;
+        if(p._stepAcc>=stride){
+          p._stepAcc=0;
+          playFootstep(p.running);
+        }
+      }else{
+        p._stepAcc=0;
+      }
+    }
+    /* 2D landmark cutouts (2026-10-06 QA #3): flat duotone billboard sprites with true
+       transparent backgrounds, drawn once per landmark type on an offscreen canvas.
+       Each art function draws into a 256x256 box, ground line at y=218. */
+    var LANDMARK_SPRITE_CACHE={};
+    function landmarkPunch(x,fn){x.save();x.shadowBlur=0;x.globalCompositeOperation='destination-out';fn();x.restore();}
+    var LANDMARK_ART={
+      sails:function(x){
+        for(var i=0;i<3;i++){
+          var cx=64+i*64,top=70+i*14;
+          x.beginPath();
+          x.moveTo(cx-44,218);
+          x.quadraticCurveTo(cx-40,top+40,cx,top);
+          x.quadraticCurveTo(cx+40,top+40,cx+44,218);
+          x.closePath();x.fill();x.stroke();
+        }
+      },
+      bridge:function(x){
+        x.fillRect(66,80,18,98);x.fillRect(172,80,18,98);
+        x.fillRect(60,104,24,8);x.fillRect(166,104,24,8);
+        x.fillRect(20,170,216,12);
+        x.save();x.strokeStyle='rgba(230,255,250,.9)';x.lineWidth=4;x.shadowBlur=0;
+        x.beginPath();x.moveTo(75,84);x.quadraticCurveTo(128,168,181,84);x.stroke();
+        x.beginPath();x.moveTo(20,170);x.quadraticCurveTo(48,120,75,84);x.stroke();
+        x.beginPath();x.moveTo(181,84);x.quadraticCurveTo(208,120,236,170);x.stroke();
+        x.restore();
+      },
+      star:function(x){
+        x.beginPath();
+        for(var i=0;i<10;i++){
+          var r=i%2?44:100,a=-Math.PI/2+i*Math.PI/5;
+          var px=128+r*Math.cos(a),py=128+r*Math.sin(a);
+          if(i)x.lineTo(px,py);else x.moveTo(px,py);
+        }
+        x.closePath();x.fill();x.stroke();
+      },
+      tower:function(x){
+        x.fillRect(88,120,80,98);
+        x.fillRect(100,74,56,46);
+        x.fillRect(112,34,32,40);
+        x.fillRect(124,18,8,16);
+      },
+      pyramid:function(x){
+        x.beginPath();x.moveTo(128,52);x.lineTo(36,218);x.lineTo(220,218);x.closePath();x.fill();x.stroke();
+        x.save();x.strokeStyle='rgba(3,46,40,.35)';x.lineWidth=3;x.shadowBlur=0;
+        for(var i=1;i<5;i++){var y=52+i*33;
+          x.beginPath();x.moveTo(128-(128-36)*i/5,y);x.lineTo(128+(220-128)*i/5,y);x.stroke();}
+        x.restore();
+      },
+      liberty:function(x){
+        x.fillRect(100,188,56,30);
+        x.beginPath();x.moveTo(128,96);x.lineTo(102,188);x.lineTo(154,188);x.closePath();x.fill();x.stroke();
+        x.beginPath();x.arc(128,80,15,0,6.2832);x.fill();x.stroke();
+        x.save();x.strokeStyle='rgba(3,46,40,.6)';x.lineWidth=4;x.shadowBlur=0;
+        for(var i=-2;i<=2;i++){x.beginPath();x.moveTo(128+i*9,68);x.lineTo(128+i*16,44);x.stroke();}
+        x.beginPath();x.moveTo(146,120);x.lineTo(178,58);x.stroke();
+        x.restore();
+        x.beginPath();x.ellipse(182,48,9,13,0,0,6.2832);x.fill();x.stroke();
+      },
+      needle:function(x){
+        x.beginPath();x.moveTo(112,218);x.lineTo(122,110);x.lineTo(134,110);x.lineTo(144,218);x.closePath();x.fill();x.stroke();
+        x.beginPath();x.ellipse(128,96,30,15,0,0,6.2832);x.fill();x.stroke();
+        x.fillRect(125,26,6,60);
+        x.beginPath();x.moveTo(128,26);x.lineTo(122,40);x.lineTo(134,40);x.closePath();x.fill();
+      },
+      christ:function(x){
+        x.fillRect(108,178,40,40);
+        x.fillRect(120,104,16,74);
+        x.fillRect(66,112,124,16);
+        x.beginPath();x.arc(128,90,11,0,6.2832);x.fill();x.stroke();
+      },
+      beam:function(x){
+        x.fillRect(36,76,184,34);
+        var pxs=[64,106,150,192];
+        for(var i=0;i<pxs.length;i++)x.fillRect(pxs[i],110,12,108);
+      },
+      obelisk:function(x){
+        x.beginPath();x.moveTo(116,64);x.lineTo(140,64);x.lineTo(152,218);x.lineTo(104,218);x.closePath();x.fill();x.stroke();
+        x.beginPath();x.moveTo(128,30);x.lineTo(116,64);x.lineTo(140,64);x.closePath();x.fill();x.stroke();
+      },
+      clock:function(x){
+        x.fillRect(104,88,48,130);
+        x.beginPath();x.moveTo(128,24);x.lineTo(102,88);x.lineTo(154,88);x.closePath();x.fill();x.stroke();
+        x.save();x.shadowBlur=0;x.fillStyle='#f4ffe9';
+        x.beginPath();x.arc(128,128,21,0,6.2832);x.fill();x.restore();
+        x.save();x.strokeStyle='rgba(3,46,40,.7)';x.lineWidth=3;x.shadowBlur=0;
+        x.beginPath();x.moveTo(128,128);x.lineTo(128,114);x.moveTo(128,128);x.lineTo(138,132);x.stroke();x.restore();
+      },
+      eiffel:function(x){
+        x.beginPath();
+        x.moveTo(92,218);
+        x.quadraticCurveTo(104,140,118,64);
+        x.lineTo(138,64);
+        x.quadraticCurveTo(152,140,164,218);
+        x.lineTo(146,218);
+        x.quadraticCurveTo(138,160,128,150);
+        x.quadraticCurveTo(118,160,110,218);
+        x.closePath();x.fill();x.stroke();
+        x.fillRect(104,120,48,10);
+        x.fillRect(124,40,8,26);
+      },
+      tree:function(x){
+        x.fillRect(120,150,16,68);
+        x.beginPath();x.arc(96,116,34,0,6.2832);x.fill();
+        x.beginPath();x.arc(160,116,34,0,6.2832);x.fill();
+        x.beginPath();x.arc(128,88,40,0,6.2832);x.fill();x.stroke();
+      },
+      colosseum:function(x){
+        x.beginPath();
+        x.moveTo(44,218);x.lineTo(44,120);
+        x.quadraticCurveTo(128,96,212,120);
+        x.lineTo(212,218);x.closePath();x.fill();x.stroke();
+        landmarkPunch(x,function(){
+          for(var i=0;i<6;i++){var ax=66+i*24;
+            x.fillRect(ax,168,14,50);
+            x.beginPath();x.arc(ax+7,168,7,Math.PI,0);x.fill();}
+          for(var j=0;j<6;j++){var bx=66+j*24;
+            x.fillRect(bx,128,14,28);
+            x.beginPath();x.arc(bx+7,128,7,Math.PI,0);x.fill();}
+        });
+      },
+      gate:function(x){
+        for(var i=0;i<6;i++)x.fillRect(52+i*28,108,13,110);
+        x.fillRect(40,76,176,32);
+        x.fillRect(118,52,20,24);
+        x.beginPath();x.moveTo(128,30);x.lineTo(118,52);x.lineTo(138,52);x.closePath();x.fill();
+      },
+      domes:function(x){
+        function onion(cx,baseY,w,h){
+          x.fillRect(cx-w*.22,baseY-h*.55,w*.44,h*.55);
+          x.beginPath();x.ellipse(cx,baseY-h*.62,w*.5,h*.34,0,0,6.2832);x.fill();
+          x.beginPath();x.moveTo(cx,baseY-h*1.02);x.lineTo(cx-w*.14,baseY-h*.78);x.lineTo(cx+w*.14,baseY-h*.78);x.closePath();x.fill();
+        }
+        onion(78,218,56,120);onion(178,218,56,120);onion(128,218,72,170);
+        x.fillRect(52,196,152,22);
+      },
+      theatre:function(x){
+        x.fillRect(58,150,140,68);
+        x.beginPath();x.arc(128,150,70,Math.PI,0);x.fill();x.stroke();
+        x.fillRect(122,58,12,24);
+      },
+      spire:function(x){
+        x.fillRect(106,96,44,122);
+        x.beginPath();x.moveTo(128,22);x.lineTo(104,96);x.lineTo(152,96);x.closePath();x.fill();x.stroke();
+        x.fillRect(96,196,64,22);
+      },
+      mountain:function(x){
+        x.beginPath();
+        x.moveTo(36,218);x.lineTo(74,86);x.lineTo(182,86);x.lineTo(220,218);x.closePath();x.fill();x.stroke();
+        x.save();x.strokeStyle='rgba(3,46,40,.3)';x.lineWidth=3;x.shadowBlur=0;
+        x.beginPath();x.moveTo(100,120);x.lineTo(88,218);x.moveTo(156,120);x.lineTo(168,218);x.stroke();
+        x.restore();
+      },
+      mosque:function(x){
+        x.fillRect(64,150,128,68);
+        x.beginPath();x.arc(128,150,62,Math.PI,0);x.fill();x.stroke();
+        x.beginPath();x.arc(84,160,26,Math.PI,0);x.fill();
+        x.beginPath();x.arc(172,160,26,Math.PI,0);x.fill();
+        var mxs=[30,52,204,226];
+        for(var i=0;i<mxs.length;i++){var mx=mxs[i];
+          x.fillRect(mx,84,9,134);
+          x.beginPath();x.moveTo(mx+4.5,56);x.lineTo(mx,84);x.lineTo(mx+9,84);x.closePath();x.fill();}
+        x.fillRect(124,66,8,26);
+      },
+      burj:function(x){
+        var w=96,y=218;
+        for(var i=0;i<7;i++){var h=26;x.fillRect(128-w/2,y-h,w,h);y-=h;w*=.78;}
+        x.fillRect(126,y-44,4,44);
+      },
+      gateway:function(x){
+        x.fillRect(78,96,100,122);
+        landmarkPunch(x,function(){
+          x.fillRect(112,140,32,78);
+          x.beginPath();x.arc(128,140,16,Math.PI,0);x.fill();
+        });
+        x.fillRect(58,140,20,78);x.fillRect(178,140,20,78);
+        var dxs=[68,188];
+        for(var i=0;i<dxs.length;i++){
+          x.beginPath();x.arc(dxs[i],140,14,Math.PI,0);x.fill();x.stroke();
+        }
+        x.beginPath();x.arc(128,96,20,Math.PI,0);x.fill();x.stroke();
+      },
+      arch:function(x){
+        x.fillRect(94,64,68,154);
+        x.fillRect(84,50,88,14);
+        landmarkPunch(x,function(){
+          x.fillRect(114,120,28,98);
+          x.beginPath();x.arc(128,120,14,Math.PI,0);x.fill();
+        });
+      },
+      merlion:function(x){
+        x.beginPath();x.arc(104,108,26,0,6.2832);x.fill();x.stroke();
+        x.save();x.strokeStyle='rgba(3,46,40,.55)';x.lineWidth=4;x.shadowBlur=0;
+        for(var i=0;i<8;i++){var a=i/8*6.2832;
+          x.beginPath();x.moveTo(104+30*Math.cos(a),108+30*Math.sin(a));
+          x.lineTo(104+44*Math.cos(a),108+44*Math.sin(a));x.stroke();}
+        x.restore();
+        x.beginPath();x.moveTo(120,130);x.quadraticCurveTo(150,170,138,218);x.lineTo(104,218);x.quadraticCurveTo(112,170,120,130);x.closePath();x.fill();
+        x.beginPath();x.moveTo(138,200);x.lineTo(186,178);x.lineTo(172,206);x.lineTo(186,218);x.lineTo(138,218);x.closePath();x.fill();
+      },
+      temple:function(x){
+        x.beginPath();x.moveTo(104,218);x.lineTo(148,218);x.lineTo(140,70);x.lineTo(112,70);x.closePath();x.fill();x.stroke();
+        x.save();x.strokeStyle='rgba(3,46,40,.35)';x.lineWidth=3;x.shadowBlur=0;
+        for(var i=0;i<5;i++){var y=96+i*26,w=8+i*4;
+          x.beginPath();x.moveTo(128-w,y);x.lineTo(128+w,y);x.stroke();}
+        x.restore();
+        x.beginPath();x.moveTo(128,28);x.lineTo(112,70);x.lineTo(144,70);x.closePath();x.fill();
+        x.beginPath();x.moveTo(64,218);x.lineTo(88,218);x.lineTo(82,140);x.lineTo(70,140);x.closePath();x.fill();
+        x.beginPath();x.moveTo(168,218);x.lineTo(192,218);x.lineTo(186,140);x.lineTo(174,140);x.closePath();x.fill();
+      },
+      pearl:function(x){
+        x.fillRect(58,200,140,18);
+        x.fillRect(121,96,14,104);
+        x.beginPath();x.arc(128,158,32,0,6.2832);x.fill();x.stroke();
+        x.beginPath();x.arc(128,72,20,0,6.2832);x.fill();x.stroke();
+        x.fillRect(125,28,6,26);
+      },
+      junk:function(x){
+        x.beginPath();x.moveTo(52,168);x.lineTo(204,168);x.lineTo(182,218);x.lineTo(74,218);x.closePath();x.fill();x.stroke();
+        x.fillRect(124,60,8,108);
+        x.beginPath();x.moveTo(132,70);x.lineTo(196,70);x.lineTo(188,120);x.lineTo(132,120);x.closePath();x.fill();
+        x.beginPath();x.moveTo(60,80);x.lineTo(124,80);x.lineTo(124,130);x.lineTo(68,130);x.closePath();x.fill();
+      },
+      hall:function(x){
+        for(var i=0;i<3;i++)x.fillRect(72+i*40,182,12,36);
+        function roof(cx,y,w){
+          x.beginPath();x.moveTo(cx-w/2,y);x.lineTo(cx+w/2,y);x.lineTo(cx+w*.28,y-34);x.lineTo(cx-w*.28,y-34);x.closePath();x.fill();x.stroke();
+        }
+        roof(128,182,168);roof(128,148,128);roof(128,114,88);
+        x.beginPath();x.arc(128,66,8,0,6.2832);x.fill();
+      },
+      torii:function(x){
+        x.fillRect(78,84,16,134);x.fillRect(162,84,16,134);
+        x.beginPath();x.moveTo(52,62);x.quadraticCurveTo(128,48,204,62);x.lineTo(204,78);x.quadraticCurveTo(128,64,52,78);x.closePath();x.fill();x.stroke();
+        x.fillRect(66,100,124,14);
+        x.fillRect(120,78,16,24);
+      },
+      sun:function(x){
+        x.beginPath();x.arc(128,128,38,0,6.2832);x.fill();x.stroke();
+        x.save();x.strokeStyle='rgba(3,46,40,.6)';x.lineWidth=7;x.shadowBlur=0;
+        for(var i=0;i<8;i++){var a=i/8*6.2832+0.3927;
+          x.beginPath();x.moveTo(128+48*Math.cos(a),128+48*Math.sin(a));
+          x.lineTo(128+78*Math.cos(a),128+78*Math.sin(a));x.stroke();}
+        x.restore();
+      },
+      station:function(x){
+        x.fillRect(36,146,184,72);
+        landmarkPunch(x,function(){
+          for(var i=0;i<7;i++)x.fillRect(50+i*24,166,12,34);
+        });
+        x.fillRect(106,70,44,76);
+        x.beginPath();x.arc(128,70,26,Math.PI,0);x.fill();x.stroke();
+        x.save();x.shadowBlur=0;x.fillStyle='#f4ffe9';
+        x.beginPath();x.arc(128,104,12,0,6.2832);x.fill();x.restore();
+      }
+    };
+    function landmarkSpriteTexture(type){
+      if(LANDMARK_SPRITE_CACHE[type])return LANDMARK_SPRITE_CACHE[type];
+      var c=document.createElement('canvas');c.width=c.height=256;
+      var x=c.getContext('2d');
+      var g=x.createLinearGradient(0,40,0,218);
+      g.addColorStop(0,'#f2fffd');g.addColorStop(.55,'#a4f7e6');g.addColorStop(1,'#54c8ae');
+      x.save();x.globalAlpha=.3;x.fillStyle='#01181a';
+      x.beginPath();x.ellipse(128,220,74,9,0,0,6.2832);x.fill();x.restore();
+      x.save();
+      x.fillStyle=g;x.strokeStyle='rgba(3,46,40,.6)';x.lineWidth=3;x.lineJoin='round';
+      x.shadowColor='rgba(120,255,228,.5)';x.shadowBlur=14;
+      (LANDMARK_ART[type]||LANDMARK_ART.tower)(x);
+      x.restore();
+      var tex=new THREE.CanvasTexture(c);
+      if(THREE.sRGBEncoding!==undefined)tex.encoding=THREE.sRGBEncoding;
+      tex.anisotropy=4;
+      LANDMARK_SPRITE_CACHE[type]=tex;
+      return tex;
+    }
+
     cityData.forEach(function(city,index){
       var pos=latLon(city[1],city[2],2.035);
       var marker=new THREE.Mesh(new THREE.SphereGeometry(.72,10,8),new THREE.MeshBasicMaterial({transparent:true,opacity:.001,depthWrite:false}));
       marker.position.copy(pos);
       marker.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),pos.clone().normalize());
-      var procModel=landmarkModel(city[3]);
-      marker.add(procModel);
+      /* 2D cutout billboard (2026-10-06 QA #3): camera-facing sprite, transparent background. */
+      var sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:landmarkSpriteTexture(city[3]),transparent:true,depthWrite:false}));
+      sprite.scale.set(1.55,1.55,1);
+      sprite.position.set(0,.52,0);
+      marker.add(sprite);
       marker.scale.setScalar(.17);
-      marker.userData={name:city[0],normal:pos.clone().normalize(),landmark:city[4],type:city[3],baseScale:.11,index:index,procModel:procModel,glbApplied:false,glbURL:null};
+      marker.userData={name:city[0],normal:pos.clone().normalize(),landmark:city[4],type:city[3],baseScale:.11,index:index,sprite:sprite,glbApplied:false,glbURL:null};
       markerGroup.add(marker);markers.push(marker);
       var cityButton=document.createElement('button');
       cityButton.type='button';cityButton.className='city-name';cityButton.textContent=city[0];cityButton.title=city[0]+' — '+city[4];cityButton.setAttribute('aria-label',city[0]+', '+city[4]);
@@ -1209,7 +3265,7 @@
       cityButton.addEventListener('click',function(){centerReel(marker,true);selectCity(marker);});
       cityList.appendChild(cityButton);marker.userData.button=cityButton;
     });
-    var centeredMarker=null,reelFrame=0,reelQuietUntil=0;
+    var centeredMarker=markers[0]||null,reelFrame=0,reelQuietUntil=0; /* single city: always Vancouver */
     function updateReelCenter(){
       reelFrame=0;
       var listRect=cityList.getBoundingClientRect(),center=listRect.top+listRect.height/2,closest=null,distance=Infinity;
@@ -1235,22 +3291,10 @@
     }
     cityList.addEventListener('scroll',function(){if(!reelFrame)reelFrame=requestAnimationFrame(updateReelCenter);},{passive:true});
     cityList.addEventListener('wheel',function(event){event.stopPropagation();},{passive:true});
-    /* Arrow / joystick city navigation: recenter on the city at the CURRENT zoom, no zoom change. */
+    /* Arrow / joystick city navigation: retired — single-city build has nothing to step through. */
     var navIndex=0;
     function stepCity(dir){
-      if(window.__espilIntroActive||cityPhaseActive)return;
-      /* Stepping away from a zoomed-in city eases back out to orbit first. */
-      if(selected||infoShown)clearSelection(true);
-      var cur=markers.indexOf(centeredMarker);
-      if(cur<0)cur=navIndex;
-      navIndex=(cur+dir+markers.length)%markers.length;
-      var marker=markers[navIndex];
-      centerReel(marker,true);
-      var cityDirection=marker.position.clone().normalize().applyAxisAngle(new THREE.Vector3(0,1,0),earthSpin.rotation.y);
-      targetYaw=Math.atan2(cityDirection.x,cityDirection.z);
-      targetPitch=Math.asin(Math.max(-1,Math.min(1,cityDirection.y)));
-      status.textContent=marker.userData.name+' — '+marker.userData.landmark;
-      if(window.EspilAudio&&window.EspilAudio.tick)window.EspilAudio.tick();
+      if(window.__espilIntroActive||cityPhaseActive||entryActive)return;
     }
     function modalOpen(){
       var m=document.getElementById('signin-modal');
@@ -1258,6 +3302,12 @@
     }
     document.addEventListener('keydown',function(e){
       if(window.__espilIntroActive||modalOpen())return;
+      /* City entry gate (2026-10-06 QA #4): any key enters, ESC goes back to the info panel. */
+      if(entryActive){
+        if(e.key==='Escape'){e.preventDefault();cancelCityEntry();}
+        else{e.preventDefault();finishCityEntry();}
+        return;
+      }
       if(e.key==='ArrowDown'||e.key==='ArrowRight'){e.preventDefault();stepCity(1);}
       else if(e.key==='ArrowUp'||e.key==='ArrowLeft'){e.preventDefault();stepCity(-1);}
       else if(e.key==='Enter'){
@@ -1265,37 +3315,38 @@
         var m=centeredMarker||markers[navIndex];
         if(m)selectCity(m);
       }
-      else if(e.key==='Escape'&&selected){clearSelection(true);}
+      else if(e.key==='Escape'){ if(skillTreeOpen){toggleSkillTree(false);} else if(selected){clearSelection(true);} }
     });
-    /* Virtual joystick (touch devices): push up/down/left/right to step through cities. */
+    /* Virtual joystick (touch devices): analog movement stick for the walkable map.
+       Only live while the map is open; exposes a normalized -1..1 vector. */
+    window.__joyVec={x:0,y:0};
     (function(){
       var joy=document.getElementById('joystick'),knob=document.getElementById('joy-knob');
       if(!joy)return;
-      var joyActive=false,joyCX=0,joyCY=0,joyDir=0,joyTimer=null;
-      function joyStep(){if(joyDir)stepCity(joyDir);}
+      var joyActive=false,joyCX=0,joyCY=0;
+      function setKnob(dx,dy){
+        if(knob)knob.style.transform='translate('+Math.max(-28,Math.min(28,dx))+'px,'+Math.max(-28,Math.min(28,dy))+'px)';
+      }
       joy.addEventListener('pointerdown',function(e){
+        if(!document.body.classList.contains('in-map'))return;
         joyActive=true;
         try{joy.setPointerCapture(e.pointerId);}catch(err){}
         var r=joy.getBoundingClientRect();joyCX=r.left+r.width/2;joyCY=r.top+r.height/2;
         e.preventDefault();
       });
       joy.addEventListener('pointermove',function(e){
-        if(!joyActive)return;
+        if(!joyActive||!document.body.classList.contains('in-map'))return;
         var dx=e.clientX-joyCX,dy=e.clientY-joyCY;
-        var adx=Math.abs(dx),ady=Math.abs(dy),nd=0;
-        if(ady>26&&ady>=adx)nd=dy>0?1:-1;
-        else if(adx>26)nd=dx>0?1:-1;
-        if(nd!==joyDir){
-          joyDir=nd;
-          if(knob)knob.style.transform='translate('+Math.max(-28,Math.min(28,dx))+'px,'+Math.max(-28,Math.min(28,dy))+'px)';
-          if(joyTimer){clearInterval(joyTimer);joyTimer=null;}
-          if(nd){joyStep();joyTimer=setInterval(joyStep,420);}
-        }
+        var len=Math.sqrt(dx*dx+dy*dy),max=44;
+        if(len>max){dx=dx/len*max;dy=dy/len*max;}
+        setKnob(dx,dy);
+        window.__joyVec.x=dx/max;window.__joyVec.y=dy/max;
+        e.preventDefault();
       });
       function joyEnd(){
-        joyActive=false;joyDir=0;
+        joyActive=false;
+        window.__joyVec.x=0;window.__joyVec.y=0;
         if(knob)knob.style.transform='';
-        if(joyTimer){clearInterval(joyTimer);joyTimer=null;}
       }
       joy.addEventListener('pointerup',joyEnd);
       joy.addEventListener('pointercancel',joyEnd);
@@ -1303,43 +3354,8 @@
     var boundary=new THREE.Mesh(new THREE.RingGeometry(.225,.243,80),new THREE.MeshBasicMaterial({color:0x8ff4e8,transparent:true,opacity:.9,side:THREE.DoubleSide,depthTest:false}));
     boundary.visible=false;
     markerGroup.add(boundary);
-    /* Aurora-borealis city-dimension outline: yellow-light bands shimmering around the city area. */
-    var aurora=new THREE.Group(),auroraMats=[];
-    (function buildAurora(){
-      var cols=[0xffe27a,0xd8f77a,0x7dfce6],radii=[[.30,.338],[.365,.38],[.425,.435]];
-      for(var i=0;i<3;i++){
-        var mat=new THREE.MeshBasicMaterial({color:cols[i],transparent:true,opacity:0,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false});
-        aurora.add(new THREE.Mesh(new THREE.RingGeometry(radii[i][0],radii[i][1],72),mat));
-        auroraMats.push(mat);
-      }
-      aurora.visible=false;
-      markerGroup.add(aurora);
-    }());
-    function showAurora(marker){
-      var n=marker.position.clone().normalize();
-      aurora.position.copy(n.clone().multiplyScalar(2.02));
-      aurora.lookAt(n.clone().multiplyScalar(4));
-      aurora.visible=true;
-    }
-    function hideAurora(){aurora.visible=false;}
-    /* Soft halo under every landmark miniature. */
-    var glowTex=(function(){
-      var c=document.createElement('canvas');c.width=c.height=128;
-      var x=c.getContext('2d');
-      var g=x.createRadialGradient(64,64,4,64,64,64);
-      g.addColorStop(0,'rgba(255,240,180,.8)');
-      g.addColorStop(.45,'rgba(255,220,130,.32)');
-      g.addColorStop(1,'rgba(255,220,130,0)');
-      x.fillStyle=g;x.fillRect(0,0,128,128);
-      return new THREE.CanvasTexture(c);
-    }());
-    markers.forEach(function(marker){
-      var halo=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,transparent:true,opacity:.5,blending:THREE.AdditiveBlending,depthWrite:false}));
-      halo.scale.setScalar(.38);
-      halo.position.copy(marker.position);
-      marker.userData.halo=halo;
-      markerGroup.add(halo);
-    });
+    /* The aurora shimmer rings and halo glow sprites were removed (2026-10-06 QA #3):
+       landmarks are plain 2D cutout billboards now — no rings, no blinking. */
 
     var raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2(),hovered=null,selected=null;
     var orbitDistance=6.6,targetDistance=6.6,minDistance=2.1,maxDistance=12.2; /* minDistance keeps the camera outside the globe: max zoom-in is the city zoom level */
@@ -1389,6 +3405,7 @@
     function resize(){
       var w=frame.clientWidth,h=frame.clientHeight,oldDefault=Math.max(6.6,2.12/(Math.tan(camera.fov*Math.PI/360)*camera.aspect));
       renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();
+      if(typeof mapCamera!=='undefined'&&mapCamera){mapCamera.aspect=w/h;mapCamera.updateProjectionMatrix();}
       var nextDefault=Math.max(6.6,2.12/(Math.tan(camera.fov*Math.PI/360)*camera.aspect));
       maxDistance=Math.max(12.2,nextDefault*1.5);
       if(!hasInteracted||Math.abs(targetDistance-oldDefault)<.08){targetDistance=nextDefault;orbitDistance=nextDefault;placeCamera();}
@@ -1399,9 +3416,7 @@
       var timezone='';
       try{timezone=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(error){}
       var rules=[
-        [/Vancouver|Tijuana|Los_Angeles|Whitehorse/,'Vancouver'],[/Denver|Edmonton|Phoenix/,'Los Angeles'],[/Chicago|Winnipeg/,'Chicago'],[/Toronto|Detroit/,'Toronto'],[/New_York|Montreal/,'New York'],[/Mexico/,'Mexico City'],[/Sao_Paulo/,'São Paulo'],[/Buenos_Aires/,'Buenos Aires'],
-        [/London|Dublin|Lisbon/,'London'],[/Paris|Brussels|Amsterdam/,'Paris'],[/Madrid/,'Madrid'],[/Rome|Vienna|Zurich/,'Rome'],[/Berlin|Warsaw|Prague/,'Berlin'],[/Moscow/,'Moscow'],[/Istanbul/,'Istanbul'],[/Lagos|Accra/,'Lagos'],[/Nairobi|Addis/,'Nairobi'],[/Cairo/,'Cairo'],[/Johannesburg|Cape_Town/,'Cape Town'],
-        [/Dubai|Muscat/,'Dubai'],[/Kolkata|Calcutta|Colombo/,'Delhi'],[/Singapore|Kuala_Lumpur/,'Singapore'],[/Bangkok|Ho_Chi_Minh/,'Bangkok'],[/Shanghai|Taipei/,'Shanghai'],[/Hong_Kong/,'Hong Kong'],[/Beijing/,'Beijing'],[/Seoul/,'Seoul'],[/Tokyo/,'Tokyo'],[/Manila/,'Manila'],[/Jakarta/,'Jakarta'],[/Sydney|Brisbane/,'Sydney'],[/Melbourne|Hobart/,'Melbourne'],[/Auckland|Fiji/,'Auckland']
+        [/Vancouver|Tijuana|Los_Angeles|Whitehorse/,'Vancouver']
       ];
       var cityName='';
       for(var r=0;r<rules.length;r++){if(rules[r][0].test(timezone)){cityName=rules[r][1];break;}}
@@ -1441,14 +3456,29 @@
       ensureLandmarkGLB(marker); /* start fetching the real 3D model; swaps in when ready */
       navIndex=markers.indexOf(marker);
       approachSlow=true;infoShown=false;hideCityInfo();
+      cancelCityEntry();
       if(window.EspilAudio){window.EspilAudio.onCitySelect();window.EspilAudio.pop();}
-      cityPhaseActive=false;cityPhaseFade=0;cityApproachStarted=performance.now();
+      exitWalkMap(true); /* silent: leaving any previous map visit */
+      cityPhaseActive=false;cityApproachStarted=performance.now();
       citySky.visible=false;
       cityPhasePanel.setAttribute('aria-hidden','true');
       document.getElementById('city-status').classList.remove('is-city');
-      buildCityStage(marker);
-      /* Slow zoom starts at the CURRENT zoom level and dives to the landmark. */
-      targetDistance=Math.min(orbitDistance,1.9);
+      /* Staged cinematic zoom (2026-10-06 QA #3): the dive unfolds in three beats
+         instead of one short drop. */
+      clearZoomStages();
+      var cityName=marker.userData.name,cityLandmark=marker.userData.landmark;
+      var zoomStages=[
+        {d:3.6,wait:0,label:'1/3 \u00B7 Locating '+cityName},
+        {d:2.6,wait:1900,label:'2/3 \u00B7 Approaching '+cityName},
+        {d:1.9,wait:3800,label:'3/3 \u00B7 Final approach \u2014 '+cityLandmark}
+      ];
+      zoomStages.forEach(function(st){
+        zoomStageTimers.push(setTimeout(function(){
+          if(selected!==marker||cityPhaseActive||entryActive)return;
+          targetDistance=Math.min(orbitDistance,st.d);
+          status.textContent=st.label;
+        },st.wait));
+      });
       var cityDirection=marker.position.clone().normalize().applyAxisAngle(new THREE.Vector3(0,1,0),earthSpin.rotation.y);
       targetYaw=Math.atan2(cityDirection.x,cityDirection.z);
       targetPitch=Math.asin(Math.max(-1,Math.min(1,cityDirection.y)));
@@ -1456,8 +3486,6 @@
       boundary.position.copy(marker.position.clone().normalize().multiplyScalar(2.097));
       boundary.lookAt(marker.position.clone().normalize().multiplyScalar(4));
       boundary.visible=true;
-      showAurora(marker);
-      status.textContent='Zooming in now — '+marker.userData.name;
     }
     function nearestFacingMarker(){
       var dir=camera.position.clone().normalize(),best=null,bestDot=-2;
@@ -1476,15 +3504,18 @@
       orbitDistance=camera.position.length();
       if(returnToOrbit)targetDistance=Math.max(6.6,2.12/(Math.tan(camera.fov*Math.PI/360)*camera.aspect));
       selected=null;navigationReady=false;setActiveButton(null);
-      cityPhaseActive=false;cityPhaseFade=0;
+      clearZoomStages();cancelCityEntry();
+      exitWalkMap(true); /* silent: back to the globe */
+      cityPhaseActive=false;
       citySky.visible=false;
       starMaterial.opacity=1;
       cityPhasePanel.setAttribute('aria-hidden','true');
       if(typeof hideCityInfo==='function')hideCityInfo();
       document.getElementById('city-status').classList.remove('is-city');
-      destroyCityStage();
+      var charPanel=document.getElementById('char-custom');
+      if(charPanel)charPanel.setAttribute('aria-hidden','true');
+      gateActive=false;
       boundary.visible=false;
-      hideAurora();
       /* Keep the text div honest: highlight the city the camera is facing. */
       var facing=nearestFacingMarker();
       if(facing){centerReel(facing,false);navIndex=markers.indexOf(facing);}
@@ -1492,44 +3523,14 @@
       if(returnToOrbit&&window.EspilAudio)window.EspilAudio.onReturnToOrbit();
     }
     cityReturn.addEventListener('click',function(){clearSelection(true);});
+    var singleCityBtn=document.getElementById('single-city');
+    if(singleCityBtn)singleCityBtn.addEventListener('click',function(){
+      if(window.__espilIntroActive||cityPhaseActive||!markers[0])return;
+      selectCity(markers[0]);
+    });
     /* City info panel: image, metro population, popular brands. ENTER dives into the street view. */
     var cityFacts={
-      'Vancouver':{pop:'2.6M',brands:['Lululemon','Aritzia',"Arc'teryx"],img:'assets/cities/vancouver.webp'},
-      'San Francisco':{pop:'4.7M',brands:["Levi's",'Gap','Salesforce'],img:'assets/cities/san-francisco.webp'},
-      'Los Angeles':{pop:'12.5M',brands:['Disney','Warner Bros.','In-N-Out'],img:'assets/cities/los-angeles.webp'},
-      'Chicago':{pop:'9.5M',brands:["McDonald's",'Boeing','Kraft Heinz'],img:'assets/cities/chicago.webp'},
-      'Mexico City':{pop:'22M',brands:['Corona','Bimbo','Telcel'],img:'assets/cities/mexico-city.webp'},
-      'New York':{pop:'20M',brands:["Macy's",'Estée Lauder','HBO'],img:'assets/cities/new-york.webp'},
-      'Toronto':{pop:'6.4M',brands:['Tim Hortons','Canadian Tire','Loblaw'],img:'assets/cities/toronto.webp'},
-      'Rio de Janeiro':{pop:'13.5M',brands:['Havaianas','Petrobras','Brahma'],img:'assets/cities/rio-de-janeiro.webp'},
-      'São Paulo':{pop:'22M',brands:['Itaú','Natura','Embraer'],img:'assets/cities/sao-paulo.webp'},
-      'Buenos Aires':{pop:'15M',brands:['Mercado Libre','Globant','Quilmes'],img:'assets/cities/buenos-aires.webp'},
-      'London':{pop:'14.3M',brands:['Burberry','Harrods','BBC'],img:'assets/cities/london.webp'},
-      'Paris':{pop:'11.1M',brands:['Chanel','Louis Vuitton',"L'Oréal"],img:'assets/cities/paris.webp'},
-      'Madrid':{pop:'6.6M',brands:['El Corte Inglés','Real Madrid','Mahou'],img:'assets/cities/madrid.webp'},
-      'Rome':{pop:'4.3M',brands:['Fendi','Bulgari','Enel'],img:'assets/cities/rome.webp'},
-      'Berlin':{pop:'6M',brands:['Zalando','HelloFresh','N26'],img:'assets/cities/berlin.webp'},
-      'Moscow':{pop:'13M',brands:['Aeroflot','GUM','Kaspersky'],img:'assets/cities/moscow.webp'},
-      'Lagos':{pop:'16M',brands:['Dangote','Jumia','GTBank'],img:'assets/cities/lagos.webp'},
-      'Nairobi':{pop:'5.1M',brands:['M-Pesa','Safaricom','Kenya Airways'],img:'assets/cities/nairobi.webp'},
-      'Cairo':{pop:'21M',brands:['EgyptAir','Orascom','Juhayna'],img:'assets/cities/cairo.webp'},
-      'Cape Town':{pop:'4.9M',brands:['Woolworths','Pick n Pay','Castle Lager'],img:'assets/cities/cape-town.webp'},
-      'Istanbul':{pop:'16M',brands:['Turkish Airlines','Arçelik','Mavi'],img:'assets/cities/istanbul.webp'},
-      'Dubai':{pop:'3.6M',brands:['Emirates','Emaar','Jumeirah'],img:'assets/cities/dubai.webp'},
-      'Mumbai':{pop:'21M',brands:['Tata','Reliance','Bollywood'],img:'assets/cities/mumbai.webp'},
-      'Delhi':{pop:'33M',brands:['Air India',"Haldiram's",'DLF'],img:'assets/cities/delhi.webp'},
-      'Singapore':{pop:'6M',brands:['Singapore Airlines','DBS','Tiger Beer'],img:'assets/cities/singapore.webp'},
-      'Bangkok':{pop:'10.7M',brands:['Thai Airways','CP Group','Red Bull'],img:'assets/cities/bangkok.webp'},
-      'Shanghai':{pop:'29M',brands:['NIO','SAIC','Yum China'],img:'assets/cities/shanghai.webp'},
-      'Hong Kong':{pop:'7.5M',brands:['HSBC','Cathay Pacific','Giordano'],img:'assets/cities/hong-kong.webp'},
-      'Beijing':{pop:'22M',brands:['Lenovo','Baidu','Air China'],img:'assets/cities/beijing.webp'},
-      'Seoul':{pop:'25M',brands:['Samsung','Hyundai','Kakao'],img:'assets/cities/seoul.webp'},
-      'Tokyo':{pop:'37M',brands:['Sony','Uniqlo','Muji'],img:'assets/cities/tokyo.webp'},
-      'Manila':{pop:'14.5M',brands:['Jollibee','SM','San Miguel'],img:'assets/cities/manila.webp'},
-      'Jakarta':{pop:'33M',brands:['Garuda Indonesia','Tokopedia','Indomie'],img:'assets/cities/jakarta.webp'},
-      'Sydney':{pop:'5.3M',brands:['Qantas','Atlassian','Bonds'],img:'assets/cities/sydney.webp'},
-      'Melbourne':{pop:'5.2M',brands:['BHP','ANZ','Vegemite'],img:'assets/cities/melbourne.webp'},
-      'Auckland':{pop:'1.7M',brands:['Air New Zealand','Fonterra',"Whittaker's"],img:'assets/cities/auckland.webp'}
+      'Vancouver':{pop:'2.6M',brands:['Lululemon','Aritzia',"Arc'teryx"],img:'assets/cities/vancouver.webp'}
     };
     var infoPanel=document.getElementById('city-info'),infoImg=document.getElementById('city-info-img'),
         infoName=document.getElementById('city-info-name'),infoPop=document.getElementById('city-info-pop'),
@@ -1548,29 +3549,105 @@
     }
     function hideCityInfo(){ infoShown=false; if(infoPanel)infoPanel.setAttribute('aria-hidden','true'); }
     var infoEnter=document.getElementById('city-info-enter'),infoBack=document.getElementById('city-info-back');
-    if(infoEnter)infoEnter.addEventListener('click',function(){if(window.EspilAudio&&window.EspilAudio.pop)window.EspilAudio.pop();hideCityInfo();activateCityPhase();});
+    /* City entry sequence (2026-10-06 QA #4): ENTER CITY starts a slow zoom toward the
+       city while its name types out like the intro logo, then "press any key to enter". */
+    var entryEl=document.getElementById('city-entry'),entryTyped=document.getElementById('city-entry-typed'),
+        entryCaret=document.getElementById('city-entry-caret'),entrySub=document.getElementById('city-entry-sub');
+    var entryActive=false,entryTypedDone=false,entrySubShown=false,entryTimers=[];
+    function clearEntryTimers(){entryTimers.forEach(function(t){clearTimeout(t);});entryTimers=[];}
+    function maybeShowEntrySub(){
+      if(entryActive&&entryTypedDone&&!entrySubShown&&
+         (Math.abs(orbitDistance-targetDistance)<.12||performance.now()-entryStartedAt>12000)){
+        entrySubShown=true;
+        if(entrySub)entrySub.classList.add('show');
+        status.textContent=(selected?selected.userData.name+' — ':'')+'press any key to enter';
+      }
+    }
+    var entryStartedAt=0;
+    function typeEntryName(name){
+      if(!entryTyped)return;
+      entryTyped.innerHTML='';entryTypedDone=false;
+      var spans=[],i;
+      for(i=0;i<name.length;i++){
+        var sp=document.createElement('span');sp.className='ch';sp.textContent=name[i];
+        entryTyped.appendChild(sp);spans.push(sp);
+      }
+      entryTyped.appendChild(entryCaret);
+      entryTyped.insertBefore(entryCaret,spans[0]||null); /* caret starts at the first letter */
+      var idx=0;
+      function step(){
+        if(!entryActive)return;
+        if(idx>=spans.length){entryTypedDone=true;maybeShowEntrySub();return;}
+        spans[idx].classList.add('on');
+        entryTyped.insertBefore(entryCaret,spans[idx+1]||null);
+        idx++;
+        entryTimers.push(setTimeout(step,95+Math.random()*95));
+      }
+      entryTimers.push(setTimeout(step,600));
+    }
+    function startCityEntry(){
+      if(!selected||entryActive||cityPhaseActive)return;
+      entryActive=true;entryTypedDone=false;entrySubShown=false;entryStartedAt=performance.now();
+      clearZoomStages();
+      if(window.EspilAudio&&window.EspilAudio.pop)window.EspilAudio.pop();
+      hideCityInfo();
+      /* Slow dive toward the city in two beats while the name types out. */
+      entryTimers.push(setTimeout(function(){if(entryActive)targetDistance=Math.min(orbitDistance,1.62);},0));
+      entryTimers.push(setTimeout(function(){if(entryActive)targetDistance=1.34;},2300));
+      entryTimers.push(setTimeout(function(){maybeShowEntrySub();},12000)); /* safety net */
+      if(entryEl)entryEl.setAttribute('aria-hidden','false');
+      if(entrySub)entrySub.classList.remove('show');
+      if(entryEl)try{entryEl.focus({preventScroll:true});}catch(e){}
+      status.textContent='Entering '+selected.userData.name+'…';
+      typeEntryName(selected.userData.name);
+    }
+    function finishCityEntry(){
+      if(!entryActive||!entrySubShown)return;
+      entryActive=false;entrySubShown=false;clearEntryTimers();
+      if(entryEl)entryEl.setAttribute('aria-hidden','true');
+      activateCityPhase();
+    }
+    function cancelCityEntry(){
+      if(!entryActive)return;
+      entryActive=false;entrySubShown=false;clearEntryTimers();
+      if(entryEl)entryEl.setAttribute('aria-hidden','true');
+      if(selected&&!cityPhaseActive){targetDistance=1.9;showCityInfo(selected);}
+    }
+    if(entryEl){
+      entryEl.addEventListener('click',function(){finishCityEntry();});
+      entryEl.addEventListener('touchend',function(e){e.preventDefault();finishCityEntry();},{passive:false});
+      entryEl.addEventListener('keydown',function(e){
+        if(e.key==='Escape'){e.preventDefault();e.stopPropagation();cancelCityEntry();}
+        /* stopPropagation: the document-level entry gate would otherwise see the same
+           keypress with entryActive already false and fall through to its Enter branch. */
+        else{e.preventDefault();e.stopPropagation();finishCityEntry();}
+      });
+    }
+    if(infoEnter)infoEnter.addEventListener('click',function(){startCityEntry();});
     if(infoBack)infoBack.addEventListener('click',function(){if(window.EspilAudio&&window.EspilAudio.pop)window.EspilAudio.pop();clearSelection(true);});
     function zoomBy(delta){
       hasInteracted=true;
       /* During city zoom, all manual zoom is locked: arrows switch city, Enter confirms, ESC exits. */
       if(selected&&!cityPhaseActive){
-        if(window.__espilToast)window.__espilToast('Zoom locked \u2014 arrows switch city, ESC exits');
+        if(window.__espilToast)window.__espilToast('Zoom locked \u2014 Enter confirms, ESC exits');
         return;
       }
       targetDistance=Math.max(minDistance,Math.min(maxDistance,targetDistance+delta));
       if(selected&&targetDistance>5.7)clearSelection();
     }
-    canvas.addEventListener('wheel',function(event){event.preventDefault();zoomBy(event.deltaY*.006);},{passive:false});
+    canvas.addEventListener('wheel',function(event){event.preventDefault();if(cityPhaseActive){mapZoom(event.deltaY*.01);return;}zoomBy(event.deltaY*.006);},{passive:false});
     canvas.addEventListener('keydown',function(event){
       if(event.key==='+'||event.key==='='){event.preventDefault();zoomBy(-.7);}
       if(event.key==='-'||event.key==='_'){event.preventDefault();zoomBy(.7);}
     });
     canvas.addEventListener('pointerdown',function(event){
+      if(cityPhaseActive){mapPointerDown(event);return;}
       if(event.cancelable)event.preventDefault();
       hasInteracted=true;dragging=true;moved=false;lastX=event.clientX;lastY=event.clientY;
       canvas.setPointerCapture(event.pointerId);canvas.classList.add('is-dragging');
     });
     canvas.addEventListener('pointermove',function(event){
+      if(cityPhaseActive){mapPointerMove(event);return;}
       if(dragging){
         if(event.cancelable)event.preventDefault();
         var dx=event.clientX-lastX,dy=event.clientY-lastY;
@@ -1580,7 +3657,7 @@
             navigationHeading.applyAxisAngle(navigationNormal,-dx*.0045).normalize();
             targetDistance=Math.max(minDistance,Math.min(3.38,targetDistance+dy*.004));
           }else if(selected){
-            /* City zoom is locked: swipes don't change the view. Arrows switch city, Enter confirms, ESC exits. */
+            /* City zoom is locked: swipes don't change the view. Enter confirms, ESC exits. */
           }else{
             targetYaw-=dx*.006;
             targetPitch=Math.max(-1.28,Math.min(1.28,targetPitch+dy*.0045));
@@ -1590,6 +3667,7 @@
       }else hoverCity(pick(event));
     });
     canvas.addEventListener('pointerup',function(event){
+      if(cityPhaseActive){mapPointerUp(event);return;}
       dragging=false;canvas.classList.remove('is-dragging');canvas.releasePointerCapture(event.pointerId);
       if(!moved){if(window.__espilIntroActive)return;var hit=pick(event);if(hit)selectCity(hit.object);}
       else if(!window.__espilIntroActive&&!cityPhaseActive&&!selected){
@@ -1612,13 +3690,26 @@
 
     var pinchDistance=0;
     frame.addEventListener('touchstart',function(event){if(event.touches.length===2){var dx=event.touches[0].clientX-event.touches[1].clientX,dy=event.touches[0].clientY-event.touches[1].clientY;pinchDistance=Math.sqrt(dx*dx+dy*dy);}}, {passive:true});
-    frame.addEventListener('touchmove',function(event){if(event.touches.length===2&&pinchDistance){event.preventDefault();hasInteracted=true;var dx=event.touches[0].clientX-event.touches[1].clientX,dy=event.touches[0].clientY-event.touches[1].clientY,next=Math.sqrt(dx*dx+dy*dy);zoomBy(-(next-pinchDistance)*.012);pinchDistance=next;}}, {passive:false});
+    frame.addEventListener('touchmove',function(event){if(event.touches.length===2&&pinchDistance){event.preventDefault();hasInteracted=true;var dx=event.touches[0].clientX-event.touches[1].clientX,dy=event.touches[0].clientY-event.touches[1].clientY,next=Math.sqrt(dx*dx+dy*dy);if(cityPhaseActive){mapZoom(-(next-pinchDistance)*.05);}else{zoomBy(-(next-pinchDistance)*.012);}pinchDistance=next;}}, {passive:false});
     frame.addEventListener('touchend',function(){pinchDistance=0;},{passive:true});
 
     var worldPoint=new THREE.Vector3(),cameraDirection=new THREE.Vector3();
     function shortestAngle(from,to){return Math.atan2(Math.sin(to-from),Math.cos(to-from));}
+    var lastFrameT=performance.now();
     function animate(){
       requestAnimationFrame(animate);
+      var nowMs=performance.now();
+      var dt=Math.min(.05,(nowMs-lastFrameT)/1000);lastFrameT=nowMs;
+      if(cityPhaseActive){
+        /* Walkable downtown map owns the frame. */
+        updateWalkMap(dt,nowMs/1000);
+        if(walkPlayer)curvePlayer.set(walkPlayer.pos.x,walkPlayer.pos.z);
+        updateMapSky();
+        updateProps();
+        updateTraffic(dt);
+        renderer.render(mapScene,mapCamera);
+        return;
+      }
       yaw+=shortestAngle(yaw,targetYaw)*(reduced?1:.075);
       pitch+=(targetPitch-pitch)*(reduced?1:.075);
       orbitDistance+=(targetDistance-orbitDistance)*(reduced?1:(selected&&approachSlow&&!cityPhaseActive?.03:.075));
@@ -1630,21 +3721,10 @@
         marker.visible=!cityPhaseActive&&facing;
         /* Constant landmark size regardless of zoom; half size while its city is zoomed. No hover scaling. */
         marker.scale.setScalar(marker.userData.baseScale*(marker===selected?.5:1));
-        if(marker.userData.halo)marker.userData.halo.scale.setScalar(marker===selected?.19:.38);
       });
-      if(aurora.visible){
-        var at=performance.now()*.001;
-        aurora.rotation.z+=.0016;
-        for(var ai=0;ai<auroraMats.length;ai++)auroraMats[ai].opacity=.34+.24*Math.sin(at*2.2+ai*2.1);
-      }
-      if(selected&&!cityPhaseActive&&!infoShown&&performance.now()-cityApproachStarted>1200&&(Math.abs(orbitDistance-targetDistance)<.09||performance.now()-cityApproachStarted>9000)){
+      if(entryActive)maybeShowEntrySub();
+      if(selected&&!cityPhaseActive&&!infoShown&&!gateActive&&!entryActive&&performance.now()-cityApproachStarted>1200&&(Math.abs(orbitDistance-targetDistance)<.09||performance.now()-cityApproachStarted>9000)){
         showCityInfo(selected);
-      }
-      if(cityPhaseActive&&cityStage){
-        cityPhaseFade=Math.min(1,cityPhaseFade+(reduced?1:.028));
-        cityStage.userData.fadeMaterials.forEach(function(material){material.opacity=cityPhaseFade;});
-        var daylight=skyUniforms.daylight.value;
-        starMaterial.opacity=Math.max(.035,1-daylight*.94);
       }
       renderer.render(scene,camera);
     }
@@ -1671,7 +3751,9 @@
     var typed=document.getElementById('intro-typed');
     var cont=document.getElementById('intro-continue');
     var canvas=document.getElementById('intro-stars');
-    var WORD='Espil Online';
+    var WORD_A='Espil',WORD_B=' Online'; /* "Espil" …breathe… "Online" (2026-10-06 QA #1) */
+    var WORD=WORD_A+WORD_B;
+    var BREATHE_MS=850; /* the beat between the two words */
     var TYPE_MIN=50,TYPE_JITTER=50; /* 50-100ms per char: brisk, natural keystroke rhythm */
     var CARET_LINGER=2000; /* caret keeps blinking 2s after typing completes, then disappears */
     var done=false,continued=false,earthReady=false,typedDone=false,caretGone=false,idx=0;
@@ -1719,6 +3801,9 @@
       caret=document.createElement('span');
       caret.className='caret';
       typed.appendChild(caret);
+      /* The caret must start at the E and follow the typing: invisible chars
+         still occupy layout, so parking it at the end put it on the far right. */
+      typed.insertBefore(caret,spans[0]||null);
     }
     function maybeShowContinue(){
       if(typedDone&&caretGone&&earthReady&&!done){
@@ -1741,7 +3826,9 @@
       spans[idx].classList.add('on');
       typed.insertBefore(caret,spans[idx+1]||null);
       idx++;
-      setTimeout(typeStep,TYPE_MIN+Math.random()*TYPE_JITTER);
+      var delay=TYPE_MIN+Math.random()*TYPE_JITTER;
+      if(idx===WORD_A.length)delay=BREATHE_MS; /* "Espil" lands, a beat, then "Online" */
+      setTimeout(typeStep,delay);
     }
     function beginEarth(){
       var G=window.__espilGlobe;
@@ -1796,12 +3883,39 @@
     var audio=document.getElementById('bgm');
     var toggle=document.getElementById('bgm-toggle');
     var started=false, muted=false, userPaused=false;
+    /* Track catalogue (2026-10-06 QA #2): the hover card shows the current song.
+       Adding a city theme = one line here + the mp3 in assets/bgm/cities/. */
+    var LANDING_THEME={title:'Green',artist:'Espil Ceil',src:'assets/Green_bgm_landing.mp3'};
+    var CITY_THEMES={
+      'Vancouver':{title:'Citrus Tree',artist:'Espil Ceil',src:'assets/bgm/cities/vancouver.mp3'}
+    };
+    var currentTheme=LANDING_THEME,pendingThemeUrl=null;
+    function paintBgmCard(){
+      var t=document.getElementById('bgm-card-title'),
+          a=document.getElementById('bgm-card-artist'),
+          s=document.getElementById('bgm-card-state');
+      if(t)t.textContent=currentTheme.title;
+      if(a)a.textContent=currentTheme.artist;
+      if(s)s.textContent=(muted?'Muted':'Now playing')+' · loops forever';
+    }
     if(audio){
       audio.volume=0.5;
-      /* Theme song file not uploaded yet: show OFF instead of pretending. */
+      audio.loop=true; /* songs loop forever (2026-10-06 QA #2) */
+      audio.addEventListener('playing',function(){pendingThemeUrl=null;});
       audio.addEventListener('error',function(){
+        var cur='';
+        try{cur=audio.currentSrc||audio.src||'';}catch(e){}
+        if(pendingThemeUrl&&cur.slice(-pendingThemeUrl.length)===pendingThemeUrl){
+          /* A city theme file is missing: fall back to the landing theme, stay unmuted. */
+          pendingThemeUrl=null;
+          try{audio.src=LANDING_THEME.src;audio.loop=true;}catch(e){}
+          currentTheme=LANDING_THEME;paintBgmCard();
+          if(started&&!muted&&!userPaused)play();
+          return;
+        }
+        /* Theme song file not uploaded yet: show OFF instead of pretending. */
         if(audio.networkState===3||(audio.error&&audio.error.code===4)){
-          muted=true; userPaused=true; paintToggle();
+          muted=true; userPaused=true; paintToggle(); paintBgmCard();
         }
       });
     }
@@ -1873,26 +3987,142 @@
     document.addEventListener('pointerdown',unlock);
     document.addEventListener('keydown',unlock);
     document.addEventListener('touchstart',unlock,{passive:true});
+    /* Switch to a city theme song (loops forever); missing files fall back to the
+       landing theme via the error handler above. */
+    function playTheme(theme){
+      if(!audio)return;
+      pendingThemeUrl=theme.src;
+      fadeTo(0,function(){
+        try{audio.src=theme.src;audio.loop=true;}catch(e){}
+        currentTheme=theme;paintBgmCard();
+        if(!started||muted||userPaused)return;
+        try{audio.volume=0;}catch(e){}
+        var p=audio.play(); if(p&&p.catch)p.catch(function(){});
+        fadeTo(.5);
+      });
+    }
+    /* Per-city theme songs (walkable-map BGM). To give a new city its own theme,
+       drop its mp3 in assets/bgm/cities/ and add one line here, e.g.
+       tokyo:{src:'assets/bgm/cities/tokyo.mp3',title:'...'}.
+       Vancouver's theme is "Citrus Tree" by Espil Ceil. */
+    /* 'vancouver' (walkable-map key) aliases the landing catalogue's 'Vancouver' theme entry. */
+    CITY_THEMES.vancouver={src:'assets/bgm/cities/vancouver.mp3',title:'Citrus Tree',artist:'Espil Ceil'};
+    var CITY_DWELL_MS=60000, CITY_FADE_MS=4000, CITY_VOLUME=0.5;
+    var cityAudio=null, cityTimer=null, cityFadeTimer=null;
+    var mapCity=null, cityDwellElapsed=false, cityThemeFailed=false;
+    function ensureCityAudio(){
+      if(cityAudio)return cityAudio;
+      var a=document.createElement('audio');
+      a.loop=true; a.preload='auto';
+      a.addEventListener('error',function(){ cityThemeFailed=true; });
+      cityAudio=a; return a;
+    }
+    function cityFadeTo(target,done){
+      var a=cityAudio;
+      if(!a){ if(done)done(); return; }
+      if(cityFadeTimer){clearInterval(cityFadeTimer);cityFadeTimer=null;}
+      var steps=Math.max(1,Math.round(CITY_FADE_MS/60));
+      var step=(target-a.volume)/steps;
+      if(Math.abs(target-a.volume)<0.004){
+        try{a.volume=target;}catch(e){}
+        if(done)done(); return;
+      }
+      cityFadeTimer=setInterval(function(){
+        var v=a.volume+step;
+        if((step>0&&v>=target)||(step<0&&v<=target))v=target;
+        try{a.volume=Math.max(0,Math.min(1,v));}catch(e){}
+        if(v===target){clearInterval(cityFadeTimer);cityFadeTimer=null;if(done)done();}
+      },60);
+    }
+    function startCityTheme(){
+      if(muted||userPaused||!mapCity)return;
+      var theme=CITY_THEMES[mapCity];
+      if(!theme||!theme.src)return;
+      /* The entry sequence already switched the main BGM to this city theme:
+         don't layer a second copy of the same song. */
+      if(currentTheme&&currentTheme.src===theme.src&&audio&&!audio.paused)return;
+      var a=ensureCityAudio();
+      if(a.getAttribute('src')!==theme.src){
+        cityThemeFailed=false;
+        a.setAttribute('src',theme.src);
+        try{a.load();}catch(e){}
+      }
+      if(cityThemeFailed)return;
+      try{a.volume=0;}catch(e){}
+      var p=a.play(); if(p&&p.catch)p.catch(function(){});
+      cityFadeTo(CITY_VOLUME);
+    }
+    function stopCityTheme(){
+      if(cityTimer){clearTimeout(cityTimer);cityTimer=null;}
+      if(cityAudio&&!cityAudio.paused){
+        cityFadeTo(0,function(){ try{cityAudio.pause();}catch(e){} });
+      }
+      cityDwellElapsed=false;
+    }
     window.EspilAudio={
       onCitySelect:function(){
         if(audio&&!audio.paused)fadeTo(0,function(){try{audio.pause();}catch(e){}});
       },
+      onCityEnter:function(cityName){
+        var theme=CITY_THEMES[cityName];
+        if(theme)playTheme(theme);
+      },
       onReturnToOrbit:function(){
+        if(currentTheme!==LANDING_THEME&&audio){
+          try{audio.src=LANDING_THEME.src;audio.loop=true;}catch(e){}
+          currentTheme=LANDING_THEME;paintBgmCard();
+        }
         if(!started||muted||userPaused||!audio)return;
         try{audio.volume=0;}catch(e){}
         var p=audio.play(); if(p&&p.catch)p.catch(function(){});
         fadeTo(.5);
       },
+      /* Walkable map entered: after CITY_DWELL_MS in the map, fade the city's
+         theme in and loop it. Exiting the map cancels the timer/stops the song. */
+      onMapEnter:function(cityId){
+        stopCityTheme();
+        mapCity=cityId||null;
+        if(!mapCity||!CITY_THEMES[mapCity])return;
+        cityTimer=setTimeout(function(){
+          cityTimer=null; cityDwellElapsed=true; startCityTheme();
+        },CITY_DWELL_MS);
+      },
+      onMapExit:function(){
+        mapCity=null; stopCityTheme();
+      },
+      currentTrack:function(){return {title:currentTheme.title,artist:currentTheme.artist,muted:muted};},
       pop:pop,
       tick:tick,
       toggle:function(){
         muted=!muted; userPaused=muted;
         if(audio){ if(muted)audio.pause(); else play(); }
-        paintToggle();
+        if(cityAudio){
+          if(muted){ try{cityAudio.pause();}catch(e){} }
+          else if(mapCity&&cityDwellElapsed)startCityTheme();
+        }
+        paintToggle();paintBgmCard();
       }
     };
     if(toggle)toggle.addEventListener('click',function(e){e.stopPropagation();window.EspilAudio.toggle();});
-    paintToggle();
+    paintToggle();paintBgmCard();
+    /* Hover/focus card: song info in a Genshin-styled caption box (2026-10-06 QA #2). */
+    (function(){
+      var card=document.getElementById('bgm-card');
+      if(!toggle||!card)return;
+      function show(){
+        paintBgmCard();
+        card.classList.add('show');
+        card.setAttribute('aria-hidden','false');
+      }
+      function hide(){
+        card.classList.remove('show');
+        card.setAttribute('aria-hidden','true');
+      }
+      toggle.addEventListener('mouseenter',show);
+      toggle.addEventListener('mouseleave',hide);
+      toggle.addEventListener('focus',show);
+      toggle.addEventListener('blur',hide);
+    }());
 
     /* Toast */
     var toast=document.getElementById('toast'), toastTimer=null;
