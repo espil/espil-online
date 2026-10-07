@@ -1942,6 +1942,53 @@
           if(runClip)av.actions.run=mixer.clipAction(runClip);
           av.ready=true;
           av.playAnim('idle');
+          /* QA #7: Jump clip from male_jump.glb (Meshy "Regular Jump", 1.87s, non-loop).
+             Same Mixamo 22-bone skeleton, mixamorig:* names — binds to the same mixer.
+             The male π counter-rotation on `model` applies as-is (clip keeps baked-in half-turn).
+             Root motion (Hips position) is stripped — game physics (velY) drives the jump,
+             the clip supplies only the pose. In-place jump, no X/Z drift. */
+          try{
+            new THREE.GLTFLoader().load('assets/character/male_jump.glb',function(jgltf){
+              var jclips=jgltf.animations||[],jumpClip=null;
+              for(var i=0;i<jclips.length;i++){
+                if(/jump/i.test(jclips[i].name)){jumpClip=jclips[i];break;}
+              }
+              if(!jumpClip&&jclips.length)jumpClip=jclips[0];
+              if(jumpClip){
+                /* Strip Hips/root position tracks — keep rotations only.
+                   Prevents double-jump (clip Y + game velY stacking) and X/Z drift. */
+                jumpClip.tracks=jumpClip.tracks.filter(function(t){
+                  var n=(t.name||'').toLowerCase();
+                  var isPos=n.indexOf('.position')>=0;
+                  var isRoot=/^(mixamorig[_:]?hips|hips|armature|root)/.test(n);
+                  return !(isPos&&isRoot);
+                });
+                var jumpAction=mixer.clipAction(jumpClip);
+                jumpAction.setLoop(THREE.LoopOnce);
+                jumpAction.clampWhenFinished=true;
+                av.actions.jump=jumpAction;
+                av.playJump=function(){
+                  if(!av.mixer||!av.actions.jump)return false;
+                  var cur=av.actions[av.curAnim];
+                  av.curAnim='jump';
+                  jumpAction.reset().fadeIn(.12).play();
+                  if(cur&&cur!==jumpAction){
+                    cur.fadeOut(.12);
+                    (function(pp){setTimeout(function(){pp.stop();},180);})(cur);
+                  }
+                  /* Return to locomotion when the clip finishes (1.87s). */
+                  var dur=(jumpClip.duration||1.87)*1000;
+                  setTimeout(function(){
+                    if(av.curAnim!=='jump')return;
+                    jumpAction.fadeOut(.15);
+                    setTimeout(function(){jumpAction.stop();},180);
+                    av.curAnim=null; /* playAnim picks up current move state next frame */
+                  },dur);
+                  return true;
+                };
+              }
+            });
+          }catch(e){/* jump clip optional — procedural jump still works */}
         },undefined,function(err){
           if(window.__espilToast)window.__espilToast('Character failed to load');
         });
@@ -2919,8 +2966,10 @@
         p.bobT+=dt*11;
       }
       g.rotation.y=p.faceY;
-      /* Animation state machine: idle / walk / run follow the movement state. */
-      if(p.av.ready){
+      /* Animation state machine: idle / walk / run follow the movement state.
+         While the jump clip is playing, don't override it — it returns to
+         locomotion on its own when finished (see av.playJump). */
+      if(p.av.ready&&p.av.curAnim!=='jump'){
         var wantAnim=!p.moving?'idle':(p.running?'run':'walk');
         p.av.playAnim(wantAnim);
       }
