@@ -2266,6 +2266,169 @@
         incidentMarkers.push({mesh:mesh,si:j});
       }
     }
+    /* Han 2026-10-11: hoisted from buildWalkMapOnce() to outer scope.
+       syncTrafficCars() is called from updateTraffic() (outer scope); the nested
+       definition was invisible there -> ReferenceError every traffic tick. */
+    var CAR_COLORS=['#d94f4f','#4f7ed9','#e8e8e8','#2b2f36','#f2b134','#7ed957','#9b59b6'];
+    var CAR_W=4.6,CAR_H=1.6,CAR_TOP=1.6; /* single jump apex ~1.56 + .55 step grace -> landable */
+    /* Han 2026-10-09: soft blob shadow under cars for 3D feel */
+    var carShadowTex=(function(){
+      var c=document.createElement('canvas');c.width=128;c.height=64;
+      var g=c.getContext('2d');
+      var grad=g.createRadialGradient(64,32,8,64,32,60);
+      grad.addColorStop(0,'rgba(0,0,0,0.45)');
+      grad.addColorStop(0.7,'rgba(0,0,0,0.25)');
+      grad.addColorStop(1,'rgba(0,0,0,0)');
+      g.fillStyle=grad;
+      g.fillRect(0,0,128,64);
+      var t=new THREE.CanvasTexture(c);return t;
+    })();
+    function carTexture(variant,color){
+      var c=document.createElement('canvas');c.width=72;c.height=25;
+      var g=c.getContext('2d');g.clearRect(0,0,72,25);
+      g.fillStyle='rgba(0,0,0,.25)';g.beginPath();g.ellipse(36,22,30,3,0,0,7);g.fill();
+      g.fillStyle=color;
+      if(variant===2){ /* van */
+        g.beginPath();g.roundRect(8,6,56,13,3);g.fill();
+        g.fillStyle='#bcd6f5';g.fillRect(50,8,10,6);
+      }else{
+        g.beginPath();g.roundRect(8,11,56,9,4);g.fill();
+        g.fillStyle=color;g.beginPath();g.roundRect(22,5,28,9,4);g.fill();
+        g.fillStyle='#bcd6f5';g.beginPath();g.roundRect(25,7,22,6,2);g.fill();
+        if(variant===3){g.fillStyle='#2b2f36';g.fillRect(32,2,8,4);} /* taxi sign */
+      }
+      g.fillStyle='#1c1e22';
+      g.beginPath();g.arc(20,20,4.5,0,7);g.fill();
+      g.beginPath();g.arc(52,20,4.5,0,7);g.fill();
+      g.fillStyle='#8a8f98';
+      g.beginPath();g.arc(20,20,2,0,7);g.fill();
+      g.beginPath();g.arc(52,20,2,0,7);g.fill();
+      var t=new THREE.CanvasTexture(c);t.anisotropy=4;return t;
+    }
+    function initCarTextures(){
+      for(var v=0;v<4;v++)for(var k=0;k<3;k++)
+        carTextures.push(carTexture(v,CAR_COLORS[(v*3+k)%CAR_COLORS.length]));
+    }
+    /* #5 (Han 2nd QA): top-view car sprite for N/S movement.
+       Simple top-down: body, windshield at front (+x), roof. */
+    var carTopTextures=[];
+    function carTopTexture(color){
+      var c=document.createElement('canvas');c.width=144;c.height=60;
+      var g=c.getContext('2d');g.clearRect(0,0,144,60);
+      g.fillStyle='rgba(0,0,0,.3)';g.beginPath();g.ellipse(72,52,60,6,0,0,7);g.fill();
+      /* Han 2026-10-09: vibrant colors for N/S cars */
+      g.fillStyle=color;
+      g.beginPath();g.roundRect(12,10,120,40,16);g.fill(); /* body from top */
+      g.fillStyle='#cfe4ff';g.beginPath();g.roundRect(88,18,28,24,6);g.fill(); /* windshield (front) */
+      g.fillStyle=color;g.globalAlpha=.9;
+      g.beginPath();g.roundRect(24,18,52,24,8);g.fill(); /* roof */
+      g.globalAlpha=1;
+      /* dark outline for pop */
+      g.strokeStyle='rgba(0,0,0,.45)';g.lineWidth=3;
+      g.beginPath();g.roundRect(12,10,120,40,16);g.stroke();
+      g.fillStyle='#ffe9a8';g.fillRect(128,16,6,8);g.fillRect(128,36,6,8); /* headlights */
+      g.fillStyle='#ff2d2d';g.fillRect(12,16,6,8);g.fillRect(12,36,6,8); /* taillights */
+      var t=new THREE.CanvasTexture(c);t.anisotropy=4;return t;
+    }
+    function initCarTopTextures(){
+      for(var k=0;k<CAR_COLORS.length;k++)
+        carTopTextures.push(carTopTexture(CAR_COLORS[k]));
+    }
+    function carCountFor(flow,len){
+      /* #4 (Han 2nd QA): reduced from 10 to 5 max per segment for perf */
+      var want=Math.round(5-4*flow); /* flow 1 -> 1 car, flow 0 -> 5 cars */
+      return Math.max(1,Math.min(want,Math.max(1,Math.floor(len/8))));
+    }
+    /* #4: object pool for car meshes (avoid create/dispose churn) */
+    var carPool=[];
+    function getCarMesh(){
+      if(carPool.length>0)return carPool.pop();
+      return null;
+    }
+    function releaseCarMesh(mesh){
+      mesh.visible=false;
+      if(mesh.userData.shadow)mesh.userData.shadow.visible=false;
+      carPool.push(mesh);
+    }
+    function spawnCar(si){
+      /* #4: distance culling — only spawn cars near player (400m) */
+      if(walkPlayer&&walkPlayer.pos){
+        var seg=trafficSegs[si];
+        var scx=(seg.x1+seg.x2)/2,scz=(seg.z1+seg.z2)/2;
+        var pdx=scx-walkPlayer.pos.x,pdz=scz-walkPlayer.pos.z;
+        if(pdx*pdx+pdz*pdz>400*400)return;
+      }
+      /* #4: total cap — max 80 cars */
+      if(trafficCars.length>=80)return;
+      var seg=trafficSegs[si],len=Math.hypot(seg.x2-seg.x1,seg.z2-seg.z1);
+      var lane=Math.random()<.5?1:-1;
+      var texIdx=(Math.random()*carTextures.length)|0;
+      var colorIdx=texIdx%carTopTextures.length;
+      var mesh=getCarMesh();
+      if(mesh){
+        /* Reuse pooled mesh */
+        mesh.material.map=carTextures[texIdx];
+        mesh.material.needsUpdate=true;
+        mesh.visible=true;
+        if(mesh.userData.shadow)mesh.userData.shadow.visible=true;
+      }else{
+        var mat=new THREE.MeshBasicMaterial({map:carTextures[texIdx],transparent:true,side:THREE.DoubleSide,fog:true,depthWrite:false});
+        mesh=new THREE.Mesh(new THREE.PlaneGeometry(CAR_W,CAR_H),mat);
+        mesh.renderOrder=2;mesh.frustumCulled=false;
+        /* Han 2026-10-09: blob shadow for 3D feel */
+        var shMat=new THREE.MeshBasicMaterial({map:carShadowTex,transparent:true,depthWrite:false});
+        var shMesh=new THREE.Mesh(new THREE.PlaneGeometry(CAR_W*1.3,CAR_H*2.2),shMat);
+        shMesh.rotation.x=-Math.PI/2;
+        shMesh.renderOrder=1;shMesh.frustumCulled=false;
+        mapScene.add(shMesh);
+        mesh.userData.shadow=shMesh;
+        mapScene.add(mesh);
+      }
+      var t0=Math.random(),dx=seg.x2-seg.x1,dz=seg.z2-seg.z1;
+      var off=1.4*lane,x0=seg.x1+dx*t0+(-dz/len)*off,z0=seg.z1+dz*t0+(dx/len)*off;
+      mesh.userData.car={si:si,t:t0,lane:lane,dir:lane>0?1:-1,len:len,x:x0,px:x0,z:z0,pz:z0,
+        sideTex:carTextures[texIdx],topTex:carTopTextures[colorIdx]};
+      var col={x0:0,x1:0,z0:0,z1:0,bottom:0,top:CAR_TOP,car:mesh};
+      mesh.userData.car.col=col;carColliders.push(col);
+      /* scale.x flip now handled per-frame in updateTrafficCars (screen-space direction) */
+      trafficCars.push(mesh);
+    }
+    function syncTrafficCars(){
+      var counts={};
+      for(var i=0;i<trafficCars.length;i++){var s=trafficCars[i].userData.car.si;counts[s]=(counts[s]||0)+1;}
+      for(var si=0;si<trafficSegs.length;si++){
+        var seg=trafficSegs[si],len=Math.hypot(seg.x2-seg.x1,seg.z2-seg.z1);
+        var want=carCountFor(seg.flow,len),have=counts[si]||0,diff=want-have;
+        var step=Math.max(-2,Math.min(2,diff));
+        if(step>0)for(var k=0;k<step;k++)spawnCar(si);
+        else if(step<0){
+          var removed=0;
+          for(var j=trafficCars.length-1;j>=0&&removed<-step;j--){
+            if(trafficCars[j].userData.car.si===si){
+              /* #4: pool instead of dispose */
+              var mesh=trafficCars[j];
+              var ci=carColliders.indexOf(mesh.userData.car.col);
+              if(ci>=0)carColliders.splice(ci,1);
+              releaseCarMesh(mesh);
+              trafficCars.splice(j,1);removed++;
+            }
+          }
+        }
+      }
+      /* #4: despawn cars that drifted too far from player (>500m) */
+      if(walkPlayer&&walkPlayer.pos){
+        for(var k=trafficCars.length-1;k>=0;k--){
+          var cm=trafficCars[k],cu=cm.userData.car;
+          var ddx=cu.x-walkPlayer.pos.x,ddz=cu.z-walkPlayer.pos.z;
+          if(ddx*ddx+ddz*ddz>500*500){
+            var ci2=carColliders.indexOf(cu.col);
+            if(ci2>=0)carColliders.splice(ci2,1);
+            releaseCarMesh(cm);
+            trafficCars.splice(k,1);
+          }
+        }
+      }
+    }
     function updateProps(){
       for(var i=0;i<billboardProps.length;i++){
         var m=billboardProps[i],u=m.userData.prop;
@@ -2865,166 +3028,6 @@
          cars. Camera-facing billboards like other props (no 3D models). Random
          models/colors; Han can swap art later via setCarSprite(). */
       trafficCars.length=0;carTextures.length=0;carColliders.length=0; /* reset (hoisted vars) */
-      var CAR_COLORS=['#d94f4f','#4f7ed9','#e8e8e8','#2b2f36','#f2b134','#7ed957','#9b59b6'];
-      var CAR_W=4.6,CAR_H=1.6,CAR_TOP=1.6; /* single jump apex ~1.56 + .55 step grace -> landable */
-      /* Han 2026-10-09: soft blob shadow under cars for 3D feel */
-      var carShadowTex=(function(){
-        var c=document.createElement('canvas');c.width=128;c.height=64;
-        var g=c.getContext('2d');
-        var grad=g.createRadialGradient(64,32,8,64,32,60);
-        grad.addColorStop(0,'rgba(0,0,0,0.45)');
-        grad.addColorStop(0.7,'rgba(0,0,0,0.25)');
-        grad.addColorStop(1,'rgba(0,0,0,0)');
-        g.fillStyle=grad;
-        g.fillRect(0,0,128,64);
-        var t=new THREE.CanvasTexture(c);return t;
-      })();
-      function carTexture(variant,color){
-        var c=document.createElement('canvas');c.width=72;c.height=25;
-        var g=c.getContext('2d');g.clearRect(0,0,72,25);
-        g.fillStyle='rgba(0,0,0,.25)';g.beginPath();g.ellipse(36,22,30,3,0,0,7);g.fill();
-        g.fillStyle=color;
-        if(variant===2){ /* van */
-          g.beginPath();g.roundRect(8,6,56,13,3);g.fill();
-          g.fillStyle='#bcd6f5';g.fillRect(50,8,10,6);
-        }else{
-          g.beginPath();g.roundRect(8,11,56,9,4);g.fill();
-          g.fillStyle=color;g.beginPath();g.roundRect(22,5,28,9,4);g.fill();
-          g.fillStyle='#bcd6f5';g.beginPath();g.roundRect(25,7,22,6,2);g.fill();
-          if(variant===3){g.fillStyle='#2b2f36';g.fillRect(32,2,8,4);} /* taxi sign */
-        }
-        g.fillStyle='#1c1e22';
-        g.beginPath();g.arc(20,20,4.5,0,7);g.fill();
-        g.beginPath();g.arc(52,20,4.5,0,7);g.fill();
-        g.fillStyle='#8a8f98';
-        g.beginPath();g.arc(20,20,2,0,7);g.fill();
-        g.beginPath();g.arc(52,20,2,0,7);g.fill();
-        var t=new THREE.CanvasTexture(c);t.anisotropy=4;return t;
-      }
-      function initCarTextures(){
-        for(var v=0;v<4;v++)for(var k=0;k<3;k++)
-          carTextures.push(carTexture(v,CAR_COLORS[(v*3+k)%CAR_COLORS.length]));
-      }
-      /* #5 (Han 2nd QA): top-view car sprite for N/S movement.
-         Simple top-down: body, windshield at front (+x), roof. */
-      var carTopTextures=[];
-      function carTopTexture(color){
-        var c=document.createElement('canvas');c.width=144;c.height=60;
-        var g=c.getContext('2d');g.clearRect(0,0,144,60);
-        g.fillStyle='rgba(0,0,0,.3)';g.beginPath();g.ellipse(72,52,60,6,0,0,7);g.fill();
-        /* Han 2026-10-09: vibrant colors for N/S cars */
-        g.fillStyle=color;
-        g.beginPath();g.roundRect(12,10,120,40,16);g.fill(); /* body from top */
-        g.fillStyle='#cfe4ff';g.beginPath();g.roundRect(88,18,28,24,6);g.fill(); /* windshield (front) */
-        g.fillStyle=color;g.globalAlpha=.9;
-        g.beginPath();g.roundRect(24,18,52,24,8);g.fill(); /* roof */
-        g.globalAlpha=1;
-        /* dark outline for pop */
-        g.strokeStyle='rgba(0,0,0,.45)';g.lineWidth=3;
-        g.beginPath();g.roundRect(12,10,120,40,16);g.stroke();
-        g.fillStyle='#ffe9a8';g.fillRect(128,16,6,8);g.fillRect(128,36,6,8); /* headlights */
-        g.fillStyle='#ff2d2d';g.fillRect(12,16,6,8);g.fillRect(12,36,6,8); /* taillights */
-        var t=new THREE.CanvasTexture(c);t.anisotropy=4;return t;
-      }
-      function initCarTopTextures(){
-        for(var k=0;k<CAR_COLORS.length;k++)
-          carTopTextures.push(carTopTexture(CAR_COLORS[k]));
-      }
-      function carCountFor(flow,len){
-        /* #4 (Han 2nd QA): reduced from 10 to 5 max per segment for perf */
-        var want=Math.round(5-4*flow); /* flow 1 -> 1 car, flow 0 -> 5 cars */
-        return Math.max(1,Math.min(want,Math.max(1,Math.floor(len/8))));
-      }
-      /* #4: object pool for car meshes (avoid create/dispose churn) */
-      var carPool=[];
-      function getCarMesh(){
-        if(carPool.length>0)return carPool.pop();
-        return null;
-      }
-      function releaseCarMesh(mesh){
-        mesh.visible=false;
-        if(mesh.userData.shadow)mesh.userData.shadow.visible=false;
-        carPool.push(mesh);
-      }
-      function spawnCar(si){
-        /* #4: distance culling — only spawn cars near player (400m) */
-        if(walkPlayer&&walkPlayer.pos){
-          var seg=trafficSegs[si];
-          var scx=(seg.x1+seg.x2)/2,scz=(seg.z1+seg.z2)/2;
-          var pdx=scx-walkPlayer.pos.x,pdz=scz-walkPlayer.pos.z;
-          if(pdx*pdx+pdz*pdz>400*400)return;
-        }
-        /* #4: total cap — max 80 cars */
-        if(trafficCars.length>=80)return;
-        var seg=trafficSegs[si],len=Math.hypot(seg.x2-seg.x1,seg.z2-seg.z1);
-        var lane=Math.random()<.5?1:-1;
-        var texIdx=(Math.random()*carTextures.length)|0;
-        var colorIdx=texIdx%carTopTextures.length;
-        var mesh=getCarMesh();
-        if(mesh){
-          /* Reuse pooled mesh */
-          mesh.material.map=carTextures[texIdx];
-          mesh.material.needsUpdate=true;
-          mesh.visible=true;
-          if(mesh.userData.shadow)mesh.userData.shadow.visible=true;
-        }else{
-          var mat=new THREE.MeshBasicMaterial({map:carTextures[texIdx],transparent:true,side:THREE.DoubleSide,fog:true,depthWrite:false});
-          mesh=new THREE.Mesh(new THREE.PlaneGeometry(CAR_W,CAR_H),mat);
-          mesh.renderOrder=2;mesh.frustumCulled=false;
-          /* Han 2026-10-09: blob shadow for 3D feel */
-          var shMat=new THREE.MeshBasicMaterial({map:carShadowTex,transparent:true,depthWrite:false});
-          var shMesh=new THREE.Mesh(new THREE.PlaneGeometry(CAR_W*1.3,CAR_H*2.2),shMat);
-          shMesh.rotation.x=-Math.PI/2;
-          shMesh.renderOrder=1;shMesh.frustumCulled=false;
-          mapScene.add(shMesh);
-          mesh.userData.shadow=shMesh;
-          mapScene.add(mesh);
-        }
-        var t0=Math.random(),dx=seg.x2-seg.x1,dz=seg.z2-seg.z1;
-        var off=1.4*lane,x0=seg.x1+dx*t0+(-dz/len)*off,z0=seg.z1+dz*t0+(dx/len)*off;
-        mesh.userData.car={si:si,t:t0,lane:lane,dir:lane>0?1:-1,len:len,x:x0,px:x0,z:z0,pz:z0,
-          sideTex:carTextures[texIdx],topTex:carTopTextures[colorIdx]};
-        var col={x0:0,x1:0,z0:0,z1:0,bottom:0,top:CAR_TOP,car:mesh};
-        mesh.userData.car.col=col;carColliders.push(col);
-        /* scale.x flip now handled per-frame in updateTrafficCars (screen-space direction) */
-        trafficCars.push(mesh);
-      }
-      function syncTrafficCars(){
-        var counts={};
-        for(var i=0;i<trafficCars.length;i++){var s=trafficCars[i].userData.car.si;counts[s]=(counts[s]||0)+1;}
-        for(var si=0;si<trafficSegs.length;si++){
-          var seg=trafficSegs[si],len=Math.hypot(seg.x2-seg.x1,seg.z2-seg.z1);
-          var want=carCountFor(seg.flow,len),have=counts[si]||0,diff=want-have;
-          var step=Math.max(-2,Math.min(2,diff));
-          if(step>0)for(var k=0;k<step;k++)spawnCar(si);
-          else if(step<0){
-            var removed=0;
-            for(var j=trafficCars.length-1;j>=0&&removed<-step;j--){
-              if(trafficCars[j].userData.car.si===si){
-                /* #4: pool instead of dispose */
-                var mesh=trafficCars[j];
-                var ci=carColliders.indexOf(mesh.userData.car.col);
-                if(ci>=0)carColliders.splice(ci,1);
-                releaseCarMesh(mesh);
-                trafficCars.splice(j,1);removed++;
-              }
-            }
-          }
-        }
-        /* #4: despawn cars that drifted too far from player (>500m) */
-        if(walkPlayer&&walkPlayer.pos){
-          for(var k=trafficCars.length-1;k>=0;k--){
-            var cm=trafficCars[k],cu=cm.userData.car;
-            var ddx=cu.x-walkPlayer.pos.x,ddz=cu.z-walkPlayer.pos.z;
-            if(ddx*ddx+ddz*ddz>500*500){
-              var ci2=carColliders.indexOf(cu.col);
-              if(ci2>=0)carColliders.splice(ci2,1);
-              releaseCarMesh(cm);
-              trafficCars.splice(k,1);
-            }
-          }
-        }
-      }
       updateTrafficCars=function(dt){
         /* Reusable temporaries (avoid per-car allocation) */
         if(!updateTrafficCars._cr)updateTrafficCars._cr=new THREE.Vector3();
