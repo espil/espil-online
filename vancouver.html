@@ -108,16 +108,35 @@
   #toast.show{display:block;}
   /* Loading */
   #loading{position:absolute;inset:0;background:#050914;display:flex;align-items:center;justify-content:center;z-index:200;color:#fff;}
-  #loading.done{display:none;}
-</style>
+  #loading.done{display:none;}</style>
 </head>
 <body>
-<div id="loading">Loading Vancouver…
-  <div style="width:200px;height:4px;background:rgba(255,255,255,.2);border-radius:2px;margin-top:12px;overflow:hidden;">
-    <div id="load-progress" style="height:100%;width:0%;background:#4f7ed9;transition:width .3s;"></div>
+<div id="loading">
+  <!-- Han 2026-10-10: Espil Online typewriter scene (like landing intro) -->
+  <div style="text-align:center;">
+    <div id="load-typewriter" style="font-size:42px;font-weight:bold;letter-spacing:8px;color:#fff;text-shadow:0 0 20px #4f7ed9;margin-bottom:24px;min-height:60px;"></div>
+    <div style="width:280px;height:4px;background:rgba(255,255,255,.15);border-radius:2px;margin:0 auto;overflow:hidden;">
+      <div id="load-progress" style="height:100%;width:0%;background:linear-gradient(90deg,#4f7ed9,#7ed9e8);transition:width .3s;box-shadow:0 0 10px #4f7ed9;"></div>
+    </div>
+    <div id="load-status" style="font-size:13px;color:#9fb3c8;margin-top:12px;letter-spacing:2px;">INITIALIZING…</div>
   </div>
-  <div id="load-status" style="font-size:12px;color:#9fb3c8;margin-top:8px;">Initializing…</div>
 </div>
+<script>
+// Typewriter effect for loading (Han 2026-10-10)
+(function(){
+  var text = 'ESPIL ONLINE';
+  var el = document.getElementById('load-typewriter');
+  var i = 0;
+  function type(){
+    if(i <= text.length){
+      el.textContent = text.substring(0, i);
+      i++;
+      setTimeout(type, 120);
+    }
+  }
+  if(el) type();
+})();
+</script>
 <div id="map"></div>
 <!-- Joystick (from espil.online) -->
 <div class="joystick" id="joystick"><div class="joy-knob" id="joy-knob"></div></div>
@@ -279,8 +298,12 @@ window.CAULDRON_STATIC_CONFIG = {
   var collisionLoaded = false;
 
   function loadCollisionData(){
-    fetch('/assets/osm/vancouver_chunks.json')
-      .then(function(r){ return r.json(); })
+    // Han 2026-10-10: Use relative path (works from /vancouver.html)
+    fetch('assets/osm/vancouver_chunks.json')
+      .then(function(r){
+        if(!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
       .then(function(data){
         var chunks = data.chunks || {};
         var count = 0;
@@ -305,6 +328,8 @@ window.CAULDRON_STATIC_CONFIG = {
       })
       .catch(function(e){
         console.warn('[Collision] Failed to load:', e);
+        // Han 2026-10-10: Don't block loading on failure (was stuck at 67%)
+        updateLoadProgress('collision', 100);
       });
   }
 
