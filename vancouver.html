@@ -99,16 +99,32 @@
 </div>
 <div id="store-modal">
   <button id="store-modal-close">×</button>
-  <div id="store-modal-content"></div>
+  <div class="store-modal-panel" style="padding:20px;color:#fff;">
+    <!-- Step 1: Choose a place (action window) -->
+    <div id="store-list-view">
+      <h3>Choose a place</h3>
+      <p style="font-size:.8rem;color:#9fb3c8;margin:-8px 0 12px;">Click to select, ESC to cancel</p>
+      <div id="store-list"></div>
+    </div>
+    <!-- Step 2: Place info (separate screen) -->
+    <div id="store-detail-view" class="hidden" style="display:none;">
+      <button id="store-back" type="button" style="background:none;border:none;color:#4f7ed9;cursor:pointer;margin-bottom:12px;">← Back</button>
+      <h3 id="store-detail-name"></h3>
+      <div class="store-actions" style="display:flex;gap:8px;margin:12px 0;">
+        <button data-action="info" type="button" style="padding:8px 12px;border-radius:6px;border:1px solid #4f7ed9;background:none;color:#fff;cursor:pointer;">Info</button>
+        <button data-action="reviews" type="button" style="padding:8px 12px;border-radius:6px;border:1px solid #4f7ed9;background:none;color:#fff;cursor:pointer;">Reviews</button>
+        <button data-action="photos" type="button" style="padding:8px 12px;border-radius:6px;border:1px solid #4f7ed9;background:none;color:#fff;cursor:pointer;">Photos</button>
+        <button data-action="enter" type="button" style="padding:8px 12px;border-radius:6px;background:#4f7ed9;border:none;color:#fff;cursor:pointer;">Enter →</button>
+      </div>
+      <div id="store-detail-content"></div>
+    </div>
+  </div>
 </div>
 <div id="toast"></div>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.js"></script>
 <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-<script>
-// GLTFLoader minimal (for character)
-// In production, use the full GLTFLoader from three/examples
-</script>
+<script src="https://unpkg.com/three@0.160.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
 // Static config (from Cauldron)
 window.CAULDRON_STATIC_CONFIG = {
@@ -185,24 +201,32 @@ window.CAULDRON_STATIC_CONFIG = {
       document.getElementById('loading').classList.add('done');
     });
 
+    // 2D marker as fallback (hidden when 3D character loads)
     playerMarker = new mapboxgl.Marker({
       element: createMarkerEl('player-marker', 'Player'),
       anchor: 'center',
     }).setLngLat(playerLngLat).addTo(map);
+    // Hide marker once 3D character is ready (to avoid duplication)
+    // The 3D layer will handle positioning
 
     initMinimap();
     initControls();
   }
 
   // 3D Character via Mapbox Custom Layer + Three.js
-  // Han 2026-10-10: GLB character on Mapbox
-  // TODO: Replace primitive with actual GLB via GLTFLoader
+  // Han 2026-10-10: GLB character on Mapbox (merge, not replace)
   var characterLayer = null;
+  var characterModel = null;
+  var characterMixer = null;
   function addCharacterLayer(){
     if(typeof THREE === 'undefined'){
       console.warn('[Character] THREE not loaded, using marker only');
       return;
     }
+
+    var modelOrigin = playerLngLat.slice();
+    var modelAltitude = 0;
+    var modelRotate = [Math.PI/2, 0, 0];
 
     characterLayer = {
       id: 'character-3d',
@@ -211,61 +235,110 @@ window.CAULDRON_STATIC_CONFIG = {
 
       onAdd: function(map, gl){
         this.map = map;
-        // Three.js scene
         this.camera = new THREE.Camera();
         this.scene = new THREE.Scene();
+
+        // Lighting
+        var dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        dirLight.position.set(0, 10, 10);
+        this.scene.add(dirLight);
+        this.scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+
+        // Load GLB character
+        var loader = new THREE.GLTFLoader();
+        var charUrl = '/assets/character/male.glb';
+        // Try male, fallback to primitive
+        loader.load(
+          charUrl,
+          function(gltf){
+            characterModel = gltf.scene;
+            characterModel.scale.set(2, 2, 2); // Scale up (GLB is ~1.2 units)
+            this.scene.add(characterModel);
+            console.log('[Character] GLB loaded:', charUrl);
+
+            // Setup animations if available
+            if(gltf.animations && gltf.animations.length > 0){
+              characterMixer = new THREE.AnimationMixer(characterModel);
+              console.log('[Character] Animations:', gltf.animations.map(function(a){return a.name;}));
+            }
+          }.bind(this),
+          undefined,
+          function(err){
+            console.warn('[Character] GLB failed, using primitive:', err);
+            // Fallback primitive
+            var bodyMat = new THREE.MeshLambertMaterial({color: 0x4f7ed9});
+            characterModel = new THREE.Group();
+            var body = new THREE.Mesh(
+              new THREE.CapsuleGeometry(0.4, 0.8, 4, 12),
+              bodyMat
+            );
+            body.position.y = 0.9;
+            characterModel.add(body);
+            var head = new THREE.Mesh(
+              new THREE.SphereGeometry(0.3, 16, 16),
+              new THREE.MeshLambertMaterial({color: 0xf0c8a0})
+            );
+            head.position.y = 1.8;
+            characterModel.add(head);
+            this.scene.add(characterModel);
+          }.bind(this)
+        );
+
         this.renderer = new THREE.WebGLRenderer({
           canvas: map.getCanvas(),
           context: gl,
           antialias: true,
         });
         this.renderer.autoClear = false;
-
-        // Simple stylized character (placeholder for GLB)
-        // Body
-        var bodyMat = new THREE.MeshLambertMaterial({color: 0x4f7ed9});
-        this.body = new THREE.Mesh(
-          new THREE.CapsuleGeometry(0.4, 0.8, 4, 12),
-          bodyMat
-        );
-        this.body.position.y = 0.9;
-        this.scene.add(this.body);
-        // Head
-        var headMat = new THREE.MeshLambertMaterial({color: 0xf0c8a0});
-        this.head = new THREE.Mesh(
-          new THREE.SphereGeometry(0.3, 16, 16),
-          headMat
-        );
-        this.head.position.y = 1.8;
-        this.scene.add(this.head);
-
-        // Lighting
-        var light = new THREE.DirectionalLight(0xffffff, 1);
-        light.position.set(0, 10, 10);
-        this.scene.add(light);
-        this.scene.add(new THREE.AmbientLight(0xffffff, 0.5));
       },
 
       render: function(gl, matrix){
-        // Update character position to player
-        var lngLat = playerLngLat;
-        // Convert lng/lat to Mercator coordinates
+        // Update model position to player
+        modelOrigin = playerLngLat.slice();
+
         var merc = mapboxgl.MercatorCoordinate.fromLngLat(
-          {lng: lngLat[0], lat: lngLat[1]},
-          0
+          {lng: modelOrigin[0], lat: modelOrigin[1]},
+          modelAltitude
         );
 
-        // Position the character group
-        // (In a real implementation, we'd use the matrix to place it)
+        // Model matrix
+        var modelMatrix = new THREE.Matrix4()
+          .makeTranslation(merc.x, merc.y, merc.z)
+          .scale(new THREE.Vector3(
+            merc.meterInMercatorCoordinateUnits(),
+            merc.meterInMercatorCoordinateUnits(),
+            merc.meterInMercatorCoordinateUnits()
+          ));
 
-        this.renderer.state.reset();
-        // ... (simplified - full matrix math needed for production)
+        var rotationX = new THREE.Matrix4().makeRotationAxis(
+          new THREE.Vector3(1, 0, 0), modelRotate[0]);
+        var rotationY = new THREE.Matrix4().makeRotationAxis(
+          new THREE.Vector3(0, 1, 0), modelRotate[1]);
+        var rotationZ = new THREE.Matrix4().makeRotationAxis(
+          new THREE.Vector3(0, 0, 1), modelRotate[2]);
+
+        var m = new THREE.Matrix4().fromArray(matrix);
+        var l = new THREE.Matrix4()
+          .multiplyMatrices(m, modelMatrix)
+          .multiply(rotationX)
+          .multiply(rotationY)
+          .multiply(rotationZ);
+
+        this.camera.projectionMatrix = l;
+
+        // Update animations
+        if(characterMixer){
+          characterMixer.update(0.016); // ~60fps
+        }
+
+        this.renderer.resetState();
+        this.renderer.render(this.scene, this.camera);
+        this.map.triggerRepaint();
       }
     };
 
-    // Note: Full custom layer matrix math is complex.
-    // For now, using the 2D marker. 3D character needs more work.
-    console.log('[Character] 3D layer prepared (marker fallback active)');
+    map.addLayer(characterLayer);
+    console.log('[Character] 3D layer added');
   }
 
   function initMinimap(){
@@ -397,18 +470,143 @@ window.CAULDRON_STATIC_CONFIG = {
     });
   }
 
+  /* Store modal wiring */
+  (function initStoreModal(){
+    function onReady(){
+      var closeBtn=document.getElementById('store-modal-close');
+      if(closeBtn)closeBtn.addEventListener('click',function(){
+        document.getElementById('store-modal').classList.remove('open');
+      });
+      var backBtn=document.getElementById('store-back');
+      if(backBtn)backBtn.addEventListener('click',function(){
+        document.getElementById('store-detail-view').classList.add('hidden');
+        document.getElementById('store-list-view').classList.remove('hidden');
+      });
+    }
+    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',onReady);
+    else onReady();
+  })();
+
   // Store interaction (from espil.online, adapted for Mapbox)
+  // Han 2026-10-10: Real store system, not just Cauldron POI
   var GOOGLE_PLACES_KEY = '__PUT_YOUR_KEY_HERE__';
+  var nearbyStoresCache = {};
+
   function tryInteract(){
-    // Fetch nearby stores via Google Places
     var lat = playerLngLat[1], lng = playerLngLat[0];
-    if(GOOGLE_PLACES_KEY.indexOf('__PUT_')===0){
-      showToast('Store data unavailable (API key needed)');
+    fetchNearbyStores(lat, lng, function(stores){
+      if(stores && stores.length > 0){
+        showStoreModal(stores);
+      }else{
+        var msg = 'Not a store';
+        if(GOOGLE_PLACES_KEY.indexOf('__PUT_')===0){
+          msg = 'Store data unavailable (API key needed)';
+        }
+        showToast(msg);
+      }
+    });
+  }
+
+  function fetchNearbyStores(lat, lng, cb){
+    // Check cache (100m grid)
+    var key = Math.round(lat*1000)+','+Math.round(lng*1000);
+    if(nearbyStoresCache[key]){
+      cb(nearbyStoresCache[key]);
       return;
     }
+
+    if(GOOGLE_PLACES_KEY.indexOf('__PUT_')===0){
+      cb([]);
+      return;
+    }
+
+    // Google Places API (New) Nearby Search
     var url = 'https://places.googleapis.com/v1/places:searchNearby';
-    // ... (Places API call, show modal if stores found)
-    showToast('Checking for nearby stores…');
+    var body = {
+      includedTypes: ['store', 'restaurant', 'cafe', 'shopping_mall'],
+      maxResultCount: 10,
+      locationRestriction: {
+        circle: {
+          center: {latitude: lat, longitude: lng},
+          radius: 50.0
+        }
+      }
+    };
+
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': GOOGLE_PLACES_KEY,
+        'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location,places.rating,places.id'
+      },
+      body: JSON.stringify(body)
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var stores = (data.places || []).map(function(p){
+        return {
+          id: p.id,
+          name: p.displayName ? p.displayName.text : 'Unknown',
+          address: p.formattedAddress || '',
+          lat: p.location ? p.location.latitude : lat,
+          lng: p.location ? p.location.longitude : lng,
+          rating: p.rating || 0
+        };
+      });
+      nearbyStoresCache[key] = stores;
+      cb(stores);
+    })
+    .catch(function(e){
+      console.warn('[Stores] Places API failed:', e);
+      cb([]);
+    });
+  }
+
+  function showStoreModal(stores){
+    var modal = document.getElementById('store-modal');
+    var listView = document.getElementById('store-list-view');
+    var detailView = document.getElementById('store-detail-view');
+    var listEl = document.getElementById('store-list');
+
+    // Show list view
+    listView.classList.remove('hidden');
+    detailView.classList.add('hidden');
+
+    // Populate list
+    listEl.innerHTML = '';
+    stores.forEach(function(store, idx){
+      var item = document.createElement('div');
+      item.className = 'store-item';
+      item.style.cssText = 'padding:12px;border-bottom:1px solid rgba(255,255,255,.1);cursor:pointer;';
+      item.innerHTML = '<strong>' + escapeHtml(store.name) + '</strong><br>' +
+        '<small style="color:#9fb3c8;">' + escapeHtml(store.address) + '</small>';
+      item.addEventListener('click', function(){
+        showStoreDetail(store);
+      });
+      listEl.appendChild(item);
+    });
+
+    modal.classList.add('open');
+  }
+
+  function showStoreDetail(store){
+    document.getElementById('store-list-view').classList.add('hidden');
+    document.getElementById('store-list-view').style.display = 'none';
+    var detailView = document.getElementById('store-detail-view');
+    detailView.classList.remove('hidden');
+    detailView.style.display = 'block';
+
+    document.getElementById('store-detail-name').textContent = store.name;
+    document.getElementById('store-detail-content').innerHTML =
+      '<p><strong>Address:</strong> ' + escapeHtml(store.address) + '</p>' +
+      (store.rating ? '<p><strong>Rating:</strong> ' + store.rating + ' ⭐</p>' : '');
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
   }
 
   function showToast(msg){
