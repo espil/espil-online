@@ -4022,6 +4022,7 @@
       /* Han 2026-10-10: never show store modal on landing page */
       if(!document.body.classList.contains('in-map')) return;
       var modal=document.getElementById('store-modal');
+      modal.style.display='';
       var listView=document.getElementById('store-list-view');
       var detailView=document.getElementById('store-detail-view');
       var listEl=document.getElementById('store-list');
