@@ -384,6 +384,7 @@
     body:not(.in-map) .map-status,
     body:not(.in-map) .skill-bar,
     body:not(.in-map) .map-attack,
+    body:not(.in-map) .chat-window,
     body:not(.in-map) #tree-toggle { display:none !important; }
     /* ---- Landing/game separation (2026-10-07): hide ALL landing UI when in-game ----
        NOTE (2026-10-08): #earth-frame and #globe-canvas are NOT hidden — the map
@@ -405,6 +406,31 @@
       background:rgba(4,16,20,.66); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
       color:#ddfffc; font-family:"Manrope",sans-serif; pointer-events:none;
     }
+    /* ---- Chat window (2026-10-11): always-on log, high-transparency bg,
+       text stays legible, Enter activates input. Local single-player only. ---- */
+    .chat-window {
+      position:fixed; z-index:30; left:14px; bottom:calc(14px + env(safe-area-inset-bottom));
+      width:min(320px,calc(100vw - 28px));
+      font-family:"Manrope",sans-serif; pointer-events:none;
+    }
+    .chat-log {
+      max-height:168px; overflow-y:auto; display:flex; flex-direction:column; gap:4px;
+      padding:8px 10px; margin:0 0 6px; border-radius:10px;
+      background:rgba(2,8,11,.55); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+      border:1px solid rgba(134,238,228,.18);
+      font-size:.72rem; line-height:1.45; color:#eafffd; text-shadow:0 1px 4px #000;
+    }
+    .chat-log:empty { display:none; }
+    .chat-msg .who { color:#86eee4; font-weight:800; }
+    .chat-msg.sys { color:rgba(181,255,248,.78); font-style:italic; }
+    .chat-input {
+      display:none; width:100%; box-sizing:border-box; pointer-events:auto;
+      padding:9px 12px; border-radius:10px;
+      border:1px solid rgba(134,238,228,.35); background:rgba(2,10,14,.82); color:#eafffd;
+      font:600 .75rem "Manrope",sans-serif; outline:none;
+    }
+    .chat-input:focus { border-color:rgba(134,238,228,.75); }
+    .chat-window.typing .chat-input { display:block; }
     .ms-level { display:flex; justify-content:space-between; align-items:center; font:800 .68rem/1.2 "Manrope",sans-serif; letter-spacing:.1em; color:#eafffd; text-shadow:0 0 8px rgba(80,232,220,.5); }
     .ms-sp { color:#ffd97a; font-size:.68rem; }
     .ms-label { display:flex; justify-content:space-between; margin-top:7px; font:700 .55rem/1 "Manrope",sans-serif; letter-spacing:.12em; color:rgba(181,255,248,.62); }
@@ -1100,6 +1126,13 @@
         <div class="kb-row" id="move-row" aria-label="Attack moves"></div>
       </div>
       <div class="kb-menu" id="kb-menu" aria-label="Menu shortcuts"></div>
+    </div>
+    <!-- 3D UI (2026-10-11): chat window. Always-on log, high-transparency bg,
+         Enter activates input. Local single-player only (server = real multiplayer). -->
+    <div class="chat-window" id="chat-window" aria-hidden="true" aria-label="Chat">
+      <div class="chat-log" id="chat-log" aria-live="polite"></div>
+      <input class="chat-input" id="chat-input" type="text" maxlength="200"
+             placeholder="Press Enter to chat…" autocomplete="off" aria-label="Chat message" />
     </div>
     <div class="skill-tree" id="skill-tree" aria-hidden="true" role="dialog" aria-label="Skill tree: Keeper">
       <div class="st-card">
@@ -4928,6 +4961,51 @@
       if(window.__espilToast)window.__espilToast('집 위치가 아직 설정되지 않았어요');
       if(typeof resetToSpawn==='function'){try{resetToSpawn();}catch(_){}}
     }
+    /* ---- Chat window (2026-10-11, Han 2026-10-05 spec): always-on log,
+       high-transparency bg, text legible, Enter activates input.
+       Local single-player only — real multiplayer needs the server. ---- */
+    var chatWindow=null,chatLog=null,chatInput=null,chatTyping=false,chatWelcomed=false;
+    function initChat(){
+      chatWindow=document.getElementById('chat-window');
+      chatLog=document.getElementById('chat-log');
+      chatInput=document.getElementById('chat-input');
+      if(!chatWindow||!chatLog||!chatInput)return;
+      chatInput.addEventListener('keydown',function(e){
+        e.stopPropagation(); /* game keys must not fire while typing */
+        if(e.key==='Enter'){e.preventDefault();sendChat();}
+        else if(e.key==='Escape'){e.preventDefault();setChatTyping(false);}
+      });
+      chatInput.addEventListener('blur',function(){setChatTyping(false);});
+    }
+    function setChatTyping(on){
+      chatTyping=!!on;
+      if(chatWindow)chatWindow.classList.toggle('typing',chatTyping);
+      if(chatInput){
+        if(chatTyping){try{chatInput.focus({preventScroll:true});}catch(e){chatInput.focus();}}
+        else chatInput.blur();
+      }
+    }
+    function addChatMsg(who,text,sys){
+      if(!chatLog)return;
+      var d=document.createElement('div');
+      d.className='chat-msg'+(sys?' sys':'');
+      if(sys){d.textContent=text;}
+      else{
+        var w=document.createElement('span');w.className='who';w.textContent=who+': ';
+        d.appendChild(w);d.appendChild(document.createTextNode(text));
+      }
+      chatLog.appendChild(d);
+      while(chatLog.children.length>50)chatLog.removeChild(chatLog.firstChild);
+      chatLog.scrollTop=chatLog.scrollHeight;
+    }
+    function sendChat(){
+      if(!chatInput)return;
+      var t=chatInput.value.trim();
+      chatInput.value='';
+      setChatTyping(false);
+      if(!t)return;
+      addChatMsg('You',t,false);
+    }
     function initSkillHud(){
       var row=document.getElementById('move-row');
       if(row&&!row.children.length){
@@ -4989,21 +5067,24 @@
           kbm.appendChild(b);
         });
       }
-      ['map-status','skill-bar'].forEach(function(id){
+      ['map-status','skill-bar','chat-window'].forEach(function(id){
         var el=document.getElementById(id);
         if(el)el.setAttribute('aria-hidden','false');
       });
+      if(!chatWelcomed){chatWelcomed=true;addChatMsg('','— Vancouver Downtown —',true);addChatMsg('','Press Enter to chat.',true);}
       paintStatus();paintMoveSlots();paintCooldowns();
     }
     function hideSkillHud(){
       skillTreeOpen=false;inventoryOpen=false;characterOpen=false;
-      ['map-status','skill-bar','skill-tree','inventory-panel','character-panel'].forEach(function(id){
+      setChatTyping(false);
+      ['map-status','skill-bar','skill-tree','inventory-panel','character-panel','chat-window'].forEach(function(id){
         var el=document.getElementById(id);
         if(el)el.setAttribute('aria-hidden','true');
       });
     }
     window.__espilSkills={state:skillState,gainKnowledge:gainKnowledge,
       move:doMove,tree:toggleSkillTree};
+    initChat();
     (function wireSkillHud(){
       var atk=document.getElementById('map-attack');
       if(atk)atk.addEventListener('pointerdown',function(e){e.preventDefault();doMove('punch');});
@@ -5079,7 +5160,11 @@
     /* Keyboard: tracked only while the map is open (globe keeps its own bindings). */
     document.addEventListener('keydown',function(e){
       if(!document.body.classList.contains('in-map'))return;
+      /* Chat input guard (2026-10-11): game keys stay off while typing. */
+      var _ae=document.activeElement,_at=(_ae&&_ae.tagName)||'';
+      if(/INPUT|TEXTAREA|SELECT/.test(_at))return;
       var k=e.key;
+      if(k==='Enter'&&!e.repeat){setChatTyping(true);return;}
       if(k===' '||k==='ArrowUp'||k==='ArrowDown'||k==='ArrowLeft'||k==='ArrowRight')e.preventDefault();
       walkKeys[k.toLowerCase()]=true;
       /* QA #8 (2026-10-06): Shift=jump, Space=interact. Shift-run deprecated. */
