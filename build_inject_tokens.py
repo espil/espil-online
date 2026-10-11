@@ -14,18 +14,25 @@ def main():
     if not openweather_key:
         print("WARNING: OPENWEATHER_KEY not set", file=sys.stderr)
     
-    # vancouver.html (production)
-    vancouver_path = 'vancouver.html'
-    try:
-        with open(vancouver_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        if mapbox_token:
-            content = content.replace('__PUT_YOUR_MAPBOX_TOKEN_HERE__', mapbox_token)
-        with open(vancouver_path, 'w', encoding='utf-8') as f:
-            f.write(content)
-        print(f"Processed {vancouver_path}")
-    except FileNotFoundError:
-        print(f"Skip {vancouver_path} (not found)", file=sys.stderr)
+    # HTML files (production)
+    for html_path in ['index.html', 'vancouver.html']:
+        try:
+            with open(html_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            if mapbox_token:
+                content = content.replace('__PUT_YOUR_MAPBOX_TOKEN_HERE__', mapbox_token)
+                # Also handle mapboxgl.accessToken pattern
+                import re
+                content = re.sub(
+                    r"mapboxgl\.accessToken='__PUT_YOUR_MAPBOX_TOKEN_HERE__'",
+                    f"mapboxgl.accessToken='{mapbox_token}'",
+                    content
+                )
+            with open(html_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            print(f"Processed {html_path}")
+        except FileNotFoundError:
+            print(f"Skip {html_path} (not found)", file=sys.stderr)
     
     # cauldron/static-config.js (if exists)
     config_path = 'cauldron/static-config.js'

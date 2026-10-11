@@ -1167,6 +1167,9 @@
   </main>
 
   <script src="assets/leaflet/leaflet.js"></script>
+  <!-- Han 2026-10-10: Mapbox for Cauldron minimap -->
+  <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.css">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.js"></script>
   <script src="assets/three.min.js"></script>
   <script src="assets/GLTFLoader.js"></script>
   <script>
@@ -2045,10 +2048,10 @@
       }
     }
     var mapDragId=null,mapLastX=0,mapLastY=0;
-    var MAP_BOUND=5000,PLAYER_R=.55,PLAYER_H=1.9;
+    var MAP_BOUND=15000,PLAYER_R=.55,PLAYER_H=1.9; /* Han 2026-10-10: 15km radius */
     /* 5km city radius (Han 2026-10-07): chunked procedural city extends from
        the detailed downtown core to 5km. Chunk size 250m, deterministic seeds. */
-    var CHUNK_SIZE=250,CITY_RADIUS=5000;
+    var CHUNK_SIZE=250,CITY_RADIUS=15000; /* Han 2026-10-10: 15km */
     var chunkMap={}; /* "cx,cz" -> {group, colliders, buildings} */
     var chunkColliders={}; /* "cx,cz" -> collider array (spatial hash) */
     var walkAudioCtx=null;
@@ -5931,28 +5934,64 @@
        OSM tiles, +/- zoom, M key cycles stages. Game units = meters, center 49.2827,-123.1207. */
     var leafletMap=null,playerMarker=null,mapStage=1,lastMapCenter=0;
     var MAP_CENTER_LAT=49.2827,MAP_CENTER_LNG=-123.1207;
+    /* Han 2026-10-10: Cauldron minimap (Mapbox) — replaces Leaflet */
+    var mapboxMinimap=null, mapboxMarker=null;
+    var CAULDRON_MINIMAP_LEVELS=[
+      {label:'50m', zoom:18.35},
+      {label:'100m', zoom:17.35},
+      {label:'500m', zoom:15.05},
+      {label:'1km', zoom:14.05},
+      {label:'5km', zoom:11.75},
+    ];
+    var minimapLevelIdx=1; // 100m default
     function gameToLatLng(x,z){
       var lat=MAP_CENTER_LAT+(z/111320);
       var lng=MAP_CENTER_LNG+(x/(111320*Math.cos(MAP_CENTER_LAT*Math.PI/180)));
       return [lat,lng];
     }
     function initLeafletMap(){
-      if(leafletMap||typeof L==='undefined')return;
+      /* Han 2026-10-10: Use Cauldron Mapbox minimap instead of Leaflet */
+      if(mapboxMinimap||typeof mapboxgl==='undefined')return;
       var el=document.getElementById('minimap');
       if(!el)return;
-      leafletMap=L.map('minimap',{zoomControl:false,attributionControl:false}).setView([MAP_CENTER_LAT,MAP_CENTER_LNG],16);
-      /* Han 2026-10-10: Esri satellite tiles for minimap */
-      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'© Esri World Imagery'}).addTo(leafletMap);
-      playerMarker=L.circleMarker([MAP_CENTER_LAT,MAP_CENTER_LNG],{radius:8,color:'#ffd97a',fillColor:'#ffd97a',fillOpacity:1}).addTo(leafletMap);
+      mapboxgl.accessToken='__PUT_YOUR_MAPBOX_TOKEN_HERE__';
+      mapboxMinimap=new mapboxgl.Map({
+        container:'minimap',
+        style:'mapbox://styles/mapbox/streets-v12',
+        center:[MAP_CENTER_LNG,MAP_CENTER_LAT],
+        zoom:CAULDRON_MINIMAP_LEVELS[minimapLevelIdx].zoom,
+        interactive:false,
+        attributionControl:false,
+      });
+      mapboxMinimap.on('load',function(){
+        var markerEl=document.createElement('div');
+        markerEl.style.cssText='width:16px;height:16px;border-radius:50%;background:#4f7ed9;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.5);';
+        mapboxMarker=new mapboxgl.Marker({element:markerEl})
+          .setLngLat([MAP_CENTER_LNG,MAP_CENTER_LAT])
+          .addTo(mapboxMinimap);
+      });
+      /* Wire zoom buttons to Cauldron levels */
+      var zin=document.getElementById('map-zoom-in');
+      var zout=document.getElementById('map-zoom-out');
+      if(zin)zin.onclick=function(){
+        minimapLevelIdx=Math.min(CAULDRON_MINIMAP_LEVELS.length-1,minimapLevelIdx+1);
+        if(mapboxMinimap)mapboxMinimap.setZoom(CAULDRON_MINIMAP_LEVELS[minimapLevelIdx].zoom);
+      };
+      if(zout)zout.onclick=function(){
+        minimapLevelIdx=Math.max(0,minimapLevelIdx-1);
+        if(mapboxMinimap)mapboxMinimap.setZoom(CAULDRON_MINIMAP_LEVELS[minimapLevelIdx].zoom);
+      };
     }
     function updateLeafletMap(){
-      if(!leafletMap||!walkPlayer||!walkPlayer.pos)return;
+      /* Han 2026-10-10: Updated for Cauldron Mapbox minimap */
+      if(!mapboxMinimap||!walkPlayer||!walkPlayer.pos)return;
       var now=performance.now();
       if(now-lastMapCenter<200)return;
       lastMapCenter=now;
       var ll=gameToLatLng(walkPlayer.pos.x,walkPlayer.pos.z);
-      leafletMap.panTo(ll,{animate:false});
-      if(playerMarker)playerMarker.setLatLng(ll);
+      // ll = [lat, lng], Mapbox needs [lng, lat]
+      mapboxMinimap.setCenter([ll[1], ll[0]]);
+      if(mapboxMarker)mapboxMarker.setLngLat([ll[1], ll[0]]);
     }
     function setMapStage(s){
       mapStage=Math.max(1,Math.min(3,s));
