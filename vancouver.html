@@ -43,6 +43,30 @@
   .st-close{appearance:none;flex:none;width:34px;height:34px;border-radius:50%;border:2px solid #6b4a2f;background:#1a2e1c;color:#ffd97a;font-size:.95rem;cursor:pointer;}
   .st-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
   .st-foot{margin:14px 0 0;font:600 .62rem/1.6 system-ui,sans-serif;color:rgba(200,230,201,.6);}
+  /* Joystick (from espil.online) */
+  .joystick{position:absolute;z-index:20;left:18px;bottom:132px;width:104px;height:104px;border-radius:50%;border:1px solid rgba(134,238,228,.4);background:radial-gradient(circle,rgba(3,16,20,.55),rgba(3,16,20,.85));box-shadow:0 0 24px rgba(64,255,205,.18);display:none;touch-action:none;user-select:none;-webkit-user-select:none;}
+  .joy-knob{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:radial-gradient(circle at 35% 35%,rgba(125,252,230,.9),rgba(64,255,205,.35));box-shadow:0 0 18px rgba(64,255,205,.5);pointer-events:none;}
+  @media (pointer:coarse){.joystick{display:block;}}
+  /* Status HUD (from espil.online) */
+  .map-status{position:absolute;z-index:10;top:calc(14px + env(safe-area-inset-top));left:14px;width:212px;padding:10px 12px 12px;border:1px solid rgba(134,238,228,.32);border-radius:12px;background:rgba(4,16,20,.66);color:#ddfffc;font-family:system-ui,sans-serif;pointer-events:none;}
+  .ms-level{display:flex;justify-content:space-between;align-items:center;font:800 .68rem/1.2 system-ui,sans-serif;letter-spacing:.1em;color:#eafffd;}
+  .ms-sp{color:#ffd97a;font-size:.68rem;}
+  .ms-label{display:flex;justify-content:space-between;margin-top:7px;font:700 .55rem/1 system-ui,sans-serif;letter-spacing:.12em;color:rgba(181,255,248,.62);}
+  .ms-bar{height:8px;margin-top:4px;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden;}
+  .ms-bar>i{display:block;height:100%;border-radius:99px;}
+  .ms-hp>i{background:linear-gradient(90deg,#ff5f6d,#ff9a5a);width:100%;}
+  .ms-mp>i{background:linear-gradient(90deg,#3fa7ff,#7dfce6);width:100%;}
+  /* Chat (new, per Han 2026-10-10) */
+  #chat-wrap{position:absolute;z-index:10;left:14px;bottom:calc(14px + env(safe-area-inset-bottom));width:min(340px,calc(100vw - 28px));font-family:system-ui,sans-serif;}
+  #chat-log{max-height:120px;overflow-y:auto;margin-bottom:6px;padding:8px 10px;border-radius:10px;background:rgba(4,16,20,.6);color:#ddfffc;font-size:.75rem;line-height:1.4;display:none;}
+  #chat-log.show{display:block;}
+  #chat-log div{margin:2px 0;}
+  #chat-row{display:none;gap:6px;}
+  #chat-row.show{display:flex;}
+  #chat-input{flex:1;padding:8px 12px;border-radius:20px;border:1px solid rgba(134,238,228,.4);background:rgba(4,16,20,.8);color:#ddfffc;font-size:.8rem;outline:none;}
+  #chat-send{padding:8px 16px;border-radius:20px;border:1px solid rgba(134,238,228,.4);background:rgba(64,255,205,.2);color:#ddfffc;cursor:pointer;font-size:.8rem;}
+  #chat-toggle{position:absolute;z-index:10;left:14px;bottom:calc(70px + env(safe-area-inset-bottom));width:44px;height:44px;border-radius:50%;border:2px solid rgba(134,238,228,.4);background:rgba(4,16,20,.7);color:#ddfffc;font-size:1.2rem;cursor:pointer;display:grid;place-items:center;}
+  @media (pointer:coarse){#chat-wrap{bottom:calc(200px + env(safe-area-inset-bottom));}#chat-toggle{bottom:calc(256px + env(safe-area-inset-bottom));}}
   /* Store modal (from espil.online) */
   #store-modal{display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:90%;max-width:500px;max-height:80vh;background:#1a2233;border-radius:16px;z-index:100;overflow:hidden;}
   #store-modal.open{display:block;}
@@ -58,6 +82,25 @@
 <body>
 <div id="loading">Loading Vancouver…</div>
 <div id="map"></div>
+<!-- Joystick (from espil.online) -->
+<div class="joystick" id="joystick"><div class="joy-knob" id="joy-knob"></div></div>
+<!-- Status HUD (from espil.online) -->
+<div class="map-status" id="map-status">
+  <div class="ms-level"><span>KEEPER</span><span class="ms-sp">📚 10</span></div>
+  <div class="ms-label"><span>HP</span><span>100/100</span></div>
+  <div class="ms-bar ms-hp"><i></i></div>
+  <div class="ms-label"><span>MP</span><span>50/50</span></div>
+  <div class="ms-bar ms-mp"><i></i></div>
+</div>
+<!-- Chat (per Han 2026-10-10) -->
+<button id="chat-toggle" type="button" aria-label="Toggle chat">💬</button>
+<div id="chat-wrap">
+  <div id="chat-log"></div>
+  <div id="chat-row">
+    <input id="chat-input" type="text" placeholder="Type a message…" maxlength="200" />
+    <button id="chat-send" type="button">Send</button>
+  </div>
+</div>
 <div id="minimap-wrap" data-stage="1">
   <div id="minimap"></div>
   <div class="map-zoom-controls">
@@ -122,6 +165,19 @@
 </div>
 <div id="toast"></div>
 
+<!-- Mobile joystick (Han 2026-10-10) -->
+<div id="joystick" style="display:none;position:absolute;bottom:100px;left:24px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.3);z-index:20;touch-action:none;">
+  <div id="joystick-knob" style="position:absolute;top:50%;left:50%;width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.5);transform:translate(-50%,-50%);"></div>
+</div>
+<div id="joystick-btn" style="display:none;position:absolute;bottom:100px;right:24px;width:64px;height:64px;border-radius:50%;background:rgba(79,126,217,.7);color:#fff;border:none;font-size:14px;z-index:20;">SPACE</div>
+
+<style>
+  @media (pointer:coarse){
+    #joystick{display:block !important;}
+    #joystick-btn{display:block !important;}
+  }
+</style>
+
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.js"></script>
 <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
 <!-- GLTFLoader removed (module incompatibility) — using primitive fallback -->
@@ -161,7 +217,9 @@ window.CAULDRON_STATIC_CONFIG = {
     var el = document.createElement('div');
     el.className = cls;
     el.setAttribute('aria-label', label);
-    el.style.cssText = 'width:20px;height:20px;border-radius:50%;background:#4f7ed9;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.5);';
+    // Han 2026-10-10: Make character marker highly visible
+    el.style.cssText = 'width:32px;height:32px;border-radius:50%;background:#4f7ed9;border:4px solid #fff;box-shadow:0 2px 12px rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:bold;';
+    el.textContent = '🧍'; // Person emoji as character
     return el;
   }
 
@@ -198,7 +256,9 @@ window.CAULDRON_STATIC_CONFIG = {
         }
       });
       // Add 3D character layer
-      addCharacterLayer();
+      // Han 2026-10-10: Disabled — 3D custom layer unreliable, using 2D marker
+      // TODO: Re-enable with proper ES module GLTFLoader
+      // addCharacterLayer();
       document.getElementById('loading').classList.add('done');
     });
 
@@ -392,6 +452,48 @@ window.CAULDRON_STATIC_CONFIG = {
       keys[e.key.toLowerCase()] = false;
     });
 
+    // Mobile joystick (Han 2026-10-10)
+    var joyActive = false, joyDX = 0, joyDY = 0;
+    var joyEl = document.getElementById('joystick');
+    var knobEl = document.getElementById('joystick-knob');
+    if(joyEl){
+      var joyCenter = {x:0, y:0};
+      joyEl.addEventListener('touchstart', function(e){
+        e.preventDefault();
+        joyActive = true;
+        var rect = joyEl.getBoundingClientRect();
+        joyCenter.x = rect.left + rect.width/2;
+        joyCenter.y = rect.top + rect.height/2;
+      }, {passive:false});
+      document.addEventListener('touchmove', function(e){
+        if(!joyActive) return;
+        var t = e.touches[0];
+        var dx = t.clientX - joyCenter.x;
+        var dy = t.clientY - joyCenter.y;
+        var maxR = 40;
+        var dist = Math.sqrt(dx*dx + dy*dy);
+        if(dist > maxR){
+          dx = dx * maxR / dist;
+          dy = dy * maxR / dist;
+        }
+        joyDX = dx / maxR;
+        joyDY = dy / maxR;
+        knobEl.style.transform = 'translate(calc(-50% + ' + dx + 'px), calc(-50% + ' + dy + 'px))';
+      }, {passive:true});
+      document.addEventListener('touchend', function(){
+        joyActive = false;
+        joyDX = 0; joyDY = 0;
+        knobEl.style.transform = 'translate(-50%,-50%)';
+      });
+      var spaceBtn = document.getElementById('joystick-btn');
+      if(spaceBtn){
+        spaceBtn.addEventListener('touchstart', function(e){
+          e.preventDefault();
+          tryInteract();
+        }, {passive:false});
+      }
+    }
+
     // Movement loop
     var STEP = 0.00005; // ~5m per frame at 60fps
     function tick(){
@@ -401,6 +503,12 @@ window.CAULDRON_STATIC_CONFIG = {
       if(keys['s']||keys['arrowdown']){ dlat -= STEP; moved=true; }
       if(keys['a']||keys['arrowleft']){ dlng -= STEP; moved=true; }
       if(keys['d']||keys['arrowright']){ dlng += STEP; moved=true; }
+      // Joystick input
+      if(joyActive && (Math.abs(joyDX) > 0.1 || Math.abs(joyDY) > 0.1)){
+        dlng += joyDX * STEP * 2;
+        dlat -= joyDY * STEP * 2;
+        moved = true;
+      }
       if(moved){
         playerLngLat[0] += dlng;
         playerLngLat[1] += dlat;
@@ -638,7 +746,91 @@ window.CAULDRON_STATIC_CONFIG = {
   // Init
   initMap();
   initSkillBar();
+  initJoystick();
+  initChat();
   checkDeepLink();
+
+  /* Joystick (from espil.online) */
+  function initJoystick(){
+    var joy=document.getElementById('joystick'),knob=document.getElementById('joy-knob');
+    if(!joy||!knob)return;
+    var active=false,joyId=null,cx=0,cy=0;
+    var R=34;
+    function setKnob(dx,dy){knob.style.transform='translate('+dx+'px,'+dy+'px)';}
+    joy.addEventListener('pointerdown',function(e){
+      active=true;joyId=e.pointerId;joy.setPointerCapture(joyId);
+      var r=joy.getBoundingClientRect();cx=r.left+r.width/2;cy=r.top+r.height/2;
+      e.preventDefault();
+    });
+    joy.addEventListener('pointermove',function(e){
+      if(!active||e.pointerId!==joyId)return;
+      var dx=e.clientX-cx,dy=e.clientY-cy;
+      var d=Math.hypot(dx,dy);
+      if(d>R){dx=dx/d*R;dy=dy/d*R;}
+      setKnob(dx,dy);
+      /* Feed into movement: reuse keys object via custom event */
+      joy._dx=dx/R;joy._dy=dy/R;
+    });
+    function endJoy(e){
+      if(e.pointerId!==joyId)return;
+      active=false;joyId=null;setKnob(0,0);joy._dx=0;joy._dy=0;
+    }
+    joy.addEventListener('pointerup',endJoy);
+    joy.addEventListener('pointercancel',endJoy);
+    joy._dx=0;joy._dy=0;
+    /* Hook into movement tick */
+    var origTick=window._vancouverTick;
+    setInterval(function(){
+      if(joy._dx||joy._dy){
+        var STEP=0.00005;
+        playerLngLat[0]+=joy._dx*STEP*2;
+        playerLngLat[1]-=joy._dy*STEP*2;
+        map.setCenter(playerLngLat);
+        playerMarker.setLngLat(playerLngLat);
+        if(minimapMarker)minimapMarker.setLngLat(playerLngLat);
+        if(minimap)minimap.setCenter(playerLngLat);
+      }
+    },16);
+  }
+
+  /* Chat (per Han 2026-10-10) */
+  function initChat(){
+    var toggle=document.getElementById('chat-toggle');
+    var log=document.getElementById('chat-log');
+    var row=document.getElementById('chat-row');
+    var input=document.getElementById('chat-input');
+    var send=document.getElementById('chat-send');
+    if(!toggle||!log||!row)return;
+    var open=false;
+    function setOpen(o){
+      open=o;
+      log.classList.toggle('show',o);
+      row.classList.toggle('show',o);
+      if(o&&input)input.focus();
+    }
+    toggle.addEventListener('click',function(){setOpen(!open);});
+    function sendMsg(){
+      var txt=input.value.trim();
+      if(!txt)return;
+      var div=document.createElement('div');
+      div.textContent='You: '+txt;
+      log.appendChild(div);
+      log.scrollTop=log.scrollHeight;
+      input.value='';
+      /* Local only — multiplayer needs server */
+    }
+    if(send)send.addEventListener('click',sendMsg);
+    if(input)input.addEventListener('keydown',function(e){
+      if(e.key==='Enter'){e.preventDefault();sendMsg();}
+      e.stopPropagation();
+    });
+    /* Enter toggles chat when not typing */
+    document.addEventListener('keydown',function(e){
+      if(e.key==='Enter'&&document.activeElement!==input){
+        /* Let the main handler decide — don't interfere */
+      }
+    });
+  }
 })();
 </script>
 </body>
