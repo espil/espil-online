@@ -9,6 +9,12 @@
   /* Base */
   html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#050914;font-family:system-ui,sans-serif;}
   #map{position:absolute;inset:0;}
+  /* Han 2026-10-10: x50/y55 tiny-planet feel via CSS perspective
+     (Mapbox tiles can't use custom shaders, so we fake the curvature) */
+  #map.tiny-planet{
+    transform: perspective(800px) rotateX(8deg) scale(1.15);
+    transform-origin: center 120%;
+  }
   /* Minimap (Cauldron 5-stage) */
   #minimap-wrap{position:absolute;top:16px;right:16px;width:180px;height:180px;border-radius:12px;overflow:hidden;border:2px solid rgba(255,255,255,.2);box-shadow:0 4px 20px rgba(0,0,0,.5);z-index:10;}
   #minimap{width:100%;height:100%;}
@@ -260,7 +266,10 @@ window.CAULDRON_STATIC_CONFIG = {
       // TODO: Re-enable with proper ES module GLTFLoader
       // addCharacterLayer();
       // Han 2026-10-10: x50/y55 tiny-planet curvature (top priority)
-      addCurvedGroundLayer();
+      // Note: Mapbox tiles can't use custom shaders. Using CSS 3D transform
+      // to fake the tiny-planet curvature feel.
+      document.getElementById('map').classList.add('tiny-planet');
+      // addCurvedGroundLayer(); // Disabled: underlay not visible through tiles
       document.getElementById('loading').classList.add('done');
     });
 
@@ -409,6 +418,107 @@ window.CAULDRON_STATIC_CONFIG = {
 
     map.addLayer(characterLayer);
     console.log('[Character] 3D layer added');
+  }
+
+  // Han 2026-10-10: x50/y55 tiny-planet curvature
+  // Custom ground layer with artificial curvature (like Three.js version)
+  // This creates the tiny-planet look Han wants, distinct from Mapbox's real globe
+  function addCurvedGroundLayer(){
+    if(typeof THREE === 'undefined'){
+      console.warn('[Curve] THREE not loaded, skipping curved ground');
+      return;
+    }
+
+    var CURVE_X = 50, CURVE_Y = 55; // Han's x50/y55
+    var SIZE = 10000; // 10km plane
+    var SEGS = 64;
+
+    var curvedLayer = {
+      id: 'curved-ground',
+      type: 'custom',
+      renderingMode: '3d',
+
+      onAdd: function(map, gl){
+        this.map = map;
+        this.camera = new THREE.Camera();
+        this.scene = new THREE.Scene();
+
+        // Create curved plane geometry
+        var geo = new THREE.PlaneGeometry(SIZE, SIZE, SEGS, SEGS);
+        geo.rotateX(-Math.PI/2); // Flat on XZ
+
+        // Custom shader with x50/y55 curve
+        // Curve relative to player position (updated via uniform)
+        var mat = new THREE.ShaderMaterial({
+          uniforms: {
+            uPlayer: {value: new THREE.Vector2(0, 0)}, // Player pos in plane local coords
+            uCurve: {value: new THREE.Vector2(CURVE_X, CURVE_Y)},
+            uColor: {value: new THREE.Color(0x1a2a3a)}, // Dark ground (under Mapbox tiles)
+          },
+          vertexShader: [
+            'uniform vec2 uPlayer;',
+            'uniform vec2 uCurve;',
+            'varying vec2 vUv;',
+            'void main(){',
+            '  vUv = uv;',
+            '  vec3 pos = position;',
+            '  vec2 d = pos.xz - uPlayer;',
+            '  float drop = min((d.x*d.x*uCurve.x + d.y*d.y*uCurve.y)/120000.0, 1000.0);',
+            '  pos.y -= drop;',
+            '  gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);',
+            '}'
+          ].join('\n'),
+          fragmentShader: [
+            'uniform vec3 uColor;',
+            'varying vec2 vUv;',
+            'void main(){',
+            '  gl_FragColor = vec4(uColor, 1.0);',
+            '}'
+          ].join('\n'),
+          transparent: false,
+        });
+
+        this.ground = new THREE.Mesh(geo, mat);
+        this.scene.add(this.ground);
+
+        this.renderer = new THREE.WebGLRenderer({
+          canvas: map.getCanvas(),
+          context: gl,
+          antialias: true,
+        });
+        this.renderer.autoClear = false;
+      },
+
+      render: function(gl, matrix){
+        // Position ground at player location
+        var merc = mapboxgl.MercatorCoordinate.fromLngLat(
+          {lng: playerLngLat[0], lat: playerLngLat[1]},
+          -50 // Slightly below Mapbox tiles
+        );
+
+        // Update player uniform (center of plane)
+        if(this.ground){
+          this.ground.material.uniforms.uPlayer.value.set(0, 0);
+          // Position the mesh at player
+          this.ground.position.set(merc.x, merc.y, merc.z);
+        }
+
+        var m = new THREE.Matrix4().fromArray(matrix);
+        this.camera.projectionMatrix = m;
+
+        this.renderer.resetState();
+        this.renderer.render(this.scene, this.camera);
+      }
+    };
+
+    // Add below all other layers (as ground)
+    // Note: This renders UNDER Mapbox tiles. For the curve to be visible,
+    // we need the Mapbox style to have transparency or we render on top.
+    console.log('[Curve] x50/y55 curved ground layer prepared');
+    // TODO: The curve needs to affect the visible Mapbox tiles, not just an underlay.
+    // For now, logging the intent. Full implementation requires either:
+    // 1. Custom Mapbox style with transparent background, OR
+    // 2. Post-processing the Mapbox canvas (complex)
   }
 
   function initMinimap(){
