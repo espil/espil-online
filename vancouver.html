@@ -259,6 +259,8 @@ window.CAULDRON_STATIC_CONFIG = {
       // Han 2026-10-10: Disabled — 3D custom layer unreliable, using 2D marker
       // TODO: Re-enable with proper ES module GLTFLoader
       // addCharacterLayer();
+      // Han 2026-10-10: x50/y55 tiny-planet curvature (top priority)
+      addCurvedGroundLayer();
       document.getElementById('loading').classList.add('done');
     });
 
