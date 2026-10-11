@@ -3797,32 +3797,74 @@
 
       console.log('[OSM City] '+items.length+' buildings within 2km');
 
-      /* InstancedMesh: one draw call for all buildings */
-      if(items.length>0){
-        var bgeo=new THREE.BoxGeometry(1,1,1);
-        /* Translate so base is at y=0 (not centered) */
-        bgeo.translate(0,0.5,0);
-        var bmat=new THREE.MeshLambertMaterial({color:0xffffff});
-        /* Apply globe curve (Han 2026-10-10 #3) */
-        if(typeof curvePatch==='function')curvePatch(bmat);
-        var inst=new THREE.InstancedMesh(bgeo,bmat,items.length);
-        var m4=new THREE.Matrix4(),q=new THREE.Quaternion(),sv=new THREE.Vector3(),pv=new THREE.Vector3();
-        var cc=new THREE.Color();
-        for(var j=0;j<items.length;j++){
-          var it=items[j];
-          pv.set(it.x,0,it.z);
-          sv.set(it.w,it.h,it.d);
-          q.identity();
-          m4.compose(pv,q,sv);
-          inst.setMatrixAt(j,m4);
-          inst.setColorAt(j,cc.setHex(it.color));
-        }
-        inst.instanceMatrix.needsUpdate=true;
-        if(inst.instanceColor)inst.instanceColor.needsUpdate=true;
-        inst.castShadow=true;
-        inst.receiveShadow=true;
-        mapScene.add(inst);
+      /* Facade pass (2026-10-11): real OSM massing + designed facades.
+         Buildings are classified into archetypes (tower/midrise/lowrise/house/
+         warehouse); each archetype gets its own InstancedMesh with the Plushy
+         facade texture on the 4 sides and a plain roof. Missing texture ->
+         sandy fallback color (pipeline works before Han's sprites land). */
+      var ARCHETYPES=['tower','midrise','lowrise','house','warehouse'];
+      function archOf(h,w,d){
+        var a=w*d;
+        if(h>=60)return 'tower';
+        if(h>=25)return 'midrise';
+        if(h>=12)return 'lowrise';
+        if(a>=300)return 'warehouse';
+        return 'house';
       }
+      var byArch={};
+      ARCHETYPES.forEach(function(a){byArch[a]=[];});
+      items.forEach(function(it){byArch[archOf(it.h,it.w,it.d)].push(it);});
+      var texLoader=new THREE.TextureLoader();
+      function loadFacadeTex(arch){
+        return new Promise(function(res){
+          texLoader.load('assets/sprites/city/facade_'+arch+'.png?v=1',
+            function(t){
+              if(THREE.sRGBEncoding!==undefined)t.encoding=THREE.sRGBEncoding;
+              t.wrapS=t.wrapT=THREE.RepeatWrapping;
+              t.anisotropy=4;
+              res(t);
+            },
+            undefined,
+            function(){res(null);} /* missing -> fallback color */
+          );
+        });
+      }
+      Promise.all(ARCHETYPES.map(loadFacadeTex)).then(function(texs){
+        var m4=new THREE.Matrix4(),q=new THREE.Quaternion(),
+            sv=new THREE.Vector3(),pv=new THREE.Vector3(),cc=new THREE.Color();
+        ARCHETYPES.forEach(function(arch,ai){
+          var list=byArch[arch];
+          if(!list.length)return;
+          var tex=texs[ai];
+          var sideMat=tex
+            ? new THREE.MeshLambertMaterial({map:tex})
+            : new THREE.MeshLambertMaterial({color:0xd9b678});
+          var roofMat=new THREE.MeshLambertMaterial({color:0x8f8f8f});
+          /* BoxGeometry group order: +x,-x,+y,-y,+z,-z -> facade on sides, roof on top */
+          var mats=[sideMat,sideMat,roofMat,roofMat,sideMat,sideMat];
+          mats.forEach(function(m){if(typeof curvePatch==='function')curvePatch(m);});
+          var bgeo=new THREE.BoxGeometry(1,1,1);
+          bgeo.translate(0,0.5,0); /* base at y=0 */
+          var inst=new THREE.InstancedMesh(bgeo,mats,list.length);
+          for(var j=0;j<list.length;j++){
+            var it=list[j];
+            pv.set(it.x,0,it.z);
+            sv.set(it.w,it.h,it.d);
+            q.identity();
+            m4.compose(pv,q,sv);
+            inst.setMatrixAt(j,m4);
+            /* subtle per-building tint variation */
+            var v=0.92+((j*37)%17)/17*0.14;
+            inst.setColorAt(j,cc.setRGB(v,v,v));
+          }
+          inst.instanceMatrix.needsUpdate=true;
+          if(inst.instanceColor)inst.instanceColor.needsUpdate=true;
+          inst.castShadow=true;
+          inst.receiveShadow=true;
+          mapScene.add(inst);
+        });
+        console.log('[OSM City] Facade meshes built per archetype');
+      });
 
       /* Build traffic on OSM roads */
       buildOsmTraffic();
