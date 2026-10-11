@@ -9,11 +9,37 @@
   /* Base */
   html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#050914;font-family:system-ui,sans-serif;}
   #map{position:absolute;inset:0;}
-  /* Han 2026-10-10: x50/y55 tiny-planet feel via CSS perspective
-     (Mapbox tiles can't use custom shaders, so we fake the curvature) */
+  /* Han 2026-10-10 #5: x50/y55 tiny-planet feel via CSS perspective
+     Stronger curve, centered, with stars/moon/sky background */
   #map.tiny-planet{
-    transform: perspective(800px) rotateX(8deg) scale(1.15);
-    transform-origin: center 120%;
+    transform: perspective(600px) rotateX(18deg) scale(1.35);
+    transform-origin: center 130%;
+  }
+  /* Starry sky background (visible at edges with strong curve) */
+  body::before{
+    content:'';
+    position:absolute;
+    inset:0;
+    background:
+      radial-gradient(2px 2px at 20% 30%, #fff, transparent),
+      radial-gradient(2px 2px at 60% 70%, #fff, transparent),
+      radial-gradient(1px 1px at 50% 50%, #fff, transparent),
+      radial-gradient(2px 2px at 80% 10%, #fff, transparent),
+      radial-gradient(1px 1px at 10% 80%, #fff, transparent),
+      radial-gradient(2px 2px at 90% 60%, #fff, transparent),
+      linear-gradient(to bottom, #050914 0%, #0a1528 50%, #050914 100%);
+    z-index:0;
+  }
+  #map{z-index:1;}
+  /* Moon */
+  body::after{
+    content:'🌙';
+    position:absolute;
+    top:8%;
+    right:12%;
+    font-size:48px;
+    z-index:0;
+    opacity:.8;
   }
   /* Minimap (Cauldron 5-stage) */
   #minimap-wrap{position:absolute;top:16px;right:16px;width:180px;height:180px;border-radius:12px;overflow:hidden;border:2px solid rgba(255,255,255,.2);box-shadow:0 4px 20px rgba(0,0,0,.5);z-index:10;}
@@ -23,7 +49,7 @@
   .map-zoom-controls{position:absolute;bottom:8px;right:8px;display:flex;gap:4px;z-index:11;}
   .map-zoom-controls button{width:28px;height:28px;border-radius:6px;border:none;background:rgba(0,0,0,.6);color:#fff;font-size:16px;cursor:pointer;}
   /* HUD — keyboard layout (from espil.online, 2026-10-10) */
-  .skill-bar{position:absolute;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom));display:flex;gap:10px;align-items:flex-end;justify-content:space-between;padding:0 14px;z-index:10;pointer-events:none;font-family:system-ui,sans-serif;}
+  .skill-bar{position:absolute;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom));display:flex;gap:10px;align-items:flex-end;justify-content:space-between;padding:0 16px;z-index:10;pointer-events:none;font-family:system-ui,sans-serif;}
   .skill-bar>*{pointer-events:auto;}
   .kb-main{display:flex;flex-direction:column;gap:5px;}
   #item-row{display:flex;gap:5px;}
@@ -86,7 +112,12 @@
 </style>
 </head>
 <body>
-<div id="loading">Loading Vancouver…</div>
+<div id="loading">Loading Vancouver…
+  <div style="width:200px;height:4px;background:rgba(255,255,255,.2);border-radius:2px;margin-top:12px;overflow:hidden;">
+    <div id="load-progress" style="height:100%;width:0%;background:#4f7ed9;transition:width .3s;"></div>
+  </div>
+  <div id="load-status" style="font-size:12px;color:#9fb3c8;margin-top:8px;">Initializing…</div>
+</div>
 <div id="map"></div>
 <!-- Joystick (from espil.online) -->
 <div class="joystick" id="joystick"><div class="joy-knob" id="joy-knob"></div></div>
@@ -219,14 +250,125 @@ window.CAULDRON_STATIC_CONFIG = {
   var map, minimap, playerMarker, minimapMarker;
   var playerLngLat = VANCOUVER.slice();
 
+  // Han 2026-10-10 #4: Loading progress system
+  var loadProgress = {map:0, collision:0, character:0};
+  function updateLoadProgress(key, pct){
+    loadProgress[key] = pct;
+    var total = (loadProgress.map + loadProgress.collision + loadProgress.character) / 3;
+    var bar = document.getElementById('load-progress');
+    var status = document.getElementById('load-status');
+    if(bar) bar.style.width = total + '%';
+    if(status){
+      if(total < 100){
+        status.textContent = 'Loading… ' + Math.round(total) + '%';
+      }else{
+        status.textContent = 'Ready!';
+      }
+    }
+    // Hide loading when all done
+    if(total >= 100){
+      setTimeout(function(){
+        document.getElementById('loading').classList.add('done');
+      }, 500);
+    }
+  }
+
+  // Han 2026-10-10 #3: Collision system (OSM building data)
+  // Prevents walking through buildings
+  var collisionBuildings = []; // {x0,x1,z0,z1} in meters
+  var collisionLoaded = false;
+
+  function loadCollisionData(){
+    fetch('/assets/osm/vancouver_chunks.json')
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        var chunks = data.chunks || {};
+        var count = 0;
+        for(var key in chunks){
+          var c = chunks[key];
+          if(!c.b) continue;
+          for(var i=0; i<c.b.length; i++){
+            var b = c.b[i]; // [x, z, w, d, h]
+            var bx = b[0], bz = b[1], bw = b[2], bd = b[3];
+            // Only downtown 1.5km (performance)
+            if(Math.sqrt(bx*bx + bz*bz) > 1500) continue;
+            collisionBuildings.push({
+              x0: bx - bw/2, x1: bx + bw/2,
+              z0: bz - bd/2, z1: bz + bd/2
+            });
+            count++;
+          }
+        }
+        collisionLoaded = true;
+        console.log('[Collision] Loaded ' + count + ' buildings');
+        updateLoadProgress('collision', 100);
+      })
+      .catch(function(e){
+        console.warn('[Collision] Failed to load:', e);
+      });
+  }
+
+  // Convert lng/lat to meters (x,z)
+  function lngLatToMeters(lng, lat){
+    var x = (lng - (-123.1207)) * 111320 * Math.cos(49.2827 * Math.PI/180);
+    var z = -(lat - 49.2827) * 111320;
+    return {x: x, z: z};
+  }
+
+  // Check if position collides with any building
+  function checkCollision(lng, lat){
+    if(!collisionLoaded) return false;
+    var m = lngLatToMeters(lng, lat);
+    // Player radius ~0.5m
+    var r = 0.5;
+    for(var i=0; i<collisionBuildings.length; i++){
+      var b = collisionBuildings[i];
+      if(m.x + r > b.x0 && m.x - r < b.x1 &&
+         m.z + r > b.z0 && m.z - r < b.z1){
+        return true;
+      }
+    }
+    return false;
+  }
+
   function createMarkerEl(cls, label){
     var el = document.createElement('div');
     el.className = cls;
     el.setAttribute('aria-label', label);
-    // Han 2026-10-10: Make character marker highly visible
-    el.style.cssText = 'width:32px;height:32px;border-radius:50%;background:#4f7ed9;border:4px solid #fff;box-shadow:0 2px 12px rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:bold;';
-    el.textContent = '🧍'; // Person emoji as character
+    // Han 2026-10-10 #1: Male/female character selection
+    var gender = 'male';
+    try{
+      var saved = JSON.parse(localStorage.getItem('espil_character') || '{}');
+      if(saved.gender) gender = saved.gender;
+    }catch(e){}
+    var bg = gender === 'female' ? '#e87ea1' : '#4f7ed9';
+    var emoji = gender === 'female' ? '🧍‍♀️' : '🧍';
+    el.style.cssText = 'width:32px;height:32px;border-radius:50%;background:'+bg+';border:4px solid #fff;box-shadow:0 2px 12px rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:bold;';
+    el.textContent = emoji;
+    el.id = 'player-marker-el';
     return el;
+  }
+
+  // Han 2026-10-10 #1: Character gender toggle (P key cycles, or UI)
+  function toggleCharacterGender(){
+    var current = 'male';
+    try{
+      var saved = JSON.parse(localStorage.getItem('espil_character') || '{}');
+      current = saved.gender || 'male';
+    }catch(e){}
+    var next = current === 'male' ? 'female' : 'male';
+    try{
+      localStorage.setItem('espil_character', JSON.stringify({gender: next, ts: Date.now()}));
+    }catch(e){}
+    // Update marker
+    var el = document.getElementById('player-marker-el');
+    if(el){
+      var bg = next === 'female' ? '#e87ea1' : '#4f7ed9';
+      var emoji = next === 'female' ? '🧍‍♀️' : '🧍';
+      el.style.background = bg;
+      el.textContent = emoji;
+    }
+    showToast('Character: ' + next);
   }
 
   function initMap(){
@@ -256,6 +398,12 @@ window.CAULDRON_STATIC_CONFIG = {
         });
       }catch(e){}
       // Lower building opacity for visibility (Cauldron style)
+      // Han 2026-10-10 #6: Building textures require Mapbox Studio style changes
+      // The style 'mapbox://styles/quadclipse/cmos12qyt008901rgg1eka1xm' controls
+      // building appearance. To add textures:
+      // 1. Open the style in Mapbox Studio
+      // 2. Add fill-extrusion with texture (or use Plushy AI generated textures)
+      // 3. If not possible, revert to Three.js renderer
       map.getStyle().layers.forEach(function(layer){
         if(layer.type === 'fill-extrusion' && /building/i.test(layer.id)){
           map.setPaintProperty(layer.id, 'fill-extrusion-opacity', 0.85);
@@ -270,7 +418,7 @@ window.CAULDRON_STATIC_CONFIG = {
       // to fake the tiny-planet curvature feel.
       document.getElementById('map').classList.add('tiny-planet');
       // addCurvedGroundLayer(); // Disabled: underlay not visible through tiles
-      document.getElementById('loading').classList.add('done');
+      updateLoadProgress('map', 100);
     });
 
     // 2D marker as fallback (hidden when 3D character loads)
@@ -555,7 +703,7 @@ window.CAULDRON_STATIC_CONFIG = {
       if(lk==='m') cycleMinimap();
       else if(lk==='k') togglePanel('skill-tree-panel');
       else if(lk==='i') togglePanel('inventory-panel');
-      else if(lk==='p') togglePanel('character-panel');
+      else if(lk==='p') toggleCharacterGender(); // Han 2026-10-10 #1
       else if(lk==='y') togglePanel('friends-panel');
       else if(lk==='h') showToast('Home teleport coming soon');
       if(e.key===' '){ e.preventDefault(); tryInteract(); }
@@ -607,14 +755,16 @@ window.CAULDRON_STATIC_CONFIG = {
     }
 
     // Movement loop
+    // Han 2026-10-10 #7: Arrow keys/joystick only, NOT WASD
+    // (WASD reserved for character direction/skills in this game)
     var STEP = 0.00005; // ~5m per frame at 60fps
     function tick(){
       var moved = false;
       var dlng = 0, dlat = 0;
-      if(keys['w']||keys['arrowup']){ dlat += STEP; moved=true; }
-      if(keys['s']||keys['arrowdown']){ dlat -= STEP; moved=true; }
-      if(keys['a']||keys['arrowleft']){ dlng -= STEP; moved=true; }
-      if(keys['d']||keys['arrowright']){ dlng += STEP; moved=true; }
+      if(keys['arrowup']){ dlat += STEP; moved=true; }
+      if(keys['arrowdown']){ dlat -= STEP; moved=true; }
+      if(keys['arrowleft']){ dlng -= STEP; moved=true; }
+      if(keys['arrowright']){ dlng += STEP; moved=true; }
       // Joystick input
       if(joyActive && (Math.abs(joyDX) > 0.1 || Math.abs(joyDY) > 0.1)){
         dlng += joyDX * STEP * 2;
@@ -622,12 +772,18 @@ window.CAULDRON_STATIC_CONFIG = {
         moved = true;
       }
       if(moved){
-        playerLngLat[0] += dlng;
-        playerLngLat[1] += dlat;
-        map.setCenter(playerLngLat);
-        playerMarker.setLngLat(playerLngLat);
-        if(minimapMarker) minimapMarker.setLngLat(playerLngLat);
-        minimap.setCenter(playerLngLat);
+        var newLng = playerLngLat[0] + dlng;
+        var newLat = playerLngLat[1] + dlat;
+        // Han 2026-10-10 #3: Check collision before moving
+        if(!checkCollision(newLng, newLat)){
+          playerLngLat[0] = newLng;
+          playerLngLat[1] = newLat;
+          map.setCenter(playerLngLat);
+          playerMarker.setLngLat(playerLngLat);
+          if(minimapMarker) minimapMarker.setLngLat(playerLngLat);
+          minimap.setCenter(playerLngLat);
+        }
+        // Else: blocked by building, don't move
       }
       requestAnimationFrame(tick);
     }
@@ -857,6 +1013,8 @@ window.CAULDRON_STATIC_CONFIG = {
 
   // Init
   initMap();
+  loadCollisionData(); // Han 2026-10-10 #3
+  updateLoadProgress('character', 100); // Marker is instant
   initSkillBar();
   initJoystick();
   initChat();
