@@ -8,7 +8,58 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&amp;family=Monoton&amp;display=swap" rel="stylesheet" />
-  <title>ESPIL Online — Earth</title>
+  <title>Espil Online — 3D Browser City Game on Real Earth</title>
+  <meta name="description" content="Espil Online is a free 3D browser game on the real Earth. Walk Vancouver's streets, customize your character, chat with friends, and enter the Cauldron." />
+  <link rel="canonical" href="https://espil.online/" />
+  <meta name="theme-color" content="#010306" />
+  <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Espil Online" />
+  <meta property="og:title" content="Espil Online — 3D Browser City Game on Real Earth" />
+  <meta property="og:description" content="A free 3D browser game on the real Earth. Walk Vancouver's streets, customize your character, chat with friends, and enter the Cauldron." />
+  <meta property="og:url" content="https://espil.online/" />
+  <meta property="og:image" content="https://espil.online/assets/og/og-cover.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="The Cauldron glass capsule floating above Earth at night — Espil Online key art" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Espil Online — 3D Browser City Game on Real Earth" />
+  <meta name="twitter:description" content="A free 3D browser game on the real Earth. Walk Vancouver's streets, customize your character, chat with friends, and enter the Cauldron." />
+  <meta name="twitter:image" content="https://espil.online/assets/og/og-cover.jpg" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://espil.online/#website",
+        "url": "https://espil.online/",
+        "name": "Espil Online",
+        "description": "Espil Online is a free 3D browser game on the real Earth. Walk Vancouver's streets, customize your character, chat with friends, and enter the Cauldron.",
+        "inLanguage": "en"
+      },
+      {
+        "@type": "Organization",
+        "@id": "https://espil.online/#org",
+        "name": "Espil Online",
+        "url": "https://espil.online/",
+        "logo": "https://espil.online/apple-touch-icon.png",
+        "sameAs": ["https://www.instagram.com/espil_online/"]
+      },
+      {
+        "@type": "VideoGame",
+        "name": "Espil Online",
+        "url": "https://espil.online/",
+        "applicationCategory": "Game",
+        "operatingSystem": "Web Browser",
+        "genre": ["Adventure", "Social", "Open World"],
+        "description": "A free 3D browser game set on the real Earth, starting in Vancouver. Explore real city streets, customize your character, chat with friends, and step through the Cauldron.",
+        "author": { "@id": "https://espil.online/#org" }
+      }
+    ]
+  }
+  </script>
   <style>
     :root {
       color-scheme:dark;
@@ -401,9 +452,9 @@
     body.direct-entry .city-markers { display:none !important; }
     .map-status {
       position:fixed; z-index:30; top:calc(14px + env(safe-area-inset-top)); left:14px;
-      width:212px; padding:10px 12px 12px;
-      border:1px solid rgba(134,238,228,.32); border-radius:12px;
-      background:rgba(4,16,20,.66); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+      width:200px; padding:8px 10px 10px;
+      border:none; border-radius:8px;
+      background:rgba(2,8,11,.38); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
       color:#ddfffc; font-family:"Manrope",sans-serif; pointer-events:none;
     }
     /* ---- Chat window (2026-10-11): always-on log, high-transparency bg,
@@ -438,6 +489,7 @@
     .ms-bar > i { display:block; height:100%; border-radius:99px; transition:width .25s ease; }
     .ms-hp > i { background:linear-gradient(90deg,#ff5f6d,#ff9a5a); width:100%; }
     .ms-mp > i { background:linear-gradient(90deg,#3fa7ff,#7dfce6); width:100%; }
+    .ms-exp > i { background:linear-gradient(90deg,#a3e635,#4ade80); width:0%; }
     /* QA #7 (2026-10-09): minimap top-right, player-centered. */
     /* Han 2026-10-09: 3-stage map (minimap → district → fullscreen), OSM tiles, +/- zoom, M key cycles. */
     #minimap-wrap {
@@ -943,6 +995,17 @@
   <link rel="stylesheet" href="assets/leaflet/leaflet.css" />
 </head>
 <body>
+  <!-- SEO: crawlable page summary (visually hidden, matches visible page content) -->
+  <header class="sr-only">
+    <h1>Espil Online — 3D browser city game on the real Earth</h1>
+    <p>Espil Online is a free 3D browser game set on the real Earth. Choose a city on the globe, dive from orbit to street level, and walk real streets — starting with Vancouver. Customize your character, chat with friends, and step through the Cauldron, the glass capsule vessel at the heart of the Espil universe.</p>
+  </header>
+  <noscript>
+    <div style="padding:40px;font-family:sans-serif;color:#f3f7f3;background:#010306;">
+      <h1>Espil Online — 3D browser city game on the real Earth</h1>
+      <p>Espil Online is a free 3D browser game set on the real Earth. Walk the streets of Vancouver, customize your character, chat with friends, and enter the Cauldron. This experience requires JavaScript.</p>
+    </div>
+  </noscript>
   <div class="intro" id="intro" role="button" tabindex="0" aria-label="Enter Espil Online">
     <canvas class="intro-stars" id="intro-stars" aria-hidden="true"></canvas>
     <div class="intro-logo" id="intro-logo" aria-label="Espil Online">
@@ -1110,6 +1173,8 @@
       <div class="ms-bar ms-hp"><i id="ms-hp"></i></div>
       <div class="ms-label"><span>MP</span><span id="ms-mp-t">50/50</span></div>
       <div class="ms-bar ms-mp"><i id="ms-mp"></i></div>
+      <div class="ms-label"><span>EXP</span><span id="ms-exp-t">0%</span></div>
+      <div class="ms-bar ms-exp"><i id="ms-exp"></i></div>
     </div>
     <!-- QA #7 (2026-10-09): 3-stage map (minimap → district → fullscreen), OSM tiles. -->
     <div id="minimap-wrap" data-stage="1" aria-label="Map">
@@ -4528,7 +4593,7 @@
     function rankCost(rank){ return 1+Math.floor(rank/4); }
     /* Progression is Knowledge, not levels: watching videos earns Knowledge,
        which is spent to raise each skill toward Lv 20. */
-    var skillState={knowledge:10,alloc:{},hp:100,maxhp:100,mp:50,maxmp:50,cd:{punch:0,kick:0,throw:0,defense:0}};
+    var skillState={knowledge:10,alloc:{},hp:100,maxhp:100,mp:50,maxmp:50,exp:0,maxexp:100,cd:{punch:0,kick:0,throw:0,defense:0}};
     try{
       var _ss=JSON.parse(window.localStorage.getItem('espil_skills_v1')||'null');
       if(_ss){
@@ -4729,6 +4794,10 @@
       var mp=document.getElementById('ms-mp'),mpt=document.getElementById('ms-mp-t');
       if(mp)mp.style.width=(100*skillState.mp/skillState.maxmp)+'%';
       if(mpt)mpt.textContent=Math.round(skillState.mp)+'/'+skillState.maxmp;
+      var exp=document.getElementById('ms-exp'),expt=document.getElementById('ms-exp-t');
+      var expPct=skillState.maxexp>0?100*skillState.exp/skillState.maxexp:0;
+      if(exp)exp.style.width=expPct+'%';
+      if(expt)expt.textContent=Math.round(expPct)+'%';
     }
     function paintKnowledge(){
       var kn=document.getElementById('ms-kn');
