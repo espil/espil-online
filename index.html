@@ -5696,10 +5696,14 @@
       if(!entryActive||!entrySubShown)return;
       entryActive=false;entrySubShown=false;clearEntryTimers();
       if(entryEl)entryEl.setAttribute('aria-hidden','true');
-      /* Live site (2026-10-06): testing phase — the walkable map is local-testing
-         only, so on espil.online city entry ends with COMING SOON. Localhosts
-         keep the full map flow for Han's testing. */
-      if(isProdHost()){showComingSoon();return;}
+      /* Han 2026-10-10: Vancouver goes to Mapbox version */
+      if(isProdHost()){
+        if(selected && selected.userData && selected.userData.name==='Vancouver'){
+          location.href='/vancouver';
+          return;
+        }
+        showComingSoon();return;
+      }
       activateCityPhase();
     }
     /* Production gate: espil.online / www.espil.online serve the testing-phase
