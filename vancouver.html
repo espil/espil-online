@@ -685,13 +685,16 @@ window.CAULDRON_STATIC_CONFIG = {
       }).setLngLat(playerLngLat).addTo(minimap);
     });
 
+    /* Han 2026-10-11 #9: +/- adjusts SIZE (stage), not zoom. */
     document.getElementById('map-zoom-in').addEventListener('click', function(){
-      zoomIdx = Math.min(MINIMAP_LEVELS.length-1, zoomIdx+1);
-      minimap.setZoom(MINIMAP_LEVELS[zoomIdx].zoom);
+      var wrap=document.getElementById('minimap-wrap');
+      var stage=parseInt(wrap.getAttribute('data-stage'),10);
+      wrap.setAttribute('data-stage',String(Math.min(3,stage+1)));
     });
     document.getElementById('map-zoom-out').addEventListener('click', function(){
-      zoomIdx = Math.max(0, zoomIdx-1);
-      minimap.setZoom(MINIMAP_LEVELS[zoomIdx].zoom);
+      var wrap=document.getElementById('minimap-wrap');
+      var stage=parseInt(wrap.getAttribute('data-stage'),10);
+      wrap.setAttribute('data-stage',String(Math.max(1,stage-1)));
     });
   }
 
