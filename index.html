@@ -5812,13 +5812,8 @@
       entryActive=false;entrySubShown=false;clearEntryTimers();
       if(entryEl)entryEl.setAttribute('aria-hidden','true');
       /* Han 2026-10-10: Vancouver goes to Mapbox version */
-      if(isProdHost()){
-        if(selected && selected.userData && selected.userData.name==='Vancouver'){
-          location.href='/vancouver';
-          return;
-        }
-        showComingSoon();return;
-      }
+      /* Han 2026-10-11: COMING SOON gate removed - Vancouver accessible */
+      
       activateCityPhase();
     }
     /* Production gate: espil.online / www.espil.online serve the testing-phase
