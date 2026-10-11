@@ -16,9 +16,33 @@
   #minimap-wrap[data-stage="3"]{width:100vw;height:100vh;top:0;right:0;border-radius:0;border:none;}
   .map-zoom-controls{position:absolute;bottom:8px;right:8px;display:flex;gap:4px;z-index:11;}
   .map-zoom-controls button{width:28px;height:28px;border-radius:6px;border:none;background:rgba(0,0,0,.6);color:#fff;font-size:16px;cursor:pointer;}
-  /* HUD (from espil.online) */
-  #hud{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:10;}
-  .hotkey{width:48px;height:48px;border-radius:8px;background:rgba(0,0,0,.5);border:2px solid rgba(255,255,255,.3);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;}
+  /* HUD — keyboard layout (from espil.online, 2026-10-10) */
+  .skill-bar{position:absolute;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom));display:flex;gap:10px;align-items:flex-end;justify-content:space-between;padding:0 14px;z-index:10;pointer-events:none;font-family:system-ui,sans-serif;}
+  .skill-bar>*{pointer-events:auto;}
+  .kb-main{display:flex;flex-direction:column;gap:5px;}
+  #item-row{display:flex;gap:5px;}
+  #move-row{display:grid;grid-template-columns:repeat(4,44px);gap:5px;}
+  .kb-menu{display:grid;grid-template-columns:repeat(2,44px);gap:5px;}
+  .kb-menu .move-slot{border-radius:12px;}
+  @media (pointer:coarse){
+    .skill-bar{display:block;left:50%;right:auto;transform:translateX(-50%);bottom:calc(86px + env(safe-area-inset-bottom));padding:0;}
+    .kb-menu{display:none;}
+  }
+  .move-slot{position:relative;width:44px;height:44px;appearance:none;cursor:pointer;border:2px solid #6b4a2f;border-radius:50%;background:radial-gradient(circle at 50% 40%,#2d4a2f 0%,#1a2e1c 70%,#0f1d10 100%);box-shadow:0 0 12px rgba(63,125,68,.35),inset 0 0 8px rgba(107,74,47,.3);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#e8f5e9;font-family:system-ui,sans-serif;touch-action:manipulation;user-select:none;-webkit-user-select:none;}
+  .move-slot:active{border-color:#ffd97a;box-shadow:0 0 16px rgba(255,217,122,.5);}
+  .move-slot.is-locked{opacity:.5;cursor:default;border-style:dashed;border-color:#5a3d26;}
+  .move-slot .key{position:absolute;top:2px;left:50%;transform:translateX(-50%);font:800 .52rem/1 system-ui,sans-serif;color:#ffd97a;text-shadow:0 1px 2px #000;}
+  .move-slot .mn{font:700 .42rem/1 system-ui,sans-serif;letter-spacing:.04em;color:#c8e6c9;}
+  /* Panels (from espil.online) */
+  .skill-tree{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;background:rgba(10,20,12,.85);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);}
+  .skill-tree[aria-hidden="false"]{display:flex;}
+  .st-card{width:min(640px,calc(100% - 32px));max-height:88vh;overflow-y:auto;padding:22px;border:2px solid #6b4a2f;border-radius:24px;background:linear-gradient(180deg,#1e3320 0%,#142414 50%,#0d1a0d 100%);box-shadow:0 0 44px rgba(63,125,68,.25);color:#e8f5e9;font-family:system-ui,sans-serif;}
+  .st-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+  .st-head h2{margin:0;font:800 1.05rem/1.2 system-ui,sans-serif;letter-spacing:.14em;color:#ffd97a;}
+  .st-sub{margin:6px 0 0;font:600 .7rem/1.5 system-ui,sans-serif;color:rgba(200,230,201,.7);}
+  .st-close{appearance:none;flex:none;width:34px;height:34px;border-radius:50%;border:2px solid #6b4a2f;background:#1a2e1c;color:#ffd97a;font-size:.95rem;cursor:pointer;}
+  .st-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+  .st-foot{margin:14px 0 0;font:600 .62rem/1.6 system-ui,sans-serif;color:rgba(200,230,201,.6);}
   /* Store modal (from espil.online) */
   #store-modal{display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:90%;max-width:500px;max-height:80vh;background:#1a2233;border-radius:16px;z-index:100;overflow:hidden;}
   #store-modal.open{display:block;}
@@ -41,9 +65,37 @@
     <button id="map-zoom-out">−</button>
   </div>
 </div>
-<div id="hud">
-  <div class="hotkey">1</div><div class="hotkey">2</div><div class="hotkey">3</div><div class="hotkey">4</div>
-  <div class="hotkey">Q</div><div class="hotkey">W</div><div class="hotkey">E</div><div class="hotkey">R</div>
+<div class="skill-bar" id="skill-bar">
+  <div class="kb-main">
+    <div id="item-row" aria-label="Item slots"></div>
+    <div id="move-row" aria-label="Skill slots"></div>
+  </div>
+  <div class="kb-menu" id="kb-menu" aria-label="Menu shortcuts"></div>
+</div>
+<!-- Panels (from espil.online) -->
+<div class="skill-tree" id="skill-tree-panel" aria-hidden="true" role="dialog" aria-label="Skill tree">
+  <div class="st-card">
+    <div class="st-head"><div><h2>SKILL TREE</h2><p class="st-sub">Press K to close.</p></div><button class="st-close" id="skill-close" type="button">✕</button></div>
+    <div class="st-grid"><p class="st-foot">Skill tree arrives with the character update.</p></div>
+  </div>
+</div>
+<div class="skill-tree" id="inventory-panel" aria-hidden="true" role="dialog" aria-label="Inventory">
+  <div class="st-card">
+    <div class="st-head"><div><h2>INVENTORY</h2><p class="st-sub">Press I to close.</p></div><button class="st-close" id="inv-close" type="button">✕</button></div>
+    <div class="st-grid"><p class="st-foot">Empty for now.</p></div>
+  </div>
+</div>
+<div class="skill-tree" id="character-panel" aria-hidden="true" role="dialog" aria-label="Character">
+  <div class="st-card">
+    <div class="st-head"><div><h2>CHARACTER</h2><p class="st-sub">Status and outfit. Press P to close.</p></div><button class="st-close" id="char-close" type="button">✕</button></div>
+    <div class="st-grid"><p class="st-foot">Outfit system arrives with the character update.</p></div>
+  </div>
+</div>
+<div class="skill-tree" id="friends-panel" aria-hidden="true" role="dialog" aria-label="Friends">
+  <div class="st-card">
+    <div class="st-head"><div><h2>FRIENDS / PARTY</h2><p class="st-sub">Press Y to close.</p></div><button class="st-close" id="friends-close" type="button">✕</button></div>
+    <div class="st-grid"><p class="st-foot">Friend sync needs the server.</p></div>
+  </div>
 </div>
 <div id="store-modal">
   <button id="store-modal-close">×</button>
@@ -52,6 +104,11 @@
 <div id="toast"></div>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.js"></script>
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script>
+// GLTFLoader minimal (for character)
+// In production, use the full GLTFLoader from three/examples
+</script>
 <script>
 // Static config (from Cauldron)
 window.CAULDRON_STATIC_CONFIG = {
@@ -123,6 +180,8 @@ window.CAULDRON_STATIC_CONFIG = {
           map.setPaintProperty(layer.id, 'fill-extrusion-opacity', 0.85);
         }
       });
+      // Add 3D character layer
+      addCharacterLayer();
       document.getElementById('loading').classList.add('done');
     });
 
@@ -133,6 +192,80 @@ window.CAULDRON_STATIC_CONFIG = {
 
     initMinimap();
     initControls();
+  }
+
+  // 3D Character via Mapbox Custom Layer + Three.js
+  // Han 2026-10-10: GLB character on Mapbox
+  // TODO: Replace primitive with actual GLB via GLTFLoader
+  var characterLayer = null;
+  function addCharacterLayer(){
+    if(typeof THREE === 'undefined'){
+      console.warn('[Character] THREE not loaded, using marker only');
+      return;
+    }
+
+    characterLayer = {
+      id: 'character-3d',
+      type: 'custom',
+      renderingMode: '3d',
+
+      onAdd: function(map, gl){
+        this.map = map;
+        // Three.js scene
+        this.camera = new THREE.Camera();
+        this.scene = new THREE.Scene();
+        this.renderer = new THREE.WebGLRenderer({
+          canvas: map.getCanvas(),
+          context: gl,
+          antialias: true,
+        });
+        this.renderer.autoClear = false;
+
+        // Simple stylized character (placeholder for GLB)
+        // Body
+        var bodyMat = new THREE.MeshLambertMaterial({color: 0x4f7ed9});
+        this.body = new THREE.Mesh(
+          new THREE.CapsuleGeometry(0.4, 0.8, 4, 12),
+          bodyMat
+        );
+        this.body.position.y = 0.9;
+        this.scene.add(this.body);
+        // Head
+        var headMat = new THREE.MeshLambertMaterial({color: 0xf0c8a0});
+        this.head = new THREE.Mesh(
+          new THREE.SphereGeometry(0.3, 16, 16),
+          headMat
+        );
+        this.head.position.y = 1.8;
+        this.scene.add(this.head);
+
+        // Lighting
+        var light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(0, 10, 10);
+        this.scene.add(light);
+        this.scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+      },
+
+      render: function(gl, matrix){
+        // Update character position to player
+        var lngLat = playerLngLat;
+        // Convert lng/lat to Mercator coordinates
+        var merc = mapboxgl.MercatorCoordinate.fromLngLat(
+          {lng: lngLat[0], lat: lngLat[1]},
+          0
+        );
+
+        // Position the character group
+        // (In a real implementation, we'd use the matrix to place it)
+
+        this.renderer.state.reset();
+        // ... (simplified - full matrix math needed for production)
+      }
+    };
+
+    // Note: Full custom layer matrix math is complex.
+    // For now, using the 2D marker. 3D character needs more work.
+    console.log('[Character] 3D layer prepared (marker fallback active)');
   }
 
   function initMinimap(){
@@ -164,8 +297,14 @@ window.CAULDRON_STATIC_CONFIG = {
   function initControls(){
     var keys = {};
     document.addEventListener('keydown', function(e){
-      keys[e.key.toLowerCase()] = true;
-      if(e.key==='m'||e.key==='M') cycleMinimap();
+      var lk=e.key.toLowerCase();
+      keys[lk] = true;
+      if(lk==='m') cycleMinimap();
+      else if(lk==='k') togglePanel('skill-tree-panel');
+      else if(lk==='i') togglePanel('inventory-panel');
+      else if(lk==='p') togglePanel('character-panel');
+      else if(lk==='y') togglePanel('friends-panel');
+      else if(lk==='h') showToast('Home teleport coming soon');
       if(e.key===' '){ e.preventDefault(); tryInteract(); }
     });
     document.addEventListener('keyup', function(e){
@@ -199,6 +338,63 @@ window.CAULDRON_STATIC_CONFIG = {
     var stage = parseInt(wrap.getAttribute('data-stage'),10);
     stage = stage >= 3 ? 1 : stage + 1;
     wrap.setAttribute('data-stage', stage);
+  }
+
+  /* UI panels (from espil.online, 2026-10-10) */
+  function togglePanel(id, force){
+    var panel=document.getElementById(id);
+    if(!panel)return;
+    var open=typeof force==='boolean'?force:panel.getAttribute('aria-hidden')!=='false';
+    panel.setAttribute('aria-hidden',String(!open));
+  }
+  function initSkillBar(){
+    var irow=document.getElementById('item-row');
+    if(irow&&!irow.children.length){
+      ['1','2','3','4'].forEach(function(k){
+        var b=document.createElement('button');
+        b.type='button';b.className='move-slot is-locked';
+        b.innerHTML='<span class="key">'+k+'</span><span class="mn">—</span>';
+        b.setAttribute('aria-label','Item slot '+k);
+        irow.appendChild(b);
+      });
+    }
+    var mrow=document.getElementById('move-row');
+    if(mrow&&!mrow.children.length){
+      ['Q','W','E','R','A','S','D','F'].forEach(function(k){
+        var b=document.createElement('button');
+        b.type='button';b.className='move-slot is-locked';
+        b.innerHTML='<span class="key">'+k+'</span><span class="mn">—</span>';
+        b.setAttribute('aria-label','Skill slot '+k);
+        b.title='Skills arrive with the combat update';
+        mrow.appendChild(b);
+      });
+    }
+    var kbm=document.getElementById('kb-menu');
+    if(kbm&&!kbm.children.length){
+      var menus=[
+        {key:'K',label:'SKILL',fn:function(){togglePanel('skill-tree-panel');}},
+        {key:'M',label:'MAP',fn:function(){cycleMinimap();}},
+        {key:'I',label:'INV',fn:function(){togglePanel('inventory-panel');}},
+        {key:'P',label:'CHAR',fn:function(){togglePanel('character-panel');}},
+        {key:'H',label:'HOME',fn:function(){showToast('Home teleport coming soon');}},
+        {key:'⚙',label:'SET',fn:function(){showToast('Settings coming soon');}}
+      ];
+      menus.forEach(function(m){
+        var b=document.createElement('button');
+        b.type='button';b.className='move-slot';
+        b.innerHTML='<span class="key">'+m.key+'</span><span class="mn">'+m.label+'</span>';
+        b.setAttribute('aria-label',m.label);
+        b.addEventListener('click',function(e){e.preventDefault();m.fn();});
+        kbm.appendChild(b);
+      });
+    }
+    /* Panel close buttons */
+    [['skill-close','skill-tree-panel'],['inv-close','inventory-panel'],['char-close','character-panel'],['friends-close','friends-panel']].forEach(function(pair){
+      var btn=document.getElementById(pair[0]);
+      if(btn)btn.addEventListener('click',function(){togglePanel(pair[1],false);});
+      var panel=document.getElementById(pair[1]);
+      if(panel)panel.addEventListener('click',function(e){if(e.target===panel)togglePanel(pair[1],false);});
+    });
   }
 
   // Store interaction (from espil.online, adapted for Mapbox)
@@ -235,6 +431,7 @@ window.CAULDRON_STATIC_CONFIG = {
 
   // Init
   initMap();
+  initSkillBar();
   checkDeepLink();
 })();
 </script>
