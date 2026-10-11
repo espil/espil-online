@@ -124,7 +124,8 @@
 
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.js"></script>
 <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-<script src="https://unpkg.com/three@0.160.0/examples/js/loaders/GLTFLoader.js"></script>
+<!-- GLTFLoader removed (module incompatibility) — using primitive fallback -->
+<!-- TODO: Use ES modules with importmap for GLB loading -->
 <script>
 // Static config (from Cauldron)
 window.CAULDRON_STATIC_CONFIG = {
@@ -244,45 +245,52 @@ window.CAULDRON_STATIC_CONFIG = {
         this.scene.add(dirLight);
         this.scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 
-        // Load GLB character
-        var loader = new THREE.GLTFLoader();
-        var charUrl = '/assets/character/male.glb';
-        // Try male, fallback to primitive
-        loader.load(
-          charUrl,
-          function(gltf){
-            characterModel = gltf.scene;
-            characterModel.scale.set(2, 2, 2); // Scale up (GLB is ~1.2 units)
-            this.scene.add(characterModel);
-            console.log('[Character] GLB loaded:', charUrl);
+        // Load GLB character (if GLTFLoader available)
+        // Note: Using primitive fallback until ES module GLTFLoader is set up
+        if(typeof THREE.GLTFLoader !== 'undefined'){
+          var loader = new THREE.GLTFLoader();
+          var charUrl = '/assets/character/male.glb';
+          loader.load(
+            charUrl,
+            function(gltf){
+              characterModel = gltf.scene;
+              characterModel.scale.set(2, 2, 2);
+              this.scene.add(characterModel);
+              console.log('[Character] GLB loaded:', charUrl);
+              if(gltf.animations && gltf.animations.length > 0){
+                characterMixer = new THREE.AnimationMixer(characterModel);
+                console.log('[Character] Animations:', gltf.animations.map(function(a){return a.name;}));
+              }
+            }.bind(this),
+            undefined,
+            function(err){
+              console.warn('[Character] GLB failed, using primitive:', err);
+              addPrimitiveCharacter.call(this);
+            }.bind(this)
+          );
+        }else{
+          // GLTFLoader not available — use primitive directly
+          addPrimitiveCharacter.call(this);
+        }
 
-            // Setup animations if available
-            if(gltf.animations && gltf.animations.length > 0){
-              characterMixer = new THREE.AnimationMixer(characterModel);
-              console.log('[Character] Animations:', gltf.animations.map(function(a){return a.name;}));
-            }
-          }.bind(this),
-          undefined,
-          function(err){
-            console.warn('[Character] GLB failed, using primitive:', err);
-            // Fallback primitive
-            var bodyMat = new THREE.MeshLambertMaterial({color: 0x4f7ed9});
-            characterModel = new THREE.Group();
-            var body = new THREE.Mesh(
-              new THREE.CapsuleGeometry(0.4, 0.8, 4, 12),
-              bodyMat
-            );
-            body.position.y = 0.9;
-            characterModel.add(body);
-            var head = new THREE.Mesh(
-              new THREE.SphereGeometry(0.3, 16, 16),
-              new THREE.MeshLambertMaterial({color: 0xf0c8a0})
-            );
-            head.position.y = 1.8;
-            characterModel.add(head);
-            this.scene.add(characterModel);
-          }.bind(this)
-        );
+        function addPrimitiveCharacter(){
+          console.log('[Character] Using primitive fallback');
+          var bodyMat = new THREE.MeshLambertMaterial({color: 0x4f7ed9});
+          characterModel = new THREE.Group();
+          var body = new THREE.Mesh(
+            new THREE.CapsuleGeometry(0.4, 0.8, 4, 12),
+            bodyMat
+          );
+          body.position.y = 0.9;
+          characterModel.add(body);
+          var head = new THREE.Mesh(
+            new THREE.SphereGeometry(0.3, 16, 16),
+            new THREE.MeshLambertMaterial({color: 0xf0c8a0})
+          );
+          head.position.y = 1.8;
+          characterModel.add(head);
+          this.scene.add(characterModel);
+        }
 
         this.renderer = new THREE.WebGLRenderer({
           canvas: map.getCanvas(),
