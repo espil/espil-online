@@ -6175,7 +6175,7 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
     ];
     var minimapLevelIdx=1; // 100m default
     function gameToLatLng(x,z){
-      var lat=MAP_CENTER_LAT+(z/111320);
+      var lat=MAP_CENTER_LAT+(-z/111320);
       var lng=MAP_CENTER_LNG+(x/(111320*Math.cos(MAP_CENTER_LAT*Math.PI/180)));
       return [lat,lng];
     }
