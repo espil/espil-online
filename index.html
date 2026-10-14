@@ -2096,8 +2096,8 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
        NOTE: API key is in-page for LOCAL TESTING only. Production must use
        a backend proxy + server-side caching (per business model: fetch once,
        never live-query per user). */
-    var GOOGLE_PLACES_KEY='__PUT_YOUR_KEY_HERE__'; /* 2026-10-13: real key comes from gitignored .env (GOOGLE_PLACES_KEY=...), filled in when the .env load finishes; git pull never clobbers it */
-(window.__ESPIL_ENV_READY__||Promise.resolve()).then(function(){var e=window.__ESPIL_ENV__;if(e&&e.GOOGLE_PLACES_KEY)GOOGLE_PLACES_KEY=e.GOOGLE_PLACES_KEY;});
+    var GOOGLE_PLACES_KEY='__PUT_YOUR_KEY_HERE__'; var PLACES_PROXY=/^(www\.)?espil\.online$/.test(location.hostname); /* 2026-10-14: on the live site the key stays server-side (Vercel env) — Places goes through /api/places-* proxies */ if(PLACES_PROXY)GOOGLE_PLACES_KEY='proxy'; /* 2026-10-13: real key comes from gitignored .env (GOOGLE_PLACES_KEY=...), filled in when the .env load finishes; git pull never clobbers it */
+(window.__ESPIL_ENV_READY__||Promise.resolve()).then(function(){var e=window.__ESPIL_ENV__;if(e&&e.GOOGLE_PLACES_KEY&&!PLACES_PROXY)GOOGLE_PLACES_KEY=e.GOOGLE_PLACES_KEY;});
     var mapBuildings=[]; /* {x,z,w,d,name} — populated by buildWalkMapOnce */
     var MAP_LAT0=49.2827,MAP_LNG0=-123.1207;
     function mapToLatLng(x,z){
@@ -2114,7 +2114,7 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
       if(bldgNameCache[key]){b.name=bldgNameCache[key];cb(b.name);return;}
       /* Google Places API (New) Nearby Search — closest place within 50m. */
       if(GOOGLE_PLACES_KEY&&GOOGLE_PLACES_KEY.indexOf('__PUT_')!==0){
-        fetch('https://places.googleapis.com/v1/places:searchNearby',{
+        fetch(PLACES_PROXY?'/api/places-nearby':'https://places.googleapis.com/v1/places:searchNearby',{
           method:'POST',
           headers:{
             'Content-Type':'application/json',
@@ -4271,7 +4271,7 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
       var key=ll.lat.toFixed(4)+','+ll.lng.toFixed(4);
       if(storeCache[key]){cb(storeCache[key]);return;}
       if(GOOGLE_PLACES_KEY&&GOOGLE_PLACES_KEY.indexOf('__PUT_')!==0){
-        fetch('https://places.googleapis.com/v1/places:searchNearby',{
+        fetch(PLACES_PROXY?'/api/places-nearby':'https://places.googleapis.com/v1/places:searchNearby',{
           method:'POST',
           headers:{
             'Content-Type':'application/json',
@@ -4303,7 +4303,7 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
     }
     function fetchPlaceDetails(placeId,cb){
       if(GOOGLE_PLACES_KEY&&GOOGLE_PLACES_KEY.indexOf('__PUT_')!==0){
-        fetch('https://places.googleapis.com/v1/places/'+placeId,{
+        fetch((PLACES_PROXY?'/api/places-details?placeId=':'https://places.googleapis.com/v1/places/')+placeId,{
           headers:{
             'X-Goog-Api-Key':GOOGLE_PLACES_KEY,
             'X-Goog-FieldMask':'displayName,primaryType,formattedAddress,location,rating,userRatingCount,reviews,photos,websiteUri,regularOpeningHours,priceLevel'
@@ -4410,7 +4410,7 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
         var html='<div class="photo-grid">';
         d.photos.slice(0,6).forEach(function(p){
           if(p.name){
-            var url='https://places.googleapis.com/v1/'+p.name+'/media?maxWidthPx=400&key='+GOOGLE_PLACES_KEY;
+            var url=PLACES_PROXY?('/api/places-photo?name='+encodeURIComponent(p.name)+'&maxWidthPx=400'):('https://places.googleapis.com/v1/'+p.name+'/media?maxWidthPx=400&key='+GOOGLE_PLACES_KEY);
             html+='<img src="'+escapeHtml(url)+'" loading="lazy" alt="Place photo">';
           }
         });
