@@ -1628,6 +1628,13 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
     <h1>Espil Online — the world is listening</h1>
     <p>Espil Online is a community for sharing knowledge, information and technology freely, in a living world on the real cities of Earth. Walk the streets of the most popular cities around the globe - shop, drive, fly and dive with friends. Step through the Cauldron, the glass capsule at the heart of it all.</p>
   </header>
+  <style>
+    #dev-credit{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:70;pointer-events:none;font:600 .72rem/1.5 "Manrope",sans-serif;letter-spacing:.08em;color:rgba(255,248,225,.72);background:rgba(1,3,6,.38);border:1px solid rgba(134,238,228,.25);padding:6px 16px;border-radius:999px;backdrop-filter:blur(6px);white-space:nowrap}
+    #dev-credit a{color:#86eee4;text-decoration:none;pointer-events:auto}
+    #dev-credit a:hover{text-decoration:underline}
+    body.in-map #dev-credit,body.direct-entry #dev-credit{display:none}
+  </style>
+  <footer id="dev-credit">Developed by HanBin Im &middot; <a href="https://han.espil.online">han.espil.online</a></footer>
   <noscript>
     <div style="padding:40px;font-family:sans-serif;color:#f3f7f3;background:#010306;">
       <h1>Espil Online — the world is listening</h1>
