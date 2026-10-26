@@ -12832,7 +12832,11 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
      target is a Pokemon-style convenience store. Entering moves to
      a NEW interior MAP; inside there is a KIOSK, and interacting
      with it brings up the order information. The v2 HUD pill bar
-     was the disconnect - it is removed. While inside, this module
+     was the disconnect - it is removed. V3.1 (Han, same day): the
+     world-map building panel carries exactly two options, ENTER
+     and CANCEL - the greeting line is gone; ENTER presses the
+     world's own entry, which moves the player to the interior map.
+     While inside, this module
      shows nothing until the world calls window.__espilKb.openKiosk()
      on the kiosk interact: a small kiosk menu (ORDER / DECORATE /
      CLOSE) over the interior map. ORDER opens the shop card,
@@ -12992,10 +12996,9 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
       '<div class="kb-awning"></div><div class="kb-body">' +
         '<h2 class="kb-name" id="kb-bname">Building</h2>' +
         '<p class="kb-meta" id="kb-bmeta">-</p>' +
-        '<p class="kb-greet">Step inside and take a look around.</p>' +
         '<div class="kb-row">' +
           '<button class="kb-btn kb-go" id="kb-enter" type="button">ENTER</button>' +
-          '<button class="kb-btn" id="kb-closebtn" type="button">Close</button>' +
+          '<button class="kb-btn" id="kb-closebtn" type="button">CANCEL</button>' +
         '</div>' +
       '</div>' +
     '</div>' +
