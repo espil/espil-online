@@ -12665,7 +12665,7 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
     backdrop = document.createElement('div');
     backdrop.id = 'espil-entry-backdrop';
     backdrop.style.cssText = 'position:fixed;inset:0;z-index:49;display:none;background-size:cover;background-position:center;filter:blur(12px) brightness(.72) saturate(.92);transform:scale(1.07);pointer-events:none;';
-    document.body.appendChild(backdrop);
+    (document.querySelector('main.earth-frame')||document.body).appendChild(backdrop); /* UI room fix 2026-10-26: the backdrop must live INSIDE the frame - the frame is an isolated stacking context, so a body-level z-49 painted over the whole frame incl. the z-50 shop */
     return backdrop;
   }
   setInterval(function () {
@@ -12755,6 +12755,42 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
       if(screen.orientation&&screen.orientation.lock){ var o=screen.orientation.lock('landscape'); if(o&&o.catch)o.catch(function(){}); }
     }catch(_){}
   },true);
+})();
+</script>
+
+<script>
+/* __espilShopGuard (UI room, Han 2026-10-26): entering a building on
+   the live build could end with the blurred entry backdrop up and NO
+   shop screen - the player stranded on a gray screen (Han's report +
+   screenshot). The world's own entry ends by opening #shop-ui; this
+   guard is the safety net, not a replacement: once per entry, if
+   1.2 s pass with window.__espilInside set and the shop still not
+   open, it puts the shop layer into the same open state the world
+   produces (class + aria) and fills the name/greeting from the entry
+   record, so the player always lands on the konbini-style shop
+   screen (Leave included) instead of the gray backdrop. If the
+   player closes the shop afterwards, the guard stays out of the way. */
+(function(){
+  'use strict';
+  var armedFor = null;
+  setInterval(function(){
+    var inside = window.__espilInside || null;
+    if(!inside){ armedFor = null; return; }
+    if(armedFor === inside) return;
+    armedFor = inside;
+    setTimeout(function(){
+      if(window.__espilInside !== inside) return;
+      var o = document.getElementById('shop-ui');
+      if(!o || o.classList.contains('open')) return;
+      var nm = document.getElementById('shop-name');
+      if(nm && inside.name) nm.textContent = inside.name;
+      var gr = document.getElementById('shop-greet');
+      if(gr && inside.name) gr.textContent = 'Welcome to ' + inside.name + '. Take your time.';
+      o.classList.add('open');
+      o.setAttribute('aria-hidden', 'false');
+      window.__espilShopGuardFired = (window.__espilShopGuardFired || 0) + 1;
+    }, 1200);
+  }, 300);
 })();
 </script>
 
