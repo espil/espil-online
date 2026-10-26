@@ -12845,10 +12845,22 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
   #kb-screen {
     position:fixed; inset:0; z-index:70; display:none;
     align-items:center; justify-content:center;
-    background:rgba(6,12,8,.55);
+    background:transparent;
     font-family:"Manrope",sans-serif;
   }
   #kb-screen.on { display:flex; }
+  /* No black backdrop anywhere (v3.2, Han 2026-10-26): opening a
+     choice or a menu is not a scene change, so the map stays fully
+     visible behind every card - the cards carry their own shadow.
+     In the panel state (the player has not moved yet) clicks also
+     pass through outside the card. */
+  #kb-screen.bare { pointer-events:none; }
+  #kb-screen.bare .kb-card { pointer-events:auto; }
+  /* The building panel is a two-option choice, so its card hugs its
+     content instead of taking the shop card's width (v3.2, Han:
+     the div was far bigger than its text). */
+  #kb-panel-card { width:fit-content; min-width:290px; max-width:min(430px, calc(100vw - 24px)); }
+  #kb-panel-card .kb-body { padding:14px 18px 16px; }
   .kb-card {
     width:min(680px, calc(100vw - 24px));
     max-height:92dvh; overflow-y:auto;
@@ -12961,6 +12973,13 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
   @media (pointer:coarse) {
     #kb-screen { align-items:stretch; }
     .kb-card { width:100%; max-height:none; height:100dvh; border-radius:0; border:none; }
+    /* The panel card stays a compact floating choice on mobile too
+       (v3.2 follow-up): exempt from the full-bleed card rule. */
+    #kb-panel-card {
+      width:fit-content; min-width:290px; max-width:calc(100vw - 24px);
+      height:auto; max-height:92dvh; align-self:center; margin:0 auto;
+      border-radius:18px; border:3px solid #6b4a2f;
+    }
     .kb-awning { border-radius:0; }
     .kb-grid { grid-template-columns:repeat(3, 1fr); gap:9px; }
     .kb-tile { height:58px; font-size:34px; }
@@ -13125,6 +13144,7 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
   function show(state){
     var on = !!state;
     screen.classList.toggle('on', on);
+    screen.classList.toggle('bare', state === 'panel');
     screen.setAttribute('aria-hidden', on ? 'false' : 'true');
     $('kb-panel-card').hidden = state !== 'panel';
     $('kb-shop-card').hidden = state !== 'shop';
