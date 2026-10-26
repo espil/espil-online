@@ -12794,6 +12794,273 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
 })();
 </script>
 
+<!-- KONBINI UI (UI room, Han 2026-10-26): the post-interact UI is
+     rebuilt from scratch. Han's call: the old building panel + shop
+     layer come out; what replaces them is a Gamania-era convenience
+     store / fast-food shop screen - a real takeover screen, not a
+     small popup - and on mobile it leans Cooking Tycoon: chunky
+     tiles, a coin purse pill, a sticky buy bar.
+     How it rides the world: the world's mechanics stay (Space opens
+     its building panel, Enter teleports inside, Leave returns), but
+     its three surfaces (#bldg-panel, #bldg-opts, #shop-ui) are held
+     invisible and THIS screen presents instead - the panel state
+     when the world's panel opens, the shop state while
+     window.__espilInside is set. Buttons press the world's own
+     buttons (#bldg-enter, #bldg-cancel, #shop-leave). Buying uses the
+     world's own contracts: the purse is localStorage
+     espil_leo_balance, and each purchase fires the same espil-guide
+     'bought' event the world's shop fires, so the panels module's
+     purchase mirror records it into espil_owned_items / inventory.
+     Stock tables are the world's own (same items, same Leo prices);
+     a food-named building gets the fast-food table. -->
+<style>
+  body.kb-live #bldg-panel, body.kb-live #bldg-opts, body.kb-live #shop-ui { opacity:0 !important; pointer-events:none !important; }
+  #kb-screen {
+    position:fixed; inset:0; z-index:70; display:none;
+    align-items:center; justify-content:center;
+    background:rgba(6,12,8,.55);
+    font-family:"Manrope",sans-serif;
+  }
+  #kb-screen.on { display:flex; }
+  .kb-card {
+    width:min(680px, calc(100vw - 24px));
+    max-height:92dvh; overflow-y:auto;
+    border-radius:18px; border:3px solid #6b4a2f;
+    background:#f7f1de; color:#2b2118;
+    box-shadow:0 24px 60px rgba(0,0,0,.55);
+  }
+  .kb-awning {
+    height:26px; border-bottom:3px solid #6b4a2f;
+    border-radius:15px 15px 0 0;
+    background:repeating-linear-gradient(45deg, #2e7d4f 0 22px, #f7f1de 22px 44px);
+  }
+  .kb-body { padding:18px 20px 20px; }
+  .kb-name { margin:0; font:800 1.45rem/1.2 "Manrope",sans-serif; letter-spacing:.02em; color:#22301f; }
+  .kb-meta { margin:5px 0 0; font:600 .8rem/1.4 "Manrope",sans-serif; color:#7a6a52; }
+  .kb-greet { margin:10px 0 0; font:600 .92rem/1.5 "Manrope",sans-serif; color:#4c5a41; }
+  .kb-row { display:flex; gap:10px; margin-top:18px; flex-wrap:wrap; }
+  .kb-btn {
+    appearance:none; cursor:pointer; touch-action:manipulation;
+    border:2px solid #6b4a2f; border-radius:12px;
+    padding:13px 22px; min-height:52px;
+    background:#fffdf4; color:#2b2118;
+    font:800 .95rem/1 "Manrope",sans-serif; letter-spacing:.06em;
+    box-shadow:0 3px 0 #6b4a2f;
+  }
+  .kb-btn:active { transform:translateY(2px); box-shadow:0 1px 0 #6b4a2f; }
+  .kb-btn.kb-go { background:#2e7d4f; color:#fff8e6; border-color:#1d5233; box-shadow:0 3px 0 #1d5233; }
+  .kb-btn.kb-go:active { box-shadow:0 1px 0 #1d5233; }
+  .kb-btn.kb-leave { background:#b3312c; color:#ffe9e6; border-color:#7c1f1b; box-shadow:0 3px 0 #7c1f1b; }
+  /* Shop state */
+  .kb-shop { width:min(920px, calc(100vw - 24px)); }
+  .kb-head { display:flex; align-items:flex-start; gap:12px; }
+  .kb-head .kb-titles { flex:1; min-width:0; }
+  .kb-purse {
+    flex:none; display:flex; align-items:center; gap:8px;
+    background:#22301f; color:#ffd97a; border:2px solid #6b4a2f; border-radius:999px;
+    padding:9px 16px; font:800 1rem/1 "Manrope",sans-serif;
+  }
+  .kb-purse .kb-coin {
+    width:18px; height:18px; border-radius:50%;
+    background:radial-gradient(circle at 35% 32%, #ffe9a8, #e0aa3c 70%, #a8742a);
+    border:1px solid #8a6420;
+  }
+  .kb-grid {
+    display:grid; grid-template-columns:repeat(5, 1fr); gap:10px; margin-top:16px;
+  }
+  .kb-item {
+    appearance:none; cursor:pointer; text-align:center; touch-action:manipulation;
+    border:2px solid #d8cba6; border-radius:14px; background:#fffdf4;
+    padding:10px 6px 9px; color:#2b2118; font-family:"Manrope",sans-serif;
+    box-shadow:0 2px 0 rgba(107,74,47,.35);
+  }
+  .kb-item:active { transform:scale(.96); }
+  .kb-item.sel { border-color:#2e7d4f; outline:3px solid rgba(46,125,79,.45); }
+  .kb-tile {
+    height:52px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+    font-size:30px; line-height:1;
+  }
+  .kb-iname { margin-top:7px; font:700 .8rem/1.25 "Manrope",sans-serif; min-height:2.5em; }
+  .kb-price {
+    display:inline-block; margin-top:5px; padding:3px 9px; border-radius:999px;
+    background:#ffd97a; border:1px solid #c9a227; color:#5a4300;
+    font:800 .74rem/1 "Manrope",sans-serif;
+  }
+  .kb-buybar {
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    margin-top:16px; padding:12px; border-radius:14px;
+    background:#efe6c8; border:2px solid #d8cba6;
+  }
+  .kb-sel { flex:1; min-width:130px; font:800 .92rem/1.35 "Manrope",sans-serif; color:#22301f; }
+  .kb-qty { display:flex; align-items:center; gap:8px; }
+  .kb-qbtn {
+    appearance:none; cursor:pointer; width:44px; height:44px; border-radius:50%;
+    border:2px solid #6b4a2f; background:#fffdf4; color:#2b2118;
+    font:800 1.15rem/1 "Manrope",sans-serif; touch-action:manipulation;
+  }
+  .kb-qbtn:active { transform:scale(.93); }
+  .kb-qn { font:800 1.1rem/1 "Manrope",sans-serif; min-width:26px; text-align:center; }
+  .kb-buy { min-width:132px; }
+  .kb-bag { margin-top:12px; font:600 .85rem/1.5 "Manrope",sans-serif; color:#4c5a41; }
+  .kb-toast {
+    margin-top:10px; min-height:1.4em; font:800 .9rem/1.4 "Manrope",sans-serif; color:#2e7d4f;
+  }
+  .kb-toast.err { color:#b3312c; }
+  @media (pointer:coarse) {
+    #kb-screen { align-items:stretch; }
+    .kb-card { width:100%; max-height:none; height:100dvh; border-radius:0; border:none; }
+    .kb-awning { border-radius:0; }
+    .kb-grid { grid-template-columns:repeat(3, 1fr); gap:9px; }
+    .kb-tile { height:58px; font-size:34px; }
+    .kb-buybar { position:sticky; bottom:0; }
+    .kb-btn { min-height:58px; }
+    .kb-buy { flex:1; min-height:58px; font-size:1.05rem; }
+  }
+</style>
+<script>
+(function(){
+  'use strict';
+  document.body.classList.add('kb-live'); /* fail-safe (Architecture 2026-10-26): the world surfaces are only suppressed once this script is actually alive - if it ever fails to run, the world's own UI stays visible */
+  var STOCK = {
+    convenience: [['Triangle Kimbap',120,'#e8e3d5','\u{1F359}'],['Cup Ramen',150,'#d96b4f','\u{1F35C}'],['Cola',90,'#b3312c','\u{1F964}'],['Iced Coffee',110,'#6b4a2f','\u{1F9CB}'],['Banana Milk',95,'#f2d13c','\u{1F34C}'],['Choco Bar',60,'#5a3a22','\u{1F36B}'],['Umbrella',450,'#3c6e91','\u2602\uFE0F'],['Batteries AA',210,'#7d8894','\u{1F50B}'],['Hot Pack',80,'#c9532f','\u{1F525}'],['Mineral Water',50,'#7fb8d8','\u{1F4A7}']],
+    fastfood: [['Burger Set',590,'#d98e2b','\u{1F354}'],['Cheeseburger',420,'#e0aa3c','\u{1F354}'],['Fries',180,'#e8c53a','\u{1F35F}'],['Chicken Strips',460,'#c96a34','\u{1F357}'],['Cola',90,'#b3312c','\u{1F964}'],['Coffee',110,'#6b4a2f','\u2615'],['Nuggets (6)',320,'#d9a03c','\u{1F356}'],['Sundae',150,'#e8e3d5','\u{1F366}']]
+  };
+  var FOOD_RE = /burger|cafe|coffee|bakery|restaurant|pizza|sushi|diner|fast|food|kitchen|grill/i;
+  function $(id){ return document.getElementById(id); }
+  function leo(){ try{ var v = parseInt(localStorage.getItem('espil_leo_balance'), 10); return isNaN(v) ? 1000 : v; }catch(e){ return 1000; } }
+  function leoSet(v){
+    try{ localStorage.setItem('espil_leo_balance', String(v)); }catch(e){}
+    var p = $('shop-purse'); if(p) p.textContent = 'Leo ' + v.toLocaleString('en-US');
+  }
+  function frame(){ return document.querySelector('main.earth-frame') || document.body; }
+
+  var screen = document.createElement('div');
+  screen.id = 'kb-screen';
+  screen.setAttribute('aria-hidden', 'true');
+  screen.innerHTML =
+    '<div class="kb-card" id="kb-panel-card">' +
+      '<div class="kb-awning"></div><div class="kb-body">' +
+        '<h2 class="kb-name" id="kb-bname">Building</h2>' +
+        '<p class="kb-meta" id="kb-bmeta">-</p>' +
+        '<p class="kb-greet">Step inside and take a look around.</p>' +
+        '<div class="kb-row">' +
+          '<button class="kb-btn kb-go" id="kb-enter" type="button">ENTER</button>' +
+          '<button class="kb-btn" id="kb-closebtn" type="button">Close</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="kb-card kb-shop" id="kb-shop-card" hidden>' +
+      '<div class="kb-awning"></div><div class="kb-body">' +
+        '<div class="kb-head"><div class="kb-titles">' +
+          '<h2 class="kb-name" id="kb-sname">Shop</h2>' +
+          '<p class="kb-greet" id="kb-sgreet">Welcome in.</p>' +
+        '</div>' +
+        '<div class="kb-purse"><span class="kb-coin"></span><span id="kb-purse-v">Leo 1,000</span></div></div>' +
+        '<div class="kb-grid" id="kb-grid"></div>' +
+        '<div class="kb-buybar">' +
+          '<div class="kb-sel" id="kb-sel">Tap an item to select it.</div>' +
+          '<div class="kb-qty"><button class="kb-qbtn" id="kb-minus" type="button" aria-label="Less">-</button><span class="kb-qn" id="kb-qn">1</span><button class="kb-qbtn" id="kb-plus" type="button" aria-label="More">+</button></div>' +
+          '<button class="kb-btn kb-go kb-buy" id="kb-buy" type="button">BUY</button>' +
+        '</div>' +
+        '<p class="kb-bag" id="kb-bag">Your bag is empty.</p>' +
+        '<p class="kb-toast" id="kb-toast"></p>' +
+        '<div class="kb-row"><button class="kb-btn kb-leave" id="kb-leave" type="button">Leave building</button></div>' +
+      '</div>' +
+    '</div>';
+  frame().appendChild(screen);
+
+  var sel = null, qty = 1, bag = [], shopFor = null, toastTimer = null;
+  function toast(msg, err){
+    var t = $('kb-toast'); if(!t) return;
+    t.textContent = msg; t.classList.toggle('err', !!err);
+    if(toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ t.textContent = ''; }, 3400);
+  }
+  function paintPurse(){ var v = $('kb-purse-v'); if(v) v.textContent = 'Leo ' + leo().toLocaleString('en-US'); }
+  function paintBag(){ var b = $('kb-bag'); if(b) b.textContent = bag.length ? ('Your bag: ' + bag.join(', ')) : 'Your bag is empty.'; }
+  function paintSel(){
+    var s = $('kb-sel'); if(!s) return;
+    if(!sel){ s.textContent = 'Tap an item to select it.'; return; }
+    s.textContent = sel[0] + '  ·  Leo ' + (sel[1] * qty).toLocaleString('en-US');
+    $('kb-qn').textContent = String(qty);
+  }
+  function buildGrid(theme){
+    var g = $('kb-grid'); if(!g) return;
+    g.innerHTML = ''; sel = null; qty = 1; paintSel();
+    STOCK[theme].forEach(function(it){
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'kb-item';
+      b.innerHTML = '<div class="kb-tile" style="background:' + it[2] + '">' + it[3] + '</div>' +
+                    '<div class="kb-iname"></div><span class="kb-price">Leo ' + it[1] + '</span>';
+      b.querySelector('.kb-iname').textContent = it[0];
+      b.addEventListener('click', function(){
+        sel = it; qty = 1;
+        Array.prototype.forEach.call(g.children, function(c){ c.classList.remove('sel'); });
+        b.classList.add('sel'); paintSel();
+      });
+      g.appendChild(b);
+    });
+  }
+  function show(state){
+    var on = !!state;
+    screen.classList.toggle('on', on);
+    screen.setAttribute('aria-hidden', on ? 'false' : 'true');
+    $('kb-panel-card').hidden = state !== 'panel';
+    $('kb-shop-card').hidden = state !== 'shop';
+  }
+  function worldClick(id){
+    var el = $(id); if(el){ el.click(); return true; } return false;
+  }
+  $('kb-enter').addEventListener('click', function(){ worldClick('bldg-enter'); });
+  $('kb-closebtn').addEventListener('click', function(){ if(!worldClick('bldg-cancel')) worldClick('bldg-close'); });
+  $('kb-leave').addEventListener('click', function(){ if(!worldClick('shop-leave')) worldClick('bldg-opt-leave'); });
+  $('kb-minus').addEventListener('click', function(){ if(qty > 1){ qty--; paintSel(); } });
+  $('kb-plus').addEventListener('click', function(){ if(qty < 9){ qty++; paintSel(); } });
+  $('kb-buy').addEventListener('click', function(){
+    if(!sel){ toast('Pick an item first.', true); return; }
+    var total = sel[1] * qty, bal = leo();
+    if(bal < total){ toast('Not enough Leo for ' + sel[0] + '.', true); return; }
+    leoSet(bal - total);
+    for(var i = 0; i < qty; i++){
+      bag.push(sel[0]);
+      try{ window.dispatchEvent(new CustomEvent('espil-guide', { detail: { type: 'bought', item: sel[0] } })); }catch(e){}
+    }
+    paintPurse(); paintBag();
+    toast('Bought ' + sel[0] + (qty > 1 ? ' x ' + qty : '') + ' for Leo ' + total.toLocaleString('en-US') + '.');
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key !== 'Escape' || !screen.classList.contains('on')) return;
+    if(!$('kb-shop-card').hidden) $('kb-leave').click();
+    else $('kb-closebtn').click();
+  });
+
+  setInterval(function(){
+    var panel = $('bldg-panel');
+    var panelOpen = panel && panel.getAttribute('aria-hidden') === 'false';
+    var inside = window.__espilInside || null;
+    if(inside){
+      if(shopFor !== inside){
+        shopFor = inside;
+        var name = inside.name || 'Shop';
+        $('kb-sname').textContent = name;
+        $('kb-sgreet').textContent = 'Welcome to ' + name + '. Take your time.';
+        buildGrid(FOOD_RE.test(name) ? 'fastfood' : 'convenience');
+        paintPurse(); paintBag();
+      }
+      show('shop');
+    } else {
+      shopFor = null;
+      if(panelOpen){
+        var n = $('bldg-name'), m = $('bldg-meta');
+        if(n) $('kb-bname').textContent = n.textContent || 'Building';
+        if(m) $('kb-bmeta').textContent = m.textContent || '-';
+        show('panel');
+      } else show(null);
+    }
+  }, 250);
+})();
+</script>
+
 </body>
 </html>
 tx.fillStyle=grad; ctx.fill();
