@@ -12681,6 +12681,81 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
 /* __espilEntryPopup END */
 
 </script>
+<!-- MOBILE LIVE FIX (UI room, Han 2026-10-25: fix the live problems
+     right away). Exactly the three reported problems, coarse pointers
+     only; desktop untouched. The MENU chooser and chat SEND from the
+     2026-10-24 mobile order stay with the pending guide batch - they
+     are NOT in this live fix.
+     1) JUMP / ACTION covered by the quick buttons: the build's last
+        coarse block parks .map-attack / .map-jump at left:26vw/38vw,
+        bottom:3vh - the same band as the .skill-bar slot grid
+        (left:12, bottom:12, ~100px tall), so the slots cover them on
+        most phones; the joystick also overlaps the quickbar's top on
+        the right. Below, every bottom element gets its own band:
+        slots stay at the bottom, the action circles move to one
+        clear row above them, the joystick lifts clear.
+     2) The top ~10% browser bar after city entry: the landing page
+        asks for fullscreen BEFORE navigating, and the request does
+        not survive the page change. The game page re-asks on its own
+        taps (a user gesture, as the API requires) until fullscreen
+        engages, with the landscape lock alongside.
+     3) The building text box invisible on mobile: the panel cards
+        cap at max-height:88vh, but vh counts the screen WITHOUT the
+        browser bar, so with the bar visible the card is taller than
+        the visible area and its top (name + greeting text) clips out
+        of view. Cards now cap in dvh, which tracks the visible area. -->
+<style>
+  @media (pointer:coarse) {
+    body {
+      --mc-row: calc(126px + env(safe-area-inset-bottom, 0px));
+      --mc-s: 68px;
+    }
+    /* One clear row for the action circles, above the slot grid. */
+    body.in-map .map-attack {
+      left:12px !important; right:auto !important;
+      bottom:var(--mc-row) !important;
+      width:64px !important; height:64px !important;
+    }
+    body.in-map #map-interact {
+      left:84px !important; right:auto !important;
+      bottom:var(--mc-row) !important;
+      width:var(--mc-s) !important; height:var(--mc-s) !important;
+      font-size:.82rem;
+    }
+    body.in-map .map-jump {
+      left:160px !important; right:auto !important;
+      bottom:var(--mc-row) !important;
+      width:var(--mc-s) !important; height:var(--mc-s) !important;
+      font-size:.82rem;
+    }
+    /* Joystick clear of the quickbar below it. */
+    body.in-map .joystick {
+      bottom:calc(140px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+    /* Panels fit the VISIBLE viewport (dvh), browser bar or not. */
+    .skill-tree { height:100dvh; }
+    .st-card { max-height:88dvh; }
+    #shop-grid { max-height:min(300px, 34dvh) !important; }
+  }
+</style>
+<script>
+(function(){
+  'use strict';
+  if(!window.matchMedia||!window.matchMedia('(pointer:coarse)').matches)return;
+  /* Fullscreen, re-asked by the game page itself (fix 2): retry on
+     each tap until it engages; rejections are swallowed so a denied
+     request never surfaces as an error. */
+  document.addEventListener('pointerdown',function(){
+    if(document.fullscreenElement)return;
+    try{
+      var de=document.documentElement;
+      if(de.requestFullscreen){ var p=de.requestFullscreen(); if(p&&p.catch)p.catch(function(){}); }
+      if(screen.orientation&&screen.orientation.lock){ var o=screen.orientation.lock('landscape'); if(o&&o.catch)o.catch(function(){}); }
+    }catch(_){}
+  },true);
+})();
+</script>
+
 </body>
 </html>
 tx.fillStyle=grad; ctx.fill();
