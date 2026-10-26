@@ -12812,10 +12812,10 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
      Stock tables are the world's own (same items, same Leo prices);
      a food-named building gets the fast-food table.
      V2 (Han 2026-10-26, after his in-game check): the shop must NOT
-     come first. Entering shows the interior; this module now keeps
-     the shop closed on entry and shows a slim interior HUD instead
-     (building name + Shop / Decorate / Leave). The shop opens only
-     from the HUD and its card gains a "Back to interior" button.
+     come first. Entering shows the interior; this module kept the
+     shop closed on entry and showed a slim interior HUD instead.
+     (The HUD itself was then ruled the disconnect and removed in
+     V3 below; the interior-first principle stands.)
      Decorate is the owner's option set; there is no owner in the
      test phase, so Han ordered it open to everyone (KB_DECOR_OPEN) -
      the future gate is window.__espilInteriorRights().design. Its
@@ -12825,7 +12825,17 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
      per user in localStorage espil_graffiti_mine with a FIFO cap of
      5, and is published as 'espil-graffiti' CustomEvents
      (placed/removed/sync) plus window.__espilGraffiti for the world
-     to render. Full spec: interior-decor-graffiti-SPEC.md. -->
+     to render. Full spec: interior-decor-graffiti-SPEC.md.
+     V3 (Han 2026-10-26, after seeing the v2 screenshots): the exact
+     target is a Pokemon-style convenience store. Entering moves to
+     a NEW interior MAP; inside there is a KIOSK, and interacting
+     with it brings up the order information. The v2 HUD pill bar
+     was the disconnect - it is removed. While inside, this module
+     shows nothing until the world calls window.__espilKb.openKiosk()
+     on the kiosk interact: a small kiosk menu (ORDER / DECORATE /
+     CLOSE) over the interior map. ORDER opens the shop card,
+     DECORATE the decorate card, Back returns to the kiosk menu, ESC
+     steps back one layer. The graffiti bridge is unchanged. -->
 <style>
   body.kb-live #bldg-panel, body.kb-live #bldg-opts, body.kb-live #shop-ui { opacity:0 !important; pointer-events:none !important; }
   #kb-screen {
@@ -12919,29 +12929,10 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
     margin-top:10px; min-height:1.4em; font:800 .9rem/1.4 "Manrope",sans-serif; color:#2e7d4f;
   }
   .kb-toast.err { color:#b3312c; }
-  /* Interior HUD (v2): a slim pill at the top centre while inside,
-     so the interior itself stays the first thing seen. */
-  #kb-hud {
-    position:fixed; top:46px; left:50%; transform:translateX(-50%);
-    z-index:70; display:none; align-items:center; gap:8px;
-    max-width:calc(100vw - 16px);
-    background:rgba(24,32,20,.88); border:2px solid #6b4a2f; border-radius:999px;
-    padding:6px 8px 6px 16px; font-family:"Manrope",sans-serif;
-    box-shadow:0 8px 24px rgba(0,0,0,.4);
-  }
-  #kb-hud.on { display:flex; }
-  .kb-hud-name {
-    color:#fff8e6; font:800 .9rem/1 "Manrope",sans-serif; letter-spacing:.03em;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:34vw;
-  }
-  .kb-hbtn {
-    appearance:none; cursor:pointer; touch-action:manipulation; flex:none;
-    border:2px solid #6b4a2f; border-radius:999px; padding:9px 16px; min-height:40px;
-    background:#fffdf4; color:#2b2118; font:800 .82rem/1 "Manrope",sans-serif; letter-spacing:.05em;
-  }
-  .kb-hbtn:active { transform:scale(.95); }
-  .kb-hbtn.kb-go { background:#2e7d4f; color:#fff8e6; border-color:#1d5233; }
-  .kb-hbtn.kb-leave { background:#b3312c; color:#ffe9e6; border-color:#7c1f1b; }
+  /* Kiosk menu (v3): a compact card, deliberately smaller than the
+     shop card - it is the kiosk's front panel, not a takeover. */
+  .kb-kiosk { width:min(430px, calc(100vw - 24px)); }
+  .kb-kiosk .kb-btn { flex:1; }
   /* Graffiti toast (v2): bottom centre, above the world controls. */
   #kb-gtoast {
     position:fixed; left:50%; transform:translateX(-50%); bottom:118px;
@@ -13021,7 +13012,18 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
         '</div>' +
         '<p class="kb-bag" id="kb-bag">Your bag is empty.</p>' +
         '<p class="kb-toast" id="kb-toast"></p>' +
-        '<div class="kb-row"><button class="kb-btn" id="kb-back" type="button">Back to interior</button><button class="kb-btn kb-leave" id="kb-leave" type="button">Leave building</button></div>' +
+        '<div class="kb-row"><button class="kb-btn" id="kb-back" type="button">Back</button><button class="kb-btn kb-leave" id="kb-leave" type="button">Leave building</button></div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="kb-card kb-kiosk" id="kb-kiosk-card" hidden>' +
+      '<div class="kb-awning"></div><div class="kb-body">' +
+        '<h2 class="kb-name" id="kb-kname">Kiosk</h2>' +
+        '<p class="kb-greet">The kiosk screen lights up. What would you like to do?</p>' +
+        '<div class="kb-row">' +
+          '<button class="kb-btn kb-go" id="kb-kiosk-order" type="button">ORDER</button>' +
+          '<button class="kb-btn" id="kb-kiosk-decor" type="button">DECORATE</button>' +
+        '</div>' +
+        '<div class="kb-row"><button class="kb-btn" id="kb-kiosk-close" type="button">Close</button></div>' +
       '</div>' +
     '</div>' +
     '<div class="kb-card" id="kb-decor-card" hidden>' +
@@ -13034,26 +13036,17 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
         '</div>' +
         '<p class="kb-bag" id="kb-gcount">Your graffiti: 0 / 5</p>' +
         '<p class="kb-toast" id="kb-dtoast"></p>' +
-        '<div class="kb-row"><button class="kb-btn" id="kb-decor-close" type="button">Back to interior</button></div>' +
+        '<div class="kb-row"><button class="kb-btn" id="kb-decor-close" type="button">Back</button></div>' +
       '</div>' +
     '</div>';
   frame().appendChild(screen);
 
-  var hud = document.createElement('div');
-  hud.id = 'kb-hud';
-  hud.setAttribute('aria-hidden', 'true');
-  hud.innerHTML =
-    '<span class="kb-hud-name" id="kb-hud-name">Inside</span>' +
-    '<button class="kb-hbtn kb-go" id="kb-hud-shop" type="button">SHOP</button>' +
-    '<button class="kb-hbtn" id="kb-hud-decor" type="button">DECORATE</button>' +
-    '<button class="kb-hbtn kb-leave" id="kb-hud-leave" type="button">LEAVE</button>';
-  frame().appendChild(hud);
   var gtoast = document.createElement('div');
   gtoast.id = 'kb-gtoast';
   frame().appendChild(gtoast);
 
   var sel = null, qty = 1, bag = [], shopFor = null, toastTimer = null;
-  var shopOpen = false, decorOpen = false;
+  var kioskOpen = false, shopOpen = false, decorOpen = false;
   var KB_DECOR_OPEN = true; /* Han 2026-10-26: no shop owner exists in the test phase, so the owner decorate options stay open to everyone. The future gate is window.__espilInteriorRights().design. */
 
   /* ---- Graffiti (v2): per-user store, FIFO cap 5, world renders ---- */
@@ -13133,12 +13126,47 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
     $('kb-panel-card').hidden = state !== 'panel';
     $('kb-shop-card').hidden = state !== 'shop';
     $('kb-decor-card').hidden = state !== 'decor';
+    $('kb-kiosk-card').hidden = state !== 'kiosk';
   }
-  function hudShow(on, name){
-    hud.classList.toggle('on', !!on);
-    hud.setAttribute('aria-hidden', on ? 'false' : 'true');
-    if(on && name) $('kb-hud-name').textContent = name;
+  function prepFor(name){
+    if(!name || shopFor === name) return;
+    shopFor = name;
+    $('kb-sname').textContent = name;
+    $('kb-sgreet').textContent = 'Welcome to ' + name + '. Take your time.';
+    $('kb-dname').textContent = 'Decorate · ' + name;
+    $('kb-kname').textContent = name + ' Kiosk';
+    buildGrid(FOOD_RE.test(name) ? 'fastfood' : 'convenience');
+    paintPurse(); paintBag();
   }
+  function kbState(){
+    if(decorOpen) return 'decor';
+    if(shopOpen) return 'shop';
+    if(kioskOpen) return 'kiosk';
+    return null;
+  }
+  function decorGate(){
+    if(KB_DECOR_OPEN) return true;
+    try{
+      var r = typeof window.__espilInteriorRights === 'function' ? window.__espilInteriorRights() : null;
+      return !!(r && r.design);
+    }catch(e){ return false; }
+  }
+  /* Public hook (v3): the world calls openKiosk() when the player
+     interacts with the kiosk inside the interior map. */
+  window.__espilKb = {
+    openKiosk: function(name){
+      var n = name || (window.__espilInside && window.__espilInside.name) || null;
+      if(n) prepFor(n);
+      kioskOpen = true; shopOpen = false; decorOpen = false;
+    },
+    openShop: function(){ shopOpen = true; decorOpen = false; },
+    openDecor: function(){
+      if(!decorGate()){ gToast('Decorating belongs to the shop owner.'); return; }
+      decorOpen = true; shopOpen = false; paintGCount();
+    },
+    close: function(){ kioskOpen = false; shopOpen = false; decorOpen = false; },
+    state: function(){ return kbState(); }
+  };
   function dtoast(msg, err){
     var t = $('kb-dtoast'); if(!t) return;
     t.textContent = msg; t.classList.toggle('err', !!err);
@@ -13151,17 +13179,12 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
   $('kb-closebtn').addEventListener('click', function(){ if(!worldClick('bldg-cancel')) worldClick('bldg-close'); });
   $('kb-leave').addEventListener('click', function(){ if(!worldClick('shop-leave')) worldClick('bldg-opt-leave'); });
   $('kb-back').addEventListener('click', function(){ shopOpen = false; });
-  $('kb-hud-shop').addEventListener('click', function(){ shopOpen = true; decorOpen = false; });
-  $('kb-hud-decor').addEventListener('click', function(){
-    if(!KB_DECOR_OPEN){
-      try{
-        var r = typeof window.__espilInteriorRights === 'function' ? window.__espilInteriorRights() : null;
-        if(!r || !r.design){ gToast('Decorating belongs to the shop owner.'); return; }
-      }catch(e){ return; }
-    }
+  $('kb-kiosk-order').addEventListener('click', function(){ shopOpen = true; decorOpen = false; });
+  $('kb-kiosk-decor').addEventListener('click', function(){
+    if(!decorGate()){ gToast('Decorating belongs to the shop owner.'); return; }
     decorOpen = true; shopOpen = false; paintGCount();
   });
-  $('kb-hud-leave').addEventListener('click', function(){ if(!worldClick('shop-leave')) worldClick('bldg-opt-leave'); });
+  $('kb-kiosk-close').addEventListener('click', function(){ kioskOpen = false; shopOpen = false; decorOpen = false; });
   $('kb-decor-close').addEventListener('click', function(){ decorOpen = false; });
   $('kb-decor-graffiti').addEventListener('click', function(){
     var inside = window.__espilInside || null;
@@ -13206,41 +13229,38 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
   });
   document.addEventListener('keydown', function(e){
     if(e.key !== 'Escape') return;
-    /* v2: ESC closes only this module's topmost layer. Leaving the
-       building on ESC is the world's own handling. */
+    /* ESC steps back one layer: card -> kiosk menu -> closed.
+       Leaving the building is the world's own handling (door). */
     if(decorOpen){ decorOpen = false; return; }
     if(shopOpen){ shopOpen = false; return; }
+    if(kioskOpen){ kioskOpen = false; return; }
     if(screen.classList.contains('on') && !$('kb-panel-card').hidden) $('kb-closebtn').click();
   });
 
+  var wasInside = false;
   setInterval(function(){
     var panel = $('bldg-panel');
     var panelOpen = panel && panel.getAttribute('aria-hidden') === 'false';
     var inside = window.__espilInside || null;
     if(inside){
-      var name = inside.name || 'Shop';
-      if(shopFor !== inside){
-        shopFor = inside;
-        $('kb-sname').textContent = name;
-        $('kb-sgreet').textContent = 'Welcome to ' + name + '. Take your time.';
-        $('kb-dname').textContent = 'Decorate · ' + name;
-        buildGrid(FOOD_RE.test(name) ? 'fastfood' : 'convenience');
-        paintPurse(); paintBag();
-      }
-      /* v2 interior-first: the interior is what shows on entry. The
-         HUD rides on top; shop and decorate open only on demand. */
-      if(decorOpen){ hudShow(false); show('decor'); }
-      else if(shopOpen){ hudShow(false); show('shop'); }
-      else { show(null); hudShow(true, name); }
+      wasInside = true;
+      prepFor(inside.name || 'Shop');
+      /* v3: nothing overlays the interior map. The kiosk menu and
+         its cards appear only when the world calls
+         window.__espilKb.openKiosk() (kiosk interact). */
+      show(kbState());
     } else {
-      shopFor = null; shopOpen = false; decorOpen = false;
-      hudShow(false);
+      if(wasInside){ /* leaving the building ends the kiosk session */
+        wasInside = false;
+        kioskOpen = false; shopOpen = false; decorOpen = false;
+        shopFor = null;
+      }
       if(panelOpen){
         var n = $('bldg-name'), m = $('bldg-meta');
         if(n) $('kb-bname').textContent = n.textContent || 'Building';
         if(m) $('kb-bmeta').textContent = m.textContent || '-';
         show('panel');
-      } else show(null);
+      } else show(kbState());
     }
   }, 250);
 })();
