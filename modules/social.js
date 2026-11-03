@@ -509,7 +509,14 @@
     var idEl = $('auth-id'), pwEl = $('auth-pw');
     return { id: idEl ? idEl.value.trim() : '', pw: pwEl ? pwEl.value : '' };
   }
+  /* Batch A (Han 2026-11-02 #2): guest-only entry until the server
+     account system lands. The pair's form is disabled in markup;
+     these guards keep the handlers inert even if a control is
+     re-enabled by another module. Account code and stored accounts
+     stay intact for the backend step. */
+  var GUEST_ONLY = true;
   function doSignup() {
+    if (GUEST_ONLY) { authMsg('Account sign-in is paused - entry is guest-only until the server account system lands.'); return; }
     var c = readCreds();
     if (!/^[A-Za-z0-9_]{3,16}$/.test(c.id)) { authMsg('ID: 3-16 letters, numbers or underscore.'); return; }
     if (!c.pw || c.pw.length < 6) { authMsg('Password: 6 characters or more.'); return; }
@@ -524,6 +531,7 @@
     });
   }
   function doSignin() {
+    if (GUEST_ONLY) { authMsg('Account sign-in is paused - entry is guest-only until the server account system lands.'); return; }
     var c = readCreds();
     var all = accounts(), rec = all[c.id.toLowerCase()];
     if (!rec) { authMsg('No account with that ID yet. Sign up first.'); return; }

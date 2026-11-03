@@ -49,7 +49,13 @@
     loader.load('assets/kenney-mini-market/' + name + '.glb', function (gltf) {
       modelCache[name] = gltf.scene;
       done(gltf.scene.clone());
-    }, undefined, function () { done(null); });
+    }, undefined, function () {
+      /* Batch A6 fix: never fail silently again - a missing shared
+         texture (Textures/colormap.png) once 404ed every model in
+         this set while kenneyReady still reported true. */
+      try { console.warn('[espil-store] Kenney model failed to load: ' + name); } catch (e) {}
+      done(null);
+    });
   }
   function place(group, name, x, y, z, ry) {
     loadModel(name, function (obj) {

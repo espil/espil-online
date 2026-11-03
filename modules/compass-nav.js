@@ -43,7 +43,12 @@
 
   var CSS = [
     '#espil-compass{',
-    '  position:fixed; left:50%; top:10px; transform:translateX(-50%) translateY(-8px);',
+    /* Batch A (Han 2026-11-02 #4): the top-centre pill sat under the
+       HUD cluster and got covered; the compass now hangs directly
+       below the character (screen centre), at 60% of the viewport
+       height - clear of the character model above it and of the
+       bottom UI cluster below it. */
+    '  position:fixed; left:50%; top:60%; transform:translateX(-50%) translateY(-8px);',
     '  z-index:46; display:flex; align-items:center; gap:11px;',
     '  padding:7px 16px 7px 7px; border-radius:999px;',
     '  border:1px solid rgba(142,247,232,.35);',
@@ -86,6 +91,25 @@
     '}',
     '#espil-compass .cmp-name{ color:#8ef7e8; font:900 .58rem/1 "Manrope",sans-serif; letter-spacing:.22em; margin-bottom:3px; }',
     '#espil-compass .cmp-dist{ color:#fff4cf; font:800 1.02rem/1.2 "Manrope",sans-serif; white-space:nowrap; }',
+    /* Batch A7 (Han 2026-11-02 #7): the overhead indicator - a chip
+       that floats above the character's head carrying the direction
+       arrow and the remaining distance, alongside the pill. */
+    '#espil-compass-chip{',
+    '  position:fixed; left:0; top:0; transform:translate(-50%,-115%);',
+    '  z-index:45; display:flex; align-items:center; gap:6px;',
+    '  padding:4px 10px 4px 7px; border-radius:999px;',
+    '  border:1px solid rgba(142,247,232,.4);',
+    '  background:linear-gradient(180deg, rgba(4,18,24,.85), rgba(3,10,14,.8));',
+    '  box-shadow:0 8px 20px rgba(0,0,0,.45);',
+    '  pointer-events:none; opacity:0; transition:opacity .25s ease;',
+    '  font-family:"Manrope",sans-serif;',
+    '}',
+    '#espil-compass-chip.on{ opacity:1; }',
+    '#espil-compass-chip .cmp-chip-arrow{',
+    '  display:inline-block; color:#ffd94d; font-size:.8rem; line-height:1;',
+    '  text-shadow:0 0 8px rgba(255,217,77,.8);',
+    '}',
+    '#espil-compass-chip .cmp-chip-dist{ color:#fff4cf; font:800 .8rem/1 "Manrope",sans-serif; white-space:nowrap; }',
     '@media (max-width: 600px){',
     '  #espil-compass{ gap:9px; padding:6px 13px 6px 6px; }',
     '  #espil-compass .cmp-dial{ width:48px; height:48px; }',
@@ -106,6 +130,17 @@
     '<div><div class="cmp-name" id="espil-compass-name"></div>' +
     '<div class="cmp-dist" id="espil-compass-dist"></div></div>';
   document.body.appendChild(cmpEl);
+
+  var chipEl = document.createElement('div');
+  chipEl.id = 'espil-compass-chip';
+  chipEl.setAttribute('aria-hidden', 'true');
+  chipEl.innerHTML =
+    '<span class="cmp-chip-arrow" id="espil-compass-chip-arrow">&#10148;</span>' +
+    '<span class="cmp-chip-dist" id="espil-compass-chip-dist"></span>';
+  document.body.appendChild(chipEl);
+  var chipArrow = chipEl.querySelector('#espil-compass-chip-arrow'),
+      chipDistEl = chipEl.querySelector('#espil-compass-chip-dist'),
+      chipOn = false, chipAngle = null;
 
   var cmpRot = cmpEl.querySelector('#espil-compass-rot'),
       cmpNameEl = cmpEl.querySelector('#espil-compass-name'),
@@ -138,6 +173,45 @@
     if (d >= 1000) { var k = d / 1000; return (k >= 10 ? k.toFixed(1) : k.toFixed(2)) + ' km'; }
     return Math.max(0, Math.round(d)) + ' m';
   }
+  /* ---- the overhead chip (Batch A7) ------------------------------
+     Projected every frame from the player's head position (+2.2 m)
+     through the map camera; hidden when the player is off-screen,
+     behind the camera, or out of the map. The arrow is the target
+     direction expressed on screen: the target vector dotted with
+     the camera's ground-plane right/forward axes, so it always
+     points toward the target as the player sees the world. */
+  function chipHide() {
+    chipOn = false; chipAngle = null;
+    if (chipEl) { chipEl.classList.remove('on'); chipEl.setAttribute('aria-hidden', 'true'); }
+  }
+  function chipUpdate(pose, dx, dz, d) {
+    if (!chipEl || typeof THREE === 'undefined') { chipHide(); return; }
+    if (!document.body.classList.contains('in-map')) { chipHide(); return; }
+    var cam = null;
+    try { cam = (typeof window.__espilMapCameraObj === 'function') ? window.__espilMapCameraObj() : null; } catch (e) {}
+    if (!cam || !cam.matrixWorldInverse) { chipHide(); return; }
+    var head = new THREE.Vector3(pose.x, (typeof pose.y === 'number' ? pose.y : 0) + 2.2, pose.z);
+    var viewZ = head.clone().applyMatrix4(cam.matrixWorldInverse).z;
+    if (viewZ > -0.5) { chipHide(); return; }
+    head.project(cam);
+    var sx = (head.x * 0.5 + 0.5) * window.innerWidth;
+    var sy = (-head.y * 0.5 + 0.5) * window.innerHeight;
+    if (sx < -40 || sx > window.innerWidth + 40 || sy < -20 || sy > window.innerHeight + 20) { chipHide(); return; }
+    var fwd = new THREE.Vector3(); cam.getWorldDirection(fwd);
+    var rx = -fwd.z, rz = fwd.x;
+    var rl = Math.hypot(rx, rz) || 1; rx /= rl; rz /= rl;
+    var fl = Math.hypot(fwd.x, fwd.z) || 1;
+    var dl = Math.hypot(dx, dz) || 1;
+    var ax = (dx / dl) * rx + (dz / dl) * rz;
+    var ay = (dx / dl) * (fwd.x / fl) + (dz / dl) * (fwd.z / fl);
+    var ang = Math.atan2(-ay, ax) * 180 / Math.PI;
+    chipEl.style.left = sx.toFixed(1) + 'px';
+    chipEl.style.top = sy.toFixed(1) + 'px';
+    if (chipArrow) chipArrow.style.transform = 'rotate(' + ang.toFixed(1) + 'deg)';
+    if (chipDistEl) chipDistEl.textContent = cmpFmt(d);
+    chipEl.classList.add('on'); chipEl.setAttribute('aria-hidden', 'false');
+    chipOn = true; chipAngle = Math.round(ang);
+  }
   function cmpShow(t, opts) {
     /* Accept the legacy positional form show(x, z, name) as well as
        show({x, z, name}, opts) - see the header note. */
@@ -159,6 +233,7 @@
   function cmpHide() {
     cmpTarget = null; cmpArrive = false; cmpOwner = null; cmpDist = null;
     if (cmpEl) { cmpEl.classList.remove('on'); cmpEl.setAttribute('aria-hidden', 'true'); }
+    chipHide();
     document.body.classList.remove('espil-compass-on'); document.body.classList.remove('guide-compass-on');
   }
   /* A world-fired arrival closes the compass whatever set it
@@ -176,12 +251,17 @@
     state: function () {
       return {
         on: !!cmpTarget, target: cmpTarget, owner: cmpOwner,
-        dist: (typeof cmpDist === 'number') ? Math.round(cmpDist) : null
+        dist: (typeof cmpDist === 'number') ? Math.round(cmpDist) : null,
+        chip: { on: chipOn, angle: chipAngle, text: chipDistEl ? chipDistEl.textContent : '' }
       };
     }
   };
-  setInterval(function () {
+  /* Batch A7: the tick runs per animation frame (it was a 100 ms
+     interval) so the dial, the marker and the overhead arrow track
+     the player continuously while walking or turning. */
+  function cmpTick() {
     if (!window.__ESPIL_GAME_PAGE) return;
+    requestAnimationFrame(cmpTick);
     /* Follow mode: the world posted a target itself (minimap pins
        and the like) - mirror it until the world clears it. An
        explicit show() always wins over the mirror. */
@@ -190,7 +270,7 @@
       if (typeof wt.x === 'number' && typeof wt.z === 'number') cmpShow(wt, { arrive: false, owner: 'follow' });
     }
     if (cmpOwner === 'follow' && !window.__espilNavActive) { cmpHide(); return; }
-    if (!cmpTarget) return;
+    if (!cmpTarget) { chipHide(); return; }
     var pose = null;
     try { pose = (typeof window.__espilPlayerPose === 'function') ? window.__espilPlayerPose() : null; } catch (e) {}
     if (!pose || typeof pose.x !== 'number' || typeof pose.z !== 'number') return;
@@ -200,10 +280,12 @@
     if (cmpRot) cmpRot.style.transform = 'rotate(' + (heading * 180 / Math.PI) + 'deg)';
     if (cmpMark) cmpMark.style.transform = 'rotate(' + (-bearing * 180 / Math.PI) + 'deg)';
     if (cmpDistEl) cmpDistEl.textContent = cmpFmt(d);
+    chipUpdate(pose, dx, dz, d);
     if (cmpArrive && !cmpArrived && d <= 5) {
       cmpArrived = true; var nm = cmpTarget.name; cmpHide();
       emit('nav-arrived', { name: nm });
     }
-  }, 100);
+  }
+  requestAnimationFrame(cmpTick);
 })();
 

@@ -51,7 +51,8 @@
     englishBay: { en: 'English Bay', ko: '잉글리시 베이', fr: 'English Bay', zh: '英吉利湾' },
     locating: { en: 'Finding your location...', ko: '위치를 확인하는 중입니다...', fr: 'Localisation en cours...', zh: '正在定位...' },
     outside: { en: 'That is outside the playable area - arriving at the Art Gallery instead.', ko: '플레이 가능 지역 밖이라 아트갤러리 앞에 도착합니다.', fr: "Hors de la zone jouable - arrivée devant la galerie d'art.", zh: '超出可游玩区域，将在美术馆前抵达。' },
-    noGeo: { en: 'Location is unavailable - pick a place instead.', ko: '위치를 확인할 수 없습니다. 장소를 골라 주세요.', fr: 'Position indisponible - choisissez un lieu.', zh: '无法定位，请选择一个地点。' }
+    noGeo: { en: 'Location is unavailable - pick a place instead.', ko: '위치를 확인할 수 없습니다. 장소를 골라 주세요.', fr: 'Position indisponible - choisissez un lieu.', zh: '无法定位，请选择一个地点。' },
+    guestOnly: { en: 'Account sign-in is paused. Accounts are moving to our server, with character data saved server-side and email verification. Until that system lands, entry is guest-only.', ko: '계정 로그인은 잠시 중단되었습니다. 계정은 저희 서버로 이전되며, 캐릭터 데이터는 서버에 저장되고 이메일 인증이 도입됩니다. 그 시스템이 열릴 때까지는 게스트로만 입장하실 수 있습니다.', fr: 'La connexion par compte est en pause. Les comptes migrent vers notre serveur, avec les personnages enregistrés côté serveur et une vérification par e-mail. En attendant, l\'entrée est réservée aux invités.', zh: '账户登录已暂停。账户正在迁移到我们的服务器，角色数据将保存在服务器端并引入邮箱验证。在此之前，仅限访客进入。' }
   };
   function lang() { try { return window.__espilLang() || 'en'; } catch (e) { return 'en'; } }
   function t(k, vars) {
@@ -113,7 +114,14 @@
     authMsg(msg, true);
     setTimeout(completeGate, 350);
   }
+  /* Batch A (Han 2026-11-02 #2): guest-only entry until the server
+     account system lands (server-side character storage + email
+     verification). The account code below stays intact for that
+     backend step; the guard makes it unreachable, and buildAuthZone
+     renders the zone disabled. Stored accounts are never deleted. */
+  var GUEST_ONLY = true;
   function doSignup() {
+    if (GUEST_ONLY) { authMsg(t('guestOnly')); return; }
     var id = ($('eauth-su-id') || {}).value || '', nm = ($('eauth-su-name') || {}).value || '',
         em = ($('eauth-su-email') || {}).value || '', pw = ($('eauth-su-pw') || {}).value || '';
     id = id.trim(); nm = nm.trim(); em = em.trim();
@@ -132,6 +140,7 @@
     });
   }
   function doSignin() {
+    if (GUEST_ONLY) { authMsg(t('guestOnly')); return; }
     var id = (($('eauth-si-id') || {}).value || '').trim(), pw = ($('eauth-si-pw') || {}).value || '';
     var rec = accounts()[id.toLowerCase()];
     if (!rec) { authMsg(t('noAcct')); return; }
@@ -144,55 +153,37 @@
     var zone = $('auth-box');
     if (!zone || zone.getAttribute('data-entryflow') === '1') return;
     zone.setAttribute('data-entryflow', '1');
-    var hasAccounts = Object.keys(accounts()).length > 0;
-    zone.innerHTML =
-      '<div class="eauth-tabs" role="tablist">' +
-        '<button type="button" class="eauth-tab' + (hasAccounts ? '' : ' on') + '" id="eauth-tab-su">' + esc(t('signUp')) + '</button>' +
-        '<button type="button" class="eauth-tab' + (hasAccounts ? ' on' : '') + '" id="eauth-tab-si">' + esc(t('signIn')) + '</button>' +
-      '</div>' +
-      '<div class="eauth-pane" id="eauth-pane-su"' + (hasAccounts ? ' hidden' : '') + '>' +
-        '<label class="eauth-label" for="eauth-su-id">ID</label>' +
-        '<input id="eauth-su-id" type="text" autocomplete="username" maxlength="16" placeholder="' + esc(t('idPh')) + '">' +
-        '<label class="eauth-label" for="eauth-su-name">NAME</label>' +
-        '<input id="eauth-su-name" type="text" autocomplete="name" maxlength="24" placeholder="' + esc(t('namePh')) + '">' +
-        '<label class="eauth-label" for="eauth-su-email">EMAIL</label>' +
-        '<input id="eauth-su-email" type="email" autocomplete="email" maxlength="64" placeholder="' + esc(t('emailPh')) + '">' +
-        '<label class="eauth-label" for="eauth-su-pw">PASSWORD</label>' +
-        '<input id="eauth-su-pw" type="password" autocomplete="new-password" maxlength="64" placeholder="' + esc(t('pwPh')) + '">' +
-        '<button type="button" class="espil-auth-btn" id="eauth-do-su">' + esc(t('create')) + '</button>' +
-      '</div>' +
-      '<div class="eauth-pane" id="eauth-pane-si"' + (hasAccounts ? '' : ' hidden') + '>' +
-        '<label class="eauth-label" for="eauth-si-id">ID</label>' +
-        '<input id="eauth-si-id" type="text" autocomplete="username" maxlength="16" placeholder="' + esc(t('idPh')) + '">' +
-        '<label class="eauth-label" for="eauth-si-pw">PASSWORD</label>' +
-        '<input id="eauth-si-pw" type="password" autocomplete="current-password" maxlength="64" placeholder="' + esc(t('pwPh')) + '">' +
-        '<button type="button" class="espil-auth-btn" id="eauth-do-si">' + esc(t('enter')) + '</button>' +
-      '</div>' +
-      '<p id="auth-msg" role="status"></p>' +
-      '<p id="auth-session" hidden></p>';
-    function tab(which) {
-      $('eauth-tab-su').classList.toggle('on', which === 'su');
-      $('eauth-tab-si').classList.toggle('on', which === 'si');
-      $('eauth-pane-su').hidden = which !== 'su';
-      $('eauth-pane-si').hidden = which !== 'si';
+    /* Batch A guest-only: the pair's own account form (auth-id,
+       auth-pw, auth-signin, auth-signup) is kept in place - ids and
+       the social module's wiring stay valid for the server backend
+       step - but every control is disabled and the reason is written
+       under the form. (This replaces the tabbed rebuild this module
+       used to inject: while GUEST_ONLY stands, no account control
+       may be live anywhere in the modal.) */
+    zone.querySelectorAll('input, button').forEach(function (el) { el.disabled = true; });
+    var note = zone.querySelector('.auth-guestonly-note');
+    if (!note) {
+      note = document.createElement('p');
+      note.className = 'auth-guestonly-note';
+      zone.appendChild(note);
     }
-    $('eauth-tab-su').addEventListener('click', function () { tab('su'); });
-    $('eauth-tab-si').addEventListener('click', function () { tab('si'); });
-    $('eauth-do-su').addEventListener('click', doSignup);
-    $('eauth-do-si').addEventListener('click', doSignin);
-    zone.querySelectorAll('input').forEach(function (inp) {
-      inp.addEventListener('keydown', function (e) {
-        e.stopPropagation();
-        if (e.key === 'Enter') { e.preventDefault(); if (inp.id.indexOf('su') >= 0) doSignup(); else doSignin(); }
-      });
-      inp.addEventListener('keyup', function (e) { e.stopPropagation(); });
-    });
+    note.textContent = t('guestOnly');
   }
 
   /* ---------------- guests: adopt the server's Guest N ----------- */
   var guestIntent = false, guestNumbered = false;
   document.addEventListener('click', function (e) {
-    if (e.target && e.target.id === 'guest-enter') guestIntent = true;
+    if (e.target && e.target.id === 'guest-enter') {
+      guestIntent = true;
+      /* Batch A guest-only: a guest entry must not silently carry a
+         stored account session (the custmerge gate would otherwise
+         adopt the account's registered character, and presence would
+         join under the account name). Drop ONLY the session record;
+         espil_accounts_v1 itself is left untouched for the server
+         backend step. Capture phase: this runs before the gate
+         completes and the character gate reads the session. */
+      try { localStorage.removeItem(LS_SESSION); } catch (_) {}
+    }
   }, true);
   setInterval(function () {
     if (guestNumbered || session()) return;

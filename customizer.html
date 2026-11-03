@@ -1012,6 +1012,177 @@ refreshAll();
 (function () {
   var q = new URLSearchParams(location.search);
   var FROM = q.get('from') || '';
+
+  /* ---- UI language: English version (Batch A, Han 2026-11-02 #1) --
+     The v3 app ships Korean-only (lang="ko"). This block adds English
+     WITHOUT touching the app, the character JSON format, or the
+     postMessage contract: option ids are never translated - only the
+     visible label strings are swapped, in the app's own data arrays
+     (so every re-render comes out in the active language), in the
+     static markup, and in dynamically rendered DOM text. Default
+     follows the pair's language: localStorage 'espil_lang' is shared
+     with the parent page (same origin) - 'ko' stays Korean, any
+     other set language reads English; with no pair choice, the
+     browser language decides. The in-frame KO/EN toggle persists to
+     'espil_cust_lang', which wins over the pair default. */
+  var L10N = {
+    '정면': 'Front', '오른쪽': 'Right', '뒷면': 'Back', '왼쪽': 'Left',
+    '밝게': 'Light', '구릿빛': 'Bronze',
+    '원본 남색': 'Original navy', '원본 갈색': 'Original brown', '원본': 'Original',
+    '검정': 'Black', '갈색': 'Brown', '빨강': 'Red', '주황': 'Orange', '금발': 'Blond',
+    '초록': 'Green', '파랑': 'Blue', '보라': 'Violet', '분홍': 'Pink', '에메랄드': 'Emerald',
+    '흰색': 'White', '회색': 'Gray',
+    '기본 뭉게머리': 'Default puffy', '사이드 파트': 'Side part', '사이드 포니테일': 'Side ponytail',
+    '포니테일': 'Ponytail', '스파이키 크롭': 'Spiky crop', '기본 트윈테일': 'Default twintails',
+    '단발 보브': 'Bob cut', '히메 롱': 'Hime long',
+    '기본 눈': 'Default eyes', '날카로운 눈': 'Sharp eyes', '반쯤 감긴 눈': 'Half-closed eyes',
+    '둥근 눈': 'Round eyes', '처진 눈': 'Droopy eyes', '올라간 눈': 'Up-turned eyes', '삼백안': 'Sanpaku eyes',
+    '기본 세트': 'Default set', '파랑 세트': 'Blue set', '초록 세트': 'Green set', '보라 세트': 'Violet set',
+    '스타일 2': 'Style 2', '갑옷': 'Armour', '가죽갑옷': 'Leather armour', '마법 로브': 'Magic robe',
+    '수호자 · 얼음검/방패': 'Guardian · Ice sword & shield', '양손검': 'Greatsword', '마법 활': 'Magic bow',
+    '지팡이': 'Staff', '단검 (준비 중)': 'Dagger (coming soon)', '맨손': 'Bare hands',
+    '남 ♂': 'Male ♂', '여 ♀': 'Female ♀',
+    '헤어': 'Hair', '얼굴': 'Face', '피부': 'Skin', '상의': 'Top', '하의': 'Bottom', '신발': 'Shoes',
+    '무기': 'Weapon', '캐릭터': 'Character',
+    '기본 (장착 중)': 'Default (worn)', '(항상 착용)': '(always worn)', '입기': 'Wear', '벗기': 'Remove', '벗음': 'Off',
+    '염색은 전 방향에 적용됩니다.': 'Hair colour applies in every direction.',
+    '눈 스타일은 정면 애니메이션에, 눈 색상은 정면과 측면에 적용됩니다.': 'Eye style applies to the front animation; eye colour applies to the front and side views.',
+    '스타일은 상의와 하의가 세트로 바뀝니다. 기본 세트 외의 스타일은 정면 애니메이션으로 재생됩니다.': 'A style changes the top and bottom as a set. Styles other than the default set play in the front animation.',
+    '상의는 항상 착용합니다. 벗기는 없습니다. 종류를 고르면 상의와 하의 세트 색상이 함께 바뀝니다. 종류 변경은 전 방향 정지 포즈에 적용됩니다.': 'The top is always worn and cannot be removed. Choosing a kind recolours the top and bottom set together. Kind changes apply to the still poses in every direction.',
+    '한 부위만 벗으면 그 복장으로 idle 애니메이션이 재생됩니다. 두 부위 이상 벗으면 정면 정지 포즈로 표시됩니다.': 'With one part removed, the idle animation plays in that outfit. With two or more parts removed, a front still pose is shown.',
+    '남자 기본 베이스는 옷을 입은 상태라 색상 변경으로 적용되며, idle 애니메이션에서도 색이 따라 움직입니다.': 'The male default base is already dressed, so it applies as a colour change, and the colour follows the idle animation as well.',
+    '단검 공격 모션은 아직 준비 중입니다.': 'The dagger attack motion is still in preparation.',
+    '여자 클래스 공격 모션은 아직 준비 중입니다.': 'Female class attack motions are still in preparation.',
+    '맨손 공격은 정면만 있습니다. ⚔ 버튼으로 재생합니다.': 'Bare-hand attacks exist for the front view only. Play them with the ⚔ button.',
+    '⚔ 버튼으로 공격 모션을 재생합니다. 공격 모션은 기본 모습으로 재생됩니다. (염색과 옷 색상은 반영되지 않습니다)': 'Play the attack motion with the ⚔ button. Attacks play in the default look. (Dye and outfit colours are not reflected.)',
+    '저장했어요 ✓': 'Saved ✓', '만들기': 'Create', '기본': 'Default'
+  };
+  var PHRASES = Object.keys(L10N).sort(function (a, b) { return b.length - a.length; });
+  var labelItems = [];
+  function collectLabelItems() {
+    var sets = [];
+    try {
+      sets = [DIRS, SKINS, HAIR_COLORS, EYE_COLORS, OUTFIT_STYLES, GARMENT_COLORS, FEMALE_KINDS, WEAPONS,
+        HAIR_STYLES.male, HAIR_STYLES.female, EYE_STYLES.male, EYE_STYLES.female];
+    } catch (e) { sets = []; }
+    sets.forEach(function (arr) {
+      if (!arr) return;
+      arr.forEach(function (it) { if (it && typeof it.label === 'string') labelItems.push({ it: it, ko: it.label }); });
+    });
+  }
+  var STATIC_SEL = [
+    ['.panel-title', 'textContent', 'Style Your Character'],
+    ['label[for="nameInput"]', 'textContent', 'Name'],
+    ['#randomBtn', 'title', 'Random'],
+    ['#resetBtn', 'title', 'Reset'],
+    ['#spinBtn', 'title', 'Auto-rotate'],
+    ['#idleBtn', 'title', 'Play / pause idle'],
+    ['#atkBtn', 'title', 'Play / pause attack'],
+    ['#exportBtn', 'textContent', 'Current view PNG'],
+    ['#sheetBtn', 'textContent', '4-direction sheet PNG'],
+    ['.foot-note', 'textContent', 'Hair and eye styles apply to the front animation. Outfit changes apply to the front animation and the still poses. Side and back views take the colours and skin tone on the default form. You can also turn with the arrow keys (← →).'],
+    ['#previewImg', 'alt', 'Preview of the selected style']
+  ];
+  var staticKo = null;
+  function snapStatic() {
+    staticKo = STATIC_SEL.map(function (row) {
+      var el = document.querySelector(row[0]);
+      return el ? el[row[1]] : null;
+    });
+  }
+  function applyStatic(lang) {
+    STATIC_SEL.forEach(function (row, i) {
+      var el = document.querySelector(row[0]);
+      if (!el) return;
+      el[row[1]] = lang === 'en' ? row[2] : (staticKo ? staticKo[i] : el[row[1]]);
+    });
+  }
+  function translateDom() {
+    if (custLang !== 'en' || !document.body) return;
+    var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+      acceptNode: function (n) {
+        if (!n.nodeValue || !/[가-힣]/.test(n.nodeValue)) return NodeFilter.FILTER_REJECT;
+        var p = n.parentElement;
+        if (!p || p.tagName === 'SCRIPT' || p.tagName === 'STYLE' || p.closest('#espil-lang-toggle') || p.id === 'nametag') return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    var nodes = [], n;
+    while ((n = walker.nextNode())) nodes.push(n);
+    nodes.forEach(function (node) {
+      var v = node.nodeValue, out = v;
+      for (var i = 0; i < PHRASES.length; i++) {
+        if (out.indexOf(PHRASES[i]) >= 0) out = out.split(PHRASES[i]).join(L10N[PHRASES[i]]);
+      }
+      if (out !== v) node.nodeValue = out;
+    });
+  }
+  function fixDefaultName() {
+    if (custLang !== 'en') return;
+    try {
+      var ni = document.getElementById('nameInput');
+      if (typeof state !== 'undefined' && state.name === '모험가' && ni && ni.value === '모험가') {
+        state.name = 'Adventurer'; ni.value = 'Adventurer';
+        var nt = document.getElementById('nametag'); if (nt) nt.textContent = 'Adventurer';
+        var nc = document.getElementById('nameCnt'); if (nc) nc.textContent = '10/12';
+      }
+    } catch (e) {}
+  }
+  var custLang = 'ko';
+  try {
+    var savedLang = localStorage.getItem('espil_cust_lang');
+    var pairLang = localStorage.getItem('espil_lang');
+    if (savedLang === 'en' || savedLang === 'ko') custLang = savedLang;
+    else if (pairLang) custLang = pairLang === 'ko' ? 'ko' : 'en';
+    else custLang = (navigator.language || 'en').slice(0, 2).toLowerCase() === 'ko' ? 'ko' : 'en';
+  } catch (e) {}
+  var docTitleKo = document.title;
+  function applyLang(lang) {
+    custLang = lang;
+    labelItems.forEach(function (rec) { rec.it.label = lang === 'en' ? (L10N[rec.ko] || rec.ko) : rec.ko; });
+    applyStatic(lang);
+    try { document.documentElement.setAttribute('lang', lang === 'en' ? 'en' : 'ko'); } catch (e) {}
+    document.title = lang === 'en' ? 'Character Customizer - Before the Auckland Time Stone' : docTitleKo;
+    var tg = document.getElementById('espil-lang-toggle');
+    if (tg) tg.querySelectorAll('button').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-clang') === lang); });
+    fixDefaultName();
+    translateDom();
+  }
+  collectLabelItems();
+  snapStatic();
+  (function installLang() {
+    var st = document.createElement('style');
+    st.textContent = '#espil-lang-toggle{display:flex;gap:6px;margin:0 0 10px}' +
+      '#espil-lang-toggle button{flex:1;padding:6px 0;border-radius:8px;border:1.5px solid #d9b380;background:#fffdf6;color:#8a6a3b;font:700 .72rem/1 "Manrope",sans-serif;letter-spacing:.08em;cursor:pointer}' +
+      '#espil-lang-toggle button.on{background:linear-gradient(180deg,#ffe9b8,#ffd98c);color:#6b4a1f;border-color:#b57708}';
+    document.head.appendChild(st);
+    var panel = document.getElementById('panel');
+    if (panel) {
+      var row = document.createElement('div');
+      row.id = 'espil-lang-toggle';
+      row.innerHTML = '<button type="button" data-clang="ko">한국어</button><button type="button" data-clang="en">ENGLISH</button>';
+      var title = panel.querySelector('.panel-title');
+      if (title && title.nextSibling) panel.insertBefore(row, title.nextSibling); else panel.insertBefore(row, panel.firstChild);
+      row.querySelectorAll('button').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var lang = b.getAttribute('data-clang');
+          try { localStorage.setItem('espil_cust_lang', lang); } catch (e) {}
+          applyLang(lang);
+          try { refreshAll(); } catch (e) {}
+        });
+      });
+    }
+    if (typeof refreshAll === 'function' && !refreshAll.__l10nWrapped) {
+      var origRefresh = refreshAll;
+      var wrapped = function () { origRefresh(); fixDefaultName(); translateDom(); };
+      wrapped.__l10nWrapped = true;
+      refreshAll = wrapped;
+    }
+    if (window.MutationObserver && document.body) {
+      new MutationObserver(function () { translateDom(); }).observe(document.body, { subtree: true, childList: true, characterData: true });
+    }
+  })();
+  applyLang(custLang);
   var OUTFIT_STYLE_IDS = ['default', 'outfit2', 'armor1', 'armor2', 'robe1'];
   var WEAPON_IDS = ['none', 'guard', 'greatsword', 'bow', 'staff', 'dagger'];
   function readRec() { try { return JSON.parse(localStorage.getItem('espil_character') || 'null'); } catch (e) { return null; } }
