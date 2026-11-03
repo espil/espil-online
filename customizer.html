@@ -1013,6 +1013,32 @@ refreshAll();
   var q = new URLSearchParams(location.search);
   var FROM = q.get('from') || '';
 
+  /* ---- No JSON file download (Han 2026-11-03) ----
+     The v3 app's Create handler also pushes the character JSON out
+     as a downloaded file (Blob + <a download="character_<gender>.json">
+     + a.click()) - a leftover of its standalone tool use. On
+     espil.online the character belongs in the game record, never in
+     a downloaded file (Han: the decorated character must BE the
+     in-game character, not an exported file). The app is the
+     customizer room's file and is not edited, so this layer swallows
+     exactly that anchor path: programmatic clicks on anchors whose
+     download name is the app's character JSON are no-ops. The app's
+     PNG exports (exportBtn / sheetBtn, .png filenames) and every
+     other anchor keep working; the Create handler still posts the
+     character to the parent, and this layer still saves it to the
+     espil record + account exactly as before. */
+  (function killJsonDownload() {
+    var proto = window.HTMLAnchorElement && HTMLAnchorElement.prototype;
+    if (!proto || proto.__espilNoJsonDl) return;
+    var origClick = proto.click;
+    proto.click = function () {
+      var dl = this.getAttribute && this.getAttribute('download');
+      if (typeof dl === 'string' && /^character_.+\.json$/i.test(dl)) return;
+      return origClick.apply(this, arguments);
+    };
+    proto.__espilNoJsonDl = true;
+  })();
+
   /* ---- UI language: English version (Batch A, Han 2026-11-02 #1) --
      The v3 app ships Korean-only (lang="ko"). This block adds English
      WITHOUT touching the app, the character JSON format, or the

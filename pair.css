@@ -1,0 +1,1669 @@
+
+    :root {
+      color-scheme:dark;
+      --space:#010306;
+      --ink:#f3f7f3;
+      --muted:#8fa5a7;
+      --signal:#86eee4;
+      --line:rgba(169,226,222,.2);
+    }
+    * { box-sizing:border-box; }
+    html,body { width:100%; height:100%; margin:0; overflow:hidden; overscroll-behavior:none; overscroll-behavior-y:none; background:var(--space); }
+    body { position:fixed; inset:0; color:var(--ink); font-family:"Manrope",sans-serif; touch-action:none; -webkit-overflow-scrolling:auto; }
+    button,canvas { -webkit-tap-highlight-color:transparent; }
+    .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+
+    .earth-frame {
+      position:relative;
+      width:100%;
+      height:100svh;
+      min-height:420px;
+      overflow:hidden;
+      isolation:isolate;
+      background:
+        radial-gradient(circle at 50% 49%,rgba(16,45,57,.35) 0,rgba(4,13,19,.15) 31%,rgba(1,3,6,0) 59%),
+        var(--space);
+      touch-action:none;
+      overscroll-behavior:none;
+    }
+    #globe-canvas { position:absolute; inset:0; display:block; width:100%; height:100%; outline:none; cursor:grab; touch-action:none; overscroll-behavior:none; }
+    #globe-canvas.is-dragging { cursor:grabbing; }
+    #globe-canvas:focus-visible { outline:1px solid var(--signal); outline-offset:-6px; }
+    .city-readout {
+      position:absolute;
+      z-index:25;
+      left:50%;
+      bottom:max(16px,env(safe-area-inset-bottom));
+      width:min(460px,calc(100% - 28px));
+      transform:translateX(-50%);
+      padding:10px 18px 9px;
+      border:1px solid rgba(134,238,228,.26);
+      border-radius:18px;
+      color:var(--ink);
+      background:linear-gradient(180deg,rgba(1,9,13,.94),rgba(1,5,8,.82));
+      box-shadow:0 0 0 1px rgba(0,0,0,.8) inset,0 16px 48px rgba(0,0,0,.48),0 0 28px rgba(81,217,208,.08);
+      text-align:center;
+      text-shadow:0 2px 16px #000;
+      pointer-events:auto;
+      overflow:hidden;
+    }
+    .city-readout::before,.city-readout::after {
+      content:"";
+      position:absolute;
+      z-index:3;
+      left:10px;
+      right:10px;
+      height:1px;
+      pointer-events:none;
+      background:linear-gradient(90deg,transparent,var(--signal),transparent);
+      box-shadow:0 0 10px rgba(134,238,228,.68);
+    }
+    .city-readout::before { top:72px; }
+    .city-readout::after { top:111px; }
+    .city-list {
+      position:relative;
+      height:165px;
+      overflow-y:auto;
+      overflow-x:hidden;
+      padding:62px 0;
+      scroll-snap-type:y mandatory;
+      scrollbar-width:none;
+      mask-image:linear-gradient(to bottom,transparent 0,#000 24%,#000 76%,transparent 100%);
+      -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 24%,#000 76%,transparent 100%);
+      overscroll-behavior:contain;
+      touch-action:pan-y;
+    }
+    .city-list::-webkit-scrollbar { display:none; }
+    .city-name {
+      appearance:none;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      width:100%;
+      height:40px;
+      border:0;
+      padding:0 16px;
+      color:rgba(199,225,225,.36);
+      background:none;
+      font:600 .76rem/1 "Manrope",sans-serif;
+      letter-spacing:.12em;
+      cursor:pointer;
+      scroll-snap-align:center;
+      transition:color .18s ease,font-size .18s ease,text-shadow .18s ease,opacity .18s ease;
+      white-space:nowrap;
+    }
+    .city-name:hover,.city-name:focus-visible,.city-name.is-centered { color:#fff8e1; outline:none;
+      text-shadow:0 0 8px rgba(255,217,77,.95),0 0 26px rgba(255,180,40,.55); }
+    .city-name.is-centered,.city-name.is-active {
+      font-size:clamp(1rem,3.2vw,1.34rem);
+      font-weight:800;
+      letter-spacing:.16em;
+    }
+    /* Blinking yellow lights on hover / centered (2026-10-06, per Han). */
+    @keyframes cityBlink{0%,100%{opacity:1;}50%{opacity:.15;}}
+    .city-name:hover::before,.city-name:focus-visible::before,.city-name.is-centered::before,
+    .city-name:hover::after,.city-name:focus-visible::after,.city-name.is-centered::after {
+      content:"\25CF"; font-size:.55em; color:#ffd94d;
+      text-shadow:0 0 8px rgba(255,217,77,.95);
+      animation:cityBlink 1.1s ease-in-out infinite;
+    }
+    .city-name:hover::before,.city-name:focus-visible::before,.city-name.is-centered::before { margin-right:10px; }
+    .city-name:hover::after,.city-name:focus-visible::after,.city-name.is-centered::after { margin-left:10px; }
+    /* Selected city (Han 2026-10-16 #2): sparkling yellow highlight on the
+       chosen city's button in the text div. */
+    @keyframes citySparkle{0%,100%{text-shadow:0 0 8px rgba(255,217,77,.95),0 0 26px rgba(255,180,40,.55);}50%{text-shadow:0 0 16px rgba(255,238,160,1),0 0 48px rgba(255,196,40,.95),0 0 76px rgba(255,170,30,.55);}}
+    .city-name.is-active { color:#ffe45e; animation:citySparkle 1.15s ease-in-out infinite; }
+    .city-name.is-active::before,.city-name.is-active::after {
+      content:"\2726"; font-size:.6em; color:#ffe45e;
+      text-shadow:0 0 10px rgba(255,217,77,1);
+      animation:cityBlink .8s ease-in-out infinite;
+    }
+    .city-name.is-active::before { margin-right:10px; }
+    .city-name.is-active::after { margin-left:10px; }
+    /* Inactive cities (Han 2026-10-18): shown in the reel but not
+       selectable - dimmed, no pointer, no centered highlight or
+       blinking dots even when scrolled to the middle. */
+    .city-name.is-inactive { opacity:.55; cursor:default; color:#9aa0a3; }
+    .city-name.is-inactive.is-centered { color:#9aa0a3; text-shadow:none; font-size:.76rem; font-weight:600; letter-spacing:.12em; }
+    .city-name.is-inactive.is-centered::before,.city-name.is-inactive.is-centered::after { content:none; }
+    .city-pin.is-inactive { opacity:.45; cursor:default; }
+    /* W2 (Han 2026-11-03 round 3 #1): coming-soon badge under the
+       pin orb for every city that is not open yet. */
+    .city-pin .soon{font:700 8px/1 "Manrope",sans-serif;letter-spacing:.12em;color:#ffd97a;
+      background:rgba(10,16,10,.55);border:1px solid rgba(255,217,122,.5);border-radius:999px;
+      padding:3px 6px;white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.8);}
+    .city-name.is-local { color:rgba(181,255,248,.62); }
+    .city-name.is-local:not(.is-centered)::before { content:"•"; margin-right:7px; color:var(--signal); }
+    .city-message {
+      min-height:1.2em;
+      margin-top:3px;
+      color:rgba(181,255,248,.74);
+      font:600 .66rem/1.2 "Manrope",sans-serif;
+      letter-spacing:.1em;
+    }
+    .city-message:empty::before { content:""; }
+    /* Han 2026-10-16 (landing text rules): city name only in the
+       landing readout - no clock text; and NO loading-progress
+       display anywhere on the landing (the preload still runs,
+       it just shows no bar or percentage). */
+    #city-clock { display:none; }
+    #city-loading { display:none !important; }
+    #loader .pct { display:none; }
+    /* Fallback bubbles stay hidden until real fill (Han re-check #9). */
+    #loader .bubble { opacity:clamp(0, calc((var(--p, 0) - 30) / 6), 1); }
+    /* 2026-10-11 (Han QA): the landing city-selection readout must not cover the
+       sign-in modal (z-20) once a city is selected. Hidden during the entry gates. */
+    #city-status.gate-hidden { display:none !important; }
+    .city-clock {
+      position:absolute;
+      z-index:4;
+      top:10px;
+      right:14px;
+      color:rgba(211,255,251,.76);
+      font:700 .66rem/1 "Manrope",sans-serif;
+      font-variant-numeric:tabular-nums;
+      letter-spacing:.14em;
+      text-shadow:0 0 10px rgba(80,232,220,.66);
+      pointer-events:none;
+    }
+    .city-phase {
+      display:none;
+      min-height:96px;
+      padding:24px 8px 4px;
+      align-items:center;
+      justify-content:center;
+      gap:16px;
+    }
+    .city-readout.is-city { width:min(520px,calc(100% - 28px)); }
+    .city-readout.is-city::before,.city-readout.is-city::after { display:none; }
+    .city-readout.is-city .city-list { display:none; }
+    .city-readout.is-city .city-phase { display:flex; }
+    /* City pins (2026-10-06, per Han): small 3D-look buttons with the city name above.
+       Keep them small — they sit on the globe, not in a panel. */
+    #city-pins{position:fixed;inset:0;pointer-events:none;z-index:21;overflow:hidden;}
+    .city-pin{position:absolute;left:0;top:0;pointer-events:auto;background:none;border:0;padding:8px;
+      cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;}
+    .city-pin .nm{font:600 10px/1 "Manrope",sans-serif;letter-spacing:.14em;text-indent:.14em;color:#eafffd;
+      text-shadow:0 0 6px rgba(120,255,228,.9),0 1px 3px rgba(0,0,0,.85);white-space:nowrap;}
+    .city-pin .orb{position:relative;width:14px;height:14px;}
+    .city-pin .ball{position:absolute;inset:0;border-radius:50%;
+      background:radial-gradient(circle at 32% 28%,#ffffff 0%,#d8fff6 22%,#7fe8cf 48%,#2f9d83 78%,#16614f 100%);
+      box-shadow:0 2px 5px rgba(0,0,0,.55),0 0 9px rgba(120,255,228,.75),inset -2px -3px 4px rgba(0,40,32,.45);}
+    .city-pin .halo{position:absolute;left:50%;top:50%;width:22px;height:22px;transform:translate(-50%,-50%);
+      border-radius:50%;border:1px solid rgba(160,255,238,.4);box-shadow:0 0 6px rgba(120,255,228,.25) inset;}
+    .city-pin:hover .orb,.city-pin:focus-visible .orb{transform:scale(1.25);}
+    .city-pin:focus-visible{outline:none;}
+    /* Blinking yellow on the button itself in hover state (2026-10-06, per Han). */
+    @keyframes pinYellowBlink{
+      0%,100%{box-shadow:0 2px 5px rgba(0,0,0,.55),0 0 16px rgba(255,217,77,.95),inset -2px -3px 4px rgba(0,40,32,.45);}
+      50%{box-shadow:0 2px 5px rgba(0,0,0,.55),0 0 3px rgba(255,217,77,.2),inset -2px -3px 4px rgba(0,40,32,.45);}
+    }
+    .city-pin:hover .ball,.city-pin:focus-visible .ball{animation:pinYellowBlink 1s ease-in-out infinite;}
+    .city-pin:hover .nm,.city-pin:focus-visible .nm{color:#ffe9a8;}
+    .city-pin.is-active .ball{background:radial-gradient(circle at 32% 28%,#ffffff 0%,#ffedd2 25%,#ffcf90 52%,#d8913f 80%,#8a4d16 100%);
+      box-shadow:0 2px 5px rgba(0,0,0,.55),0 0 12px rgba(255,200,140,.9),inset -2px -3px 4px rgba(80,35,0,.45);}
+    .city-pin.is-active .nm{color:#ffe9c9;}
+    .city-phase-name {
+      margin:0;
+      color:#eafffd;
+      font:800 clamp(1.08rem,3.2vw,1.5rem)/1.1 "Manrope",sans-serif;
+      letter-spacing:.12em;
+      text-shadow:0 0 8px rgba(181,255,248,.92),0 0 25px rgba(80,232,220,.54);
+    }
+    .city-return {
+      appearance:none;
+      border:1px solid rgba(134,238,228,.46);
+      border-radius:999px;
+      padding:9px 13px;
+      color:#ddfffc;
+      background:rgba(10,34,38,.72);
+      font:700 .65rem/1 "Manrope",sans-serif;
+      letter-spacing:.1em;
+      cursor:pointer;
+      box-shadow:0 0 15px rgba(80,232,220,.12);
+    }
+    .city-return:hover,.city-return:focus-visible { border-color:var(--signal); background:rgba(22,65,68,.78); outline:none; }
+    .city-readout::before,.city-readout::after {
+      content:"";
+      position:absolute;
+      z-index:3;
+      left:10px;
+      right:10px;
+      height:1px;
+      pointer-events:none;
+      background:linear-gradient(90deg,transparent,var(--signal),transparent);
+      box-shadow:0 0 10px rgba(134,238,228,.68);
+    }
+    .city-readout::before { top:72px; }
+    .city-readout::after { top:111px; }
+    .map-hint {
+      width:100%;
+      margin:0;
+      color:rgba(181,255,248,.66);
+      font:600 .62rem/1.5 "Manrope",sans-serif;
+      letter-spacing:.08em;
+      text-align:center;
+    }
+    /* Building name pill — appears at top when near a building (Han 2026-10-05). */
+    .building-name {
+      position:fixed;
+      top:8px; /* Han: clearly at top, above modal */
+      left:50%;
+      transform:translateX(-50%) translateY(0);
+      z-index:200; /* Han: above store modal, always at top */
+      background:rgba(8,16,26,.78);
+      color:#eaf6ff;
+      padding:10px 24px;
+      border-radius:999px;
+      font:600 .85rem/1.4 "Manrope",sans-serif;
+      letter-spacing:.1em;
+      border:1px solid rgba(140,220,255,.28);
+      backdrop-filter:blur(10px);
+      -webkit-backdrop-filter:blur(10px);
+      box-shadow:0 4px 24px rgba(0,0,0,.35);
+      opacity:1;
+      transition:opacity .3s ease, transform .3s ease;
+      pointer-events:none;
+      white-space:nowrap;
+      max-width:82vw;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .building-name.hidden {
+      opacity:0;
+      transform:translateX(-50%) translateY(-8px);
+    }
+    .building-name .loc-dot {
+      display:inline-block;
+    /* #12 (Han 2nd QA): Store interaction modal */
+    #store-modal { position:fixed; inset:0; z-index:100; display:flex; align-items:flex-start; justify-content:center;
+      padding-top:70px; /* Han: below the location pill, no overlap */
+      background:rgba(0,0,0,.55); backdrop-filter:blur(4px); }
+    #store-modal.hidden { display:none; }
+    /* Han: store modal only in map, never on landing */
+    body:not(.in-map) #store-modal { display:none !important; }
+    .store-modal-panel { background:rgba(12,20,32,.96); border:1px solid rgba(140,220,255,.3); border-radius:16px;
+      padding:24px; max-width:480px; width:90vw; max-height:80vh; overflow-y:auto; position:relative;
+      box-shadow:0 12px 48px rgba(0,0,0,.5); color:#eaf6ff; }
+    #store-modal-close { position:absolute; top:12px; right:16px; background:none; border:none; color:#9fb3c8;
+      font-size:1.5rem; cursor:pointer; }
+    #store-modal h3 { margin:0 0 16px; font:700 1.1rem "Manrope",sans-serif; letter-spacing:.06em; }
+    #store-list .store-item { padding:12px 16px; margin:8px 0; background:rgba(255,255,255,.06);
+      border-radius:10px; cursor:pointer; border:1px solid transparent; transition:border-color .2s; }
+    #store-list .store-item:hover { border-color:rgba(140,220,255,.4); background:rgba(255,255,255,.1); }
+    #store-list .store-item.selected { border-color:#7ed957; background:rgba(126,217,87,.15); }
+    #store-list .store-item .s-name { font-weight:700; }
+    #store-list .store-item .s-meta { font-size:.8rem; color:#9fb3c8; margin-top:4px; }
+    #store-back { background:none; border:none; color:#7ed957; cursor:pointer; margin-bottom:12px; font-size:.9rem; }
+    .store-actions { display:flex; gap:8px; margin:16px 0; flex-wrap:wrap; }
+    .store-actions button { flex:1; min-width:100px; padding:10px; background:rgba(126,217,87,.15);
+      border:1px solid rgba(126,217,87,.4); color:#eaf6ff; border-radius:8px; cursor:pointer; font-weight:600; }
+    .store-actions button:hover { background:rgba(126,217,87,.3); }
+    #store-detail-content { margin-top:16px; font-size:.9rem; line-height:1.6; }
+    #store-detail-content .review { background:rgba(255,255,255,.05); padding:12px; border-radius:8px; margin:8px 0; }
+    #store-detail-content .review .r-stars { color:#f2b134; }
+    #store-detail-content .photo-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    #store-detail-content .photo-grid img { width:100%; border-radius:8px; }
+      width:7px;height:7px;border-radius:50%;
+      background:#7fe3ff;margin-right:9px;
+      box-shadow:0 0 8px #7fe3ff;
+      vertical-align:1px;
+    }
+    /* QA #8: interact prompt when near a building. */
+    .interact-prompt {
+      position:fixed;
+      bottom:158px;
+      left:50%;
+      transform:translateX(-50%);
+      z-index:40;
+      background:rgba(8,16,26,.78);
+      color:#ffe9a8;
+      padding:8px 18px;
+      border-radius:12px;
+      font:600 .78rem/1.4 "Manrope",sans-serif;
+      letter-spacing:.08em;
+      border:1px solid rgba(255,220,120,.3);
+      backdrop-filter:blur(10px);
+      -webkit-backdrop-filter:blur(10px);
+      opacity:1;
+      transition:opacity .25s;
+      pointer-events:none;
+    }
+    .interact-prompt.hidden { opacity:0; }
+    .interact-prompt .key {
+      display:inline-block;
+      background:rgba(255,255,255,.15);
+      border:1px solid rgba(255,255,255,.3);
+      border-radius:4px;
+      padding:1px 7px;
+      margin-right:8px;
+      font-size:.72rem;
+    }
+    /* QA #15: sprint toggle button (touch) + indicator. */
+    #sprint-toggle {
+      display:none;
+      position:fixed;
+      z-index:30;
+      right:22px;
+      bottom:186px;
+      width:64px;
+      height:64px;
+      border-radius:50%;
+      border:2px solid rgba(134,238,228,.55);
+      background:rgba(10,34,38,.6);
+      color:#ddfffc;
+      font:700 .62rem/1.2 "Manrope",sans-serif;
+      letter-spacing:.06em;
+    }
+    #sprint-toggle.active {
+      background:rgba(20,80,70,.8);
+      border-color:#7fe3ff;
+      box-shadow:0 0 14px rgba(127,227,255,.5);
+    }
+    /* 2026-10-12 (Han): sprint UI retired — one run mode. */
+    #sprint-toggle, #sprint-indicator { display:none !important; }
+    #sprint-indicator {
+      position:fixed;
+      top:64px;
+      left:50%;
+      transform:translateX(-50%);
+      z-index:40;
+      color:#7fe3ff;
+      font:700 .68rem/1 "Manrope",sans-serif;
+      letter-spacing:.14em;
+      opacity:0;
+      transition:opacity .25s;
+      pointer-events:none;
+    }
+    #sprint-indicator.active { opacity:.9; }
+    .map-jump {
+      display:none;
+      position:fixed;
+      z-index:30;
+      right:22px;
+      bottom:96px;
+      width:76px;
+      height:76px;
+      border-radius:50%;
+      border:2px solid rgba(134,238,228,.55);
+      background:rgba(10,34,38,.6);
+      color:#ddfffc;
+      font:800 .68rem/1 "Manrope",sans-serif;
+      letter-spacing:.08em;
+      cursor:pointer;
+      box-shadow:0 0 18px rgba(80,232,220,.25);
+      touch-action:none;
+      user-select:none;
+      -webkit-user-select:none;
+    }
+    .map-jump:active { background:rgba(34,90,94,.8); }
+    @media (pointer:coarse) {
+      body.in-map .map-jump { display:block; }
+      body.in-map .joystick { display:block; }
+    }
+    body:not(.in-map) .joystick { display:none !important; }
+    /* ---- Skill system HUD: Keeper ---- */
+    body:not(.in-map) .map-status,
+    body:not(.in-map) .skill-bar,
+    body:not(.in-map) .map-attack,
+    body:not(.in-map) .chat-window,
+    body:not(.in-map) #tree-toggle { display:none !important; }
+    /* ---- Landing/game separation (2026-10-07): hide ALL landing UI when in-game ----
+       NOTE (2026-10-08): #earth-frame and #globe-canvas are NOT hidden — the map
+       reuses the same WebGL canvas as the landing globe. Hiding it breaks map rendering.
+       Only the landing UI overlays are hidden. */
+    body.in-map #city-info,
+    body.in-map #city-return,
+    body.in-map #city-phase,
+    body.in-map #city-pins,
+    body.in-map .city-markers { display:none !important; }
+    /* Exit city button (Han 2026-10-18): shown only inside a city,
+       top-right beside the music button. */
+    #city-exit { display:none; }
+    body.in-map #city-exit { display:inline-flex; }
+    /* Settings gear (Han batch 5 #3): replaces the EXIT button at
+       the same top-right spot; EXIT's job lives in the settings
+       menu as Return to Earth. */
+    #city-settings { display:none; }
+    body.in-map #city-settings { display:inline-flex; }
+    /* #6: Direct entry (/vancouver) — hide landing immediately */
+    body.direct-entry #intro,
+    body.direct-entry #city-info,
+    body.direct-entry .city-markers { display:none !important; }
+    .map-status {
+      position:fixed; z-index:30; top:calc(14px + env(safe-area-inset-top)); left:14px;
+      width:200px; padding:8px 10px 10px;
+      border:none; border-radius:8px;
+      background:rgba(2,8,11,.38); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+      color:#ddfffc; font-family:"Manrope",sans-serif; pointer-events:none;
+    }
+    /* ---- Chat window (2026-10-11): always-on log, high-transparency bg,
+       text stays legible, Enter activates input. Local single-player only.
+       Han 2026-10-13 #10: raised above the 3-row hotbar to fix overlap.
+       (Re-applied 2026-10-14 after the working-copy overwrite.) ---- */
+    /* Han re-check 2026-10-17 #6: chat layout copied from cauldron-test -
+       bottom-left panel, channel header, log, always-visible input. */
+    .chat-window {
+      position:fixed; z-index:30; left:16px; bottom:calc(18px + env(safe-area-inset-bottom));
+      width:min(360px,24vw,calc(100vw - 32px));
+      border:2px solid rgba(255,221,140,.34); border-radius:14px;
+      background:rgba(8,8,12,.28); color:#fff4cf; padding:12px;
+      backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
+      box-shadow:0 12px 24px rgba(0,0,0,.2);
+      font-family:"Manrope",sans-serif; pointer-events:none;
+    }
+    .chat-window.typing {
+      border-color:rgba(115,217,255,.72); background:rgba(8,10,18,.48);
+      box-shadow:0 0 0 2px rgba(115,217,255,.14),0 16px 30px rgba(0,0,0,.28);
+    }
+    .chat-window.is-expanded { width:min(520px,60vw,calc(100vw - 32px)); }
+    .chat-head { display:flex; gap:6px; margin-bottom:7px; }
+    .chat-channel {
+      border:1px solid rgba(255,221,140,.38); border-radius:999px; background:rgba(0,0,0,.22);
+      color:rgba(255,244,207,.72); font-size:11px; font-weight:950; padding:4px 9px;
+      pointer-events:auto; cursor:pointer; font-family:inherit;
+    }
+    .chat-channel.is-active { background:rgba(255,221,140,.18); color:#fff4cf; }
+    .chat-expand {
+      margin-left:auto; pointer-events:auto; cursor:pointer; width:24px; height:24px;
+      border:1px solid rgba(255,221,140,.38); border-radius:8px; background:rgba(0,0,0,.22);
+      color:#fff4cf; font:950 13px/1 "Manrope",sans-serif; display:grid; place-items:center;
+    }
+    @media (pointer:coarse) and (orientation:landscape) {
+      .chat-window { left:12px; bottom:calc(170px + env(safe-area-inset-bottom)); width:min(320px,calc(100vw - 24px)); }
+    }
+    /* Han 2026-10-16 #10: chat window copies the cauldron-test design -
+       gold frame, cream text, message bubbles (placement unchanged). */
+    .chat-log {
+      min-height:92px; max-height:168px; overflow-y:auto; display:flex; flex-direction:column; gap:5px;
+      padding:2px 0 7px; margin:0;
+      font-size:.72rem; line-height:1.45; color:#fff4cf; text-shadow:0 1px 4px #000;
+    }
+    .chat-window.is-expanded .chat-log { max-height:260px; }
+    .chat-msg {
+      display:grid; grid-template-columns:22px 1fr; column-gap:7px; align-items:start;
+      padding:6px 8px; border-radius:10px;
+      border:1px solid rgba(255,221,140,.22); background:rgba(0,0,0,.22);
+    }
+    .chat-msg::before {
+      content:""; width:22px; height:22px; border-radius:50%; grid-row:1 / span 2;
+      background:rgba(115,217,255,.18);
+    }
+    .chat-msg .who { grid-column:2; }
+    .chat-msg .txt { grid-column:2; }
+    .chat-msg .who { color:#ffe8a0; font-weight:800; }
+    .chat-msg.sys { display:block; color:rgba(255,244,207,.62); font-style:italic; border-color:transparent; background:transparent; }
+    .chat-msg.sys::before { display:none; }
+    .chat-input {
+      display:block; width:100%; box-sizing:border-box; pointer-events:auto;
+      padding:8px; border-radius:8px;
+      border:1px solid rgba(255,221,140,.4); background:rgba(0,0,0,.28); color:#fff4cf;
+      font:600 .75rem "Manrope",sans-serif; outline:none;
+    }
+    .chat-input:focus { border-color:rgba(115,217,255,.72); box-shadow:0 0 0 2px rgba(115,217,255,.14); }
+    /* Han 2026-10-16 #11: speech bubble over the character with the sent text. */
+    #chat-bubble {
+      position:fixed; z-index:56; transform:translate(-50%,-115%);
+      background:rgba(255,255,255,.96); color:#12242b; border-radius:12px;
+      padding:6px 10px; font:600 13px/1.35 "Manrope",sans-serif;
+      max-width:230px; word-break:break-word; display:none; pointer-events:none;
+      box-shadow:0 4px 14px rgba(0,0,0,.35);
+    }
+    #chat-bubble::after {
+      content:""; position:absolute; left:50%; bottom:-6px; transform:translateX(-50%);
+      border:6px solid transparent; border-top-color:rgba(255,255,255,.96); border-bottom:0;
+    }
+    .ms-level { display:flex; justify-content:space-between; align-items:center; font:800 .68rem/1.2 "Manrope",sans-serif; letter-spacing:.1em; color:#eafffd; text-shadow:0 0 8px rgba(80,232,220,.5); }
+    .ms-sp { color:#ffd97a; font-size:.68rem; }
+    .ms-label { display:flex; justify-content:space-between; margin-top:7px; font:700 .55rem/1 "Manrope",sans-serif; letter-spacing:.12em; color:rgba(181,255,248,.62); }
+    .ms-bar { height:8px; margin-top:4px; border-radius:99px; background:rgba(255,255,255,.09); overflow:hidden; }
+    .ms-bar > i { display:block; height:100%; border-radius:99px; transition:width .25s ease; }
+    .ms-hp > i { background:linear-gradient(90deg,#ff5f6d,#ff9a5a); width:100%; }
+    .ms-mp > i { background:linear-gradient(90deg,#3fa7ff,#7dfce6); width:100%; }
+    .ms-exp > i { background:linear-gradient(90deg,#a3e635,#4ade80); width:0%; }
+    /* QA #7 (2026-10-09): minimap top-right, player-centered. */
+    /* Han 2026-10-09: 3-stage map (minimap → district → fullscreen), OSM tiles, +/- zoom, M key cycles. */
+    #minimap-wrap {
+      /* Han 2026-10-16 #15: minimap copies the cauldron-test frame -
+         wood border, gold inner ring, cream outer ring (stages unchanged). */
+      position:fixed; z-index:30; top:calc(64px + env(safe-area-inset-top)); right:14px;
+      width:140px; height:140px; border-radius:50%; overflow:hidden;
+      border:4px solid #3a2416;
+      background:#07130e;
+      box-shadow:inset 0 0 0 3px #d9b678, 0 12px 28px rgba(0,0,0,.45), 0 0 0 2px rgba(255,244,207,.24);
+      transition:width .3s, height .3s, border-radius .3s;
+    }
+    #minimap-wrap[data-stage="2"] {
+      /* Batch A10 (Han 2026-11-02 #10): stage 2 was a 430x330 rounded
+         rectangle that read as an ellipse. It is now a true circle -
+         one shared min() for width and height, so the two can never
+         diverge - at 400px, slightly larger than the old average
+         dimension (380px). */
+      width:min(400px,calc(100vw - 32px),calc(100vh - 32px)); height:min(400px,calc(100vw - 32px),calc(100vh - 32px)); border-radius:50%; transform:none;
+    }
+    #minimap-wrap[data-stage="3"] {
+      top:0; right:0; width:100vw; height:100vh; border-radius:0; border:none; z-index:70;
+    }
+    #minimap { width:100%; height:100%; }
+    #minimap-wrap[data-stage="1"] .map-zoom-controls { display:none; }
+    .map-zoom-controls {
+      position:absolute; z-index:10; right:8px; top:8px; display:flex; gap:6px;
+    }
+    .map-zoom-btn {
+      width:32px; height:32px; border-radius:50%; border:2px solid #d9b678;
+      background:rgba(8,8,12,.66); color:#fff4cf; font:700 18px/1 "Manrope",sans-serif;
+      cursor:pointer; display:grid; place-items:center;
+    }
+    .map-zoom-btn:hover { background:rgba(60,44,20,.8); }
+    body:not(.in-map) #minimap-wrap { display:none !important; }
+    /* QA hotbar (2026-10-08): desktop = keyboard layout (1234/QWER/ASDF) + menu keys on right. */
+    /* Han 2026-10-09: left/right split — keyboard left, menu right (center clear for interact UI). */
+    /* Han 2026-10-11 #8: 10% more space from border. */
+    .skill-bar {
+      position:fixed; z-index:30; left:0; right:0; bottom:calc(14px + env(safe-area-inset-bottom));
+      font-family:"Manrope",sans-serif;
+      display:flex; gap:16px; align-items:flex-end; justify-content:center;
+      padding:0 16px; pointer-events:none;
+    }
+    .skill-bar > * { pointer-events:auto; }
+    /* Han 2026-10-11: Full 3D UI — depth, bevels, perspective on all in-game UI.
+       (Re-applied 2026-10-14 after the working-copy overwrite.) */
+    .skill-bar { perspective:800px; }
+    .kb-main, .kb-menu { transform-style:preserve-3d; }
+    .move-slot {
+      transform:translateZ(0);
+      box-shadow:
+        0 0 12px rgba(63,125,68,.35),
+        inset 0 0 8px rgba(107,74,47,.3),
+        inset 0 2px 3px rgba(255,255,255,.15),
+        inset 0 -3px 5px rgba(0,0,0,.4),
+        0 4px 8px rgba(0,0,0,.5),
+        0 8px 16px rgba(0,0,0,.3);
+      transition:transform .15s ease, box-shadow .15s ease;
+    }
+    .move-slot:hover {
+      transform:translateZ(8px) scale(1.05);
+      box-shadow:
+        0 0 16px rgba(255,217,122,.4),
+        inset 0 2px 3px rgba(255,255,255,.2),
+        inset 0 -3px 5px rgba(0,0,0,.4),
+        0 6px 12px rgba(0,0,0,.5),
+        0 12px 24px rgba(0,0,0,.35);
+    }
+    .move-slot:active {
+      transform:translateZ(-2px) scale(.97);
+      border-color:#ffd97a;
+      box-shadow:
+        0 0 16px rgba(255,217,122,.5),
+        inset 0 3px 8px rgba(0,0,0,.5),
+        0 2px 4px rgba(0,0,0,.5);
+    }
+    /* Deactivated menu button (Han 2026-10-18: character custom is
+       out for now) - rendered, dimmed, no hover lift, not pressable. */
+    .move-slot.is-off { opacity:.42; cursor:default; filter:saturate(.4); }
+    .move-slot.is-off:hover { transform:translateZ(0); box-shadow:
+        0 0 12px rgba(63,125,68,.35),
+        inset 0 0 8px rgba(107,74,47,.3),
+        inset 0 2px 3px rgba(255,255,255,.15),
+        inset 0 -3px 5px rgba(0,0,0,.4),
+        0 4px 8px rgba(0,0,0,.5),
+        0 8px 16px rgba(0,0,0,.3); }
+    /* 3D panels */
+    .st-card {
+      transform:perspective(1000px) rotateX(2deg);
+      box-shadow:
+        0 0 44px rgba(63,125,68,.25),
+        inset 0 0 30px rgba(90,61,38,.15),
+        inset 0 2px 4px rgba(255,255,255,.08),
+        0 20px 60px rgba(0,0,0,.6),
+        0 40px 100px rgba(0,0,0,.4);
+    }
+    .st-close {
+      box-shadow:
+        inset 0 2px 3px rgba(255,255,255,.15),
+        inset 0 -2px 4px rgba(0,0,0,.4),
+        0 4px 8px rgba(0,0,0,.4);
+      transition:transform .15s ease;
+    }
+    .st-close:hover { transform:translateZ(4px) scale(1.1); }
+    .st-close:active { transform:translateZ(-1px) scale(.95); }
+    /* 3D status HUD */
+    .map-status {
+      transform:perspective(800px) rotateY(-3deg);
+      box-shadow:
+        0 0 18px rgba(80,232,220,.15),
+        inset 0 1px 2px rgba(255,255,255,.1),
+        0 8px 24px rgba(0,0,0,.5),
+        0 16px 40px rgba(0,0,0,.3);
+    }
+    /* 3D minimap */
+    #minimap-wrap {
+      box-shadow:
+        0 0 18px rgba(80,232,220,.15),
+        inset 0 2px 6px rgba(0,0,0,.4),
+        0 10px 30px rgba(0,0,0,.5),
+        0 20px 50px rgba(0,0,0,.3);
+      transform:perspective(800px) rotateY(3deg);
+    }
+    .map-zoom-btn {
+      box-shadow:
+        inset 0 2px 3px rgba(255,255,255,.15),
+        inset 0 -2px 4px rgba(0,0,0,.4),
+        0 4px 8px rgba(0,0,0,.4);
+      transition:transform .15s ease;
+    }
+    .map-zoom-btn:hover { transform:translateZ(4px) scale(1.1); }
+    .map-zoom-btn:active { transform:translateZ(-1px) scale(.95); }
+    /* 3D pill buttons (topbar) */
+    .pill-btn {
+      box-shadow:
+        inset 0 2px 3px rgba(255,255,255,.12),
+        inset 0 -2px 4px rgba(0,0,0,.35),
+        0 4px 10px rgba(0,0,0,.4),
+        0 8px 20px rgba(0,0,0,.25);
+      transition:transform .15s ease, box-shadow .15s ease;
+    }
+    .pill-btn:hover { transform:translateY(-2px); }
+    .pill-btn:active { transform:translateY(1px); box-shadow:inset 0 3px 8px rgba(0,0,0,.4), 0 2px 4px rgba(0,0,0,.4); }
+    /* 3D joystick */
+    .joystick {
+      box-shadow:
+        0 0 24px rgba(64,255,205,.18),
+        inset 0 3px 8px rgba(0,0,0,.5),
+        inset 0 -2px 4px rgba(255,255,255,.05),
+        0 10px 30px rgba(0,0,0,.5);
+    }
+    .joy-knob {
+      box-shadow:
+        0 0 18px rgba(64,255,205,.5),
+        inset 0 2px 4px rgba(255,255,255,.3),
+        inset 0 -3px 6px rgba(0,0,0,.3),
+        0 6px 16px rgba(0,0,0,.4);
+    }
+    /* Han 2026-10-14: HP/MP glass potion flasks (approved demo) — the loader v4
+       round-glass liquid as HUD orbs. HP red (left of the slot grid), MP blue
+       (right). Fill height = value; paintStatus() sets --p. */
+    .flask-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none;}
+    .flask{
+      position:relative;width:84px;height:84px;border-radius:50%;
+      overflow:hidden;isolation:isolate;flex:none;
+      background:radial-gradient(circle at 32% 26%, rgba(255,255,255,.1), rgba(255,255,255,0) 56%), rgba(240,248,255,.03);
+      box-shadow:
+        inset 0 0 0 1px rgba(240,248,255,.18),
+        inset 0 10px 18px rgba(255,255,255,.07),
+        inset 0 -16px 24px rgba(0,0,0,.32),
+        inset 0 0 17px rgba(240,248,255,.07),
+        0 12px 30px rgba(0,0,0,.45);
+      filter:drop-shadow(0 12px 12px rgba(0,0,0,.4));
+    }
+    .flask .slosh{position:absolute;inset:0;z-index:1;transform-origin:50% 88%;animation:flSlosh 3.4s ease-in-out infinite alternate;}
+    .flask.mp .slosh{animation-duration:4.2s;animation-delay:-1.4s;}
+    @keyframes flSlosh{from{transform:rotate(-2.4deg) translateX(-1.6px)}to{transform:rotate(2.4deg) translateX(1.6px)}}
+    .flask .water{position:absolute;left:0;right:0;bottom:0;height:calc(var(--p,100)*1%);z-index:1;transition:height .45s cubic-bezier(.22,.9,.3,1);}
+    .flask.hp .water{background:linear-gradient(180deg, rgba(255,183,160,.55), rgba(255,96,84,.48) 30%, rgba(214,40,52,.55) 74%, rgba(122,12,28,.66));}
+    .flask.mp .water{background:linear-gradient(180deg, rgba(165,225,255,.55), rgba(96,180,255,.48) 30%, rgba(38,110,220,.55) 74%, rgba(16,60,160,.66));}
+    .flask .water::before{content:"";position:absolute;left:6%;right:6%;bottom:2px;height:34%;background:radial-gradient(ellipse at 50% 100%, rgba(255,255,255,.26), rgba(255,255,255,0) 70%);}
+    .flask .water::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg, transparent 28%, rgba(255,255,255,.14) 45%, rgba(255,255,255,.03) 55%, transparent 68%);background-size:260% 100%;animation:flStreak 5.5s ease-in-out infinite alternate;}
+    @keyframes flStreak{from{background-position:110% 0}to{background-position:-30% 0}}
+    .flask .surface{position:absolute;left:-4%;right:-4%;top:-7px;height:14px;border-radius:50%;animation:flSurfaceBob 1.7s ease-in-out infinite alternate;}
+    .flask.hp .surface{background:radial-gradient(ellipse at 50% 42%, rgba(255,224,205,.85), rgba(253,164,175,.34) 55%, rgba(253,164,175,0) 74%);}
+    .flask.mp .surface{background:radial-gradient(ellipse at 50% 42%, rgba(224,246,255,.85), rgba(125,211,252,.34) 55%, rgba(125,211,252,0) 74%);}
+    @keyframes flSurfaceBob{from{transform:translateY(-1.4px) rotate(-1.7deg)}to{transform:translateY(1.6px) rotate(1.7deg)}}
+    .flask .wave{position:absolute;left:0;top:-7px;width:200%;height:8px;animation:flWave1 2.6s linear infinite;}
+    .flask.hp .wave{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 14' preserveAspectRatio='none'%3E%3Cpath d='M0 8 Q 15 1 30 8 T 60 8 T 90 8 T 120 8 V14 H0 Z' fill='%23fda4af' fill-opacity='0.45'/%3E%3C/svg%3E") repeat-x;background-size:120px 8px;}
+    .flask.mp .wave{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 14' preserveAspectRatio='none'%3E%3Cpath d='M0 8 Q 15 1 30 8 T 60 8 T 90 8 T 120 8 V14 H0 Z' fill='%237dd3fc' fill-opacity='0.45'/%3E%3C/svg%3E") repeat-x;background-size:120px 8px;}
+    .flask .wave.back{top:-6px;opacity:.22;animation:flWave2 4.4s linear infinite;}
+    .flask .wave.deep{top:-5px;opacity:.15;background-size:170px 10px;height:10px;animation:flWave3 7s linear infinite;}
+    @keyframes flWave1{0%{transform:translate(0,0)}50%{transform:translate(-60px,1.9px)}100%{transform:translate(-120px,0)}}
+    @keyframes flWave2{0%{transform:translate(-120px,1.6px)}50%{transform:translate(-60px,-1px)}100%{transform:translate(0,1.6px)}}
+    @keyframes flWave3{0%{transform:translate(0,0)}50%{transform:translate(-85px,2.6px)}100%{transform:translate(-170px,0)}}
+    .flask .swirl{position:absolute;left:0;right:0;bottom:0;height:calc(var(--p,100)*1%);overflow:hidden;z-index:2;transition:height .45s cubic-bezier(.22,.9,.3,1);pointer-events:none;}
+    .flask .swirl i{position:absolute;left:50%;top:50%;width:200px;height:200px;margin:-100px 0 0 -100px;border-radius:50%;background:conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,.26) 40deg, transparent 95deg, rgba(255,255,255,.14) 165deg, transparent 215deg, rgba(255,255,255,.2) 300deg, transparent 345deg);animation:flSwirl 6s linear infinite;}
+    @keyframes flSwirl{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+    .flask .bubble{position:absolute;bottom:8px;border-radius:50%;z-index:3;background:radial-gradient(circle at 32% 32%, rgba(255,255,255,.95), rgba(255,255,255,.15) 65%);animation:flBubble 3.2s ease-in infinite;}
+    .flask .bubble.b1{left:38%;width:5px;height:5px;animation-delay:0s}
+    .flask .bubble.b2{left:55%;width:3px;height:3px;animation-delay:1.1s}
+    .flask .bubble.b3{left:47%;width:6px;height:6px;animation-delay:2s}
+    .flask .bubble.b4{left:63%;width:4px;height:4px;animation-delay:.6s}
+    .flask .bubble.b5{left:29%;width:3.5px;height:3.5px;animation-delay:1.7s}
+    @keyframes flBubble{0%{transform:translate(0,0);opacity:0}12%{opacity:.85}38%{transform:translate(-2.4px,-24px)}62%{transform:translate(2.2px,-42px)}88%{opacity:.7}100%{transform:translate(-1px,-62px);opacity:0}}
+    .flask .glass-shade{position:absolute;inset:0;border-radius:50%;z-index:3;pointer-events:none;box-shadow:inset -14px -12px 26px rgba(0,0,0,.22), inset 12px 14px 22px rgba(255,255,255,.05);}
+    .flask .glass-shine{position:absolute;inset:0;border-radius:50%;z-index:4;pointer-events:none;background:radial-gradient(52px 27px at 30% 16%, rgba(255,255,255,.42), rgba(255,255,255,0) 62%), radial-gradient(84px 84px at 78% 88%, rgba(255,255,255,.1), rgba(255,255,255,0) 55%);}
+    .flask .pct{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:19px;color:#fff;text-shadow:0 1px 10px rgba(10,20,40,.6);}
+    .flask .pct small{font-size:10px;margin-left:1px;margin-top:5px;}
+    .flask-label{font:800 .6rem "Manrope",sans-serif;letter-spacing:.2em;text-indent:.2em;color:#eafffd;text-shadow:0 1px 6px rgba(0,0,0,.75);white-space:nowrap;}
+    .flask-label .v{color:#ffd97a;letter-spacing:.03em;text-indent:0;}
+    .flask-wrap.low .flask{animation:flPulse .8s ease-in-out infinite alternate;}
+    @keyframes flPulse{from{filter:drop-shadow(0 12px 12px rgba(0,0,0,.4)) brightness(1)}to{filter:drop-shadow(0 12px 16px rgba(255,60,60,.35)) brightness(1.18)}}
+    @media (max-width:820px){
+      .flask{width:62px;height:62px;}
+      .flask .pct{font-size:14px;}
+      .flask-label{font-size:.52rem;}
+    }
+    /* Han 2026-10-14: city name shows ONCE, big and front-center, on entry —
+       the persistent HUD city name is retired (.city-phase-name hidden). */
+    .city-phase-name{display:none !important;}
+    #city-intro{
+      position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;
+      pointer-events:none;opacity:0;visibility:hidden;
+    }
+    #city-intro.show{animation:cityIntroShow 2.6s ease forwards;}
+    #city-intro .ci-name{
+      font:800 clamp(2.4rem,7vw,4.2rem)/1.1 "Manrope",sans-serif;letter-spacing:.14em;text-indent:.14em;
+      color:#fff;text-align:center;
+      text-shadow:0 0 18px rgba(181,255,248,.75),0 0 60px rgba(80,232,220,.45),0 4px 30px rgba(0,0,0,.6);
+    }
+    #city-intro .ci-sub{
+      display:block;margin-top:10px;font:700 clamp(.62rem,1.6vw,.8rem)/1 "Manrope",sans-serif;
+      letter-spacing:.5em;text-indent:.5em;color:#ffd97a;text-shadow:0 0 12px rgba(255,217,122,.6);
+    }
+    @keyframes cityIntroShow{
+      0%{opacity:0;visibility:visible;transform:scale(.96);}
+      12%{opacity:1;transform:scale(1);}
+      78%{opacity:1;}
+      100%{opacity:0;visibility:hidden;transform:scale(1.02);}
+    }
+    /* Settings panel (Han 2026-10-14): city selection lives here. */
+    #settings-panel{position:fixed;inset:0;z-index:46;display:none;align-items:center;justify-content:center;background:rgba(2,8,6,.45);}
+    #settings-panel.open{display:flex;}
+    .set-card{
+      position:relative;width:min(430px,calc(100vw - 36px));max-height:calc(100% - 60px);overflow:auto;
+      border-radius:18px;padding:24px 26px 22px;color:#f2fff8;text-align:left;
+      background:
+        radial-gradient(420px 300px at 85% -10%, rgba(107,74,47,.35), transparent 60%),
+        linear-gradient(160deg,#122b1a,#08130c 70%);
+      border:2px solid rgba(107,74,47,.8);
+      box-shadow:0 0 44px rgba(63,125,68,.25), inset 0 0 30px rgba(90,61,38,.15), 0 20px 60px rgba(0,0,0,.6);
+    }
+    .set-card h3{margin:0 0 4px;font:800 1.05rem "Manrope",sans-serif;letter-spacing:.14em;color:#ffd97a;}
+    .set-card .set-sub{margin:0 0 18px;font:600 .68rem "Manrope",sans-serif;letter-spacing:.06em;color:rgba(220,255,238,.55);}
+    .set-card label{display:block;margin:0 0 7px;font:700 .62rem "Manrope",sans-serif;letter-spacing:.24em;color:rgba(220,255,238,.75);}
+    .set-card select{
+      width:100%;padding:11px 12px;border-radius:10px;border:1px solid rgba(255,217,122,.45);
+      background:rgba(6,20,12,.9);color:#f2fff8;font:700 .85rem "Manrope",sans-serif;cursor:pointer;
+    }
+    .set-card .set-note{margin:10px 0 0;font:500 .66rem/1.6 "Manrope",sans-serif;color:rgba(220,255,238,.5);}
+    .kb-main { display:flex; flex-direction:column; gap:5px; }
+    #item-row { display:flex; gap:5px; }
+    #move-row { display:grid; grid-template-columns:repeat(4, 44px); gap:5px; }
+    .kb-menu { display:grid; grid-template-columns:repeat(2, 44px); gap:5px; }
+    /* Han re-check 2026-10-17 #5: the quickbar copies the cauldron-test
+       layout - bottom-right, 5-column grid of 42px square gold slots.
+       (The cauldron hotkey strip is display:none there, so it is not used.) */
+    #quickbar {
+      position:fixed; z-index:30; right:16px; bottom:calc(18px + env(safe-area-inset-bottom));
+      display:grid; grid-template-columns:repeat(5,42px); gap:6px; padding:7px;
+      border-radius:12px; background:rgba(8,8,12,.3);
+      border:2px solid rgba(255,221,140,.42);
+      backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
+      box-shadow:0 12px 24px rgba(0,0,0,.22);
+      font-family:"Manrope",sans-serif;
+    }
+    body:not(.in-map) #quickbar { display:none !important; }
+    #quickbar .kb-main, #quickbar .kb-menu, #quickbar .kb-row { display:contents; }
+    #quickbar .move-slot {
+      position:relative; width:42px; height:42px; display:block; padding:0;
+      border-radius:8px; border:1px solid rgba(255,221,140,.45);
+      background:rgba(0,0,0,.36); color:#fff2bf;
+      box-shadow:inset 0 0 14px rgba(255,210,110,.14);
+      font-weight:950; text-shadow:0 2px 4px rgba(0,0,0,.9);
+    }
+    #quickbar .move-slot .key {
+      position:absolute; left:4px; top:2px; transform:none;
+      font-size:9px; font-weight:950; color:rgba(255,244,207,.72); text-shadow:none;
+    }
+    #quickbar .move-slot .sicon {
+      position:absolute; inset:0; display:grid; place-items:center; font-size:17px; line-height:1;
+    }
+    #quickbar .move-slot .sicon img { width:24px; height:24px; }
+    #quickbar .move-slot .mn {
+      position:absolute; right:4px; bottom:2px; font-size:8px; font-weight:700; color:#ffe8a0; letter-spacing:0;
+    }
+    #quickbar .move-slot.is-locked { opacity:.5; border-style:dashed; }
+    #quickbar .flask-wrap { width:42px; height:42px; display:grid; place-items:center; pointer-events:none; }
+    #quickbar .flask {
+      width:34px; height:34px; flex:none;
+      filter:drop-shadow(0 4px 6px rgba(0,0,0,.35));
+    }
+    #quickbar .flask .pct { display:none; }
+    @media (pointer:coarse) {
+      #quickbar { grid-template-columns:repeat(5,38px); right:12px; }
+      #quickbar .flask { width:30px; height:30px; }
+    }
+    /* Mobile: keep pre-hotbar layout (not keyboard, not single-row hotbar). */
+    @media (pointer:coarse) {
+      .skill-bar { display:block; left:12px; right:auto; transform:none; bottom:calc(12px + env(safe-area-inset-bottom)); padding:0; }
+      #move-row { display:grid; grid-template-columns:repeat(4, 44px); gap:5px; }
+      #item-row { display:flex; gap:5px; margin-top:5px; }
+      .kb-menu { display:none; }
+    }
+    /* QA skill theme (2026-10-08, Han): Tree/Nature — living tree, branches, leaves, growth rings. */
+    .move-slot {
+      position:relative; width:44px; height:44px; appearance:none; cursor:pointer;
+      border:2px solid #6b4a2f; border-radius:50%;
+      background:radial-gradient(circle at 50% 40%, #2d4a2f 0%, #1a2e1c 70%, #0f1d10 100%);
+      box-shadow:0 0 12px rgba(63,125,68,.35), inset 0 0 8px rgba(107,74,47,.3);
+      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+      color:#e8f5e9; font-family:"Manrope",sans-serif;
+      touch-action:manipulation; user-select:none; -webkit-user-select:none;
+    }
+    .move-slot:active { border-color:#ffd97a; box-shadow:0 0 16px rgba(255,217,122,.5); }
+    .move-slot.is-locked { opacity:.5; cursor:default; border-style:dashed; border-color:#5a3d26; }
+    .move-slot.is-locked:active { border-color:#5a3d26; }
+    .move-slot .sicon { font-size:1rem; line-height:1; }
+    .move-slot .key {
+      position:absolute; top:2px; left:50%; transform:translateX(-50%);
+      font:800 .52rem/1 "Manrope",sans-serif; color:#ffd97a; text-shadow:0 1px 2px #000;
+    }
+    .move-slot .mn { font:700 .42rem/1 "Manrope",sans-serif; letter-spacing:.04em; color:#c8e6c9; }
+    .move-slot .cd {
+      position:absolute; inset:0; border-radius:8px; pointer-events:none;
+      background:conic-gradient(rgba(4,12,14,.78) var(--cdp,0%), transparent 0);
+    }
+
+    .map-attack {
+      display:none;
+      position:fixed; z-index:30; right:110px; bottom:96px;
+      width:76px; height:76px; border-radius:50%;
+      border:2px solid rgba(255,217,122,.55); background:rgba(34,22,8,.6);
+      color:#ffe9ad; font-size:1.6rem; cursor:pointer;
+      box-shadow:0 0 18px rgba(255,217,122,.25);
+      touch-action:none; user-select:none; -webkit-user-select:none;
+    }
+    .map-attack:active { background:rgba(90,60,20,.8); }
+    @media (pointer:coarse) {
+      body.in-map .map-attack { display:block; }
+      .map-status { width:172px; }
+      .skill-bar { bottom:calc(12px + env(safe-area-inset-bottom)); }
+      /* 2026-10-12 (Han): mobile — joystick RIGHT, keyboard/buttons LEFT. */
+      .map-attack { left:204px; right:auto; bottom:24px; }
+      .map-jump { left:296px; right:auto; bottom:24px; }
+      .joystick { right:20px; left:auto; bottom:110px; }
+    }
+    /* ---- Skill tree panel ---- */
+    /* QA skill theme (2026-10-08, Han): skill tree — dark forest, round nodes, no angular boxes. */
+    .skill-tree { position:fixed; inset:0; z-index:50; display:none; align-items:center; justify-content:center; background:linear-gradient(180deg, rgba(10,20,12,.85) 0%, rgba(20,35,20,.9) 100%); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); }
+    .skill-tree[aria-hidden="false"] { display:flex; }
+    .st-card {
+      width:min(640px,calc(100% - 32px)); max-height:88vh; overflow-y:auto;
+      padding:22px; border:2px solid #6b4a2f; border-radius:24px;
+      background:linear-gradient(180deg, #1e3320 0%, #142414 50%, #0d1a0d 100%);
+      box-shadow:0 0 44px rgba(63,125,68,.25), inset 0 0 30px rgba(90,61,38,.15);
+      color:#e8f5e9; font-family:"Manrope",sans-serif;
+    }
+    .st-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+    .st-head h2 { margin:0; font:800 1.05rem/1.2 "Manrope",sans-serif; letter-spacing:.14em; color:#ffd97a; text-shadow:0 0 12px rgba(255,217,122,.4); }
+    .st-sub { margin:6px 0 0; font:600 .7rem/1.5 "Manrope",sans-serif; color:rgba(200,230,201,.7); letter-spacing:.04em; }
+    .st-close { appearance:none; flex:none; width:34px; height:34px; border-radius:50%; border:2px solid #6b4a2f; background:radial-gradient(circle, #2d4a2f, #1a2e1c); color:#ffd97a; font-size:.95rem; cursor:pointer; }
+    .st-close:hover { border-color:#ffd97a; box-shadow:0 0 12px rgba(255,217,122,.4); }
+    .st-knrow { display:flex; justify-content:space-between; align-items:center; gap:10px; margin:14px 0 6px; }
+    #st-kn { font:800 .8rem/1 "Manrope",sans-serif; letter-spacing:.08em; color:#ffd97a; }
+    .st-study { appearance:none; flex:none; border:2px solid #6b4a2f; border-radius:999px; background:linear-gradient(180deg, #3f7d44, #2d5a31); color:#fff; font:700 .62rem/1 "Manrope",sans-serif; letter-spacing:.06em; padding:9px 14px; cursor:pointer; box-shadow:0 2px 8px rgba(63,125,68,.4); }
+    .st-study:hover { border-color:#ffd97a; box-shadow:0 0 12px rgba(255,217,122,.4); }
+    .st-knsub { margin:0 0 12px; font:600 .62rem/1.5 "Manrope",sans-serif; color:rgba(200,230,201,.6); letter-spacing:.02em; }
+    .st-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+    .st-foot { margin:14px 0 0; font:600 .62rem/1.6 "Manrope",sans-serif; color:rgba(200,230,201,.6); letter-spacing:.03em; }
+    @media (max-width:640px) { .st-grid { grid-template-columns:repeat(2,1fr); } }
+    /* ---- MapleStory-style skill book ---- */
+    .st-desc { margin-top:10px; border:1px solid rgba(201,168,106,.35); border-radius:8px; background:#10141f; padding:12px 14px; min-height:118px; }
+    .st-desc h3 { margin:0 0 6px; font:800 .82rem/1.2 "Manrope",sans-serif; color:#ffd97a; letter-spacing:.06em; }
+    .st-desc p { margin:4px 0; font:600 .66rem/1.55 "Manrope",sans-serif; color:#cfd6e4; }
+    .st-desc .cur { color:#9fb2d8; }
+    .st-desc .nxt { color:#8fe6a0; }
+    .st-desc .cost { color:#ffd97a; font-weight:800; }
+    .move-slot .sicon img { width:26px; height:26px; image-rendering:pixelated; }
+    /* ---- Skill tree: living tree theme ---- */
+    .st-treeview { position:relative; height:440px; margin-top:12px; border:1px solid rgba(139,105,72,.55); border-radius:12px; overflow:hidden;
+      background:radial-gradient(ellipse at 50% 105%, rgba(52,94,50,.4), rgba(13,18,28,.92) 72%); }
+    .st-treeview svg.branches { position:absolute; inset:0; width:100%; height:100%; }
+    .tnode { position:absolute; transform:translate(-50%,-50%); display:flex; flex-direction:column; align-items:center; cursor:pointer; z-index:2; }
+    .tnode-icon { width:46px; height:46px; border-radius:50%; border:3px solid #6b4a2f; background:#1c2b1e; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,.55); }
+    .tnode-icon img { width:30px; height:30px; image-rendering:pixelated; }
+    .tnode-root .tnode-icon { width:58px; height:58px; border-color:#8a6a3f; font-size:1.6rem; }
+    .tnode-name { margin-top:4px; font:800 .62rem/1.2 "Manrope",sans-serif; color:#f2ead6; letter-spacing:.04em; white-space:nowrap; text-shadow:0 1px 3px #000; }
+    .tnode-lv { margin-top:2px; font:800 .6rem/1 "Manrope",sans-serif; color:#ffd97a; text-shadow:0 1px 3px #000; }
+    .tnode-lv.is-max { color:#ff9d3c; }
+    .tnode.is-selected .tnode-icon { border-color:#ffd97a; box-shadow:0 0 14px rgba(255,217,122,.75); }
+    .tnode.is-maxed .tnode-icon { border-color:#ff9d3c; box-shadow:0 0 12px rgba(255,157,60,.6); }
+    .tnode.is-locked { opacity:.5; cursor:default; }
+    .tnode.is-locked .tnode-icon img { filter:grayscale(1) brightness(.55); }
+    .tnode.is-dim { opacity:.55; }
+    .tnode-plus { position:absolute; top:-8px; right:2px; width:22px; height:22px; border-radius:50%; border:1px solid #8a6a2f; background:linear-gradient(180deg,#f0b45a,#d18a2e); color:#3a2708; font:900 .85rem/1 "Manrope",sans-serif; cursor:pointer; padding:0; z-index:3; }
+    .tnode-plus:active { transform:translateY(1px); }
+    @media (max-width:640px) { .st-treeview { height:380px; } .tnode-icon { width:40px; height:40px; } .tnode-icon img { width:26px; height:26px; } }
+    /* Testing-bypass note (auth + character gates). */
+    .bypass-note { margin:10px 0 0; color:#ffd97a; font:700 .68rem/1.5 "Manrope",sans-serif; letter-spacing:.08em; text-align:center; }
+    .bypass-note b { color:#ffe9ad; }
+    /* Character customization gate. */
+    .char-custom { position:fixed; inset:0; z-index:60; display:none; align-items:center; justify-content:center; background:rgba(4,12,14,.8); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
+    .char-custom[aria-hidden="false"] { display:flex; }
+    .char-card-wrap { position:relative; width:min(560px,calc(100% - 40px)); padding:34px 30px 28px; border:1px solid rgba(134,238,228,.28); border-radius:18px; background:rgba(8,20,24,.94); box-shadow:0 0 44px rgba(80,232,220,.12); text-align:center; }
+    .char-card-wrap h2 { margin:0 0 6px; color:#eafffd; font:800 1.12rem/1.2 "Manrope",sans-serif; letter-spacing:.14em; text-shadow:0 0 12px rgba(80,232,220,.6); }
+    .char-sub { margin:0 0 20px; color:rgba(181,255,248,.6); font:600 .72rem/1.4 "Manrope",sans-serif; letter-spacing:.06em; }
+    .char-grid { display:flex; gap:14px; justify-content:center; margin-bottom:6px; }
+    .char-card { appearance:none; flex:1; max-width:200px; padding:22px 10px 16px; border:1px solid rgba(134,238,228,.22); border-radius:14px; background:rgba(14,32,38,.6); color:#ddfffc; cursor:pointer; transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease; }
+    .char-card:hover:not(:disabled) { transform:translateY(-2px); }
+    .char-card:focus-visible { outline:2px solid var(--signal); outline-offset:2px; }
+    .char-card.is-selected { border-color:var(--signal); box-shadow:0 0 22px rgba(80,232,220,.28); }
+    .char-card.is-disabled { opacity:.45; cursor:not-allowed; }
+    .char-face { display:block; font-size:2.6rem; line-height:1; margin-bottom:10px; }
+    .char-name { display:block; font:800 .95rem/1.2 "Manrope",sans-serif; letter-spacing:.12em; }
+    .char-tag { display:inline-block; margin-top:8px; padding:3px 10px; border-radius:999px; border:1px solid rgba(134,238,228,.35); font:700 .6rem/1 "Manrope",sans-serif; letter-spacing:.1em; color:#9df2e8; }
+    .char-confirm { appearance:none; margin-top:14px; padding:13px 30px; border:0; border-radius:999px; background:linear-gradient(135deg,#1a7f78,#0e4f4c); color:#eafffd; font:800 .78rem/1 "Manrope",sans-serif; letter-spacing:.14em; cursor:pointer; box-shadow:0 0 24px rgba(80,232,220,.25); }
+    .char-confirm:hover,.char-confirm:focus-visible { filter:brightness(1.15); outline:none; }
+    .char-back { position:absolute; top:12px; left:12px; appearance:none; width:34px; height:34px; border-radius:50%; border:1px solid rgba(134,238,228,.3); background:none; color:#ddfffc; font-size:1rem; cursor:pointer; }
+    .char-back:hover { border-color:var(--signal); }
+    @media (max-width:640px) {
+      .earth-frame { min-height:360px; }
+      .city-readout { bottom:max(8px,env(safe-area-inset-bottom)); width:calc(100% - 18px); padding:8px 10px 8px; border-radius:14px; }
+      .city-list { height:145px; padding:52px 0; }
+      .city-name { height:40px; }
+      .city-readout::before { top:60px; }
+      .city-readout::after { top:99px; }
+      .city-clock { top:8px; right:10px; font-size:.61rem; }
+      .city-phase { min-height:92px; padding-top:25px; gap:10px; flex-wrap:wrap; }
+      .city-phase-name { width:100%; }
+      .city-return { padding:8px 12px; }
+    }
+    @media (prefers-reduced-motion:reduce) {
+      #globe-canvas { scroll-behavior:auto; }
+    }
+
+    /* ---- Brand logo ---- */
+    .topbar {
+      position:absolute; z-index:10; top:0; left:0; right:0;
+      display:flex; align-items:flex-start; justify-content:flex-end;
+      padding:calc(14px + env(safe-area-inset-top)) 18px 0;
+      pointer-events:none;
+    }
+    .topbar-actions { display:flex; gap:10px; pointer-events:auto; }
+    .pill-btn {
+      appearance:none; border:1px solid #a8854f; border-radius:8px;
+      padding:9px 16px; color:#3b2f28; background:linear-gradient(180deg,#f8f3e6,#e6dabd);
+      font:700 .68rem/1 Georgia,"Times New Roman",serif; letter-spacing:.14em; cursor:pointer;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.75),0 2px 10px rgba(0,0,0,.35);
+      transition:border-color .18s,background .18s,box-shadow .18s,transform .12s;
+    }
+    .pill-btn:hover,.pill-btn:focus-visible {
+      border-color:#d3ab63; background:linear-gradient(180deg,#fffaf0,#f1e7cd);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 2px 12px rgba(0,0,0,.4),0 0 16px rgba(211,171,99,.5);
+      outline:none; transform:translateY(-1px);
+    }
+    .pill-btn:active { transform:none; }
+    /* BGM song card: appears when hovering/focusing the BGM toggle (Genshin parchment style). */
+    .bgm-card {
+      position:absolute; z-index:40; top:calc(56px + env(safe-area-inset-top)); right:18px; width:236px;
+      background:linear-gradient(180deg,#f7f2e4,#e8dcc0);
+      border:1px solid #a8854f; border-radius:10px; color:#3b2f28;
+      padding:12px 14px 10px; pointer-events:none;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 14px 34px rgba(0,0,0,.5);
+      opacity:0; visibility:hidden; transform:translateY(-8px);
+      transition:opacity .22s ease,transform .22s ease,visibility .22s ease;
+    }
+    .bgm-card.show { opacity:1; visibility:visible; transform:none; }
+    /* Han 2026-10-11 #10: Genshin UI restore — show card on toggle hover/focus. */
+    .bgm-card-row { display:flex; align-items:center; gap:10px; }
+    .bgm-card-note {
+      flex:none; width:34px; height:34px; border-radius:50%;
+      border:1px solid #a8854f; background:radial-gradient(circle at 35% 30%,#fffaf0,#e2d3ae);
+      color:#7a5f36; font-size:1.05rem; line-height:32px; text-align:center;
+    }
+    .bgm-card-title { margin:0; font:700 .98rem/1.25 Georgia,"Times New Roman",serif; letter-spacing:.02em; color:#2f2620; }
+    .bgm-card-artist { margin:2px 0 0; font:italic 400 .78rem/1.3 Georgia,serif; color:#6f5b40; }
+    .bgm-card-hint {
+      margin:8px 0 0; padding-top:8px; border-top:1px solid rgba(168,133,79,.45);
+      font:700 .6rem/1.6 "Manrope",sans-serif; letter-spacing:.18em; color:#8a734f; text-transform:uppercase;
+    }
+
+    /* ---- Sign-in modal ---- */
+    .modal-backdrop {
+      position:absolute; z-index:20; inset:0;
+      display:flex; align-items:center; justify-content:center; padding:20px;
+      background:rgba(1,4,6,.72); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+      opacity:0; pointer-events:none; transition:opacity .25s ease;
+    }
+    .modal-backdrop[aria-hidden="false"] { opacity:1; pointer-events:auto; }
+    #human-mark { position:fixed; left:16px; bottom:14px; z-index:40; font:600 .72rem/1.5 'Manrope',sans-serif; letter-spacing:.02em; color:rgba(214,232,230,.62); pointer-events:none; }
+    body.in-map #human-mark { display:none; }
+    .modal {
+      position:relative; width:min(400px,100%); max-height:calc(100% - 40px); overflow-y:auto;
+      border:1px solid rgba(134,238,228,.28); border-radius:20px;
+      background:linear-gradient(180deg,rgba(3,14,18,.97),rgba(2,8,11,.94));
+      box-shadow:0 24px 80px rgba(0,0,0,.6),0 0 40px rgba(80,232,220,.08);
+      padding:30px 26px 26px; text-align:center;
+      transform:translateY(12px) scale(.98); transition:transform .25s ease;
+    }
+    .modal-backdrop[aria-hidden="false"] .modal { transform:none; }
+    .modal h2 { margin:0 0 6px; font-size:1.25rem; font-weight:800; letter-spacing:.12em; color:#eafffd; text-shadow:0 0 18px rgba(80,232,220,.5); }
+    .modal-sub { margin:0 0 20px; font-size:.8rem; color:var(--muted); letter-spacing:.04em; }
+    .modal-close {
+      position:absolute; top:12px; right:14px; border:0; background:none;
+      color:var(--muted); font-size:1.5rem; line-height:1; cursor:pointer; padding:4px 8px;
+    }
+    .modal-close:hover { color:#fff; }
+    /* ---- Notice panel (Han 2026-10-19): same modal family, wider,
+       left-aligned sections. Content lives in ESPIL_NOTICE_CONTENT
+       (one array per section) so a notice update is a one-push edit. ---- */
+    .notice-modal { width:min(580px,100%); text-align:left; }
+    .notice-modal h2 { text-align:center; }
+    .notice-modal .modal-sub { text-align:center; }
+    .notice-sec { margin-top:18px; }
+    .notice-sec h3 {
+      margin:0 0 8px; font:800 .78rem/1.3 "Manrope",sans-serif; letter-spacing:.14em;
+      color:#a9ecec; text-transform:uppercase;
+      border-bottom:1px solid rgba(134,238,228,.16); padding-bottom:6px;
+    }
+    .notice-list { margin:0; padding:0 0 0 2px; list-style:none; }
+    .notice-list li {
+      position:relative; margin:0 0 7px; padding-left:14px;
+      font-size:.84rem; line-height:1.55; color:#dcebe9;
+    }
+    .notice-list li::before { content:"•"; position:absolute; left:0; color:#7fd8d0; }
+    .notice-date { color:#8fb8b3; font-weight:700; white-space:nowrap; }
+    #notice-open { font:700 .72rem/1 "Manrope",sans-serif; letter-spacing:.08em; }
+    /* Notice tabs + stacking (Han 2026-10-19, notice verdict; raised
+       again on his PC verdict the same night): the four sections are
+       tabs now, one pane at a time; and the notice backdrop leaves
+       the shared modal layer (z 20) for its own fixed layer at the
+       very top of the page - above EVERY landing element, the
+       .city-readout text div and the loader family included. The
+       wiring also moves the backdrop to <body> (see wireNoticePanel):
+       inside #earth-frame its isolation stacking context would trap
+       any z-index under the body-level intro. */
+    #notice-modal { position:fixed; z-index:1000; }
+    .notice-tabs { display:flex; flex-wrap:wrap; gap:6px; margin:16px 0 2px; padding-bottom:10px; border-bottom:1px solid rgba(134,238,228,.16); }
+    .notice-tab {
+      appearance:none; border:1px solid rgba(169,226,222,.18); border-radius:999px;
+      background:rgba(10,26,31,.6); color:#b9d8d4; padding:7px 12px;
+      font:700 .74rem/1 "Manrope",sans-serif; letter-spacing:.04em; cursor:pointer;
+    }
+    .notice-tab:hover { color:#fff; }
+    .notice-tab.on { background:rgba(127,216,208,.18); color:#eafffb; border-color:rgba(127,216,208,.55); }
+    .notice-pane { display:none; margin-top:14px; }
+    .notice-pane.on { display:block; }
+    .provider-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
+    .provider {
+      position:relative; appearance:none; display:flex; align-items:center; gap:10px;
+      border:1px solid rgba(169,226,222,.18); border-radius:12px;
+      padding:11px 12px; background:rgba(10,26,31,.6); color:#e8f4f3;
+      font:700 .74rem/1 "Manrope",sans-serif; letter-spacing:.06em; cursor:pointer;
+      transition:border-color .18s,background .18s,transform .12s;
+    }
+    .provider:hover { border-color:rgba(134,238,228,.55); background:rgba(18,44,50,.75); transform:translateY(-1px); }
+    .provider:active { transform:none; }
+    /* Deactivated social sign-in (Han 2026-10-18): greyed, inert. */
+    .provider:disabled { opacity:.38; cursor:default; filter:saturate(.25); }
+    .provider:disabled:hover { border-color:rgba(169,226,222,.18); background:rgba(10,26,31,.6); transform:none; }
+    /* The one active control on the sign-in page: guest entry. */
+    .provider.guest-enter { width:100%; justify-content:center; border-color:rgba(134,238,228,.55); background:rgba(18,44,50,.8); font-size:.8rem; padding:13px 12px; }
+    .p-dot { width:11px; height:11px; border-radius:50%; flex:none; box-shadow:0 0 8px currentColor; }
+    .soon {
+      margin-left:auto; font-size:.58rem; font-weight:800; letter-spacing:.14em;
+      color:#0b1518; background:var(--signal); border-radius:999px; padding:3px 8px;
+      text-transform:uppercase;
+    }
+    .modal-divider { display:flex; align-items:center; gap:12px; margin:20px 0 12px; color:var(--muted); font-size:.66rem; letter-spacing:.22em; text-transform:uppercase; }
+    .modal-divider::before,.modal-divider::after { content:""; flex:1; height:1px; background:rgba(169,226,222,.18); }
+    .creator-link {
+      display:inline-block; color:var(--signal); font:800 .82rem/1.5 "Manrope",sans-serif;
+      letter-spacing:.1em; text-decoration:none; border-bottom:1px solid rgba(134,238,228,.4); padding-bottom:2px;
+    }
+    .creator-link:hover { text-shadow:0 0 14px rgba(134,238,228,.8); }
+    .toast {
+      position:absolute; z-index:30; left:50%; bottom:210px; transform:translateX(-50%) translateY(8px);
+      max-width:min(420px,calc(100% - 40px)); padding:11px 18px; border-radius:12px;
+      border:1px solid rgba(134,238,228,.35); background:rgba(3,14,18,.94); color:#eafffd;
+      font:600 .76rem/1.5 "Manrope",sans-serif; letter-spacing:.03em; text-align:center;
+      opacity:0; pointer-events:none; transition:opacity .25s,transform .25s;
+      box-shadow:0 12px 40px rgba(0,0,0,.5);
+    }
+    .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+    @media (max-width:640px) {
+      .topbar { padding-left:12px; padding-right:12px; }
+      .pill-btn { padding:8px 12px; font-size:.62rem; }
+      .toast { bottom:190px; }
+    }
+    /* Intro: starfield canvas, typewriter logo over its black shadow. */
+    .intro {
+      position:fixed; inset:0; z-index:60; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; gap:38px; cursor:pointer;
+      background:#010409; overflow:hidden;
+      transition:opacity 1.4s ease, visibility 1.4s ease;
+    }
+    .intro.hide { opacity:0; visibility:hidden; pointer-events:none; }
+    /* Slide-up exit (2026-10-06, per Han): the sign stays visible and slides up
+       while the camera descends — Earth rises from the bottom. No fade-out. */
+    .intro.leaving { background:transparent; pointer-events:none; transition:background .8s ease; }
+    .intro.leaving .intro-stars { opacity:0; transition:opacity .8s ease; }
+    .intro.leaving .intro-logo { transform:translateY(-115vh); transition:transform 2.4s cubic-bezier(.55,.06,.35,1); }
+    .intro.leaving .intro-continue { opacity:0 !important; transition:opacity .4s ease; }
+    .intro-stars { position:absolute; inset:0; width:100%; height:100%; display:block; }
+    .intro-logo { position:relative; text-align:center; user-select:none; margin:0 12px; }
+    /* Arrow signpost (2026-10-06, per Han): the sign itself is an arrow pointing
+       down at Earth. SVG pipe frame + neon tube; the typed text sits centered
+       in the upper board. Cyberpunk green. */
+    .arrow-sign { container-type:inline-size; position:relative; width:min(78vw,520px); }
+    .sign-svg { display:block; width:100%; height:auto;
+      filter:drop-shadow(0 10px 30px rgba(0,0,0,.6)) drop-shadow(0 0 44px rgba(70,255,125,0)) grayscale(1) brightness(.55);
+      transition:filter .6s ease .9s; }
+    .intro-logo.done .sign-svg { filter:drop-shadow(0 10px 30px rgba(0,0,0,.6)) drop-shadow(0 0 44px rgba(70,255,125,.22)) grayscale(0) brightness(1); }
+    /* The frame tubes strike with the letters: dark until .done, then the
+       same stutter, settling at the tube's natural .85 opacity. */
+    .intro-logo .sign-svg path:nth-of-type(2) { opacity:.30; }
+    .intro-logo .sign-svg path:nth-of-type(3) { opacity:.38; }
+    .intro-logo.done .sign-svg path:nth-of-type(2) { animation:neon-strike-frame 1.5s steps(1,end) .12s both; }
+    .intro-logo.done .sign-svg path:nth-of-type(3) { animation:neon-strike 1.5s steps(1,end) .12s both; }
+    @keyframes neon-strike-frame {
+      0% { opacity:.05; } 6% { opacity:.85; } 10% { opacity:.06; } 15% { opacity:.76; }
+      19% { opacity:.1; } 26% { opacity:.85; } 31% { opacity:.2; } 38% { opacity:.85; }
+      44% { opacity:.42; } 52% { opacity:.85; } 60% { opacity:.66; } 70%,100% { opacity:.85; }
+    }
+    .sign-text { position:absolute; left:0; right:0; top:8%; bottom:44%;
+      display:flex; align-items:center; justify-content:center; text-align:center; }
+    .intro-logo .shadow-layer, .intro-logo .typed-layer {
+      font-family:"Monoton","Arial Black",sans-serif;
+      font-weight:400;
+      font-size:12.5cqw;
+      letter-spacing:.05em; white-space:nowrap; margin:0; line-height:1.3;
+    }
+    .intro-logo .shadow-layer { color:transparent; text-shadow:none; } /* invisible: keeps the logo box sized so nothing jumps */
+    #intro-typed { position:absolute; top:50%; left:0; right:0;
+      transform:translateY(calc(-50% + .07em)); text-align:center; }
+    .intro-logo .typed-layer {
+      position:absolute; inset:0; color:rgba(170,178,184,.34);
+      text-shadow:none;
+    }
+    /* Lit state (neon strike, Han 2026-10-16): while the name types, the
+       letters are unlit tubes; when typing completes the sign strikes -
+       letters stutter on at staggered moments, then hold bright. */
+    .intro-logo.done .typed-layer {
+      color:#fff;
+      text-shadow:
+        0 0 4px #fff,
+        0 0 10px #b8ffd2,
+        0 0 24px #46ff7d,
+        0 0 55px #46ff7d,
+        0 0 95px rgba(70,255,125,.6),
+        0 0 150px rgba(70,255,125,.32);
+    }
+    .intro-logo .typed-inner { position:relative; display:inline-block; }
+    .intro-logo .typed-layer .ch { visibility:hidden; display:inline-block; }
+    .intro-logo .typed-layer .ch.on { visibility:visible; animation:type-punch .22s ease-out; }
+    @keyframes type-punch {
+      0% { transform:scale(1.7) translateY(-.06em); opacity:.35; }
+      60% { transform:scale(.94) translateY(.01em); opacity:1; }
+      100% { transform:scale(1) translateY(0); opacity:1; }
+    }
+    .intro-logo.done .typed-layer .ch.on { animation:neon-strike 1.5s steps(1,end) var(--d,0s) both, neon-flicker 4.2s linear calc(1.5s + var(--d,0s)) infinite; }
+    @keyframes neon-strike {
+      0% { opacity:.06; } 6% { opacity:1; } 10% { opacity:.08; } 15% { opacity:.9; }
+      19% { opacity:.12; } 26% { opacity:1; } 31% { opacity:.25; } 38% { opacity:1; }
+      44% { opacity:.5; } 52% { opacity:1; } 60% { opacity:.78; } 70%,100% { opacity:1; }
+    }
+    @keyframes neon-flicker {
+      0%,100% { opacity:1; } 3% { opacity:.85; } 5% { opacity:1; }
+      41% { opacity:1; } 43% { opacity:.78; } 45% { opacity:1; } 47% { opacity:.9; } 49% { opacity:1; }
+      77% { opacity:1; } 79% { opacity:.82; } 81% { opacity:1; }
+    }
+    .intro-logo .typed-layer .ch.on { visibility:visible; }
+    .intro-logo .caret {
+      display:inline-block; width:max(2px,.045em); height:1em; margin-left:.14em; vertical-align:-.05em;
+      background:#eafff0; box-shadow:0 0 10px rgba(70,255,125,.9);
+      animation:caret-blink 1s steps(1) infinite;
+    }
+    @keyframes caret-blink { 0%,49% { opacity:1; } 50%,100% { opacity:0; } }
+    .intro-continue {
+      position:relative; font:700 .8rem/1.6 "Manrope",sans-serif; letter-spacing:.34em; text-indent:.34em;
+      color:#eafffb; text-shadow:0 0 16px rgba(64,255,205,.8); text-align:center; padding:0 16px;
+      opacity:0; visibility:hidden; transition:opacity .6s ease, visibility .6s ease;
+      animation:intro-pulse 1.8s ease-in-out infinite; user-select:none;
+    }
+    .intro-continue.show { opacity:1; visibility:visible; }
+    @keyframes intro-pulse { 0%,100% { opacity:.4; } 50% { opacity:1; } }
+    @media (prefers-reduced-motion:reduce) { .intro-logo .caret { animation:none; } .intro-continue { animation:none; opacity:1; } .intro-logo .typed-layer { color:#fff; text-shadow:0 0 4px #fff, 0 0 10px #b8ffd2, 0 0 24px #46ff7d, 0 0 55px #46ff7d, 0 0 95px rgba(70,255,125,.6), 0 0 150px rgba(70,255,125,.32); } .intro-logo .typed-layer .ch.on { animation:none; } .intro-logo .sign-svg { filter:drop-shadow(0 10px 30px rgba(0,0,0,.6)) drop-shadow(0 0 44px rgba(70,255,125,.22)); transition:none; } .intro-logo .sign-svg path:nth-of-type(2) { opacity:.85; animation:none; } .intro-logo .sign-svg path:nth-of-type(3) { opacity:1; animation:none; } }
+    /* Virtual joystick for city stepping on touch devices. */
+    .joystick {
+      position:absolute; z-index:20; left:auto; right:18px; bottom:132px; width:104px; height:104px;
+      border-radius:50%; border:1px solid rgba(134,238,228,.4);
+      background:radial-gradient(circle,rgba(3,16,20,.55),rgba(3,16,20,.85));
+      box-shadow:0 0 24px rgba(64,255,205,.18);
+      display:none; touch-action:none; user-select:none; -webkit-user-select:none;
+    }
+    .joy-knob {
+      position:absolute; left:50%; top:50%; width:44px; height:44px; margin:-22px 0 0 -22px;
+      border-radius:50%; background:radial-gradient(circle at 35% 35%,rgba(125,252,230,.9),rgba(64,255,205,.35));
+      box-shadow:0 0 18px rgba(64,255,205,.5); pointer-events:none;
+    }
+    @media (pointer:coarse) { .joystick { display:block; } }
+    /* Mobile layout (Han 2026-10-20; placement integrated with the
+       UI room's DOM pass, wiring and joystick geometry the map
+       room's): lighter UI sized in vw/vh, far fewer buttons.
+       RIGHT: the direction joystick at opacity .1 (brightening
+       while dragged), alone in the bottom-right - nothing may
+       cover it (Han 2026-10-20 #8: the old vh-sized quickbar
+       drifted over it on narrow screens). There is no quickbar
+       on mobile: CENTRE-LEFT, USE + JUMP are the two main
+       circles and the move slots sit small above them (item row
+       and menu hidden; ATTACK folded away - punch is one of the
+       move slots); the flasks hang under the slots. Sizes that
+       reach across the screen are capped in vw/vmin so the
+       cluster can never reach the joystick's ground. Chat: the
+       old scroll-down way, plain lines, touch-scrollable. */
+    @media (pointer:coarse) {
+      .joystick { position:fixed; left:auto; right:3vw; bottom:calc(3vh + env(safe-area-inset-bottom)); width:min(28vmin,140px); height:min(28vmin,140px); opacity:.1; z-index:32; }
+      .joystick.joy-live { opacity:.35; }
+      .joy-knob { width:38%; height:38%; margin:-19% 0 0 -19%; }
+      body.in-map .map-attack { display:none !important; }
+      body.in-map .map-jump { width:min(11vh,16vw); height:min(11vh,16vw); bottom:3.5vh; left:calc(31vw + min(11vh,16vw) + 1.5vmin); right:auto; }
+      body.in-map #map-interact {
+        position:fixed; z-index:30; display:block;
+        width:min(11vh,16vw); height:min(11vh,16vw); bottom:3.5vh; left:31vw; right:auto;
+        border-radius:50%; border:2px solid rgba(134,238,228,.55);
+        background:rgba(10,34,38,.6); color:#ddfffc;
+        font:800 .68rem/1 "Manrope",sans-serif; letter-spacing:.08em;
+        box-shadow:0 0 18px rgba(80,232,220,.25);
+        touch-action:none; user-select:none; -webkit-user-select:none; cursor:pointer;
+      }
+      #quickbar { display:flex; flex-wrap:wrap; align-items:flex-end; left:31vw; right:auto; bottom:calc(3.5vh + min(11vh,16vw) + 1.2vmin); width:calc(4 * 5.4vmin + 3 * 0.8vmin); padding:0; background:none; border:none; box-shadow:none; backdrop-filter:none; -webkit-backdrop-filter:none; }
+      #quickbar .kb-menu, #quickbar #item-row { display:none; }
+      #quickbar #move-row { display:grid; grid-template-columns:repeat(4, 5.4vmin); gap:0.8vmin; order:1; }
+      #quickbar .move-slot { width:5.4vmin; height:5.4vmin; }
+      #quickbar .move-slot .sicon { font-size:.8rem; }
+      #quickbar .move-slot .mn { font-size:.34rem; }
+      #quickbar .flask-wrap { width:5.4vmin; height:5.4vmin; order:2; margin-top:0.8vmin; }
+      #quickbar .flask { width:4.7vmin; height:4.7vmin; }
+      .map-status { width:30vw; }
+      #minimap-wrap { width:20vh; height:20vh; }
+      .chat-window { left:2vw; bottom:3vh; width:27vw; padding:8px; }
+      .chat-head { display:none; }
+      .chat-log { min-height:0; max-height:24vh; gap:2px; padding:0 0 4px; font-size:.68rem; }
+      #chat-log { pointer-events:auto; }
+      .chat-msg { display:block; padding:1px 2px; border:none; background:none; border-radius:0; }
+      .chat-msg::before { display:none; }
+      .chat-msg .who { display:inline; }
+      .chat-msg .txt { display:inline; }
+    }
+    /* 2026-10-12 (Han): landscape-first on mobile — rotate prompt in portrait. */
+    #rotate-overlay { display:none; }
+    @media (pointer:coarse) and (orientation:portrait) {
+      body.in-map #rotate-overlay {
+        display:flex; position:fixed; inset:0; z-index:90;
+        background:rgba(2,10,13,.88); color:#eafffd;
+        flex-direction:column; align-items:center; justify-content:center; gap:14px;
+        font:700 1rem/1.4 "Manrope",sans-serif; letter-spacing:.04em; text-align:center; padding:24px;
+      }
+      .rotate-phone { font-size:3rem; animation:rotateHint 1.6s ease-in-out infinite; }
+    }
+    @keyframes rotateHint { 0%,20% { transform:rotate(0deg); } 60%,100% { transform:rotate(90deg); } }
+    /* City info panel: details before entering. Centered on screen (2026-10-06 QA). */
+    .city-info {
+      /* Han 2026-10-16 #5: the info window uses the text div (.city-readout)
+         design code - dark glass, signal border, Manrope. */
+      position:absolute; z-index:28; top:50%; left:50%; right:auto; transform:translate(-50%,-50%);
+      width:min(360px,calc(100vw - 52px)); max-height:calc(100% - 120px); overflow:auto;
+      border-radius:18px; border:1px solid rgba(134,238,228,.26);
+      background:linear-gradient(180deg,rgba(1,9,13,.94),rgba(1,5,8,.88));
+      box-shadow:0 0 0 1px rgba(0,0,0,.8) inset,0 24px 80px rgba(0,0,0,.6),0 0 28px rgba(81,217,208,.1);
+      padding:26px 24px 24px; color:var(--ink); text-align:center; text-shadow:0 2px 16px #000;
+      transition:opacity .45s ease, transform .45s ease, visibility .45s ease;
+    }
+    .city-info[aria-hidden="true"] { opacity:0; visibility:hidden; pointer-events:none; transform:translate(-50%,-50%) scale(.94); }
+    .city-info-back {
+      position:absolute; top:10px; left:10px; width:34px; height:34px; border-radius:8px;
+      border:1px solid rgba(134,238,228,.35); background:rgba(3,16,20,.8); color:var(--ink);
+      font:700 1rem/1 "Manrope",sans-serif; cursor:pointer;
+      box-shadow:0 2px 8px rgba(0,0,0,.45);
+      transition:border-color .18s,box-shadow .18s,transform .12s;
+    }
+    .city-info-back:hover { border-color:rgba(134,238,228,.7); box-shadow:0 0 14px rgba(81,217,208,.35); transform:translateY(-1px); }
+    .city-info-img {
+      display:block; width:100%; height:168px; object-fit:cover; border-radius:12px;
+      border:1px solid rgba(134,238,228,.3); background:#02141a; margin-bottom:16px;
+      box-shadow:0 4px 14px rgba(0,0,0,.45);
+    }
+    .city-info-name { margin:0 0 14px; font:800 1.5rem/1.2 "Manrope",sans-serif; letter-spacing:.06em; color:#fff8e1; text-shadow:0 0 18px rgba(255,200,80,.35); text-align:center; }
+    .city-info-pop { margin:0 0 14px; font:600 .78rem/1.5 Georgia,serif; letter-spacing:.04em; color:#6f5b40; text-align:center; }
+    .city-info-brands-label { margin:0 0 8px; font:700 .62rem/1 Georgia,serif; letter-spacing:.32em; text-indent:.32em; color:#8a6a3f; text-align:center; }
+    .city-info-brands { margin:0 0 20px; padding:0; list-style:none; display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+    .city-info-brands li {
+      font:700 .74rem/1 Georgia,serif; letter-spacing:.03em; color:#4a3a2a;
+      border:1px solid #a8854f; border-radius:999px; padding:8px 14px;
+      background:linear-gradient(180deg,#fffaf0,#f1e6cd);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.8), 0 2px 6px rgba(59,47,40,.18);
+    }
+    .city-info-enter {
+      display:block; width:100%; padding:14px; border-radius:12px; cursor:pointer;
+      border:1px solid rgba(134,238,228,.45); background:linear-gradient(180deg,rgba(10,36,42,.9),rgba(3,16,20,.9));
+      color:#eafffd; font:800 .9rem/1 "Manrope",sans-serif; letter-spacing:.3em; text-indent:.3em;
+      box-shadow:0 3px 12px rgba(0,0,0,.45),0 0 18px rgba(81,217,208,.12);
+      transition:border-color .18s,box-shadow .18s,transform .12s,background .18s;
+    }
+    .city-info-enter:hover { border-color:rgba(134,238,228,.8); background:linear-gradient(180deg,rgba(14,48,56,.95),rgba(4,20,26,.95)); box-shadow:0 3px 14px rgba(0,0,0,.5),0 0 26px rgba(81,217,208,.35); transform:translateY(-1px); }
+    .city-info-enter:active { transform:none; }
+    .city-info-enter.is-disabled { opacity:.35; cursor:not-allowed; filter:grayscale(.6); }
+    .city-info-enter.is-disabled:hover { transform:none; box-shadow:none; }
+    .city-info-credit { margin:12px 0 0; font:500 .6rem/1.6 "Manrope",sans-serif; letter-spacing:.03em; color:rgba(199,225,225,.5); text-align:center; }
+    @media (max-width:640px) {
+      .city-info {
+        top:auto; bottom:14px; left:50%; right:auto; transform:translateX(-50%);
+        width:calc(100vw - 28px); max-height:52%;
+      }
+      .city-info[aria-hidden="true"] { transform:translateX(-50%) translateY(26px); }
+      .city-info-img { height:120px; }
+      .intro-continue { font-size:.68rem; }
+    }
+    /* City entry sequence: slow zoom toward the city while its name types out,
+       then "press any key to enter" (2026-10-06 QA #4). */
+    .city-entry {
+      position:absolute; inset:0; z-index:26; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; gap:34px; cursor:pointer;
+      background:radial-gradient(ellipse at center,rgba(1,10,12,.42),rgba(1,4,6,.86));
+      opacity:1; visibility:visible; transition:opacity .7s ease,visibility .7s ease;
+      user-select:none; -webkit-user-select:none;
+    }
+    .city-entry[aria-hidden="true"] { opacity:0; visibility:hidden; pointer-events:none; }
+    /* Coming soon (2026-10-06): live site is in testing phase — the walkable map
+       is local-testing only, so city entry on espil.online ends here. */
+    .city-comingsoon {
+      position:absolute; inset:0; z-index:27; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; gap:14px;
+      background:radial-gradient(ellipse at center,rgba(1,10,12,.55),rgba(1,4,6,.92));
+      opacity:1; visibility:visible; transition:opacity .7s ease,visibility .7s ease;
+      text-align:center; padding:0 20px;
+    }
+    .city-comingsoon[aria-hidden="true"] { opacity:0; visibility:hidden; pointer-events:none; }
+    .city-comingsoon-kicker {
+      font:700 .72rem/1.6 "Manrope",sans-serif; letter-spacing:.4em; text-indent:.4em;
+      color:#8ffce9; margin:0;
+    }
+    .city-comingsoon h2 {
+      font:900 clamp(2.2rem,8vw,4.4rem)/1 "Arial Black","Arial",sans-serif;
+      letter-spacing:.12em; color:#eafffb; margin:0;
+      text-shadow:0 0 24px rgba(64,255,205,.8),0 0 74px rgba(64,255,205,.32);
+    }
+    .city-comingsoon-city {
+      font:700 .95rem/1.6 "Manrope",sans-serif; letter-spacing:.28em; text-indent:.28em;
+      color:#bfe9ff; margin:0;
+    }
+    .city-comingsoon-back {
+      margin-top:18px; font:700 .8rem/1 "Manrope",sans-serif; letter-spacing:.22em; text-indent:.22em;
+      color:#062a26; background:linear-gradient(180deg,#f7e9c4,#e8cf96);
+      border:1px solid #8a6d3b; border-radius:999px; padding:14px 30px; cursor:pointer;
+      box-shadow:0 2px 12px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.6);
+    }
+    .city-entry-name {
+      font-family:"Monoton","Arial Black",sans-serif; font-weight:400;
+      font-size:clamp(2.2rem,8.5vw,4.6rem); line-height:1.25;
+      letter-spacing:.05em; color:#fff; text-align:center; white-space:nowrap; margin:0 16px;
+      text-shadow:
+        0 0 4px #fff,
+        0 0 10px #b8ffd2,
+        0 0 24px #46ff7d,
+        0 0 55px #46ff7d,
+        0 0 95px rgba(70,255,125,.55);
+    }
+    .city-entry-name .ch { visibility:hidden; display:inline-block; }
+    .city-entry-name .ch.on { visibility:visible; animation:type-punch .22s ease-out; }
+    .city-entry-caret {
+      display:inline-block; width:.09em; height:1em; margin-left:.12em; vertical-align:-.06em;
+      background:#d9ffe6; box-shadow:0 0 18px rgba(70,255,125,.95),0 0 40px rgba(70,255,125,.5);
+      animation:caret-blink .8s steps(1) infinite;
+    }
+    .city-entry-sub {
+      font:700 .8rem/1.6 "Manrope",sans-serif; letter-spacing:.34em; text-indent:.34em;
+      color:#eafffb; text-shadow:0 0 16px rgba(64,255,205,.8); text-align:center; padding:0 16px;
+      opacity:0; visibility:hidden; transition:opacity .6s ease,visibility .6s ease;
+      animation:intro-pulse 1.8s ease-in-out infinite;
+    }
+    .city-entry-sub.show { opacity:1; visibility:visible; }
+    /* #3 (Han 2nd QA): loading progress bar — preloads city, auto-enters */
+    #city-loading { display:none; text-align:center; padding:20px; max-width:400px; margin:0 auto; }
+    #city-loading.show { display:block; }
+    #city-loading .load-label { font:700 .75rem/1.6 "Manrope",sans-serif; letter-spacing:.28em; color:#eafffb; margin-bottom:12px; }
+    #city-loading .load-bar-bg { width:100%; height:8px; background:rgba(255,255,255,.15); border-radius:4px; overflow:hidden; }
+    #city-loading .load-bar-fill { height:100%; width:0%; background:linear-gradient(90deg,#40ffcd,#7ed957); border-radius:4px; transition:width .3s ease; }
+    #city-loading .load-pct { font:600 .7rem/1.6 "Manrope",sans-serif; color:#9fb3c8; margin-top:8px; }
+    /* DNA imprint flash (2026-10-06): the Cauldron sticks its DNA on the city. */
+    #dna-flash{position:fixed;inset:0;pointer-events:none;opacity:0;z-index:60;
+      background:radial-gradient(ellipse at 50% 62%,rgba(255,224,242,.9),rgba(255,178,218,.28) 46%,rgba(255,178,218,0) 72%);
+      transition:opacity 1s ease;}
+    #dna-flash.on{opacity:1;transition:opacity .22s ease;}
+    /* ---- Loading screen (2026-10-14, Han): the water-glass loader from
+       han.espil.online, upgraded to v4 (Portfolio room relay, 2026-10-14).
+       The liquid mass sits in a .slosh layer that rocks as one body; the
+       surface meniscus bobs counter-phase; three wave layers, five bubbles,
+       caustic glow, light streak, spherical glass shading. Fill = --p,
+       driven by real load progress (driver script at end of body).
+       Fades out and removes itself; never traps (min ~1s, hard cap 8s). ---- */
+    @property --p{syntax:"<number>"; inherits:true; initial-value:0}
+    #loader{
+      position:fixed; inset:0; z-index:200; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; gap:22px;
+      /* Han 2026-10-15: richer gradients, stronger spherical reflections, and
+         slosh that grows with progress — --rock/--sway/--bob scale with --p,
+         so the liquid sloshes harder the closer loading gets to done. */
+      --rock:calc(0.5deg + var(--p,0) * .02deg + var(--agit,0.7) * (1.1deg + var(--p,0) * .055deg));
+      --sway:calc(0.4px + var(--p,0) * .016px + var(--agit,0.7) * (0.9px + var(--p,0) * .05px));
+      --bob:calc(.8px + var(--p,0) * .032px);
+      background:
+        radial-gradient(340px 340px at 50% 42%, rgba(190,242,100,.09), rgba(190,242,100,0) 70%),
+        radial-gradient(ellipse at 50% 40%, #0d2030 0%, #050d16 70%, #02060b 100%);
+      overflow:hidden; transition:opacity .6s ease, visibility .6s;
+    }
+    #loader.done{opacity:0; visibility:hidden; pointer-events:none}
+    #loader.seg-a{pointer-events:none} /* Dive segment: the glass is feedback, the entry overlay keeps the clicks */
+    /* Brand cursor + pixel-scatter pointer trail (Han 2026-10-19,
+       cursor verdict the same evening): the domain logo is the cursor
+       everywhere on the site at HALF the first-pass size, with the
+       black square keyed out so only the globe shows; text fields
+       keep the text beam. The trail is hard square pixels scattering
+       outward, not soft dust. */
+    *:not(input):not(textarea){cursor:url('assets/espil-cursor-32.png') 16 16,url('assets/espil-cursor-16.png') 8 8,auto !important}
+    #loader .glass{
+      position:relative; width:98px; height:98px; border-radius:50%;
+      overflow:hidden; isolation:isolate;
+      background:
+        radial-gradient(circle at 32% 24%, rgba(255,255,255,.34), rgba(255,255,255,.10) 26%, rgba(255,255,255,0) 48%),
+        linear-gradient(115deg, rgba(255,255,255,0) 30%, rgba(255,255,255,.16) 45%, rgba(255,255,255,.03) 52%, rgba(255,255,255,0) 62%),
+        linear-gradient(165deg, rgba(255,255,255,.08), rgba(255,255,255,0) 42%, rgba(120,200,255,.06) 78%, rgba(190,242,100,.08)),
+        rgba(240,238,233,.02);
+      border:none;
+      box-shadow:
+        inset 0 0 0 1px rgba(255,255,255,.28),
+        inset 0 10px 18px rgba(255,255,255,.14),
+        inset 0 -16px 24px rgba(0,0,0,.38),
+        inset 0 0 17px rgba(240,238,233,.10),
+        0 0 18px rgba(220,255,190,.10),
+        0 12px 30px rgba(0,0,0,.4);
+      filter:drop-shadow(0 16px 16px rgba(0,0,0,.35));
+      -webkit-backdrop-filter:blur(1px); backdrop-filter:blur(1px);
+    }
+    /* Spherical rim light (Han 2026-10-15): a thin ring whose brightness varies
+       around the circle, so the edge reads as curved glass catching light. */
+    #loader .glass::before{
+      content:""; position:absolute; inset:0; border-radius:50%; z-index:4; pointer-events:none;
+      background:conic-gradient(from 215deg, rgba(255,255,255,.62), rgba(255,255,255,.10) 20%, rgba(255,255,255,0) 38%, rgba(255,255,255,0) 74%, rgba(190,242,100,.24) 90%, rgba(255,255,255,.5));
+      -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+      mask:radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+    }
+    /* Bounce light pooled at the bottom inside of the glass. */
+    #loader .glass::after{
+      content:""; position:absolute; left:10%; right:10%; bottom:4px; height:18px; border-radius:50%; z-index:2; pointer-events:none;
+      background:radial-gradient(ellipse at 50% 100%, rgba(216,252,170,.34), rgba(216,252,170,0) 70%);
+    }
+    /* The liquid mass: everything wet lives in .slosh and rocks as one body,
+       pivoting low in the glass — the fill stays put, the liquid moves. */
+    #loader .slosh{
+      position:absolute; inset:-6px; z-index:1; /* oversized so a hard rock never pulls a corner clear of the glass */
+      transform-origin:50% 88%;
+      animation:espilSloshRock 3.4s ease-in-out infinite alternate;
+    }
+    @keyframes espilSloshRock{
+      from{transform:rotate(calc(var(--rock) * -1)) translateX(calc(var(--sway) * -1))}
+      to{transform:rotate(var(--rock)) translateX(var(--sway))}
+    }
+    /* Liquid physics layer (Han 2026-10-15): a canvas spring-surface with
+       droplet particles, driven by the same --p (script at end of body).
+       Pure enhancement — while .physics-on is absent the CSS liquid above
+       renders exactly as before, and any failure leaves it in place. */
+    #loader .water-canvas{position:absolute; inset:0; width:100%; height:100%; z-index:1; display:none; filter:brightness(1.24) saturate(1.38)}
+    #loader.physics-on .water-canvas{display:block}
+    #loader.physics-on .slosh{display:none}
+    #loader .water{
+      position:absolute; left:0; right:0; bottom:0; height:calc(var(--p,0)*1%);
+      background:
+        linear-gradient(100deg, rgba(255,255,255,.12), rgba(255,255,255,0) 36%, rgba(255,255,255,.07) 60%, rgba(255,255,255,0) 82%),
+        linear-gradient(180deg, rgba(255,245,155,.78), rgba(254,246,160,.72) 22%, rgba(224,252,175,.70) 45%, rgba(198,244,120,.68) 66%, rgba(172,232,70,.70) 85%, rgba(148,214,50,.74));
+      filter:brightness(1.24) saturate(1.38);
+      transition:height .12s linear; /* JS tick already eases; a long CSS transition makes the water trail the % counter */
+      z-index:1;
+    }
+    #loader .water::before{ /* caustic glow pooled at the bottom of the glass */
+      content:""; position:absolute; left:6%; right:6%; bottom:2px; height:34%;
+      background:radial-gradient(ellipse at 50% 100%, rgba(232,255,200,.68), rgba(232,255,200,0) 70%);
+    }
+    #loader .water::after{ /* a slow light streak travelling through the liquid */
+      content:""; position:absolute; inset:0;
+      background:linear-gradient(105deg, transparent 28%, rgba(255,255,255,.22) 45%, rgba(255,255,255,.05) 55%, transparent 68%);
+      background-size:260% 100%;
+      animation:espilStreakSlide 5.5s ease-in-out infinite alternate;
+    }
+    @keyframes espilStreakSlide{from{background-position:110% 0}to{background-position:-30% 0}}
+    /* The surface: an ellipse the light catches — reads as liquid in a round glass */
+    #loader .surface{
+      position:absolute; left:-4%; right:-4%; top:-7px; height:14px; border-radius:50%;
+      background:radial-gradient(ellipse at 50% 42%, rgba(236,255,205,.85), rgba(196,244,120,.34) 55%, rgba(196,244,120,0) 74%);
+      animation:espilSurfaceBob 1.7s ease-in-out infinite alternate;
+    }
+    @keyframes espilSurfaceBob{
+      from{transform:translateY(calc(var(--bob) * -1)) rotate(calc(var(--rock) * -.5))}
+      to{transform:translateY(var(--bob)) rotate(calc(var(--rock) * .5))}
+    }
+    #loader .wave{
+      position:absolute; left:0; top:-7px; width:200%; height:8px;
+      background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 14' preserveAspectRatio='none'%3E%3Cpath d='M0 8 Q 15 1 30 8 T 60 8 T 90 8 T 120 8 V14 H0 Z' fill='%23bef264' fill-opacity='0.42'/%3E%3C/svg%3E") repeat-x;
+      background-size:120px 8px;
+      animation:espilWaveMove1 2.6s linear infinite;
+    }
+    #loader .wave.back{top:-6px; opacity:.22; animation:espilWaveMove2 4.4s linear infinite}
+    #loader .wave.deep{top:-5px; opacity:.15; background-size:170px 10px; height:10px; animation:espilWaveMove3 7s linear infinite}
+    @keyframes espilWaveMove1{
+      0%{transform:translate(0,0)}
+      50%{transform:translate(-60px, calc(.9px + var(--p,0) * .028px))}
+      100%{transform:translate(-120px,0)}
+    }
+    @keyframes espilWaveMove2{
+      0%{transform:translate(-120px, calc(.8px + var(--p,0) * .02px))}
+      50%{transform:translate(-60px,-1px)}
+      100%{transform:translate(0, calc(.8px + var(--p,0) * .02px))}
+    }
+    @keyframes espilWaveMove3{
+      0%{transform:translate(0,0)}
+      50%{transform:translate(-85px, calc(1.2px + var(--p,0) * .03px))}
+      100%{transform:translate(-170px,0)}
+    }
+    /* Swirl: a slow rotating light-disc inside the liquid, clipped to the water's own box */
+    #loader .swirl{
+      position:absolute; left:0; right:0; bottom:0; height:calc(var(--p,0)*1%);
+      overflow:hidden; z-index:2; transition:height .12s linear; pointer-events:none;
+    }
+    #loader .swirl i{
+      position:absolute; left:50%; top:50%; width:220px; height:220px; margin:-110px 0 0 -110px;
+      border-radius:50%;
+      background:conic-gradient(from 0deg, transparent 0deg, rgba(255,244,150,.3) 40deg, transparent 95deg, rgba(255,255,255,.16) 165deg, transparent 215deg, rgba(190,242,100,.26) 300deg, transparent 345deg);
+      animation:espilSwirlSpin 6s linear infinite;
+    }
+    @keyframes espilSwirlSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+    #loader .bubble{
+      position:absolute; bottom:8px; border-radius:50%; z-index:3;
+      background:radial-gradient(circle at 32% 32%, rgba(255,255,255,.95), rgba(255,255,255,.15) 65%);
+      animation:espilBubbleRise 3.2s ease-in infinite;
+    }
+    #loader .bubble.b1{left:38%; width:5px; height:5px; animation-delay:0s}
+    #loader .bubble.b2{left:55%; width:3px; height:3px; animation-delay:1.1s}
+    #loader .bubble.b3{left:47%; width:6px; height:6px; animation-delay:2s}
+    #loader .bubble.b4{left:63%; width:4px; height:4px; animation-delay:.6s}
+    #loader .bubble.b5{left:29%; width:3.5px; height:3.5px; animation-delay:1.7s}
+    @keyframes espilBubbleRise{
+      0%{transform:translate(0,0); opacity:0}
+      12%{opacity:.85}
+      38%{transform:translate(calc(var(--sway) * -.8),-28px)}
+      62%{transform:translate(calc(var(--sway) * .75),-50px)}
+      88%{opacity:.7}
+      100%{transform:translate(calc(var(--sway) * -.35),-74px); opacity:0}
+    }
+    #loader .glass-shade{
+      position:absolute; inset:0; border-radius:50%; z-index:3; pointer-events:none;
+      box-shadow:inset -14px -12px 26px rgba(0,0,0,.24), inset 12px 14px 22px rgba(255,255,255,.06), inset 0 -22px 30px rgba(0,0,0,.16), inset -6px 4px 14px rgba(140,220,255,.05);
+    }
+    #loader .glass-shine{
+      position:absolute; inset:0; border-radius:50%; z-index:4; pointer-events:none;
+      background:
+        radial-gradient(64px 36px at 30% 15%, rgba(255,255,255,.55), rgba(255,255,255,0) 62%),
+        radial-gradient(26px 13px at 24% 11%, rgba(255,255,255,.5), rgba(255,255,255,0) 70%),
+        radial-gradient(100px 100px at 78% 88%, rgba(255,255,255,.13), rgba(255,255,255,0) 55%),
+        radial-gradient(76px 30px at 50% 97%, rgba(216,252,170,.18), rgba(216,252,170,0) 70%),
+        linear-gradient(115deg, transparent 30%, rgba(255,255,255,.13) 46%, rgba(255,255,255,.03) 54%, transparent 66%);
+      background-size:auto, auto, auto, auto, 260% 100%;
+      animation:espilSheenSweep 7s ease-in-out infinite alternate;
+    }
+    @keyframes espilSheenSweep{
+      from{background-position:0 0, 0 0, 0 0, 0 0, 115% 0}
+      to{background-position:0 0, 0 0, 0 0, 0 0, -35% 0}
+    }
+    body.loading{overflow:hidden}
+    @media (prefers-reduced-motion: reduce){
+      #loader .wave, #loader .bubble, #loader .swirl i, #loader .slosh, #loader .surface, #loader .water::after, #loader .glass-shine{animation:none}
+      #loader{transition:opacity .2s}
+    }
+    /* Viewport-fit pass (Han 2026-10-21, same block as the app
+       payload): every screen playable - the frame always equals the
+       visible viewport (the old min-height floor pushed framed-
+       absolute controls below short screens), and the touch
+       controls anchor to the viewport itself with safe-area inset. */
+    html, body { height:100dvh; }
+    .earth-frame { height:100dvh; min-height:0; }
+    .joystick { position:fixed; left:auto; right:max(12px,2.5vw); bottom:calc(clamp(104px,15vh,168px) + env(safe-area-inset-bottom,0px)); width:clamp(84px,13vmin,120px); height:clamp(84px,13vmin,120px); }
+    #quickbar { right:max(10px,1.5vw); bottom:calc(clamp(10px,2.2vh,18px) + env(safe-area-inset-bottom,0px)); grid-template-columns:repeat(5,clamp(30px,8.5vw,42px)); max-width:calc(100vw - 20px); }
+    .chat-window { left:max(10px,1.5vw); bottom:calc(clamp(10px,2.2vh,18px) + env(safe-area-inset-bottom,0px)); max-height:42dvh; }
+    .map-attack { right:clamp(84px,11vw,118px); bottom:calc(clamp(70px,11vh,104px) + env(safe-area-inset-bottom,0px)); width:clamp(52px,9vmin,76px); height:clamp(52px,9vmin,76px); }
+    .map-jump { right:max(12px,2vw); bottom:calc(clamp(70px,11vh,104px) + env(safe-area-inset-bottom,0px)); width:clamp(52px,9vmin,76px); height:clamp(52px,9vmin,76px); }
+    .skill-bar { bottom:calc(clamp(8px,1.8vh,14px) + env(safe-area-inset-bottom,0px)); }
+    @media (pointer:coarse) {
+      .joystick { right:4vw; bottom:calc(4vh + env(safe-area-inset-bottom,0px)); width:min(30vmin,148px); height:min(30vmin,148px); }
+      .map-attack { left:26vw; right:auto; bottom:calc(3vh + env(safe-area-inset-bottom,0px)); }
+      .map-jump { left:38vw; right:auto; bottom:calc(3vh + env(safe-area-inset-bottom,0px)); }
+    }
+    /* Handoff cover (Han live-bug fix, 2026-10-21): on a handoff
+       boot the landing chrome never paints - the loader cover and
+       then the sign-in gate are the only surfaces. The gate and the
+       character panel live inside the frame too and are NOT in
+       this list, so they keep working. */
+    html.espil-handoff #intro, html.espil-handoff #globe-canvas,
+    html.espil-handoff #city-pins, html.espil-handoff .topbar,
+    html.espil-handoff #bgm-card, html.espil-handoff #city-status,
+    html.espil-handoff #city-list,
+    html.espil-handoff #dev-credit, html.espil-handoff #wip-banner { display:none !important; }
+    html.espil-handoff #city-info { visibility:hidden !important; } /* visibility, not display: the boot poller gates its ENTER click on the panel's computed display */
+    /* Time-of-day dark screen (Han's direct specification, 2026-10-21):
+       a plain black overlay at the top of the stack that darkens
+       with the local time of day. This is the simple overlay Han
+       asked for - NOT the purged day/night filter system. */
+    /* W2 (Han 2026-11-03): the #espil-daynight overlay element is
+       gone — night now lives in the 3D scene (modules/time-of-day.js),
+       never over the UI. */
+
+      /* Language selector (Han 2026-10-23) */
+    .lang-wrap{ position:relative; display:inline-flex; }
+    #lang-toggle{ min-width:74px; }
+    .lang-menu{ position:absolute; top:calc(100% + 8px); right:0; min-width:150px;
+      display:none; flex-direction:column; gap:2px; padding:6px; z-index:1200;
+      background:rgba(8,18,22,.92); border:1px solid rgba(134,238,228,.35);
+      border-radius:12px; backdrop-filter:blur(10px); box-shadow:0 14px 34px rgba(0,0,0,.45); }
+    .lang-menu.open{ display:flex; }
+    .lang-opt{ appearance:none; border:0; background:transparent; color:#ddfffc;
+      font:700 .8rem/1.2 "Manrope",sans-serif; text-align:left; padding:8px 10px;
+      border-radius:8px; cursor:pointer; }
+    .lang-opt:hover,.lang-opt:focus-visible{ background:rgba(134,238,228,.14); outline:none; }
+    .lang-opt.on{ background:rgba(134,238,228,.2); }
+  

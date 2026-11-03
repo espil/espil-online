@@ -159,9 +159,12 @@
     var ae = document.activeElement, tag = (ae && ae.tagName) || '';
     if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
     var k = (e.key || '').toLowerCase();
-    /* P moved to the Party/Friend window (Han 2026-10-27,
-       __espilSocial); the self profile opens from the right-click
-       menu on your own character instead. */
+    /* P is the PROFILE key (Han 2026-11-03 round 3 #5; this
+       supersedes the 2026-10-27 assignment of P to the
+       Party/Friend window, which moved to O). The world's own
+       character-panel toggle is off-flagged since 2026-10-18, so
+       the profile's owner module binds the key itself. */
+    if (k === 'p' && !e.repeat) toggleProfile();
     if (k === 'escape') { var p = charPanel(); if (p && p.getAttribute('aria-hidden') === 'false') toggleProfile(false); }
   });
   window.__espilPanelsState = function () {

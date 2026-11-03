@@ -39,7 +39,7 @@
           add: 'ADD', namePh: 'Name', you: 'You', idLabel: 'ID', lookLabel: 'Appearance',
           maleLook: 'Male traveller', femaleLook: 'Female traveller', statusLabel: 'Status', here: 'Here now',
           cityLabel: 'City', distLabel: 'Distance', partyNow: 'Party', membersWord: 'members',
-          needPartyForChat: 'Party chat: join a party first (right-click a character, or press P).' },
+          needPartyForChat: 'Party chat: join a party first (right-click a character, or press O).' },
     ko: { profile: '프로필', party: '파티 초대', trade: '거래', friend: '친구 등록', soon: 'COMING SOON', close: '닫기',
           invited: '파티 초대를 보냈습니다: ', notConnected: '아직 도시에 연결되지 않았습니다.', declined: '님이 파티 초대를 거절했습니다: ',
           partyFull: '파티가 가득 찼습니다.', gone: '상대방이 나갔습니다.', alreadyMember: '이미 같은 파티입니다.',
@@ -50,7 +50,7 @@
           add: '추가', namePh: '이름', you: '나', idLabel: '아이디', lookLabel: '캐릭터 외형',
           maleLook: '남자 여행자', femaleLook: '여자 여행자', statusLabel: '상태', here: '접속 중',
           cityLabel: '도시', distLabel: '거리', partyNow: '파티', membersWord: '명',
-          needPartyForChat: '파티 대화: 먼저 파티에 들어가세요 (캐릭터 우클릭, 또는 P키).' }
+          needPartyForChat: '파티 대화: 먼저 파티에 들어가세요 (캐릭터 우클릭, 또는 O키).' }
   };
   function t(k) { var d = T[lang()] || T.en; return d[k] || T.en[k] || k; }
 
@@ -459,7 +459,7 @@
     if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
     if (!inMap()) return;
     var k = (e.key || '').toLowerCase();
-    if (k === 'p' && !e.repeat) { e.preventDefault(); e.stopPropagation(); togglePanel(); }
+    if (k === 'o' && !e.repeat) { e.preventDefault(); e.stopPropagation(); togglePanel(); }
     else if (k === 'escape') { var p = panelEl(); if (p && p.getAttribute('aria-hidden') === 'false') togglePanel(false); }
   }, true);
   (function watchPanel() {

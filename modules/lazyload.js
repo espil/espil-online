@@ -1,0 +1,135 @@
+/* __espilLazyLoad v1 - Batch W (2026-11-03): first-use loader for
+   the post-entry feature modules. The pair no longer ships eager
+   script tags for social / stall2 / tutorial / panels / store /
+   map-search; this loader dynamic-imports each at the seam that
+   first needs it:
+   - tutorial: the espil-dive-start event when the flow emits it,
+     and in any case the arrival bundle below. Its own boot watcher
+     starts the flow only once the player has landed in the map,
+     per Han's rule that the tutorial never runs inside the entry
+     sequence.
+   - social + stall2 + tutorial + panels: arrival in a city
+     (espil-guide 'arrival', the first espil-party-frame, or the
+     loader's in-map poll). Their inputs are live presence events,
+     so the earliest safe seam is the join moment itself. After
+     stall2 lands, a DOMContentLoaded is re-dispatched on window:
+     stall2 registers its context-menu observer on that event
+     unconditionally. panels rides this bundle (not only the
+     later first-use seams below) because it owns the purchase
+     mirror: the espil-guide 'bought' listener that writes bought
+     items into the inventory. A stall purchase happens outdoors
+     with no interior event, key press or context menu before it,
+     so a panels-less session would drop the bought item -
+     found by probe_stall2 on the freeze candidate and fixed
+     here; the bundle still lands after entry, so panels stays
+     out of the entry-critical set.
+   - store: the building panel being clicked, the interior event,
+     or __espilInside appearing (poll). The store's own tick then
+     applies the fitout for the building already entered.
+   - panels: the inventory/profile keys, the HUD CHAR menu button,
+     a right-click (the self-profile menu item lives in the social
+     context menu), or the interior event (the purchase mirror
+     must exist before the first buy).
+     After it lands, an already-open panel is nudged (aria-hidden
+     flip) so the module's open-watchers render it.
+   - map-search: the map key or a click on the minimap wrap; the
+     module's own build poll creates the search form from there.
+   Every import is fire-and-forget with a console warning on
+   failure; a failed lazy load never breaks the page.
+   __espilLazyState() reports what has landed (rig probes). */
+(function () {
+  'use strict';
+  var loaded = {}, loading = {};
+  var pendingProfile = false;
+  function load(name) {
+    if (loaded[name] || loading[name]) return;
+    loading[name] = true;
+    import('./' + name).then(function () {
+      loaded[name] = true;
+      if (name === 'stall2.js' && document.readyState !== 'loading') {
+        try { window.dispatchEvent(new Event('DOMContentLoaded')); } catch (e) {}
+      }
+      if (name === 'panels.js') {
+        nudgePanels();
+        /* A P press or CHAR click that arrived while panels.js
+           was still loading expressed the intent to OPEN the
+           profile; fulfil it now that the module is resident
+           (its own key binding serves every later press). */
+        if (pendingProfile) {
+          pendingProfile = false;
+          if (window.__espilOpenSelfProfile) window.__espilOpenSelfProfile();
+        }
+      }
+    }).catch(function (err) {
+      loading[name] = false;
+      if (window.console && console.warn) console.warn('[espil-lazy] failed to load ' + name, err);
+    });
+  }
+  function nudgePanels() {
+    ['inventory-panel', 'character-panel'].forEach(function (id) {
+      var p = document.getElementById(id);
+      if (p && p.getAttribute('aria-hidden') === 'false') {
+        p.setAttribute('aria-hidden', 'true');
+        p.setAttribute('aria-hidden', 'false');
+      }
+    });
+  }
+  function socialBundle() { load('social.js'); load('stall2.js'); load('tutorial.js'); load('panels.js'); }
+  /* The city-switch dive dispatches espil-dive-start on window;
+     the standard gate entry does not, so the tutorial also rides
+     the arrival bundle above - its own boot watcher only starts
+     the flow once the player has landed in the map. */
+  window.addEventListener('espil-dive-start', function () { load('tutorial.js'); });
+  window.addEventListener('espil-guide', function (e) {
+    var d = e && e.detail; if (!d) return;
+    if (d.type === 'arrival') socialBundle();
+    if (d.type === 'interior') { load('store.js'); load('panels.js'); }
+  });
+  window.addEventListener('espil-party-frame', socialBundle);
+  document.addEventListener('keydown', function (e) {
+    var ae = document.activeElement, tag = (ae && ae.tagName) || '';
+    if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
+    var k = (e.key || '').toLowerCase();
+    if (k === 'i') load('panels.js');
+    if (k === 'p') { if (!loaded['panels.js']) pendingProfile = true; load('panels.js'); }
+    if (k === 'o') socialBundle();
+    if (k === 'm') load('map-search.js');
+  }, true);
+  document.addEventListener('contextmenu', function () { load('panels.js'); }, true);
+  /* The HUD menu's CHAR button opens the self profile (panels.js).
+     Its pointerdown is the earliest seam: start the import in the
+     capture phase, before the HUD's own handler falls back to the
+     P key, so the profile renders with the least delay. */
+  document.addEventListener('pointerdown', function (e) {
+    var t = e.target;
+    if (!t || !t.closest) return;
+    var slot = t.closest('#kb-menu .move-slot');
+    if (!slot) return;
+    var mn = slot.querySelector('.mn');
+    if (mn && mn.textContent === 'CHAR') {
+      if (!loaded['panels.js']) pendingProfile = true;
+      load('panels.js');
+    }
+  }, true);
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (!t || !t.closest) return;
+    if (t.closest('#minimap-wrap')) load('map-search.js');
+    if (t.closest('#bldg-panel, #bldg-opts')) load('store.js');
+  }, true);
+  /* Backstop poll: being in the map arms the presence-adjacent
+     bundle by any arrival path; being inside a building arms the
+     store. 600 ms, and each arm is a no-op once loaded. */
+  setInterval(function () {
+    if (document.body && document.body.classList.contains('in-map')) socialBundle();
+    if (window.__espilInside) load('store.js');
+  }, 600);
+  window.__espilLazyState = function () {
+    var out = {};
+    Object.keys(loaded).forEach(function (k) { out[k] = true; });
+    return {
+      loaded: out,
+      loading: Object.keys(loading).filter(function (k) { return !loaded[k]; })
+    };
+  };
+})();
