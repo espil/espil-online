@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Konbiniya Japan Centre - 1238 Robson St · Espil Online</title>
+<style>
+  html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#10151a;
+    font-family:'Manrope','Segoe UI',system-ui,sans-serif; color:#eef6f5;
+    -webkit-user-select:none; user-select:none; touch-action:none; }
+  #view { position:fixed; inset:0; }
+  #view canvas { display:block; }
+  .chip { position:fixed; z-index:5; background:rgba(8,18,22,.72); border:1px solid rgba(134,238,228,.35);
+    border-radius:12px; backdrop-filter: blur(6px); }
+  #store-chip { top:14px; left:14px; padding:10px 14px; pointer-events:none; }
+  #store-chip .nm { font-weight:900; letter-spacing:.12em; font-size:.86rem; color:#8ef7e8; }
+  #store-chip .ad { font-size:.74rem; opacity:.85; margin-top:2px; }
+  #store-chip .fp { font-size:.66rem; letter-spacing:.18em; opacity:.6; margin-top:4px; }
+  #hint { left:50%; bottom:96px; transform:translateX(-50%); padding:10px 18px; font-size:.86rem;
+    font-weight:700; color:#fff4cf; opacity:0; transition:opacity .25s; pointer-events:none; white-space:nowrap; }
+  #hint.on { opacity:1; }
+  #controls-note { left:50%; bottom:18px; transform:translateX(-50%); padding:8px 14px; font-size:.72rem;
+    opacity:.85; pointer-events:none; white-space:nowrap; }
+  #close-page { top:14px; right:14px; padding:10px 16px; font:800 .74rem 'Manrope',sans-serif;
+    letter-spacing:.08em; color:#eafffd; cursor:pointer; }
+  #close-page:hover { border-color:rgba(134,238,228,.8); }
+  #toast { left:50%; top:70px; transform:translateX(-50%); padding:11px 20px; font-size:.88rem; font-weight:800;
+    color:#ffe9a8; opacity:0; transition:opacity .3s; pointer-events:none; z-index:9; }
+  #toast.on { opacity:1; }
+  #loading { position:fixed; inset:0; z-index:20; background:#10151a; display:flex; align-items:center;
+    justify-content:center; font-weight:800; letter-spacing:.14em; color:#8ef7e8; }
+  /* shop panel - same concepts/keys as the pair's shop */
+  #shop-ui { position:fixed; inset:0; z-index:10; display:none; align-items:center; justify-content:center;
+    background:rgba(4,10,13,.55); }
+  #shop-ui[aria-hidden="false"] { display:flex; }
+  .shop-card { width:min(520px,92vw); max-height:86vh; overflow:auto; background:rgba(10,22,27,.96);
+    border:1px solid rgba(134,238,228,.45); border-radius:16px; padding:20px 22px;
+    box-shadow:0 18px 60px rgba(0,0,0,.55); }
+  .shop-card h2 { margin:0 0 2px; font-size:1.06rem; letter-spacing:.1em; color:#8ef7e8; }
+  .shop-card .sub { font-size:.78rem; opacity:.8; margin-bottom:12px; }
+  #shop-purse { font-weight:900; color:#ffe9a8; font-size:.92rem; margin-bottom:12px; }
+  #shop-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px; }
+  .goods { border:1px solid rgba(255,233,168,.45); border-radius:10px; padding:10px; text-align:center; }
+  .goods .tile { height:44px; border-radius:6px; background:#f2ead8; display:flex; align-items:center;
+    justify-content:center; font-size:26px; }
+  .goods .gname { margin-top:7px; font-size:.86rem; font-weight:700; }
+  .goods .gmeta { opacity:.78; font-size:.78rem; margin-top:2px; }
+  .goods button { margin-top:8px; appearance:none; border:1px solid rgba(134,238,228,.55); border-radius:10px;
+    padding:8px 12px; background:rgba(18,44,50,.85); color:#eafffd; font:800 .74rem 'Manrope',sans-serif;
+    letter-spacing:.06em; cursor:pointer; }
+  .goods button:disabled { opacity:.45; cursor:default; }
+  #shop-bag { margin-top:14px; font-size:.84rem; color:#c9f5ee; min-height:1.2em; }
+  #shop-close { margin-top:12px; appearance:none; border:1px solid rgba(169,226,222,.3); border-radius:10px;
+    padding:9px 16px; background:rgba(10,26,31,.7); color:#e8f4f3; font:800 .74rem 'Manrope',sans-serif;
+    letter-spacing:.08em; cursor:pointer; }
+</style>
+</head>
+<body>
+<div id="view"></div>
+<div id="loading">ENTERING KONBINIYA…</div>
+
+<div class="chip" id="store-chip">
+  <div class="nm" id="chip-name">KONBINIYA JAPAN CENTRE</div>
+  <div class="ad" id="chip-addr">1238 Robson St, Vancouver</div>
+  <div class="fp">FIRST PERSON · THE /vancouver PAGE IS PAUSED WHILE YOU ARE HERE</div>
+</div>
+<button class="chip" id="close-page" type="button">✕ CLOSE &amp; RETURN</button>
+<div class="chip" id="hint">Press SPACE to pay at the counter</div>
+<div class="chip" id="controls-note">W A S D / arrows - walk &nbsp;·&nbsp; drag - look &nbsp;·&nbsp; SPACE at the counter - shop</div>
+<div class="chip" id="toast" role="status"></div>
+
+<div id="shop-ui" aria-hidden="true">
+  <div class="shop-card">
+    <h2 id="shop-title">KONBINIYA - COUNTER</h2>
+    <div class="sub">Browse, then pay here. Stock and your Leo balance are shared with the street page.</div>
+    <div id="shop-purse">Leo 1,000</div>
+    <div id="shop-grid"></div>
+    <div id="shop-bag">Your bag: </div>
+    <button id="shop-close" type="button">CLOSE</button>
+  </div>
+</div>
+
+<script src="../../assets/three.min.js"></script>
+<script src="../../assets/GLTFLoader.js"></script>
+<script>
+'use strict';
+/* ================================================================
+   Espil Online - standalone store page (Batch S, Han 2026-11-03).
+   One page shell for every store: identity comes from STORE below,
+   so another store reuses this file with a different config/slug.
+   Interior placements are data, not code (Batch F): they load from
+   layout.json beside this page (format: LAYOUT-SPEC.md). Only the
+   counter body and the clerk NPC stay in code config.
+   Entering from /vancouver.html pauses that page (store-page-link.js
+   + the postMessage contract at the bottom of this file); closing
+   this page resumes it.
+   ================================================================ */
+var STORE = {
+  slug: '1238-robson-st',
+  name: 'Konbiniya Japan Centre',
+  address: '1238 Robson St',
+  city: 'Vancouver',
+  counter: { x: 2.0, z: -11.6 }   /* counter interaction point */
+};
+
+/* ---- shared state: the SAME localStorage keys as the pair ---- */
+var STOCK_KEY = 'espil_shop_stock_v1';
+var ONIGIRI = { name: 'Onigiri', price: 2, glyph: '\uD83C\uDF59', initial: 20 };
+function leoBalance() { var v = parseInt(localStorage.getItem('espil_leo_balance'), 10); return isNaN(v) ? 1000 : v; }
+function leoSet(v) { try { localStorage.setItem('espil_leo_balance', String(v)); } catch (e) {} }
+function stock() {
+  try { var s = JSON.parse(localStorage.getItem(STOCK_KEY) || 'null'); if (s && typeof s.Onigiri === 'number') return s; } catch (e) {}
+  return { Onigiri: ONIGIRI.initial };
+}
+function stockSet(s) { try { localStorage.setItem(STOCK_KEY, JSON.stringify(s)); } catch (e) {} }
+
+/* ---- room design (chosen for this page) ----
+   Floor 44 m (x) by 30 m (z), walls 6 m, ceiling 6 m. Every Kenney
+   model is placed at SCALE 3 (Han: the assets are too small at the
+   pair's 1x fitout scale - triple them). Native shelf unit 0.8 m
+   wide / 0.8 m high becomes 2.4 m wide / 2.4 m high, so aisles are
+   laid out on a 3.2 m pitch with 4.4 m walkways between rows. */
+var SCALE = 3;
+var ROOM = { hx: 22, hz: 15, h: 6 };       /* half extents + wall height */
+var EYE = 1.6;                              /* first-person eye height */
+var RADIUS = 0.35;                          /* player collision radius */
+
+var scene, camera, renderer, clock;
+var player = { x: 0, z: 12.2, yaw: 0, pitch: 0 };  /* spawn at the entrance, facing -z into the store */
+var keys = {};
+var colliders = [];                          /* {minX,maxX,minZ,maxZ} */
+var loadState = { pending: 0, placed: 0, failed: [] };
+var counterNear = false, shopIsOpen = false, lastHintAt = 0;
+
+function addCollider(cx, cz, w, d) {
+  colliders.push({ minX: cx - w / 2, maxX: cx + w / 2, minZ: cz - d / 2, maxZ: cz + d / 2 });
+}
+
+/* ---------- scene ---------- */
+function buildRoom() {
+  var floorMat = new THREE.MeshLambertMaterial({ color: 0xd8dde2 });
+  var floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.hx * 2, ROOM.hz * 2), floorMat);
+  floor.rotation.x = -Math.PI / 2; scene.add(floor);
+  /* subtle floor tile grid */
+  var cv = document.createElement('canvas'); cv.width = cv.height = 128;
+  var cx2 = cv.getContext('2d'); cx2.fillStyle = '#ccd2d9'; cx2.fillRect(0, 0, 128, 128);
+  cx2.strokeStyle = 'rgba(96,108,120,0.65)'; cx2.lineWidth = 4; cx2.strokeRect(0, 0, 128, 128);
+  var tex = new THREE.CanvasTexture(cv); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(22, 15);
+  floor.material = new THREE.MeshLambertMaterial({ map: tex });
+  var wallMat = new THREE.MeshLambertMaterial({ color: 0xf3efe6 });
+  var backMat = new THREE.MeshLambertMaterial({ color: 0xa8cdc0 });  /* soft teal: pale models (clerk) read against it */
+  function wall(w, h, x, y, z, ry, mat) {
+    var m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat || wallMat);
+    m.position.set(x, y, z); m.rotation.y = ry; scene.add(m); return m;
+  }
+  wall(ROOM.hx * 2, ROOM.h, 0, ROOM.h / 2, -ROOM.hz, 0, backMat);            /* north (counter) */
+  wall(ROOM.hx * 2, ROOM.h, 0, ROOM.h / 2, ROOM.hz, Math.PI);                /* south (entrance) */
+  wall(ROOM.hz * 2, ROOM.h, -ROOM.hx, ROOM.h / 2, 0, Math.PI / 2);
+  wall(ROOM.hz * 2, ROOM.h, ROOM.hx, ROOM.h / 2, 0, -Math.PI / 2);
+  var ceil = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.hx * 2, ROOM.hz * 2),
+    new THREE.MeshLambertMaterial({ color: 0xf7f7f2 }));
+  ceil.rotation.x = Math.PI / 2; ceil.position.y = ROOM.h; scene.add(ceil);
+  /* glowing ceiling light panels (visual brightness cue) */
+  var panelMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  for (var px = -16; px <= 16; px += 8) for (var pz = -10; pz <= 10; pz += 5) {
+    var p = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 1.8), panelMat);
+    p.rotation.x = Math.PI / 2; p.position.set(px, ROOM.h - 0.02, pz); scene.add(p);
+  }
+  /* entrance door frame, white glow like the in-world interiors */
+  var glowMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 });
+  function bar(w, h, d, x, y, z) { var m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), glowMat); m.position.set(x, y, z); scene.add(m); }
+  bar(0.22, 3.6, 0.22, -2.4, 1.8, ROOM.hz - 0.15); bar(0.22, 3.6, 0.22, 2.4, 1.8, ROOM.hz - 0.15);
+  bar(5.0, 0.22, 0.22, 0, 3.7, ROOM.hz - 0.15);
+  /* store sign above the counter (canvas texture) */
+  var sc = document.createElement('canvas'); sc.width = 1024; sc.height = 160;
+  var sg = sc.getContext('2d'); sg.fillStyle = '#0d3b34'; sg.fillRect(0, 0, 1024, 160);
+  sg.fillStyle = '#aef7e4'; sg.font = '900 84px Manrope, sans-serif'; sg.textAlign = 'center';
+  sg.fillText('K O N B I N I Y A', 512, 104);
+  var sign = new THREE.Mesh(new THREE.PlaneGeometry(13, 2.0),
+    new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sc) }));
+  sign.position.set(0, 4.6, -ROOM.hz + 0.06); scene.add(sign);
+}
+
+/* ---------- Kenney fitout at 3x ---------- */
+var loader = null, modelCache = {};
+function loadModel(name, done) {
+  if (modelCache[name]) { done(modelCache[name].clone()); return; }
+  if (!loader) loader = new THREE.GLTFLoader();
+  loadState.pending++;
+  loader.load('../../assets/kenney-mini-market/' + name + '.glb', function (gltf) {
+    loadState.pending--;
+    var skinned = false;
+    gltf.scene.traverse(function (n) { if (n.isSkinnedMesh) skinned = true; });
+    /* Skinned models (character-employee) must NOT be cache-cloned:
+       a cloned SkinnedMesh keeps the ORIGINAL scene's skeleton, whose
+       bones never enter the render graph, and the mesh draws nothing.
+       Hand over the loader's own bound scene instead. */
+    if (skinned) { done(gltf.scene); return; }
+    modelCache[name] = gltf.scene; done(gltf.scene.clone());
+  }, undefined, function () {
+    loadState.pending--; loadState.failed.push(name);
+    try { console.warn('[espil-store-page] Kenney model failed to load: ' + name); } catch (e) {}
+    done(null);
+  });
+}
+/* native bounds (measured from the GLBs) so colliders match the 3x meshes */
+var BOUNDS = {
+  'shelf-boxes': [0.8, 0.7], 'shelf-bags': [0.8, 0.7], 'shelf-end': [0.8, 0.478],
+  'freezers-standing': [1.0, 0.5], 'freezer': [0.8, 0.6],
+  'display-fruit': [0.6, 0.6], 'display-bread': [0.7, 0.6],
+  'cash-register': [0.85, 0.85], 'character-employee': [0.78, 0.4],
+  'shopping-basket': [0.35, 0.35], 'shopping-cart': [0.3, 0.48], 'bottle-return': [0.45, 0.48]
+};
+function place(name, x, z, ry, noCollide, y, scaleOverride) {
+  var sc = scaleOverride || SCALE;
+  loadModel(name, function (obj) {
+    if (!obj) return;
+    obj.scale.set(sc, sc, sc);
+    obj.position.set(x, y || 0, z);
+    if (ry) obj.rotation.y = ry;
+    obj.traverse(function (n) {
+      n.frustumCulled = false;
+      if (n.isMesh && n.material && n.material.color && n.material.isMeshStandardMaterial) {
+        n.material = n.material.clone();           /* lift a touch: nothing reads dark */
+        n.material.color.multiplyScalar(1.04);
+      }
+    });
+    scene.add(obj); loadState.placed++;
+    if (noCollide) return;
+    var b = BOUNDS[name]; if (!b) return;
+    var w = b[0] * sc, d = b[1] * sc;
+    if (Math.abs(Math.sin(ry || 0)) > 0.5) { var t = w; w = d; d = t; }
+    addCollider(x, z, w + 0.1, d + 0.1);
+  });
+}
+function M(geo, color, x, y, z) {
+  var m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: color }));
+  m.position.set(x, y, z); m.frustumCulled = false; scene.add(m); return m;
+}
+function buildCounter() {
+  /* Serving counter across the north wall + top slab + clerk. The
+     counter is 3.0 m deep because the register at 3x is 2.55 m deep -
+     it must sit fully on the slab, not overhang it. The counter body
+     and the clerk NPC are CODE CONFIG, not layout placements (see
+     LAYOUT-SPEC.md); the register that sits on the slab IS one of the
+     layout.json placements. */
+  M(new THREE.BoxGeometry(19, 1.1, 3.0), 0x77572f, 0, 0.55, -12.0);
+  M(new THREE.BoxGeometry(19, 0.09, 3.25), 0xf2ecdc, 0, 1.15, -12.0);
+  addCollider(0, -12.0, 19.2, 3.2);
+  place('character-employee', STORE.counter.x - 1.6, -14.3, Math.PI, true); /* behind the counter, beside the till */
+}
+
+/* ---------- fitout placements: data-driven (Batch F) ----------
+   Every placed object comes from layout.json beside this page
+   (format: LAYOUT-SPEC.md). The grid anchors each object at its cell
+   centre plus a sub-cell offset, so world position round-trips the
+   coordinates the layout was authored from. If the file cannot be
+   loaded the page still opens on an empty floor - a missing layout
+   must never be a dead page. */
+var layoutState = { settled: false, loaded: false, count: 0 };
+function buildFromLayout(layout) {
+  var g = layout.grid, cell = g.cellMeters;
+  (layout.placements || []).forEach(function (p) {
+    var x = g.origin.x + (p.cell[0] + 0.5) * cell + (p.dx || 0);
+    var z = g.origin.z + (p.cell[1] + 0.5) * cell + (p.dz || 0);
+    place(p.model, x, z, (p.rotY || 0) * Math.PI / 180, p.collide === false, p.y || 0, p.scale);
+    layoutState.count++;
+  });
+}
+function loadLayout() {
+  fetch('layout.json').then(function (r) {
+    if (!r.ok) throw new Error('layout.json HTTP ' + r.status);
+    return r.json();
+  }).then(function (layout) {
+    buildFromLayout(layout);
+    layoutState.loaded = true;
+    layoutState.settled = true;
+  }).catch(function (err) {
+    try { console.error('[espil-store-page] layout.json failed to load; opening with an empty floor.', err); } catch (e) {}
+    layoutState.settled = true;
+  });
+}
+
+/* ---------- lighting: the interior is ALWAYS bright ---------- */
+function buildLights() {
+  scene.add(new THREE.AmbientLight(0xffffff, 0.42));
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xb8c4c2, 0.8));
+  var key = new THREE.DirectionalLight(0xffffff, 0.45);
+  key.position.set(6, ROOM.h - 0.5, 4); scene.add(key);
+  [-14, 0, 14].forEach(function (x) {
+    [-8, 3].forEach(function (z) {
+      var pt = new THREE.PointLight(0xfff6e0, 0.4, 34, 1.2);
+      pt.position.set(x, ROOM.h - 0.4, z); scene.add(pt);
+    });
+  });
+}
+
+/* ---------- shop ---------- */
+var toastTimer = null;
+function toast(msg) {
+  var t = document.getElementById('toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.classList.remove('on'); }, 2600);
+}
+function renderShop() {
+  document.getElementById('shop-purse').textContent = 'Leo ' + leoBalance().toLocaleString('en-US');
+  var grid = document.getElementById('shop-grid'); grid.innerHTML = '';
+  var n = stock().Onigiri;
+  var card = document.createElement('div'); card.className = 'goods'; card.setAttribute('data-store-onigiri', '1');
+  card.innerHTML = '<div class="tile">' + ONIGIRI.glyph + '</div>' +
+    '<div class="gname">' + ONIGIRI.name + '</div>' +
+    '<div class="gmeta">Leo ' + ONIGIRI.price + ' · Stock ' + n + '</div>';
+  var buy = document.createElement('button'); buy.type = 'button';
+  buy.textContent = n > 0 ? 'Buy at counter' : 'Sold out'; buy.disabled = n <= 0;
+  buy.addEventListener('click', function () {
+    var s = stock();
+    if (s.Onigiri <= 0) { toast('Onigiri is sold out'); return; }
+    var bal = leoBalance();
+    if (bal < ONIGIRI.price) { toast('Not enough Leo for Onigiri'); return; }
+    leoSet(bal - ONIGIRI.price); s.Onigiri -= 1; stockSet(s);
+    var bag = document.getElementById('shop-bag');
+    bag.textContent = (bag.textContent.indexOf('Your bag:') === 0 && bag.textContent !== 'Your bag: ')
+      ? bag.textContent + ', Onigiri' : 'Your bag: Onigiri';
+    toast('Bought Onigiri for Leo ' + ONIGIRI.price + ' (' + s.Onigiri + ' left)');
+    renderShop();
+  });
+  card.appendChild(buy); grid.appendChild(card);
+}
+function setShop(open) {
+  shopIsOpen = open;
+  var ui = document.getElementById('shop-ui');
+  ui.setAttribute('aria-hidden', open ? 'false' : 'true');
+  if (open) renderShop();
+}
+
+/* ---------- movement + collision ---------- */
+function collide(nx, nz) {
+  for (var i = 0; i < colliders.length; i++) {
+    var c = colliders[i];
+    if (nx > c.minX - RADIUS && nx < c.maxX + RADIUS && nz > c.minZ - RADIUS && nz < c.maxZ + RADIUS) return true;
+  }
+  return false;
+}
+function stepMove(dt) {
+  var run = (keys['ShiftLeft'] || keys['ShiftRight']) ? 7.0 : 4.5;
+  var f = 0, r = 0;
+  if (keys['KeyW'] || keys['ArrowUp']) f += 1;
+  if (keys['KeyS'] || keys['ArrowDown']) f -= 1;
+  if (keys['KeyD'] || keys['ArrowRight']) r += 1;
+  if (keys['KeyA'] || keys['ArrowLeft']) r -= 1;
+  if (!f && !r) return;
+  var len = Math.hypot(f, r); f /= len; r /= len;
+  var s = Math.sin(player.yaw), c = Math.cos(player.yaw);
+  var dx = (-s * f + c * r) * run * dt;
+  var dz = (-c * f - s * r) * run * dt;
+  var nx = Math.max(-ROOM.hx + 0.6, Math.min(ROOM.hx - 0.6, player.x + dx));
+  if (!collide(nx, player.z)) player.x = nx;
+  var nz = Math.max(-ROOM.hz + 0.6, Math.min(ROOM.hz - 0.6, player.z + dz));
+  if (!collide(player.x, nz)) player.z = nz;
+}
+
+/* ---------- drag look (pair Batch A math: yaw -= dx*0.0052) ---------- */
+function bindLook(el) {
+  var dragId = null, lx = 0, ly = 0;
+  el.addEventListener('pointerdown', function (e) {
+    if (shopIsOpen) return;
+    dragId = e.pointerId; lx = e.clientX; ly = e.clientY;
+    try { el.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+  el.addEventListener('pointermove', function (e) {
+    if (e.pointerId !== dragId) return;
+    var dx = e.clientX - lx, dy = e.clientY - ly; lx = e.clientX; ly = e.clientY;
+    player.yaw -= dx * 0.0052;
+    player.pitch = Math.max(-1.25, Math.min(1.25, player.pitch - dy * 0.0052));
+  });
+  function end(e) { if (e.pointerId === dragId) dragId = null; }
+  el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+}
+
+/* ---------- parent pause contract (child side) ---------- */
+function notifyParent(type) {
+  try { if (window.opener && !window.opener.closed) window.opener.postMessage({ type: type, store: STORE.slug }, '*'); } catch (e) {}
+}
+notifyParent('espil-store-open');
+setInterval(function () { notifyParent('espil-store-heartbeat'); }, 1000);
+window.addEventListener('beforeunload', function () { notifyParent('espil-store-close'); });
+
+/* ---------- boot ---------- */
+function init() {
+  document.getElementById('chip-name').textContent = STORE.name.toUpperCase();
+  document.getElementById('chip-addr').textContent = STORE.address + ', ' + STORE.city;
+  document.getElementById('shop-title').textContent = STORE.name.split(' ')[0].toUpperCase() + ' - COUNTER';
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xe9efec);
+  camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 200);
+  camera.rotation.order = 'YXZ';
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  if ('outputEncoding' in renderer) renderer.outputEncoding = THREE.sRGBEncoding;
+  if ('toneMapping' in renderer) { renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0; }
+  document.getElementById('view').appendChild(renderer.domElement);
+  buildLights(); buildRoom(); buildCounter(); loadLayout();
+  clock = new THREE.Clock();
+  bindLook(renderer.domElement);
+  addEventListener('resize', function () {
+    camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+  document.addEventListener('keydown', function (e) {
+    keys[e.code] = true;
+    if (e.code === 'Space') {
+      if (counterNear && !shopIsOpen) { e.preventDefault(); setShop(true); }
+    }
+    if (e.code === 'Escape' && shopIsOpen) setShop(false);
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].indexOf(e.code) >= 0) e.preventDefault();
+  });
+  document.addEventListener('keyup', function (e) { keys[e.code] = false; });
+  document.getElementById('shop-close').addEventListener('click', function () { setShop(false); });
+  document.getElementById('close-page').addEventListener('click', function () {
+    notifyParent('espil-store-close'); window.close();
+    setTimeout(function () { toast('You can close this tab - the street page resumes.'); }, 350);
+  });
+  var hintEl = document.getElementById('hint');
+  (function loop() {
+    requestAnimationFrame(loop);
+    var dt = Math.min(clock.getDelta(), 0.05);
+    if (!shopIsOpen) stepMove(dt);
+    camera.position.set(player.x, EYE, player.z);
+    camera.rotation.y = player.yaw; camera.rotation.x = player.pitch;
+    var d = Math.hypot(player.x - STORE.counter.x, player.z - STORE.counter.z);
+    counterNear = d < 3.4;
+    hintEl.classList.toggle('on', counterNear && !shopIsOpen);
+    renderer.render(scene, camera);
+  })();
+  var waitLoads = setInterval(function () {
+    if (loadState.pending <= 0 && layoutState.settled) {
+      clearInterval(waitLoads);
+      document.getElementById('loading').style.display = 'none';
+    }
+  }, 200);
+}
+init();
+
+/* probe/diagnostic surface */
+window.__storePage = {
+  debugSetPose: function (x, z, yaw) {   /* probes only: jump the FP camera */
+    player.x = x; player.z = z; if (typeof yaw === 'number') player.yaw = yaw;
+  },
+  debugOnly: function (idx) {              /* probes only: show just scene child idx (-1 = all) */
+    scene.children.forEach(function (o, i) { o.visible = (idx < 0 || i === idx); });
+  },
+  debugObjects: function () {             /* probes only: world boxes of scene children */
+    var out = [];
+    scene.children.forEach(function (o, i) {
+      var b = new THREE.Box3().setFromObject(o);
+      out.push({ i: i, type: o.type, pos: [+(o.position.x).toFixed(1), +(o.position.y).toFixed(1), +(o.position.z).toFixed(1)],
+        min: [+(b.min.x).toFixed(1), +(b.min.y).toFixed(1), +(b.min.z).toFixed(1)],
+        max: [+(b.max.x).toFixed(1), +(b.max.y).toFixed(1), +(b.max.z).toFixed(1)] });
+    });
+    return out;
+  },
+  state: function () {
+    return {
+      store: STORE.slug, x: +player.x.toFixed(2), z: +player.z.toFixed(2),
+      yaw: +player.yaw.toFixed(3), pitch: +player.pitch.toFixed(3), eye: EYE,
+      counterNear: counterNear, shopOpen: shopIsOpen,
+      layoutLoaded: layoutState.loaded, layoutCount: layoutState.count,
+      placed: loadState.placed, failed: loadState.failed.slice(),
+      colliders: colliders.length,
+      stock: stock().Onigiri, leo: leoBalance()
+    };
+  }
+};
+</script>
+</body>
+</html>

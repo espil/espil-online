@@ -2907,8 +2907,15 @@
       var t=new THREE.CanvasTexture(c);t.anisotropy=4;return t;
     }
     function initCarTextures(){
-      for(var v=0;v<4;v++)for(var k=0;k<3;k++)
-        carTextures.push(carTexture(v,CAR_COLORS[(v*3+k)%CAR_COLORS.length]));
+      /* Batch D4 (Han 2026-11-03): the van variant (v===2) is OUT of
+         the traffic pool - its tall boxy side profile on the traffic
+         billboard plane reads as a strange BUS IMAGE in front of the
+         Art Gallery (Georgia St runs along the gallery front). The
+         Georgia-St live-bus feature itself is long removed (comment
+         only); this van sprite was the only bus-like image left in
+         the build. Cars and the taxi variant remain. */
+      for(var v=0;v<4;v++){ if(v===2)continue; for(var k=0;k<3;k++)
+        carTextures.push(carTexture(v,CAR_COLORS[(v*3+k)%CAR_COLORS.length])); }
     }
     /* #5 (Han 2nd QA): top-view car sprite for N/S movement.
        Simple top-down: body, windshield at front (+x), roof. */
@@ -4155,12 +4162,30 @@
       walkPlayer={av:av,pos:new THREE.Vector3(3,.05,31),velY:0,onGround:true,jumps:0,faceY:.5,bobT:0,moving:false,flying:false,vehicle:null};
       av.shadow.position.set(3,.03,31);
     }
-    /* Han 2026-10-10 #8: Fly vehicle (B key). Test version — will be paid feature.
-       Simple airplane from primitives. WASD move, Space up, Ctrl down, B dismount. */
+    /* Fly/ride (B key). Lineage: Han 2026-10-10 #8 test vehicle, reworked
+       to Han's 2026-11-03 Batch G spec: B toggles fly/ride; while active
+       the movement is fully 3D - the arrow keys (and the touch stick)
+       stay the basic camera-relative movement, SHIFT ascends and SPACE
+       descends (their ground roles, jump/interact, are gated off while
+       flying - see the in-map keydown handler). B again RELEASES: the
+       ride vanishes and the character falls under gravity; fall damage
+       accumulates with the fall and is charged on ground impact only,
+       so summoning never damages and re-summoning mid-fall cancels the
+       fall. Terrain collision applies while airborne (the ground axis
+       sweep is reused, no noclip), and mid-air contact with another
+       player drops BOTH flyers. Tunables: */
+    var ESPIL_FLY_H_SPEED=12;    /* m/s - the ground run speed (moveSpeeds) */
+    var ESPIL_FLY_V_SPEED=9;     /* m/s vertical */
+    var ESPIL_FLY_MAX_ALT=300;   /* m (the 2026-10-10 vehicle's own cap) */
+    var ESPIL_FLY_HOVER=1.2;     /* m - descended feet rest this far above the support (the ride's body hangs below the feet datum) */
+    var ESPIL_FALL_SAFE_M=6;     /* m of fall that never damages */
+    var ESPIL_FALL_DMG_PER_M=6;  /* HP per metre fallen beyond the safe height */
+    var espilLastFallDamage=0;
     function summonVehicle(){
       if(!walkPlayer||!mapScene)return;
+      if(window.__espilInside)return; /* no summoning indoors (Batch G) */
       if(walkPlayer.flying){
-        /* Dismount */
+        /* Release */
         dismountVehicle();
         return;
       }
@@ -4184,16 +4209,33 @@
       cock.position.set(0,0.7,1);
       grp.add(cock);
       grp.position.copy(walkPlayer.pos);
-      grp.position.y+=2;
       mapScene.add(grp);
       walkPlayer.flying=true;
       walkPlayer.vehicle=grp;
-      /* Hide character, show vehicle */
-      if(walkPlayer.av&&walkPlayer.av.group)walkPlayer.av.group.visible=false;
-      console.log('[Vehicle] Summoned airplane — WASD fly, SPACE up, CTRL down, B dismount');
+      /* Batch G: summoning is instant and never damages. It cancels any
+         fall in progress (no damage is charged for a cancelled fall),
+         and the character stays VISIBLE, riding the vehicle - the
+         flight update syncs the avatar onto it every frame. A small
+         takeoff lift keeps the ride's body clear of the ground. */
+      walkPlayer._fall=null;
+      walkPlayer.velY=0;
+      walkPlayer.onGround=false;
+      walkPlayer.pos.y+=1.5;
+      if(walkPlayer.av&&walkPlayer.av.group)walkPlayer.av.group.visible=true;
+      if(walkPlayer.av&&walkPlayer.av.playAnim)try{walkPlayer.av.playAnim('idle');}catch(e){}
+      console.log('[Vehicle] Summoned airplane — arrows move, SHIFT up, SPACE down, B releases');
       var t=document.getElementById('toast');
-      if(t){t.textContent='✈️ Flying vehicle summoned (B to dismount)';t.classList.add('show');
+      if(t){t.textContent='✈️ Fly/ride on (SHIFT up, SPACE down, B to release)';t.classList.add('show');
         clearTimeout(t._it);t._it=setTimeout(function(){t.classList.remove('show');},2500);}
+    }
+    /* Batch G: clear the fly state WITHOUT a fall - used when an
+       interior entry takes the body over (the interior teleports the
+       player itself, so no fall may be armed across it). */
+    function espilFlyClear(){
+      var p=walkPlayer; if(!p)return;
+      if(p.vehicle){ if(mapScene)mapScene.remove(p.vehicle); p.vehicle=null; }
+      p.flying=false; p._fall=null; p.velY=0;
+      if(p.av&&p.av.group)p.av.group.visible=true;
     }
     function dismountVehicle(){
       if(!walkPlayer||!walkPlayer.flying)return;
@@ -4202,50 +4244,191 @@
         walkPlayer.vehicle=null;
       }
       walkPlayer.flying=false;
-      /* Land player at vehicle position (ground level) */
-      walkPlayer.pos.y=0.05;
+      /* Batch G release (replaces the 2026-10-10 ground teleport): the
+         character stays at the release point and FALLS under the ground
+         pipeline's gravity. The fall is armed here - its height is
+         measured at landing in updateWalkMap and charged there, and
+         only there, so a mid-fall re-summon cancels it clean. */
       walkPlayer.velY=0;
-      walkPlayer.onGround=true;
+      walkPlayer.onGround=false;
+      walkPlayer._fall={fromY:walkPlayer.pos.y};
+      /* Batch G fix (rig diag2, 2026-11-03): a deliberate release wins
+         over a scripted arrival. The ESPIL TILES arrival state can arm
+         while the player is airborne and then stays frozen - it only
+         advances in the ground tail - so at the first ground frame it
+         would own the body and the fall would be cancelled instead of
+         charged (observed: the first release of a fly-first session
+         landed free from 25.9 m). The entry arrival is over by the
+         time a player can release, so dropping the state here is safe. */
+      if(walkPlayer._espilArrive)walkPlayer._espilArrive=null;
       if(walkPlayer.av&&walkPlayer.av.group){
         walkPlayer.av.group.visible=true;
         walkPlayer.av.group.position.copy(walkPlayer.pos);
       }
-      console.log('[Vehicle] Dismounted');
+      if(walkPlayer.av&&walkPlayer.av.playJump)try{walkPlayer.av.playJump(false);}catch(e){}
+      console.log('[Vehicle] Released — falling from '+walkPlayer.pos.y.toFixed(1)+' m');
     }
+    /* Batch G support query: the same law updateWalkMap lands by -
+       the highest collider top at (x, z) that a body at refY could
+       step onto (top at most .55 above refY). Sources mirror the
+       ground code exactly: store colliders + cars always, strips and
+       polygon records by phase. Default .05 (open ground). Used to
+       floor a fly descent so the ride settles onto roofs instead of
+       sinking into them. */
+    function espilSupportAt(x,z,refY){
+      var p=walkPlayer; if(!p)return .05;
+      var support=.05;
+      function consider(c){
+        var cz=z<c.z0?c.z0:(z>c.z1?c.z1:z);
+        var cx=x<c.x0?c.x0:(x>c.x1?c.x1:x);
+        if(Math.abs(z-cz)>PLAYER_R||Math.abs(x-cx)>PLAYER_R)return;
+        if(c.top<=refY+.55&&c.top>support)support=c.top;
+      }
+      if(!ESPIL_P1)for(var i=0;i<walkColliders.length;i++)consider(walkColliders[i]);
+      for(var ci=0;ci<carColliders.length;ci++)consider(carColliders[ci]);
+      if(!ESPIL_P1){ var ssb=espilStripBucketAt(x,z);
+        if(ssb)for(var si=0;si<ssb.length;si++)consider(ssb[si]); }
+      if(ESPIL_P1){
+        var spb=espilPolyBucketAt(x,z);
+        if(spb)for(var spi=0;spi<spb.length;spi++){
+          var srec=spb[spi];
+          if(srec.h<=refY+.55&&srec.h>support){
+            if(x>=srec.x0-PLAYER_R&&x<=srec.x1+PLAYER_R&&z>=srec.z0-PLAYER_R&&z<=srec.z1+PLAYER_R&&espilPolyProbe(srec,x,z).d<=PLAYER_R)support=srec.h;
+          }
+        }
+      }
+      return support;
+    }
+    /* Batch G ceiling query (best effort, box colliders only): the
+       lowest collider bottom above the body's head at (x, z), as the
+       max feet height under it - or null when nothing is overhead. */
+    function espilCeilingAt(x,z,refY){
+      var ceil=null;
+      function considerC(c){
+        if(x<c.x0-PLAYER_R||x>c.x1+PLAYER_R||z<c.z0-PLAYER_R||z>c.z1+PLAYER_R)return;
+        if(c.bottom>=refY+PLAYER_H){ var f=c.bottom-PLAYER_H; if(ceil===null||f<ceil)ceil=f; }
+      }
+      if(!ESPIL_P1)for(var i=0;i<walkColliders.length;i++)considerC(walkColliders[i]);
+      for(var ci=0;ci<carColliders.length;ci++)considerC(carColliders[ci]);
+      if(!ESPIL_P1){ var ssb=espilStripBucketAt(x,z);
+        if(ssb)for(var si=0;si<ssb.length;si++)considerC(ssb[si]); }
+      return ceil;
+    }
+    /* Batch G fall damage: charged ONLY at ground impact (called from
+       updateWalkMap's landing branch with the measured fall). The
+       build has no death handling anywhere, so HP clamps at 1. */
+    function espilChargeFallDamage(dist){
+      var over=dist-ESPIL_FALL_SAFE_M;
+      var dmg=over>0?Math.round(over*ESPIL_FALL_DMG_PER_M):0;
+      espilLastFallDamage=dmg;
+      if(dmg<=0)return;
+      skillState.hp=Math.max(1,skillState.hp-dmg);
+      saveSkills(); paintStatus();
+      if(window.__espilToast)window.__espilToast('💥 Fall damage -'+dmg+' HP');
+      console.log('[Fly] Fall damage '+dmg+' HP (fell '+dist.toFixed(1)+' m, safe '+ESPIL_FALL_SAFE_M+' m)');
+    }
+    /* Batch G mid-air contact: flying into another player drops BOTH
+       flyers. Detection is local, against the presence system's
+       interpolated remote list - both clients run it over the same
+       position stream, so both drop; a fly_bump frame is also sent to
+       the other client as the fast path (see the receiver below). */
+    function espilFlyBumpCheck(){
+      var p=walkPlayer; if(!p||!p.flying)return;
+      if(!window.__espilRemoteList)return;
+      var list; try{ list=window.__espilRemoteList(); }catch(_){ return; }
+      for(var i=0;i<list.length;i++){
+        var q=list[i];
+        var dy=p.pos.y-(q.y||0.05); if(dy>2.2||dy<-2.2)continue;
+        var dx=p.pos.x-q.x, dz=p.pos.z-q.z;
+        if(dx*dx+dz*dz>1.7*1.7)continue;
+        try{ if(window.__espilSocialSend)window.__espilSocialSend({t:'fly_bump',to:q.id}); }catch(_){}
+        if(window.__espilToast)window.__espilToast('💥 Mid-air collision — both falling!');
+        console.log('[Fly] Mid-air contact with '+(q.id||'remote')+' — both drop');
+        dismountVehicle();
+        return;
+      }
+    }
+    /* The bump's receiving half: a fly_bump frame addressed to this
+       client drops its flyer too (same fall, own damage on landing).
+       presence.js forwards fly_* frames to espil-party-frame. */
+    window.addEventListener('espil-party-frame',function(e){
+      var m=e&&e.detail; if(!m||m.t!=='fly_bump')return;
+      if(walkPlayer&&walkPlayer.flying){
+        if(window.__espilToast)window.__espilToast('💥 Mid-air collision — both falling!');
+        dismountVehicle();
+      }
+    });
+    window.__espilFlyState=function(){
+      var p=walkPlayer;
+      return { flying:!!(p&&p.flying), falling:!!(p&&p._fall),
+               fallFrom:(p&&p._fall)?p._fall.fromY:null,
+               x:p?p.pos.x:null, y:p?p.pos.y:null, z:p?p.pos.z:null,
+               hp:skillState.hp, lastFallDamage:espilLastFallDamage,
+               safeM:ESPIL_FALL_SAFE_M, dmgPerM:ESPIL_FALL_DMG_PER_M,
+               hSpeed:ESPIL_FLY_H_SPEED, vSpeed:ESPIL_FLY_V_SPEED };
+    };
     function updateVehicle(dt){
-      if(!walkPlayer||!walkPlayer.flying||!walkPlayer.vehicle)return;
-      var v=walkPlayer.vehicle;
-      var speed=25*dt; /* m/s */
-      var moved=false;
-      /* WASD movement (relative to camera yaw) */
-      var yaw=walkCamYaw;
-      var fx=-Math.sin(yaw),fz=-Math.cos(yaw); /* forward */
-      var rx=Math.cos(yaw),rz=-Math.sin(yaw); /* right */
-      if(walkKeys['w']||walkKeys['arrowup']){v.position.x+=fx*speed;v.position.z+=fz*speed;moved=true;}
-      if(walkKeys['s']||walkKeys['arrowdown']){v.position.x-=fx*speed;v.position.z-=fz*speed;moved=true;}
-      if(walkKeys['a']||walkKeys['arrowleft']){v.position.x-=rx*speed;v.position.z-=rz*speed;moved=true;}
-      if(walkKeys['d']||walkKeys['arrowright']){v.position.x+=rx*speed;v.position.z+=rz*speed;moved=true;}
-      /* Space up, Ctrl down */
-      if(walkKeys[' ']){v.position.y+=speed*0.7;moved=true;}
-      if(walkKeys['control']){v.position.y-=speed*0.7;moved=true;}
-      /* Clamp altitude */
-      v.position.y=Math.max(2,Math.min(300,v.position.y));
-      /* Clamp to 5km radius */
-      var d=Math.sqrt(v.position.x*v.position.x+v.position.z*v.position.z);
-      if(d>4950){
-        v.position.x*=4950/d;
-        v.position.z*=4950/d;
+      var p=walkPlayer;
+      if(!p||!p.flying||!p.vehicle)return;
+      /* An interior entry takes the body over - never fly inside. */
+      if(window.__espilInside){ espilFlyClear(); return; }
+      /* --- horizontal: the ground input law (arrows + touch stick),
+         camera-relative, at the ground run speed --- */
+      var ix=0,iz=0;
+      if(walkKeys['arrowup'])iz-=1;
+      if(walkKeys['arrowdown'])iz+=1;
+      if(walkKeys['arrowleft'])ix-=1;
+      if(walkKeys['arrowright'])ix+=1;
+      if(window.__joyVec){ix+=window.__joyVec.x;iz+=window.__joyVec.y;}
+      var il=Math.sqrt(ix*ix+iz*iz);
+      if(il>1){ix/=il;iz/=il;}
+      var fx=-Math.sin(walkCamYaw),fz=-Math.cos(walkCamYaw);
+      var rx=-fz,rz=fx;
+      var mx=fx*(-iz)+rx*ix,mz=fz*(-iz)+rz*ix;
+      p.moving=il>.12;
+      p._dx=mx*ESPIL_FLY_H_SPEED*dt; p._dz=mz*ESPIL_FLY_H_SPEED*dt;
+      /* Terrain applies airborne: the ground axis sweep, unchanged -
+         walls block at altitude bands below their tops, roofs and
+         open sky do not. */
+      p.pos.x+=p._dx; collideCircleAxis(p,'x');
+      p.pos.z+=p._dz; collideCircleAxis(p,'z');
+      var distC=Math.sqrt(p.pos.x*p.pos.x+p.pos.z*p.pos.z);
+      if(distC>MAP_BOUND){ var s=MAP_BOUND/distC; p.pos.x*=s; p.pos.z*=s; }
+      /* --- vertical: SHIFT up, SPACE down (Han Batch G). Descending
+         settles at the support + hover offset; ascending is capped
+         by any overhead collider and by the altitude ceiling. --- */
+      var vy=0;
+      if(walkKeys['shift'])vy+=ESPIL_FLY_V_SPEED;
+      if(walkKeys[' '])vy-=ESPIL_FLY_V_SPEED;
+      if(vy!==0){
+        var ny=p.pos.y+vy*dt;
+        if(vy<0){ var sup=espilSupportAt(p.pos.x,p.pos.z,p.pos.y)+ESPIL_FLY_HOVER; if(ny<sup)ny=sup; }
+        if(vy>0){ var ce=espilCeilingAt(p.pos.x,p.pos.z,p.pos.y); if(ce!==null&&ny>ce)ny=ce; }
+        p.pos.y=Math.max(.05,Math.min(ESPIL_FLY_MAX_ALT,ny));
       }
-      /* Update player pos to vehicle */
-      walkPlayer.pos.copy(v.position);
-      /* Face vehicle in movement direction */
-      if(moved){
-        var targetYaw=Math.atan2(fx,fz);
-        /* Simple lerp for smooth turning */
-        v.rotation.y+=(targetYaw-v.rotation.y)*0.1;
+      /* --- facing (the ground law) --- */
+      if(p.moving){
+        var targetFace=Math.atan2(-mx,-mz);
+        var d=targetFace-p.faceY;
+        while(d>Math.PI)d-=Math.PI*2;while(d<-Math.PI)d+=Math.PI*2;
+        p.faceY+=d*Math.min(1,dt*12);
       }
-      /* Banking on turn */
-      v.rotation.z=0;
+      /* --- visuals: p.pos stays the feet datum (the whole ground
+         pipeline's convention); the ride hangs below the feet, the
+         rider stands on it. A gentle bob is visual only. --- */
+      var v=p.vehicle;
+      var bob=Math.sin(performance.now()/450)*0.12;
+      v.position.set(p.pos.x,p.pos.y-0.6+bob,p.pos.z);
+      v.rotation.y=p.faceY;
+      var g=p.av.group;
+      g.visible=true;
+      g.position.copy(p.pos);
+      g.rotation.y=p.faceY;
+      if(p.av.mixer)p.av.mixer.update(dt);
+      p.av.shadow.position.set(p.pos.x,.03,p.pos.z);
+      p.av.shadow.material.opacity=Math.max(.08,.26-Math.max(0,p.pos.y-.05)*.05);
+      /* --- mid-air player contact drops both flyers --- */
+      espilFlyBumpCheck();
     }
     /* QA #6 (2026-10-06): remember last location in localStorage (server sync later). */
     var LAST_POS_KEY='espil_last_pos';
@@ -6056,6 +6239,50 @@
        {type:'nav-arrived', name} once per showing. --- */
     var ESPIL_KONBINIYA={x:-518.2,z:-414.8};
     window.__espilKonbiniyaPos={x:ESPIL_KONBINIYA.x,z:ESPIL_KONBINIYA.z};
+    /* Batch D8 (Han 2026-11-03): the Konbiniya building GLOWS - a
+       permanent vertical light pillar rises from it, with a warm
+       pool of light at its base, so the store reads as a light
+       source and can be found from far away. Additive materials
+       with depth-write off and fog off (so distance does not dim
+       the beam); the only ongoing cost is a slow opacity pulse on
+       a 150 ms interval. */
+    var espilKbGlow=null;
+    window.__espilKbGlowState=function(){ return { built: !!espilKbGlow, x: ESPIL_KONBINIYA.x, z: ESPIL_KONBINIYA.z, parts: espilKbGlow ? espilKbGlow.group.children.map(function(m){ return Math.round(m.material.opacity*100)/100; }) : [] }; };
+    (function espilKbGlowInit(){
+      function build(){
+        if(espilKbGlow) return true;
+        var sc=(typeof mapScene!=='undefined'&&mapScene)?mapScene:null;
+        if(!sc||typeof THREE==='undefined') return false;
+        var g=new THREE.Group();
+        var cv=document.createElement('canvas'); cv.width=cv.height=128;
+        var cx2=cv.getContext('2d');
+        var gr=cx2.createRadialGradient(64,64,2,64,64,64);
+        gr.addColorStop(0,'rgba(255,236,170,0.9)'); gr.addColorStop(0.4,'rgba(255,205,92,0.35)'); gr.addColorStop(1,'rgba(255,190,60,0)');
+        cx2.fillStyle=gr; cx2.fillRect(0,0,128,128);
+        var base=new THREE.Mesh(new THREE.PlaneGeometry(46,46),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(cv),transparent:true,opacity:.55,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+        base.rotation.x=-Math.PI/2; base.position.set(ESPIL_KONBINIYA.x,0.25,ESPIL_KONBINIYA.z); base.renderOrder=3;
+        g.add(base);
+        function beam(rTop,rBot,op){
+          var m=new THREE.Mesh(new THREE.CylinderGeometry(rTop,rBot,110,20,1,true),new THREE.MeshBasicMaterial({color:0xffdf8e,transparent:true,opacity:op,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,depthWrite:false,fog:false}));
+          m.position.set(ESPIL_KONBINIYA.x,55,ESPIL_KONBINIYA.z); m.renderOrder=3; return m;
+        }
+        g.add(beam(4.5,7,0.10)); g.add(beam(2,3.4,0.16));
+        sc.add(g);
+        espilKbGlow={group:g,base:base};
+        return true;
+      }
+      var tries=0;
+      var iv=setInterval(function(){
+        if(!espilKbGlow){
+          if(build()){ /* built - fall through to the pulse */ }
+          else if(++tries>240){ clearInterval(iv); return; }
+          else return;
+        }
+        var s=0.5+0.5*Math.sin(Date.now()/1400);
+        espilKbGlow.group.children.forEach(function(m,i){ if(i===1)m.material.opacity=0.08+0.05*s; if(i===2)m.material.opacity=0.13+0.06*s; });
+        espilKbGlow.base.material.opacity=0.45+0.18*s;
+      },150);
+    })();
     var espilNavGroup=null, espilNavPath=null, espilNavPathCum=null, espilNavPathTotal=0, espilNavTarget=null, espilNavFlow=[], espilNavFlowT=0, espilNavArrived=false, espilNavArrivedAt=0, espilNavLastRoute=0;
     function espilNavWalkable(x,z){ var pr=window.__espilCollisionProbe?window.__espilCollisionProbe(x,z):null; return !!(pr&&pr.walkable); }
     function espilNavSnap(x,z){ if(espilNavWalkable(x,z))return {x:x,z:z};
@@ -6420,6 +6647,7 @@
     var espilInsideRec=null, espilInsideDoor=null, espilInsideOutside=null, espilInsideHint=false;
     function espilEnterInside(rec){
       var p=walkPlayer; if(!p||!rec)return;
+      if(p.flying||p._fall)espilFlyClear(); /* Batch G: fly state clears on interior entry */
       if(!window.__espilInteriorBuilt)espilBuildInterior();
       if(!window.__espilShopBuilt)espilBuildShopFitout();
       if(window.__espilFitoutGroup)window.__espilFitoutGroup.visible=true;
@@ -7593,12 +7821,22 @@
       mapDragId=e.pointerId;mapLastX=e.clientX;mapLastY=e.clientY;
       try{canvas.setPointerCapture(e.pointerId);}catch(err){}
     }
+    /* Batch M1 (Han 2026-11-03): pair.css rotates the whole body 90
+       degrees on touch devices in portrait viewports (landscape
+       always). Pointer deltas arrive in PHYSICAL screen axes; in
+       the rotated frame a physical delta (dx, dy) is the content
+       delta (dy, -dx). Every drag handler converts through here. */
+    function espilDragDelta(dx,dy){
+      if(window.matchMedia&&matchMedia('(pointer:coarse) and (orientation:portrait)').matches) return [dy,-dx];
+      return [dx,dy];
+    }
     function mapPointerMove(e){
       if(e.pointerId!==mapDragId)return;
       var dx=e.clientX-mapLastX,dy=e.clientY-mapLastY;
       mapLastX=e.clientX;mapLastY=e.clientY;
-      walkCamYaw-=dx*.0052;
-      walkCamPitch=Math.max(.12,Math.min(1.15,walkCamPitch+dy*.004));
+      var dd=espilDragDelta(dx,dy);
+      walkCamYaw-=dd[0]*.0052;
+      walkCamPitch=Math.max(.12,Math.min(1.15,walkCamPitch+dd[1]*.004));
     }
     function mapPointerUp(e){
       if(e.pointerId===mapDragId)mapDragId=null;
@@ -7643,8 +7881,9 @@
       if(e.pointerId!==gameDragId)return;
       var dx=e.clientX-gameDragX,dy=e.clientY-gameDragY;
       gameDragX=e.clientX;gameDragY=e.clientY;
-      walkCamYaw-=dx*.0052;
-      walkCamPitch=Math.max(.12,Math.min(1.15,walkCamPitch+dy*.004));
+      var dd=espilDragDelta(dx,dy); /* Batch M1: rotated-frame deltas */
+      walkCamYaw-=dd[0]*.0052;
+      walkCamPitch=Math.max(.12,Math.min(1.15,walkCamPitch+dd[1]*.004));
     });
     function gameDragEnd(e){ if(e.pointerId===gameDragId)gameDragId=null; }
     document.addEventListener('pointerup',gameDragEnd);
@@ -7693,8 +7932,12 @@
       if(k===' '||k==='ArrowUp'||k==='ArrowDown'||k==='ArrowLeft'||k==='ArrowRight')e.preventDefault();
       walkKeys[k.toLowerCase()]=true;
       /* QA #8 (2026-10-06): Shift=jump, Space=interact. Shift-run deprecated. */
-      if(k===espilKeybinds.jump&&!e.repeat)tryJump();
-      if(k===espilKeybinds.interact&&!e.repeat){ if(!espilSpaceWallJump())tryInteract(); }
+      /* Batch G conflict resolution: while fly/ride is active, SHIFT is
+         ascend and SPACE is descend (Han 2026-11-03), so the ground
+         jump/interact bindings stay silent in the air. They are
+         untouched on the ground. */
+      if(k===espilKeybinds.jump&&!e.repeat&&!(walkPlayer&&walkPlayer.flying))tryJump();
+      if(k===espilKeybinds.interact&&!e.repeat&&!(walkPlayer&&walkPlayer.flying)){ if(!espilSpaceWallJump())tryInteract(); }
       /* Han 2026-10-10 #8: B summons/dismounts fly vehicle */
       if(k.toLowerCase()==='b'&&!e.repeat){
         if(typeof summonVehicle==='function')summonVehicle();
@@ -7874,13 +8117,25 @@
     function updateWalkMap(dt,t){
       var p=walkPlayer;
       if(!p)return;
-      /* Han 2026-10-10 #8: Vehicle mode — skip normal movement */
+      /* Fly/ride mode (Batch G): the flight update owns movement;
+         the follow camera below uses the ground tail's own math (the
+         updateWalkCamera this branch used to call never existed). */
       if(p.flying){
         if(typeof updateVehicle==='function')updateVehicle(dt);
-        /* Update camera to follow vehicle */
-        if(typeof updateWalkCamera==='function')updateWalkCamera(dt);
+        var fcp=Math.cos(walkCamPitch),fsp=Math.sin(walkCamPitch);
+        var fwant=new THREE.Vector3(
+          p.pos.x+Math.sin(walkCamYaw)*fcp*walkCamDist,
+          p.pos.y+fsp*walkCamDist+1.2,
+          p.pos.z+Math.cos(walkCamYaw)*fcp*walkCamDist
+        );
+        if(fwant.y<1.4)fwant.y=1.4;
+        mapCamera.position.lerp(fwant,Math.min(1,dt*7));
+        mapCamera.lookAt(p.pos.x,p.pos.y+1.7,p.pos.z);
         return;
       }
+      /* Batch G: a scripted arrival/landing takes the body - a fall
+         armed by a fly release is cancelled, never charged across it. */
+      if(p._fall&&(p._espilArrive||p._espilLanding))p._fall=null;
       updateDnaImprint(dt);
       /* --- input: keys + touch stick, relative to camera yaw --- */
       var ix=0,iz=0;
@@ -7928,6 +8183,7 @@
       if(p._chunkT>.25){p._chunkT=0;updateChunks(p.pos.x,p.pos.z);}
       /* QA #17: in water, float at surface; no gravity, no jump. */
       if(p.swimming){
+        if(p._fall)p._fall=null; /* Batch G: water breaks the fall - no fall damage */
         p.pos.y+=(WATER_Y-p.pos.y)*Math.min(1,dt*5);
         p.velY=0;p.onGround=false;p.jumps=0;
       }
@@ -7976,6 +8232,9 @@
         }
       }
       if(p.pos.y<=support){
+        /* Batch G: a fly/ride release fall is charged HERE, at impact,
+           by the height between the release point and this support. */
+        if(p._fall){ espilChargeFallDamage(p._fall.fromY-support); p._fall=null; }
         if(!p.onGround&&p.velY<-9)walkSfx('land');
         p.pos.y=support;p.velY=0;p.onGround=true;p.jumps=0;
       }else if(p.pos.y>support+.02){
@@ -8080,7 +8339,10 @@
       var soonTxt='COMING SOON';
       try{ var _sl=localStorage.getItem('espil_lang');
         soonTxt={ko:'준비 중',fr:'BIENTÔT DISPONIBLE',zh:'即将推出'}[_sl]||'COMING SOON'; }catch(e){}
-      pin.innerHTML='<span class="nm">'+city[0]+'</span><span class="orb"><span class="halo"></span><span class="ball"></span></span>'+(espilPlayableCity(city[0])?'':'<span class="soon" data-i18n="comingSoon">'+soonTxt+'</span>');
+      /* Batch D1 (Han 2026-11-03): the COMING SOON badge belongs to
+         the ACTIVE cities only - an inactive city's pin keeps its
+         name and orb but is never badged. */
+      pin.innerHTML='<span class="nm">'+city[0]+'</span><span class="orb"><span class="halo"></span><span class="ball"></span></span>'+((espilPlayableCity(city[0])||!ESPIL_SELECTABLE_CITIES[city[0]])?'':'<span class="soon" data-i18n="comingSoon">'+soonTxt+'</span>');
       pin.addEventListener('mouseenter',function(){hoverCity({object:marker});});
       pin.addEventListener('mouseleave',function(){if(!selected)hoverCity(null);});
       pin.addEventListener('focus',function(){hoverCity({object:marker});});
@@ -8096,7 +8358,12 @@
       cityButton.addEventListener('focus',function(){hoverCity({object:marker});});
       cityButton.addEventListener('blur',function(){if(!selected)hoverCity(null);});
       cityButton.addEventListener('click',function(){centerReel(marker,true);selectCity(marker);});
-      cityList.appendChild(cityButton);marker.userData.button=cityButton;
+      /* Batch D1 (Han 2026-11-03): the city TEXT list shows the
+         active cities only - an inactive city gets no entry in the
+         list at all (its button is never appended, and the reel
+         code below skips markers whose button is null). */
+      if(ESPIL_SELECTABLE_CITIES[city[0]]){ cityList.appendChild(cityButton); marker.userData.button=cityButton; }
+      else marker.userData.button=null;
     });
     var pinV=new THREE.Vector3();
     var pinC=new THREE.Vector3(), pinCam=new THREE.Vector3();
@@ -8131,12 +8398,13 @@
       reelFrame=0;
       var listRect=cityList.getBoundingClientRect(),center=listRect.top+listRect.height/2,closest=null,distance=Infinity;
       markers.forEach(function(marker){
+        if(!marker.userData.button)return; /* Batch D1: inactive cities have no list entry */
         var rect=marker.userData.button.getBoundingClientRect(),next=Math.abs(rect.top+rect.height/2-center);
         if(next<distance){distance=next;closest=marker;}
       });
       var prev=centeredMarker;
       centeredMarker=closest;
-      markers.forEach(function(marker){marker.userData.button.classList.toggle('is-centered',marker===closest);});
+      markers.forEach(function(marker){ if(marker.userData.button)marker.userData.button.classList.toggle('is-centered',marker===closest); });
       /* The city-name text follows the centered city (2026-10-06, per Han):
          every time the city changes, the readout shows the new city. */
       if(closest&&closest!==prev&&!selected&&!entryActive&&!cityPhaseActive){
@@ -8158,7 +8426,7 @@
     function centerReel(marker,smooth){
       if(!marker||!marker.userData.button)return;
       centeredMarker=marker;
-      markers.forEach(function(item){item.userData.button.classList.toggle('is-centered',item===marker);});
+      markers.forEach(function(item){ if(item.userData.button)item.userData.button.classList.toggle('is-centered',item===marker); });
       reelQuietUntil=performance.now()+450; /* programmatic scrolls stay silent; the caller ticks */
       var button=marker.userData.button;
       cityList.scrollTo({top:button.offsetTop-cityList.clientHeight/2+button.offsetHeight/2,behavior:smooth&&!reduced?'smooth':'auto'});
@@ -8239,6 +8507,7 @@
       joy.addEventListener('pointermove',function(e){
         if(!joyActive||!document.body.classList.contains('in-map'))return;
         var dx=e.clientX-joyCX,dy=e.clientY-joyCY;
+        var dd=espilDragDelta(dx,dy); dx=dd[0]; dy=dd[1]; /* Batch M1: the knob + vector live in the rotated frame */
         var len=Math.sqrt(dx*dx+dy*dy),max=joyMax;
         if(len>max){dx=dx/len*max;dy=dy/len*max;}
         setKnob(dx,dy);
@@ -8335,8 +8604,8 @@
       var direction=marker.position.clone().normalize().applyAxisAngle(new THREE.Vector3(0,1,0),earthSpin.rotation.y);
       yaw=targetYaw=Math.atan2(direction.x,direction.z);
       pitch=targetPitch=Math.asin(Math.max(-1,Math.min(1,direction.y)));
-      marker.userData.button.classList.add('is-local');
-      marker.userData.button.title+=' · centered from browser timezone';
+      if(marker.userData.button){ marker.userData.button.classList.add('is-local');
+      marker.userData.button.title+=' · centered from browser timezone'; }
       centerReel(marker,false);
       placeCamera();
     }
@@ -8346,7 +8615,7 @@
     function setPointer(event){var rect=canvas.getBoundingClientRect();pointer.x=((event.clientX-rect.left)/rect.width)*2-1;pointer.y=-((event.clientY-rect.top)/rect.height)*2+1;}
     function pick(event){setPointer(event);raycaster.setFromCamera(pointer,camera);return raycaster.intersectObjects(markers.filter(function(marker){return marker.visible;}),false)[0];}
     function setActiveButton(marker){
-      markers.forEach(function(item){item.userData.button.classList.toggle('is-active',item===marker);});
+      markers.forEach(function(item){ if(item.userData.button)item.userData.button.classList.toggle('is-active',item===marker); }); /* Batch D1: inactive cities have no list button */
     }
     function hoverCity(hit){
       hovered=hit?hit.object:null;
@@ -8882,6 +9151,17 @@
       playerMarker=L.marker(ll0,{interactive:false,icon:L.divIcon({className:'',
         html:'<div style="width:16px;height:16px;border-radius:50%;background:#4f7ed9;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.5);"></div>',
         iconSize:[16,16],iconAnchor:[8,8]})}).addTo(leafletMap);
+      /* Batch D9 (Han 2026-11-03): the Konbiniya carries a distinct
+         "?" marker on the map - this one Leaflet map serves the
+         small minimap stages and the fullscreen stage alike, so the
+         marker shows on both, at every zoom. Placed with the
+         world's own gameToLatLng transform of the Konbiniya anchor
+         (lat 49.2827 + (-z)/111320, lng -123.1207 + x/(111320 *
+         cos(49.2827 deg))). */
+      try{
+        var kbLL=gameToLatLng(ESPIL_KONBINIYA.x,ESPIL_KONBINIYA.z);
+        L.marker(kbLL,{interactive:false,icon:L.divIcon({className:'espil-kb-q',html:'<div style="width:22px;height:22px;border-radius:50%;background:#ffb020;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.55);color:#5a3200;font:800 14px/18px Manrope,sans-serif;text-align:center;">?</div>',iconSize:[22,22],iconAnchor:[11,11]})}).addTo(leafletMap);
+      }catch(e){}
       var zin=document.getElementById('map-zoom-in');
       var zout=document.getElementById('map-zoom-out');
       if(zin)zin.onclick=function(){
@@ -8945,8 +9225,45 @@
       }
     }
     function cycleMapStage(){
+      /* Batch E (Han 2026-11-03, MOBILE ONLY): on touch devices the
+         map toggles small <-> fullscreen, matching the tap behaviour
+         below; the desktop 1->2->3->1 ladder is unchanged. */
+      if(window.matchMedia&&matchMedia('(pointer:coarse)').matches){ setMapStage(mapStage>=3?1:3); return; }
       setMapStage(mapStage>=3?1:mapStage+1);
     }
+    /* Batch E (Han 2026-11-03, MOBILE ONLY): tapping the small
+       minimap expands it to the fullscreen stage; a minimize button
+       rides the wrap's top-right corner while expanded and returns
+       to the small minimap. Coarse pointers only - on desktop the
+       button never renders and taps keep the old behaviour. */
+    (function(){
+      var wrap=document.getElementById('minimap-wrap');
+      if(!wrap)return;
+      var st=document.createElement('style');
+      st.textContent=
+        '#minimap-wrap .map-min-btn{display:none;position:absolute;z-index:12;top:8px;right:8px;'+
+        'width:34px;height:34px;border-radius:50%;border:2px solid #d9b678;background:rgba(8,8,12,.72);'+
+        'color:#fff4cf;font:800 17px/1 "Manrope",sans-serif;cursor:pointer;place-items:center;padding:0}'+
+        '@media (pointer:coarse){'+
+        '#minimap-wrap[data-stage="3"]{transform:none}'+
+        '#minimap-wrap[data-stage="3"] .map-min-btn{display:grid}'+
+        '#minimap-wrap[data-stage="3"] .map-zoom-controls{right:52px}}';
+      document.head.appendChild(st);
+      var mb=document.createElement('button');
+      mb.type='button'; mb.className='map-min-btn'; mb.id='map-min-btn';
+      mb.setAttribute('aria-label','Minimize map'); mb.textContent='\u2212';
+      mb.addEventListener('click',function(e){ e.stopPropagation(); setMapStage(1); });
+      wrap.appendChild(mb);
+      var pd=null;
+      wrap.addEventListener('pointerdown',function(e){ pd={x:e.clientX,y:e.clientY}; });
+      wrap.addEventListener('click',function(e){
+        if(!(window.matchMedia&&matchMedia('(pointer:coarse)').matches))return;
+        if(mapStage!==1)return;
+        if(e.target&&e.target.closest&&(e.target.closest('.map-zoom-controls')||e.target.closest('.map-min-btn')))return;
+        if(pd&&Math.hypot(e.clientX-pd.x,e.clientY-pd.y)>8)return; /* a drag, not a tap */
+        setMapStage(3);
+      });
+    })();
     var lastFrameT=performance.now();
     function animate(){
       requestAnimationFrame(animate);

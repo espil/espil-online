@@ -28,14 +28,18 @@
      light text) above the bar, and a dark location pill above the
      circular minimap in the client's #z-loc form (city name only -
      espil has no channels).
-   Kept from the first pass: the cream storybook panels/minimap,
-   the status cluster (portrait from the character record - since
-   the customizer merge it prefers the v3 portrait art - name, real
-   Leo balance), and the completed MAP / CHAR menu buttons (real
-   map-stage cycle, real self-profile). On touch screens the bar
-   keeps the first pass's plain wooden tray (the client uses a
-   different touch layout entirely; a dedicated mobile pass is a
-   separate job). */
+   Kept from the first pass: the cream storybook panels/minimap
+   and the completed MAP / CHAR menu buttons (real map-stage cycle,
+   real self-profile). On touch screens the bar keeps the first
+   pass's plain wooden tray (the client uses a different touch
+   layout entirely; a dedicated mobile pass is a separate job).
+   STATUS CLUSTER (Han correction 2026-11-03 07:46 MST, superseding
+   the round 2 item 9 / round 3 item 6 whole-box reading): the
+   bottom-left cream pill (#espil-mmo-status) STAYS with its guest
+   name, role line and Leo balance text; only the portrait/photo
+   (the medallion canvas and its painter) is removed. The P-key
+   profile PANEL (modules/panels.js) is a different element and
+   stays untouched. */
 (function () {
   'use strict';
   if (window.__espilMMOHud) return;
@@ -87,6 +91,17 @@
       '#quickbar #kb-menu .move-slot:nth-child(5){background:radial-gradient(circle at 33% 28%,#ffffff,#e6dcff 58%,#bda9ec);border-color:#8d7ab8}' +
       '#quickbar #kb-menu .move-slot:nth-child(6){background:radial-gradient(circle at 33% 28%,#ffffff,#e8e8e8 58%,#c2c2c2);border-color:#8a8a8a}' +
       /* the gauge: city pill + green track (client #z-expbar form) */
+      '#espil-mmo-status{position:fixed;left:14px;bottom:86px;z-index:46;display:flex;align-items:center;' +
+        'gap:10px;padding:8px 15px;border-radius:999px;' +
+        'background:linear-gradient(180deg,rgba(255,251,240,.96),rgba(255,243,220,.96));' +
+        'border:2px solid #d9b380;box-shadow:0 10px 24px rgba(90,60,20,.22);' +
+        'font-family:"Baloo 2","Manrope",sans-serif;color:#5a4020;max-width:min(78vw,340px)}' +
+      '#espil-mmo-status .mmo-who{min-width:0}' +
+      '#espil-mmo-status .mmo-name{font-weight:800;font-size:.92rem;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+      '#espil-mmo-status .mmo-sub{font-size:.66rem;letter-spacing:.08em;opacity:.72;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+      '#espil-mmo-status .mmo-leo{display:flex;align-items:center;gap:5px;font-size:.74rem;font-weight:800;color:#8a6a10;margin-top:1px}' +
+      '#espil-mmo-status .mmo-coin{width:11px;height:11px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe9a8,#f5b301 60%,#c77f02);border:1px solid #a86a00;flex:0 0 11px}' +
+      'body:not(.in-map) #espil-mmo-status{display:none}' +
       '#espil-mmo-strip{position:relative;left:auto;transform:none;bottom:auto;width:268px;height:auto;' +
         'display:flex;align-items:center;gap:8px;background:none;border:none;box-shadow:none;overflow:visible;z-index:1}' +
       '#espil-mmo-city{background:#3a2817;color:#ffe9a8;font-size:11px;font-weight:800;letter-spacing:.04em;' +
@@ -104,6 +119,7 @@
       '#quickbar{background:linear-gradient(180deg,#7c5a36,#5e4023);' +
         'border:3px solid #3a2817;box-shadow:0 12px 28px rgba(40,25,8,.4)}' +
       '#quickbar .flask .pct{display:block;font-size:8.5px}' +
+      '#espil-mmo-status{bottom:calc(118px + var(--kb-shift,0px))}' +
       '#espil-mmo-strip{display:none}' +
       '#espil-tray{display:none}' +
     '}' +
@@ -148,77 +164,82 @@
     '#espil-tut{background:rgba(255,251,240,.93);color:#6b4a1f;border:2px solid #d9b380;' +
       'border-radius:14px;box-shadow:0 8px 18px rgba(90,60,20,.22);text-shadow:none}' +
     '#espil-tut .kb{background:#fffdf6;border:1.5px solid #cfa96f;color:#6b4a1f;box-shadow:none}' +
-    /* ---- status cluster: cream pill ----------------------------------- */
-    '#espil-mmo-status{position:fixed;left:14px;bottom:calc(15px + env(safe-area-inset-bottom));z-index:31;' +
-      'display:flex;align-items:center;gap:10px;padding:7px 15px 7px 8px;border-radius:999px;' +
-      'background:rgba(255,251,240,.94);border:2px solid #d9b380;' +
-      'box-shadow:0 6px 16px rgba(90,60,20,.25),inset 0 1px 0 rgba(255,255,255,.9);' +
-      'font-family:"Manrope",sans-serif;color:#5a4020;pointer-events:none}' +
-    '#espil-mmo-status .mmo-medallion{width:52px;height:52px;border-radius:50%;flex:none;overflow:hidden;' +
-      'border:2.5px solid #d9b380;box-shadow:0 2px 6px rgba(90,60,20,.3);background:#12242f}' +
-    '#espil-mmo-status .mmo-medallion canvas{width:100%;height:100%;display:block}' +
-    '#espil-mmo-status .mmo-who{display:flex;flex-direction:column;gap:1px;min-width:0}' +
-    '#espil-mmo-status .mmo-name{font-weight:900;font-size:14.5px;letter-spacing:.02em;color:#6b4a1f;white-space:nowrap}' +
-    '#espil-mmo-status .mmo-sub{font-size:10.5px;font-weight:700;color:#8a6a3b;white-space:nowrap}' +
-    '#espil-mmo-status .mmo-leo{display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;color:#a8742c}' +
-    '#espil-mmo-status .mmo-coin{width:13px;height:13px;border-radius:50%;flex:none;display:inline-block;' +
-      'background:radial-gradient(circle at 35% 30%,#ffe9a8,#d9a441 60%,#8a6a34);border:1px solid #8a6a34}' +
-    '@media (pointer:coarse){#espil-mmo-status{padding:5px 11px 5px 6px;gap:7px}' +
-      '#espil-mmo-status .mmo-medallion{width:40px;height:40px}' +
-      '#espil-mmo-status .mmo-name{font-size:12.5px}#espil-mmo-status .mmo-sub{display:none}}' +
-    'body:not(.in-map) #espil-mmo-status{display:none!important}';
+    /* ---- Batch M (Han 2026-11-03, mobile verdict) -------------------
+       M2: the status box moves to the TOP-LEFT on touch screens -
+       the chat row at the bottom is never covered again, so chat
+       can always be typed.
+       M3: the bottom bar keeps ONLY the HP/MP flask gauges: the
+       shortcut key rows, the menu button cluster and the gauge
+       strip are display:none, and the bar's own box styling goes
+       transparent so the flasks float alone. The joystick, chat
+       and the pair's jump / interact touch circles keep their own
+       dedicated spots (pair.css coarse layout) and are no longer
+       covered by the bar. Desktop (fine pointers) is unchanged. */
+    '@media (pointer:coarse){' +
+      '#espil-mmo-status{position:fixed;top:10px;left:10px;bottom:auto;max-width:190px;padding:6px 11px}' +
+      '#quickbar{background:none;border:none;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}' +
+      '#quickbar .mmo-keys{display:none}' +
+      '#quickbar #kb-menu{display:none}' +
+      '#espil-right{display:none}' +
+    '}' +
+    /* ---- Batch E (Han 2026-11-03, MOBILE ONLY) ---------------------
+       E1: the small minimap shrinks to exactly 100px on touch
+       screens (higher specificity than the pair's coarse 20vh rule
+       and the 140px base; stages 2-3 keep their own geometry, and
+       fine pointers never see this block).
+       E3: the chat window rests COLLAPSED on touch screens. The
+       #espil-chat-btn pill at the top-centre opens it DOWNWARD
+       (top-anchored just under the button); a second press
+       collapses it. Chip-clamp note: compass-nav's D7 clamp reads
+       the .chat-window rect live every frame - collapsed reads a
+       zero rect and is skipped by its size guard, open reads the
+       current top-anchored rect - so the clamp keeps working
+       against the chat's current rect in both states with no
+       compass-nav change.
+       E4: the HP/MP flasks leave the quickbar flow on touch
+       screens and sit BIGGER at the BOTTOM CENTRE (flask 4.7vmin
+       -> 6.8vmin, a 1.45x grow), clear of the joystick
+       (bottom-right) and of the Use/Jump cluster (centre-left).
+       E5: Han's explicit exception to M3 - the QWER move row (the
+       desktop quickbar's first four slots q/w/e/r, already wired
+       to doMove by the world script) shows again directly above
+       the Use/Jump cluster; the item row, the menu cluster and
+       the right column stay hidden, and slots 5-8 (ASDF) stay
+       hidden too. ----------------------------------------------- */
+    '#espil-chat-btn{display:none}' +
+    '@media (pointer:coarse){' +
+      '#minimap-wrap[data-stage="1"]{width:100px;height:100px}' +
+      'body:not(.chat-open) #chat-window{display:none!important}' +
+      'body.chat-open #chat-window{top:calc(54px + env(safe-area-inset-top));bottom:auto;left:50%;right:auto;' +
+        'transform:translateX(-50%);width:min(430px,92vw);max-height:54vh}' +
+      'body.chat-open #chat-window .chat-log{max-height:32vh}' +
+      '#espil-chat-btn{position:fixed;top:calc(10px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);' +
+        'z-index:66;display:flex;align-items:center;gap:6px;padding:9px 16px;border-radius:999px;' +
+        'border:1.5px solid rgba(255,221,140,.5);background:rgba(10,10,16,.55);color:#fff6da;' +
+        'font:800 13px/1 "Manrope",sans-serif;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.35)}' +
+      '#espil-chat-btn .cb-badge{position:absolute;top:-6px;right:-6px;min-width:19px;height:19px;padding:0 5px;' +
+        'border-radius:10px;background:#e5484d;color:#fff;font-size:11px;font-weight:800;display:none;place-items:center;' +
+        'border:1.5px solid #fff6da;box-sizing:border-box}' +
+      '#espil-chat-btn.has-unread .cb-badge{display:grid}' +
+      '#quickbar .flask-wrap{position:fixed;bottom:calc(10px + env(safe-area-inset-bottom));width:7.6vmin;height:7.6vmin;margin:0;z-index:31}' +
+      '#quickbar #hp-flask-wrap{left:calc(50% - 8vmin)}' +
+      '#quickbar #mp-flask-wrap{left:calc(50% + 0.4vmin)}' +
+      '#quickbar .flask{width:6.8vmin;height:6.8vmin}' +
+      '#quickbar .flask .pct{font-size:11px}' +
+      '#quickbar .mmo-keys{display:contents}' +
+      '#quickbar #move-row .move-slot:nth-child(n+5){display:none}' +
+      /* E5 geometry: pair.css's later small-screen rule pins the
+         quickbar to the very bottom of the screen, which would
+         leave the QWER row lying across the flasks' new ground.
+         On touch screens the quickbar carries ONLY the QWER row
+         now, so it takes the build's own above-the-circles offset
+         (the 2026-10-20 mobile layout value): the row sits
+         directly above the Use/Jump cluster. */
+      '#quickbar{bottom:calc(3.5vh + min(11vh,16vw) + 1.2vmin)}' +
+    '}' +
+    'body:not(.in-map) #espil-chat-btn{display:none}' +
+    '';
   document.head.appendChild(st);
-
-  /* ---- portrait painter (same recipe as the customizer previews) - */
-  var SK = ['#ffe3c2', '#f2c49b', '#dca26b', '#a8703c', '#6f4525'];
-  var HC = ['#3a2a1c', '#7a4a2b', '#b3764a', '#e3c188', '#ececec', '#23262b', '#c94f4f', '#4a6ac9', '#5da873'];
-  var OF = ['#3f7fbf', '#c94f4f', '#57a773', '#e0a83c', '#7a5fc0', '#e77fc0', '#37b8a5', '#e8e4da'];
-  function paintFace(c, gender, look) {
-    /* Han 2026-10-30 (customizer merge): when the character record
-       carries the v3 customizer's rendered portrait, the medallion
-       shows the real character art instead of the painted face. */
-    var PI = window.__espilPortraitImg;
-    if (PI && PI.complete && PI.naturalWidth > 0) {
-      c.clearRect(0, 0, 112, 112);
-      c.save(); c.beginPath(); c.arc(56, 56, 54, 0, Math.PI * 2); c.clip();
-      var pg = c.createLinearGradient(0, 0, 0, 112); pg.addColorStop(0, '#d9edf0'); pg.addColorStop(1, '#faf3e0');
-      c.fillStyle = pg; c.fillRect(0, 0, 112, 112);
-      var psc = Math.max(112 / PI.naturalWidth, 112 / PI.naturalHeight);
-      c.drawImage(PI, (112 - PI.naturalWidth * psc) / 2, (112 - PI.naturalHeight * psc) / 2, PI.naturalWidth * psc, PI.naturalHeight * psc);
-      c.restore();
-      return;
-    }
-    var lk = look || {};
-    var skin = SK[typeof lk.skin === 'number' ? lk.skin : 1] || SK[1];
-    var hairCol = HC[typeof lk.hairColor === 'number' ? lk.hairColor : (gender === 'f' ? 1 : 0)] || HC[0];
-    var outfit = OF[typeof lk.outfit === 'number' ? lk.outfit : 0] || OF[0];
-    var hs = typeof lk.hair === 'number' ? lk.hair : 0;
-    var f = (gender === 'f' || gender === 'female');
-    c.clearRect(0, 0, 112, 112);
-    c.save(); c.beginPath(); c.arc(56, 56, 54, 0, Math.PI * 2); c.clip();
-    var grd = c.createLinearGradient(0, 0, 0, 112); grd.addColorStop(0, '#1d4256'); grd.addColorStop(1, '#12242f');
-    c.fillStyle = grd; c.fillRect(0, 0, 112, 112);
-    c.fillStyle = outfit; c.beginPath(); c.moveTo(22, 112); c.quadraticCurveTo(56, 82, 90, 112); c.closePath(); c.fill();
-    c.fillStyle = skin; c.fillRect(50, 74, 12, 16);
-    c.beginPath(); c.arc(56, 58, 26, 0, Math.PI * 2); c.fill();
-    c.fillStyle = hairCol;
-    if (f) {
-      if (hs === 3) { c.beginPath(); c.arc(56, 28, 9, 0, Math.PI * 2); c.fill(); }
-      c.beginPath(); c.arc(56, 40, 27, Math.PI, Math.PI * 2); c.fill();
-      if (hs === 0) { c.fillRect(27, 40, 11, 42); c.fillRect(74, 40, 11, 42); }
-      else if (hs === 1) { c.fillRect(28, 40, 10, 25); c.fillRect(74, 40, 10, 25); }
-      else if (hs === 2) { c.fillRect(77, 38, 9, 36); }
-    } else {
-      if (hs === 1) { c.beginPath(); c.moveTo(31, 42); c.lineTo(37, 25); c.lineTo(45, 36); c.lineTo(53, 23); c.lineTo(61, 36); c.lineTo(69, 25); c.lineTo(77, 38); c.lineTo(83, 43); c.lineTo(31, 43); c.closePath(); c.fill(); }
-      else if (hs === 2) { c.beginPath(); c.arc(56, 47, 25, Math.PI, Math.PI * 2); c.fill(); }
-      else if (hs === 3) { c.beginPath(); c.arc(52, 40, 27, Math.PI, Math.PI * 2); c.fill(); c.fillRect(66, 36, 12, 13); }
-      else { c.beginPath(); c.arc(56, 40, 27, Math.PI, Math.PI * 2); c.fill(); }
-    }
-    c.fillStyle = '#22303a';
-    c.beginPath(); c.arc(47, 58, 3, 0, Math.PI * 2); c.arc(65, 58, 3, 0, Math.PI * 2); c.fill();
-    c.strokeStyle = '#b3764a'; c.lineWidth = 2; c.beginPath(); c.arc(56, 64, 8, 0.15 * Math.PI, 0.85 * Math.PI); c.stroke();
-    c.restore();
-  }
 
   /* ---- the log tray outline (the client's paintTrayShape, ported) - */
   function paintEspilTray() {
@@ -275,12 +296,13 @@
   window.addEventListener('resize', paintEspilTray);
 
   /* ---- DOM -------------------------------------------------------- */
+  /* the status pill: name + role + Leo text only (no portrait -
+     Han correction 2026-11-03, see the header note) */
   var status = document.createElement('div');
   status.id = 'espil-mmo-status';
   status.setAttribute('aria-hidden', 'true');
-  status.innerHTML = '<div class="mmo-medallion"><canvas id="espil-mmo-face" width="112" height="112"></canvas></div>' +
-    '<div class="mmo-who"><div class="mmo-name" id="espil-mmo-name">Guest</div>' +
-    '<div class="mmo-sub" id="espil-mmo-sub">espil.online</div>' +
+  status.innerHTML = '<div class="mmo-who"><div class="mmo-name" id="espil-mmo-name">Guest</div>' +
+    '<div class="mmo-sub" id="espil-mmo-sub">Guest Traveler</div>' +
     '<div class="mmo-leo"><span class="mmo-coin"></span><span id="espil-mmo-leo">Leo 1,000</span></div></div>';
   var strip = document.createElement('div');
   strip.id = 'espil-mmo-strip';
@@ -290,10 +312,45 @@
   var loc = document.createElement('div');
   loc.id = 'espil-loc';
   loc.textContent = 'Vancouver';
+  /* Batch E3 (Han 2026-11-03, MOBILE ONLY): the top-centre chat
+     button + unread badge. The button exists in the DOM on every
+     pointer type, but the Batch E styles render it only on coarse
+     pointers while in-map, so the desktop HUD is untouched. */
+  var chatBtn = document.createElement('button');
+  chatBtn.type = 'button';
+  chatBtn.id = 'espil-chat-btn';
+  chatBtn.setAttribute('aria-label', 'Toggle chat');
+  chatBtn.innerHTML = '<span aria-hidden="true">\uD83D\uDCAC</span><span>Chat</span>' +
+    '<span class="cb-badge" id="espil-chat-unread"></span>';
+  var chatUnread = 0;
+  function setChatOpen(open) {
+    if (!document.body) return;
+    document.body.classList.toggle('chat-open', !!open);
+    chatBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) {
+      chatUnread = 0;
+      chatBtn.classList.remove('has-unread');
+      var b = document.getElementById('espil-chat-unread');
+      if (b) b.textContent = '';
+    }
+  }
+  chatBtn.addEventListener('click', function () {
+    setChatOpen(!(document.body && document.body.classList.contains('chat-open')));
+  });
+  window.addEventListener('espil-chat-recv', function (e) {
+    if (!document.body || !document.body.classList.contains('in-map')) return;
+    if (document.body.classList.contains('chat-open')) return;
+    if (!e || !e.detail || e.detail.sys) return; /* real messages only, not system lines */
+    chatUnread++;
+    var b = document.getElementById('espil-chat-unread');
+    if (b) b.textContent = chatUnread > 99 ? '99+' : String(chatUnread);
+    chatBtn.classList.add('has-unread');
+  });
   function mount() {
     if (!document.body) return;
     if (!document.getElementById('espil-mmo-status')) document.body.appendChild(status);
     if (!document.getElementById('espil-loc')) document.body.appendChild(loc);
+    if (!document.getElementById('espil-chat-btn')) document.body.appendChild(chatBtn);
     /* the gauge strip lives in the tray's right column once the
        quickbar structure is assembled (see the wiring below); until
        then it waits at the body level, hidden by the coarse rule and
@@ -304,37 +361,23 @@
 
   var CITY_NAMES = { vancouver: 'Vancouver', auckland: 'Auckland', tokyo: 'Tokyo', newyork: 'New York', paris: 'Paris', london: 'London', seoul: 'Seoul' };
   var TUT_STEPS = ['landingNav', 'landingEnter', 'move', 'jump', 'nav', 'enter', 'buy', 'stall', 'map'];
-  var lastRec = '';
   function refresh() {
     mount();
     var inMap = document.body && document.body.classList.contains('in-map');
-    status.setAttribute('aria-hidden', inMap ? 'false' : 'true');
     if (!inMap) return;
-    /* portrait follows the saved character record */
-    var recRaw = null, rec = null;
-    try { recRaw = localStorage.getItem('espil_character'); rec = recRaw ? JSON.parse(recRaw) : null; } catch (_) {}
-    if (recRaw !== lastRec) {
-      lastRec = recRaw;
-      var cv = document.getElementById('espil-mmo-face');
-      if (cv && cv.getContext) { var c2 = cv.getContext('2d'); if (c2) paintFace(c2, rec && rec.gender === 'female' ? 'f' : 'm', rec ? rec.look : null); }
-    }
-    /* name: display name for accounts, the adopted Guest N for guests */
-    var un = ''; try { un = localStorage.getItem('espil_username') || ''; } catch (_) {}
-    var disp = un;
-    try {
-      var accts = JSON.parse(localStorage.getItem('espil_accounts_v1') || '{}');
-      var a = accts[(un || '').toLowerCase()];
-      if (a && a.display) disp = a.display;
-    } catch (_) {}
+    if (status) status.setAttribute('aria-hidden', 'false');
+    /* status pill text: guest name + role + Leo balance */
+    var nm = 'Guest';
+    try { nm = localStorage.getItem('espil_username') || 'Guest'; } catch (_) {}
     var nameEl = document.getElementById('espil-mmo-name');
-    if (nameEl) nameEl.textContent = disp || 'Guest';
+    if (nameEl && nameEl.textContent !== nm) nameEl.textContent = nm;
     var subEl = document.getElementById('espil-mmo-sub');
-    if (subEl) subEl.textContent = (un && un !== disp) ? ('@' + un) : (/^guest/i.test(un) ? 'Guest traveler' : 'espil.online');
-    /* Leo balance */
-    var bal = 1000;
-    try { var v = parseInt(localStorage.getItem('espil_leo_balance'), 10); if (!isNaN(v)) bal = v; } catch (_) {}
+    if (subEl) { var subTxt = /^Guest/.test(nm) ? 'Guest Traveler' : 'Traveler'; if (subEl.textContent !== subTxt) subEl.textContent = subTxt; }
+    var leo = 1000;
+    try { var lv = parseInt(localStorage.getItem('espil_leo_balance') || '1000', 10); if (!isNaN(lv)) leo = lv; } catch (_) {}
     var leoEl = document.getElementById('espil-mmo-leo');
-    if (leoEl) leoEl.textContent = 'Leo ' + bal.toLocaleString('en-US');
+    var leoTxt = 'Leo ' + leo.toLocaleString('en-US');
+    if (leoEl && leoEl.textContent !== leoTxt) leoEl.textContent = leoTxt;
     /* gauge: city pill + tutorial progress fill + position text */
     var key = window.__espilCityKey || 'vancouver';
     var zone = CITY_NAMES[key] || 'Vancouver';
@@ -378,8 +421,14 @@
       var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
       svg.id = 'espil-tray';
       svg.setAttribute('aria-hidden', 'true');
+      /* Batch D5 hardening (Han 2026-11-03: the logwood tray vanished
+         on his PC in the W build): the pattern image carries BOTH the
+         SVG2 href and the legacy xlink:href (with the xlink namespace
+         declared on the svg), so WebKit/Safari builds that ignore a
+         bare href on SVG <image> still load the log texture. */
+      svg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
       svg.innerHTML = '<defs><pattern id="espilwood" patternUnits="userSpaceOnUse" width="440" height="140">' +
-        '<image href="assets/tex/logwood.jpg" width="440" height="140" preserveAspectRatio="none"></image></pattern></defs>' +
+        '<image href="assets/tex/logwood.jpg" xlink:href="assets/tex/logwood.jpg" width="440" height="140" preserveAspectRatio="none"></image></pattern></defs>' +
         '<path id="espil-tray-fill" fill="#6d4c2c"></path>' +
         '<path id="espil-tray-wood" fill="url(#espilwood)" stroke="#3a2817" stroke-width="3"></path>';
       kbMain.insertBefore(svg, kbMain.firstChild);

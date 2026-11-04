@@ -178,7 +178,7 @@
       } else if (m.t === 'stall_update' && m.user) {
         var u3 = users[m.user.id];
         if (u3) u3.stall = m.user.stall || null;
-      } else if (m.t && (m.t.indexOf('party_') === 0 || m.t.indexOf('stall_') === 0)) {
+      } else if (m.t && (m.t.indexOf('party_') === 0 || m.t.indexOf('stall_') === 0 || m.t.indexOf('fly_') === 0)) {
         try { window.dispatchEvent(new CustomEvent('espil-party-frame', { detail: m })); } catch(_){}
       } else if (m.t === 'error') {
         if (m.code && String(m.code).indexOf('party_') === 0) {

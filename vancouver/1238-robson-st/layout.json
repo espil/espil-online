@@ -1,0 +1,488 @@
+{
+  "format": "espil-store-layout",
+  "version": 1,
+  "store": {
+    "slug": "1238-robson-st",
+    "name": "Konbiniya Japan Centre",
+    "address": "1238 Robson St",
+    "city": "Vancouver"
+  },
+  "grid": {
+    "cols": 44,
+    "rows": 30,
+    "cellMeters": 1.0,
+    "scaleClass": 48,
+    "origin": {
+      "x": -22.0,
+      "z": -15.0
+    },
+    "axes": "+cx -> +x (east), +cz -> +z (south/entrance); cell [0,0] is the min-x/min-z (north-west) cell; a placement anchors at its cell centre plus dx/dz"
+  },
+  "room": {
+    "floorMeters": [
+      44,
+      30
+    ],
+    "wallHeightMeters": 6,
+    "modelScale": 3
+  },
+  "placements": [
+    {
+      "model": "cash-register",
+      "cell": [
+        25,
+        3
+      ],
+      "rotY": 180.0,
+      "dx": 0.3,
+      "dz": -0.4,
+      "y": 1.19,
+      "collide": false
+    },
+    {
+      "model": "shelf-boxes",
+      "cell": [
+        6,
+        9
+      ],
+      "rotY": 0.0,
+      "dx": -0.5,
+      "dz": -0.5
+    },
+    {
+      "model": "shelf-bags",
+      "cell": [
+        9,
+        9
+      ],
+      "rotY": 0.0,
+      "dx": -0.3,
+      "dz": -0.5
+    },
+    {
+      "model": "shelf-boxes",
+      "cell": [
+        12,
+        9
+      ],
+      "rotY": 0.0,
+      "dx": -0.1,
+      "dz": -0.5
+    },
+    {
+      "model": "shelf-boxes",
+      "cell": [
+        18,
+        9
+      ],
+      "rotY": 0.0,
+      "dx": 0.3,
+      "dz": -0.5
+    },
+    {
+      "model": "shelf-bags",
+      "cell": [
+        22,
+        9
+      ],
+      "rotY": 0.0,
+      "dx": -0.5,
+      "dz": -0.5
+    },
+    {
+      "model": "shelf-boxes",
+      "cell": [
+        25,
+        9
+      ],
+      "rotY": 0.0,
+      "dx": -0.3,
+      "dz": -0.5
+    },
+    {
+      "model": "shelf-boxes",
+      "cell": [
+        31,
+        9
+      ],
+      "rotY": 0.0,
+      "dx": 0.1,
+      "dz": -0.5
+    },
+    {
+      "model": "shelf-bags",
+      "cell": [
+        34,
+        9
+      ],
+      "rotY": 0.0,
+      "dx": 0.3,
+      "dz": -0.5
+    },
+    {
+      "model": "shelf-boxes",
+      "cell": [
+        38,
+        9
+      ],
+      "rotY": 0.0,
+      "dx": -0.5,
+      "dz": -0.5
+    },
+    {
+      "model": "shelf-end",
+      "cell": [
+        3,
+        9
+      ],
+      "rotY": 90.0,
+      "dx": 0.1,
+      "dz": -0.5
+    },
+    {
+      "model": "shelf-end",
+      "cell": [
+        40,
+        9
+      ],
+      "rotY": -90.0,
+      "dx": -0.1,
+      "dz": -0.5
+    },
+    {
+      "model": "shelf-boxes",
+      "cell": [
+        6,
+        15
+      ],
+      "rotY": 0.0,
+      "dx": -0.5
+    },
+    {
+      "model": "shelf-bags",
+      "cell": [
+        9,
+        15
+      ],
+      "rotY": 0.0,
+      "dx": -0.3
+    },
+    {
+      "model": "shelf-boxes",
+      "cell": [
+        12,
+        15
+      ],
+      "rotY": 0.0,
+      "dx": -0.1
+    },
+    {
+      "model": "shelf-boxes",
+      "cell": [
+        18,
+        15
+      ],
+      "rotY": 0.0,
+      "dx": 0.3
+    },
+    {
+      "model": "shelf-bags",
+      "cell": [
+        22,
+        15
+      ],
+      "rotY": 0.0,
+      "dx": -0.5
+    },
+    {
+      "model": "shelf-boxes",
+      "cell": [
+        25,
+        15
+      ],
+      "rotY": 0.0,
+      "dx": -0.3
+    },
+    {
+      "model": "shelf-boxes",
+      "cell": [
+        31,
+        15
+      ],
+      "rotY": 0.0,
+      "dx": 0.1
+    },
+    {
+      "model": "shelf-bags",
+      "cell": [
+        34,
+        15
+      ],
+      "rotY": 0.0,
+      "dx": 0.3
+    },
+    {
+      "model": "shelf-boxes",
+      "cell": [
+        38,
+        15
+      ],
+      "rotY": 0.0,
+      "dx": -0.5
+    },
+    {
+      "model": "shelf-end",
+      "cell": [
+        3,
+        15
+      ],
+      "rotY": 90.0,
+      "dx": 0.1
+    },
+    {
+      "model": "shelf-end",
+      "cell": [
+        40,
+        15
+      ],
+      "rotY": -90.0,
+      "dx": -0.1
+    },
+    {
+      "model": "shelf-boxes",
+      "cell": [
+        6,
+        22
+      ],
+      "rotY": 0.0,
+      "dx": -0.5,
+      "dz": -0.5
+    },
+    {
+      "model": "shelf-bags",
+      "cell": [
+        9,
+        22
+      ],
+      "rotY": 0.0,
+      "dx": -0.3,
+      "dz": -0.5
+    },
+    {
+      "model": "shelf-boxes",
+      "cell": [
+        12,
+        22
+      ],
+      "rotY": 0.0,
+      "dx": -0.1,
+      "dz": -0.5
+    },
+    {
+      "model": "shelf-boxes",
+      "cell": [
+        18,
+        22
+      ],
+      "rotY": 0.0,
+      "dx": 0.3,
+      "dz": -0.5
+    },
+    {
+      "model": "shelf-bags",
+      "cell": [
+        22,
+        22
+      ],
+      "rotY": 0.0,
+      "dx": -0.5,
+      "dz": -0.5
+    },
+    {
+      "model": "shelf-boxes",
+      "cell": [
+        25,
+        22
+      ],
+      "rotY": 0.0,
+      "dx": -0.3,
+      "dz": -0.5
+    },
+    {
+      "model": "shelf-boxes",
+      "cell": [
+        31,
+        22
+      ],
+      "rotY": 0.0,
+      "dx": 0.1,
+      "dz": -0.5
+    },
+    {
+      "model": "shelf-bags",
+      "cell": [
+        34,
+        22
+      ],
+      "rotY": 0.0,
+      "dx": 0.3,
+      "dz": -0.5
+    },
+    {
+      "model": "shelf-boxes",
+      "cell": [
+        38,
+        22
+      ],
+      "rotY": 0.0,
+      "dx": -0.5,
+      "dz": -0.5
+    },
+    {
+      "model": "shelf-end",
+      "cell": [
+        3,
+        22
+      ],
+      "rotY": 90.0,
+      "dx": 0.1,
+      "dz": -0.5
+    },
+    {
+      "model": "shelf-end",
+      "cell": [
+        40,
+        22
+      ],
+      "rotY": -90.0,
+      "dx": -0.1,
+      "dz": -0.5
+    },
+    {
+      "model": "freezers-standing",
+      "cell": [
+        1,
+        6
+      ],
+      "rotY": 90.0,
+      "dx": -0.1,
+      "dz": -0.5
+    },
+    {
+      "model": "freezers-standing",
+      "cell": [
+        1,
+        9
+      ],
+      "rotY": 90.0,
+      "dx": -0.1,
+      "dz": 0.1
+    },
+    {
+      "model": "freezers-standing",
+      "cell": [
+        1,
+        13
+      ],
+      "rotY": 90.0,
+      "dx": -0.1,
+      "dz": -0.3
+    },
+    {
+      "model": "freezers-standing",
+      "cell": [
+        1,
+        16
+      ],
+      "rotY": 90.0,
+      "dx": -0.1,
+      "dz": 0.3
+    },
+    {
+      "model": "freezers-standing",
+      "cell": [
+        1,
+        20
+      ],
+      "rotY": 90.0,
+      "dx": -0.1,
+      "dz": -0.1
+    },
+    {
+      "model": "freezer",
+      "cell": [
+        42,
+        9
+      ],
+      "rotY": -90.0,
+      "dx": 0.3,
+      "dz": -0.5
+    },
+    {
+      "model": "freezer",
+      "cell": [
+        42,
+        13
+      ],
+      "rotY": -90.0,
+      "dx": 0.3,
+      "dz": -0.5
+    },
+    {
+      "model": "freezer",
+      "cell": [
+        42,
+        17
+      ],
+      "rotY": -90.0,
+      "dx": 0.3,
+      "dz": -0.5
+    },
+    {
+      "model": "display-fruit",
+      "cell": [
+        14,
+        26
+      ],
+      "rotY": 90.0,
+      "dx": -0.5
+    },
+    {
+      "model": "display-bread",
+      "cell": [
+        30,
+        26
+      ],
+      "rotY": -90.0,
+      "dx": -0.5
+    },
+    {
+      "model": "shopping-basket",
+      "cell": [
+        35,
+        27
+      ],
+      "rotY": 22.918312,
+      "dz": 0.1
+    },
+    {
+      "model": "shopping-cart",
+      "cell": [
+        36,
+        27
+      ],
+      "rotY": 51.566202,
+      "dx": 0.1,
+      "dz": 0.4
+    },
+    {
+      "model": "bottle-return",
+      "cell": [
+        8,
+        27
+      ],
+      "rotY": 0.0,
+      "dz": 0.3
+    }
+  ]
+}

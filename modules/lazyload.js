@@ -26,6 +26,16 @@
    - store: the building panel being clicked, the interior event,
      or __espilInside appearing (poll). The store's own tick then
      applies the fitout for the building already entered.
+   - store-page-link: companion of store (Batch S integration,
+     2026-11-03). Its capture-phase click listener intercepts the
+     Konbiniya building-panel Enter click and opens the standalone
+     store page instead, so it must be RESIDENT before that click
+     can happen. store's own click seam can fire ON the Enter click
+     itself - too late for a same-click import - so the link module
+     rides every store seam AND arms earlier from the backstop
+     poll: a building panel standing open, or a building being
+     faced (__espilFacingBuilding), both of which always precede
+     an Enter click. The pair files themselves carry no new tag.
    - panels: the inventory/profile keys, the HUD CHAR menu button,
      a right-click (the self-profile menu item lives in the social
      context menu), or the interior event (the purchase mirror
@@ -75,6 +85,7 @@
     });
   }
   function socialBundle() { load('social.js'); load('stall2.js'); load('tutorial.js'); load('panels.js'); }
+  function storePair() { load('store.js'); load('store-page-link.js'); }
   /* The city-switch dive dispatches espil-dive-start on window;
      the standard gate entry does not, so the tutorial also rides
      the arrival bundle above - its own boot watcher only starts
@@ -83,7 +94,7 @@
   window.addEventListener('espil-guide', function (e) {
     var d = e && e.detail; if (!d) return;
     if (d.type === 'arrival') socialBundle();
-    if (d.type === 'interior') { load('store.js'); load('panels.js'); }
+    if (d.type === 'interior') { storePair(); load('panels.js'); }
   });
   window.addEventListener('espil-party-frame', socialBundle);
   document.addEventListener('keydown', function (e) {
@@ -115,14 +126,22 @@
     var t = e.target;
     if (!t || !t.closest) return;
     if (t.closest('#minimap-wrap')) load('map-search.js');
-    if (t.closest('#bldg-panel, #bldg-opts')) load('store.js');
+    if (t.closest('#bldg-panel, #bldg-opts')) storePair();
   }, true);
   /* Backstop poll: being in the map arms the presence-adjacent
      bundle by any arrival path; being inside a building arms the
-     store. 600 ms, and each arm is a no-op once loaded. */
+     store. The store page link arms earlier still - a building
+     panel standing open or a building being faced - because its
+     interception must be resident before the Enter click. 600 ms,
+     and each arm is a no-op once loaded. */
   setInterval(function () {
     if (document.body && document.body.classList.contains('in-map')) socialBundle();
-    if (window.__espilInside) load('store.js');
+    if (window.__espilInside) storePair();
+    var bp = document.getElementById('bldg-panel');
+    if (bp && bp.getAttribute('aria-hidden') === 'false') load('store-page-link.js');
+    else if (window.__espilFacingBuilding) {
+      try { if (window.__espilFacingBuilding()) load('store-page-link.js'); } catch (e) {}
+    }
   }, 600);
   window.__espilLazyState = function () {
     var out = {};

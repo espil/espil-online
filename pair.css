@@ -1283,16 +1283,13 @@
       .chat-msg .who { display:inline; }
       .chat-msg .txt { display:inline; }
     }
-    /* 2026-10-12 (Han): landscape-first on mobile — rotate prompt in portrait. */
+    /* 2026-10-12 (Han): landscape-first on mobile — rotate prompt in portrait.
+       Batch M1 (Han 2026-11-03) SUPERSEDES the prompt: no "please
+       rotate" surface may ever appear - the game itself rotates to
+       landscape in portrait viewports (see the end of this file). */
     #rotate-overlay { display:none; }
     @media (pointer:coarse) and (orientation:portrait) {
-      body.in-map #rotate-overlay {
-        display:flex; position:fixed; inset:0; z-index:90;
-        background:rgba(2,10,13,.88); color:#eafffd;
-        flex-direction:column; align-items:center; justify-content:center; gap:14px;
-        font:700 1rem/1.4 "Manrope",sans-serif; letter-spacing:.04em; text-align:center; padding:24px;
-      }
-      .rotate-phone { font-size:3rem; animation:rotateHint 1.6s ease-in-out infinite; }
+      body.in-map #rotate-overlay { display:none !important; }
     }
     @keyframes rotateHint { 0%,20% { transform:rotate(0deg); } 60%,100% { transform:rotate(90deg); } }
     /* City info panel: details before entering. Centered on screen (2026-10-06 QA). */
@@ -1667,3 +1664,25 @@
     .lang-opt:hover,.lang-opt:focus-visible{ background:rgba(134,238,228,.14); outline:none; }
     .lang-opt.on{ background:rgba(134,238,228,.2); }
   
+/* ================================================================
+   Batch M1 (Han 2026-11-03): LANDSCAPE ONLY, ALWAYS, on touch
+   devices - from the landing to the map, however the phone is
+   held, and never a rotate prompt. In a portrait viewport the
+   whole body is rotated 90 degrees with swapped width/height and
+   the origin set so the rotated root exactly fills the screen;
+   the game therefore renders landscape in both holdings. If the
+   OS itself rotates the viewport to landscape (e.g. a successful
+   orientation lock), this media query stops matching and the
+   rotation disengages cleanly. Desktop (fine pointers) is
+   untouched. Pointer deltas are converted back into the rotated
+   frame by espilDragDelta in the world module.
+   ================================================================ */
+@media (pointer:coarse) and (orientation:portrait) {
+  body {
+    position:fixed; top:0; left:0;
+    width:100vh; height:100vw;
+    transform-origin:0 0;
+    transform:rotate(90deg) translateY(-100%);
+    overflow:hidden;
+  }
+}

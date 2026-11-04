@@ -11,12 +11,12 @@
        entry order: the Worker assigns "Guest N" at join and this
        module adopts that name from the roster (with a client-side
        count as fallback until the Worker update deploys).
-   (2) window.__espilEntryLocationGate - the arrival picker the
-       character gate now detours through (Vancouver list: current
-       location, Art Gallery, Robson Square, Holt Renfrew,
-       Waterfront, Stanley Park, English Bay). The pick is snapped
-       to walkable ground and handed to espilEntryStart as
-       window.__espilSpawnPick; other cities enter directly. */
+   (2) window.__espilEntryLocationGate - formerly the arrival
+       picker the character gate detoured through. Batch D3 (Han
+       2026-11-03): entry no longer asks for a location - the gate
+       hands espilEntryStart a fixed first spawn in front of the
+       Art Gallery as window.__espilSpawnPick; other cities enter
+       directly. The picker implementation below is dormant. */
 (function () {
   'use strict';
   if (window.__espilEntryFlow) return;
@@ -286,10 +286,23 @@
     var key = '';
     try { var k = window.__espilCityKey; key = String(typeof k === 'function' ? k() : (k || '')).toLowerCase(); } catch (_) {}
     if (key && key.indexOf('vancouver') < 0) { if (typeof next === 'function') next(); return; }
+    /* Batch D3 (Han 2026-11-03): entry NEVER asks for a location.
+       The picker UI is not built or shown. A FIRST spawn (no saved
+       position) is fixed in front of the Art Gallery - the old
+       picker's own 'gallery' spot (3, 33), street-side south of
+       the gallery footprint, snapped to walkable ground. A
+       returning player keeps the world's own saved-position
+       resume: no pick is set, so espilEntryStart resumes exactly
+       as before. The picker code above stays dormant for a future
+       multi-spot return. */
+    var saved = null;
+    try { saved = JSON.parse(localStorage.getItem('espil_last_pos') || 'null'); } catch (_) {}
+    if (saved && typeof saved.x === 'number' && typeof saved.z === 'number' && (!saved.city || saved.city === 'vancouver')) {
+      if (typeof next === 'function') next();
+      return;
+    }
     pendingNext = typeof next === 'function' ? next : null;
-    if (!locEl) buildLocPick();
-    locMsg('');
-    locEl.setAttribute('aria-hidden', 'false');
+    finishPick(snapWalkable(3, 33));
   };
 
   /* claim the auth zone now, and re-claim it whenever the modal opens */

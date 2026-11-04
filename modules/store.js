@@ -219,7 +219,7 @@
   }, 180);
 
   window.__espilEntryRoute = function (name) {
-    if (/konbiniya/i.test(name || '')) return { mode: 'direct', floors: 1, note: 'One floor - straight into the store.' };
+    if (/konbiniya/i.test(name || '')) return { mode: 'store-page', floors: 1, note: 'Opens the standalone store page at /vancouver/1238-robson-st/ (Batch S); the street page pauses while it is open and resumes when it closes.' };
     return { mode: 'legacy', floors: null, note: 'Direct entry today. The routing framework lands 2F+ buildings in the party waiting zone first (party enters together), with elevators by building height.' };
   };
   window.__espilStoreState = function () {

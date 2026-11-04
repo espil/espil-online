@@ -126,7 +126,11 @@
       '#espil-tut .kb{display:inline-flex;align-items:center;justify-content:center;min-width:23px;height:23px;' +
       'padding:0 4px;margin-right:4px;border-radius:6px;background:linear-gradient(180deg,#fffdf6,#ffeecd);' +
       'border:1.5px solid #cfa96f;border-bottom-width:3px;color:#6b4a1f;font-size:.8rem;font-weight:800}' +
-      '#espil-tut.done{border-color:#b57708}';
+      '#espil-tut.done{border-color:#b57708}' +
+      /* Batch E2 (Han 2026-11-03, MOBILE ONLY): on touch screens the
+         tutorial message sits close to the top of the screen, just
+         under the chat button row; desktop keeps top:86px. */
+      '@media (pointer:coarse){#espil-tut{top:52px}}';
     document.head.appendChild(st);
     chip = document.createElement('div');
     chip.id = 'espil-tut';

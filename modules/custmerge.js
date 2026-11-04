@@ -24,6 +24,14 @@
    model, as the web avatar has always been. */
 (function () {
   'use strict';
+  /* Batch D2 (Han 2026-11-03): the customizer is SUSPENDED for now -
+     Han cannot test it, so character choice is the pair's DEFAULT
+     MALE / FEMALE cards only. While this flag is false the gate and
+     the profile Customize route fall through to the pair's basic
+     panels and the customizer iframe never opens; the code and
+     customizer.html stay in place for its return. Re-enable by
+     flipping this one flag to true. */
+  var CUSTMERGE_ENABLED = false;
   function $(id) { return document.getElementById(id); }
   function readRec() { try { return JSON.parse(localStorage.getItem('espil_character') || 'null'); } catch (e) { return null; } }
 
@@ -145,14 +153,14 @@
       localStorage.setItem('espil_character', JSON.stringify(rec));
     } catch (e) {}
   }
-  window.__espilCustMergeGate = function () { adoptAccountCharacter(); return openOverlay('gate'); };
-  window.__espilCustMergeGoEdit = function () { adoptAccountCharacter(); return openOverlay('profile'); };
+  window.__espilCustMergeGate = function () { if (!CUSTMERGE_ENABLED) return false; adoptAccountCharacter(); return openOverlay('gate'); };
+  window.__espilCustMergeGoEdit = function () { if (!CUSTMERGE_ENABLED) return false; adoptAccountCharacter(); return openOverlay('profile'); };
 
   /* ---- profile Customize routes here (basic panel = fallback) --- */
   (function wrapOpen() {
     if (window.__espilOpenCustomizer && !window.__espilOpenCustomizer.__custWrapped) {
       origOpenCustomizer = window.__espilOpenCustomizer;
-      var w = function () { if (window.__espilCustMergeGoEdit()) return; origOpenCustomizer(); };
+      var w = function () { if (CUSTMERGE_ENABLED && window.__espilCustMergeGoEdit()) return; origOpenCustomizer(); };
       w.__custWrapped = true;
       window.__espilOpenCustomizer = w;
     } else if (!window.__espilOpenCustomizer) { setTimeout(wrapOpen, 700); }
@@ -172,6 +180,7 @@
      the gate. */
   var gateFallbackOpen = false, gateRescued = false;
   setInterval(function () {
+    if (!CUSTMERGE_ENABLED) return; /* Batch D2: never rescue the pair's own cards while suspended */
     if (gateRescued || gateFallbackOpen || mode) return;
     if (document.body.classList.contains('in-map')) return;
     var panel = $('char-custom');
@@ -244,7 +253,7 @@
   });
 
   window.__espilCustMergeState = function () {
-    return { open: !!(overlay && overlay.classList.contains('open')), mode: mode, portrait: !!lastPortrait };
+    return { open: !!(overlay && overlay.classList.contains('open')), mode: mode, portrait: !!lastPortrait, enabled: CUSTMERGE_ENABLED };
   };
 })();
 /* __espilCustMerge END */

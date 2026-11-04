@@ -89,12 +89,15 @@
     return Math.max(0, Math.round(d)) + ' m';
   }
   /* ---- the overhead chip (Batch A7) ------------------------------
-     Projected every frame from the player's head position (+2.2 m)
-     through the map camera; hidden when the player is off-screen,
-     behind the camera, or out of the map. The arrow is the target
-     direction expressed on screen: the target vector dotted with
-     the camera's ground-plane right/forward axes, so it always
-     points toward the target as the player sees the world. */
+     Projected every frame from above the player's head (+3.6 m -
+     raised in Batch D7, Han 2026-11-03, so it clears the speech
+     bubble zone) through the map camera; hidden when the player is
+     off-screen, behind the camera, or out of the map. The arrow is
+     the target direction expressed on screen: the target vector
+     dotted with the camera's ground-plane right/forward axes, so
+     it always points toward the target as the player sees the
+     world. Its screen position is also clamped so it never renders
+     over the chat window or the local speech bubble (Batch D7). */
   function chipHide() {
     chipOn = false; chipAngle = null;
     if (chipEl) { chipEl.classList.remove('on'); chipEl.setAttribute('aria-hidden', 'true'); }
@@ -105,13 +108,41 @@
     var cam = null;
     try { cam = (typeof window.__espilMapCameraObj === 'function') ? window.__espilMapCameraObj() : null; } catch (e) {}
     if (!cam || !cam.matrixWorldInverse) { chipHide(); return; }
-    var head = new THREE.Vector3(pose.x, (typeof pose.y === 'number' ? pose.y : 0) + 2.2, pose.z);
+    var head = new THREE.Vector3(pose.x, (typeof pose.y === 'number' ? pose.y : 0) + 3.6, pose.z);
     var viewZ = head.clone().applyMatrix4(cam.matrixWorldInverse).z;
     if (viewZ > -0.5) { chipHide(); return; }
     head.project(cam);
     var sx = (head.x * 0.5 + 0.5) * window.innerWidth;
     var sy = (-head.y * 0.5 + 0.5) * window.innerHeight;
     if (sx < -40 || sx > window.innerWidth + 40 || sy < -20 || sy > window.innerHeight + 20) { chipHide(); return; }
+    /* Batch D7: never render over the chat window or the local
+       speech bubble - when the chip's x falls in such a region's
+       span and its box would cross the region's top, lift it above
+       the region. (The chip box hangs above its anchor point:
+       translate(-50%,-115%), so its bottom edge sits at
+       sy - 0.15 * chipHeight.) */
+    var chipH = chipEl.offsetHeight || 26;
+    ['.chat-window', '#chat-bubble'].forEach(function (sel) {
+      var region = document.querySelector(sel);
+      if (!region) return;
+      var r = region.getBoundingClientRect();
+      if (!r || r.height < 2 || r.width < 2) return;
+      if (sx < r.left - 14 || sx > r.right + 14) return;
+      if (sy - chipH * 0.15 > r.top - 8) sy = r.top - 8 + chipH * 0.15;
+    });
+    /* Batch M4 (Han 2026-11-03): the tutorial message stacks ABOVE
+       the chip - final vertical order from the character outward is
+       chat window (bottom), chip, tutorial message (top). When the
+       chip's box would cross under the tutorial card, it is pushed
+       down to start below the card. (The card is display:none
+       between steps, which reads as an empty rect and is skipped.) */
+    var tut = document.getElementById('espil-tut');
+    if (tut) {
+      var tr = tut.getBoundingClientRect();
+      if (tr && tr.height >= 2 && tr.width >= 2 && sx >= tr.left - 14 && sx <= tr.right + 14) {
+        if (sy - chipH * 1.15 < tr.bottom + 8) sy = tr.bottom + 8 + chipH * 1.15;
+      }
+    }
     var fwd = new THREE.Vector3(); cam.getWorldDirection(fwd);
     var rx = -fwd.z, rz = fwd.x;
     var rl = Math.hypot(rx, rz) || 1; rx /= rl; rz /= rl;
