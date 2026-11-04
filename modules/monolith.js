@@ -1127,6 +1127,91 @@
       dropAt:function(x,z){ return espilGlobeDrop(x,z); },
       state:function(){ return {k:espilGlobeU.k.value,cap:espilGlobeU.cap.value,pole:{x:espilGlobeU.pole.value.x,z:espilGlobeU.pole.value.z},patched:espilGlobePatchedCount}; }
     };
+    /* Wall-occlusion CUTOUT (Han 2026-11-03): when a building wall
+       between the camera and the LOCAL player hides the character,
+       the wall's fragments inside a screen-space circle LARGER than
+       the character are DISCARDED (cutoff / alpha clipping - a hard
+       edge, never an opacity fade; the retired 2026-10-15 whole-
+       object fade approach must not come back). A fragment is cut
+       only when BOTH hold: (a) its gl_FragCoord position lies inside
+       the circle around the character's projected screen centre, and
+       (b) its window-space depth is closer to the camera than the
+       character's centre depth (minus a small epsilon), i.e. the
+       fragment is strictly IN FRONT of the character. Walls behind
+       the character, the ground the character stands on (never
+       patched), and everything outside the circle are untouched;
+       when nothing occludes, nothing visible changes.
+       Patched materials - BUILDINGS ONLY, applied at creation:
+       the district registry wall+roof slots (espilDistrictMaterials),
+       the downtown core bldgMat cache, and the chunk-city instanced
+       building material in generateChunk. Terrain, water, nature,
+       props, NPCs, remote players and the character itself are never
+       patched. Scope: the LOCAL player only.
+       Interiors: while __espilInside is set the cutout is DISABLED -
+       indoors the enclosing room must stay whole; the in/outdoor
+       transition is a door crossing, so no pop is visible. */
+    var ESPIL_OCCLUDE_RADIUS_FACTOR=1.35; /* circle radius = projected character half-height x this (>1: the circle is larger than the character) */
+    var ESPIL_OCCLUDE_CHAR_H=1.8; /* character height in metres used for the projection */
+    var ESPIL_OCCLUDE_EPS=0.00002; /* window-depth epsilon: a fragment must be at least ~this much closer than the character centre to be cut */
+    var espilOccludeU={centre:{value:new THREE.Vector2(-10000,-10000)},radius:{value:0},charZ:{value:1},enabled:{value:0}};
+    var espilOccludePatched=new WeakSet(), espilOccludePatchedCount=0;
+    var espilOccludeMaster=true; /* probe/Han toggle via __espilOccludeState.setEnabled */
+    var espilOccludeState={enabled:false,centrePx:null,radiusPx:0,charDepth:null,patchedMaterials:0};
+    function espilOccludePatchMat(m){
+      if(!m||espilOccludePatched.has(m))return;
+      if(m.isShaderMaterial||m.isSpriteMaterial||m.isPointsMaterial||m.isLineBasicMaterial||m.isShadowMaterial)return;
+      espilOccludePatched.add(m);
+      var prev=m.onBeforeCompile;
+      m.onBeforeCompile=function(shader){
+        if(prev)prev.call(this,shader);
+        shader.uniforms.uOccCentre=espilOccludeU.centre;
+        shader.uniforms.uOccRadius=espilOccludeU.radius;
+        shader.uniforms.uOccCharZ=espilOccludeU.charZ;
+        shader.uniforms.uOccEnabled=espilOccludeU.enabled;
+        var anchor='void main() {';
+        if(shader.fragmentShader.indexOf(anchor)<0){ console.warn('[Occlude] fragment anchor missing, material not patched'); return; }
+        shader.fragmentShader=('uniform vec2 uOccCentre;\nuniform float uOccRadius;\nuniform float uOccCharZ;\nuniform float uOccEnabled;\n')+
+          shader.fragmentShader.replace(anchor,
+            anchor+'\n  if(uOccEnabled>0.5){ vec2 espilOccD=gl_FragCoord.xy-uOccCentre; if(dot(espilOccD,espilOccD)<uOccRadius*uOccRadius && gl_FragCoord.z<uOccCharZ-'+ESPIL_OCCLUDE_EPS+') discard; }');
+        espilOccludePatchedCount++;
+      };
+      m.needsUpdate=true;
+    }
+    var _espilOccV=new THREE.Vector3(), _espilOccFeet=new THREE.Vector3(), _espilOccHead=new THREE.Vector3();
+    function espilOccludeTick(){
+      var on=false, cx=0, cy=0, rad=0, cz=1;
+      try{
+        if(espilOccludeMaster && !window.__espilInside && typeof walkPlayer!=='undefined' && walkPlayer && walkPlayer.pos &&
+           typeof mapCamera!=='undefined' && mapCamera && typeof renderer!=='undefined' && renderer){
+          var grp=(walkPlayer.av&&walkPlayer.av.group)?walkPlayer.av.group:null;
+          if(grp)grp.getWorldPosition(_espilOccFeet); else _espilOccFeet.copy(walkPlayer.pos);
+          _espilOccHead.set(_espilOccFeet.x,_espilOccFeet.y+ESPIL_OCCLUDE_CHAR_H,_espilOccFeet.z);
+          var dbW=renderer.domElement.width, dbH=renderer.domElement.height;
+          _espilOccV.copy(_espilOccFeet).project(mapCamera);
+          var fNdc={x:_espilOccV.x,y:_espilOccV.y};
+          _espilOccV.copy(_espilOccHead).project(mapCamera);
+          var hNdc={x:_espilOccV.x,y:_espilOccV.y};
+          _espilOccV.copy(_espilOccFeet); _espilOccV.y+=ESPIL_OCCLUDE_CHAR_H/2; _espilOccV.project(mapCamera);
+          if(_espilOccV.z>-1&&_espilOccV.z<1&&Math.abs(_espilOccV.x)<1.3&&Math.abs(_espilOccV.y)<1.3){
+            cx=(_espilOccV.x*0.5+0.5)*dbW; cy=(_espilOccV.y*0.5+0.5)*dbH; cz=_espilOccV.z*0.5+0.5;
+            var charHeightPx=Math.abs(hNdc.y-fNdc.y)*0.5*dbH; /* full projected character height in px */
+            rad=Math.min(charHeightPx*0.5*ESPIL_OCCLUDE_RADIUS_FACTOR, dbH*0.75); /* radius = half-height x factor, so the circle's diameter is ESPIL_OCCLUDE_RADIUS_FACTOR x the character's full height */
+            if(rad>1)on=true;
+          }
+        }
+      }catch(e){ on=false; }
+      espilOccludeU.enabled.value=on?1:0;
+      if(on){ espilOccludeU.centre.value.set(cx,cy); espilOccludeU.radius.value=rad; espilOccludeU.charZ.value=cz; }
+      espilOccludeState.enabled=on;
+      espilOccludeState.centrePx=on?[Math.round(cx),Math.round(cy)]:null;
+      espilOccludeState.radiusPx=on?Math.round(rad*10)/10:0;
+      espilOccludeState.charDepth=on?Math.round(cz*1000000)/1000000:null;
+      espilOccludeState.patchedMaterials=espilOccludePatchedCount;
+    }
+    window.__espilOccludeState=function(){
+      return {enabled:espilOccludeState.enabled,master:espilOccludeMaster,centrePx:espilOccludeState.centrePx,radiusPx:espilOccludeState.radiusPx,charDepth:espilOccludeState.charDepth,patchedMaterials:espilOccludePatchedCount,factor:ESPIL_OCCLUDE_RADIUS_FACTOR};
+    };
+    window.__espilOccludeState.setEnabled=function(b){ espilOccludeMaster=!!b; return espilOccludeMaster; };
     var curvedMatCache={};
     function curvedMat(color){
       var key='c'+color, m=curvedMatCache[key];
@@ -1719,6 +1804,7 @@
            re-enables textures with no geometry rework. */
         var wm=new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide});
         var rm=new THREE.MeshLambertMaterial({map:whiteTex,vertexColors:true,side:THREE.DoubleSide});
+        espilOccludePatchMat(wm); espilOccludePatchMat(rm); /* wall-occlusion cutout: buildings only (Han 2026-11-03) */
         reg[k]={wall:wm,roof:rm};
       }
       espilDistrictMats=reg; window.__espilDistrictMaterials=reg;
@@ -3990,6 +4076,7 @@
         var key='b'+color, m=bldgMatCache[key];
         if(!m){
           m=new THREE.MeshBasicMaterial({color:color});
+          espilOccludePatchMat(m); /* wall-occlusion cutout: buildings only (Han 2026-11-03) */
           bldgMatCache[key]=m;
         }
         return m;
@@ -4769,6 +4856,7 @@
              city curves with the ground instead of floating over the
              dropped horizon. */
           var bmat=new THREE.MeshBasicMaterial({color:0xffffff});
+                    espilOccludePatchMat(bmat); /* wall-occlusion cutout: buildings only (Han 2026-11-03) */
                     EspilFader.patchInstanced(bmat);
           var inst=new THREE.InstancedMesh(bgeo,bmat,items.length);
           EspilFader.attachInstanced(inst);
@@ -9267,6 +9355,7 @@
     var lastFrameT=performance.now();
     function animate(){
       requestAnimationFrame(animate);
+      espilOccludeTick(); /* wall-occlusion cutout uniforms (Han 2026-11-03) */
       var nowMs=performance.now();
       var dt=Math.min(.05,(nowMs-lastFrameT)/1000);lastFrameT=nowMs;
       if(cityPhaseActive){
