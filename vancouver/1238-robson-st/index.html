@@ -66,7 +66,7 @@
 </div>
 <button class="chip" id="close-page" type="button">✕ CLOSE &amp; RETURN</button>
 <div class="chip" id="hint">Press SPACE to pay at the counter</div>
-<div class="chip" id="controls-note">W A S D / arrows - walk &nbsp;·&nbsp; drag - look &nbsp;·&nbsp; SPACE at the counter - shop</div>
+<div class="chip" id="controls-note">arrows - walk &nbsp;·&nbsp; A / D - turn camera &nbsp;·&nbsp; W / S - zoom &nbsp;·&nbsp; drag - look &nbsp;·&nbsp; SPACE at the counter - shop</div>
 <div class="chip" id="toast" role="status"></div>
 
 <div id="shop-ui" aria-hidden="true">
@@ -126,7 +126,10 @@ var EYE = 1.6;                              /* first-person eye height */
 var RADIUS = 0.35;                          /* player collision radius */
 
 var scene, camera, renderer, clock;
-var player = { x: 0, z: 12.2, yaw: 0, pitch: 0 };  /* spawn at the entrance, facing -z into the store */
+var player = { x: 0, z: 12.2, yaw: 0, pitch: 0, fov: 72, fovTarget: 72 };  /* spawn at the entrance, facing -z into the store */
+var FOV_MIN = 30, FOV_MAX = 95;      /* W/S zoom range in degrees (Batch H); default FOV is 72 */
+var TURN_RATE = Math.PI / 2;         /* A/D camera turn rate: 90 deg/s (Batch H) */
+var ZOOM_RATE = 45;                  /* W/S zoom rate: 45 deg of FOV per second (Batch H) */
 var keys = {};
 var colliders = [];                          /* {minX,maxX,minZ,maxZ} */
 var loadState = { pending: 0, placed: 0, failed: [] };
@@ -343,10 +346,10 @@ function collide(nx, nz) {
 function stepMove(dt) {
   var run = (keys['ShiftLeft'] || keys['ShiftRight']) ? 7.0 : 4.5;
   var f = 0, r = 0;
-  if (keys['KeyW'] || keys['ArrowUp']) f += 1;
-  if (keys['KeyS'] || keys['ArrowDown']) f -= 1;
-  if (keys['KeyD'] || keys['ArrowRight']) r += 1;
-  if (keys['KeyA'] || keys['ArrowLeft']) r -= 1;
+  if (keys['ArrowUp']) f += 1;
+  if (keys['ArrowDown']) f -= 1;
+  if (keys['ArrowRight']) r += 1;
+  if (keys['ArrowLeft']) r -= 1;
   if (!f && !r) return;
   var len = Math.hypot(f, r); f /= len; r /= len;
   var s = Math.sin(player.yaw), c = Math.cos(player.yaw);
@@ -358,21 +361,63 @@ function stepMove(dt) {
   if (!collide(player.x, nz)) player.z = nz;
 }
 
+/* ---------- camera keys (Batch H, Han 2026-11-03) ----------
+   Inside the store the ARROW keys walk; A / D move the CAMERA
+   (yaw left / right at TURN_RATE); W / S adjust the zoom level
+   (first-person FOV toward fovTarget, clamped to [FOV_MIN,
+   FOV_MAX]). WASD no longer moves the character here. The FOV
+   eases toward fovTarget every frame, which is also what makes
+   touch pinch zoom (bindLook below) smooth. */
+function stepCamera(dt) {
+  if (keys['KeyA']) player.yaw += TURN_RATE * dt;
+  if (keys['KeyD']) player.yaw -= TURN_RATE * dt;
+  if (keys['KeyW']) player.fovTarget = Math.max(FOV_MIN, player.fovTarget - ZOOM_RATE * dt);
+  if (keys['KeyS']) player.fovTarget = Math.min(FOV_MAX, player.fovTarget + ZOOM_RATE * dt);
+  if (Math.abs(player.fovTarget - player.fov) > 0.01) {
+    player.fov += (player.fovTarget - player.fov) * Math.min(1, dt * 10);
+    if (Math.abs(player.fovTarget - player.fov) <= 0.05) player.fov = player.fovTarget;
+    camera.fov = player.fov; camera.updateProjectionMatrix();
+  }
+}
+
 /* ---------- drag look (pair Batch A math: yaw -= dx*0.0052) ---------- */
 function bindLook(el) {
+  var pointers = new Map();          /* pointerId -> {x, y} (Batch H: enables pinch) */
   var dragId = null, lx = 0, ly = 0;
+  var pinchDist = 0;
+  function twoDist() {
+    var p = Array.from(pointers.values());
+    return Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+  }
   el.addEventListener('pointerdown', function (e) {
     if (shopIsOpen) return;
-    dragId = e.pointerId; lx = e.clientX; ly = e.clientY;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     try { el.setPointerCapture(e.pointerId); } catch (err) {}
+    if (pointers.size === 1) { dragId = e.pointerId; lx = e.clientX; ly = e.clientY; }
+    else if (pointers.size === 2) { dragId = null; pinchDist = twoDist(); }
   });
   el.addEventListener('pointermove', function (e) {
+    if (!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size === 2) {                        /* pinch: zoom via the W/S FOV path */
+      var d = twoDist();
+      player.fovTarget = Math.max(FOV_MIN, Math.min(FOV_MAX, player.fovTarget - (d - pinchDist) * 0.08));
+      pinchDist = d;
+      return;
+    }
     if (e.pointerId !== dragId) return;
     var dx = e.clientX - lx, dy = e.clientY - ly; lx = e.clientX; ly = e.clientY;
     player.yaw -= dx * 0.0052;
     player.pitch = Math.max(-1.25, Math.min(1.25, player.pitch - dy * 0.0052));
   });
-  function end(e) { if (e.pointerId === dragId) dragId = null; }
+  function end(e) {
+    pointers.delete(e.pointerId);
+    if (e.pointerId === dragId) dragId = null;
+    if (pointers.size === 1) {                        /* one finger left after a pinch: re-anchor the drag */
+      var ent = pointers.entries().next().value;
+      dragId = ent[0]; lx = ent[1].x; ly = ent[1].y;
+    }
+  }
   el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
 }
 
@@ -424,7 +469,7 @@ function init() {
   (function loop() {
     requestAnimationFrame(loop);
     var dt = Math.min(clock.getDelta(), 0.05);
-    if (!shopIsOpen) stepMove(dt);
+    if (!shopIsOpen) { stepMove(dt); stepCamera(dt); }
     camera.position.set(player.x, EYE, player.z);
     camera.rotation.y = player.yaw; camera.rotation.x = player.pitch;
     var d = Math.hypot(player.x - STORE.counter.x, player.z - STORE.counter.z);
@@ -463,6 +508,7 @@ window.__storePage = {
     return {
       store: STORE.slug, x: +player.x.toFixed(2), z: +player.z.toFixed(2),
       yaw: +player.yaw.toFixed(3), pitch: +player.pitch.toFixed(3), eye: EYE,
+      fov: +camera.fov.toFixed(1), fovTarget: +player.fovTarget.toFixed(1),
       counterNear: counterNear, shopOpen: shopIsOpen,
       layoutLoaded: layoutState.loaded, layoutCount: layoutState.count,
       placed: loadState.placed, failed: loadState.failed.slice(),
