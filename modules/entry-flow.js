@@ -286,18 +286,38 @@
     var key = '';
     try { var k = window.__espilCityKey; key = String(typeof k === 'function' ? k() : (k || '')).toLowerCase(); } catch (_) {}
     if (key && key.indexOf('vancouver') < 0) { if (typeof next === 'function') next(); return; }
-    /* Batch D3 (Han 2026-11-03): entry NEVER asks for a location.
-       The picker UI is not built or shown. A FIRST spawn (no saved
-       position) is fixed in front of the Art Gallery - the old
-       picker's own 'gallery' spot (3, 33), street-side south of
-       the gallery footprint, snapped to walkable ground. A
-       returning player keeps the world's own saved-position
-       resume: no pick is set, so espilEntryStart resumes exactly
-       as before. The picker code above stays dormant for a future
-       multi-spot return. */
+    /* Batch D3 (Han 2026-11-03) + Han 2026-11-04 refinement:
+       entry NEVER asks for a location (the picker UI is not built
+       or shown), and the spawn rule is exactly:
+       - arriving DIRECTLY on the GAME PAGE (/vancouver -
+         vancouver.html alone sets window.__ESPIL_GAME_PAGE, and a
+         direct visit carries no landing handoff mark: the pair's
+         head script adds the espil-handoff class when a landing
+         DIVE's espil_pending_city is in sessionStorage) WITH a
+         valid cached last position resumes at that last location:
+         no pick is set, so espilEntryStart resumes exactly as
+         before. Valid means espil_last_pos parses to numeric x/z,
+         its city is 'vancouver' or unset, and it lies inside the
+         Vancouver playable bounds with the same 50 m margin the
+         world's own loadLastPos allows.
+       - EVERY other entry - no cache, an invalid cache, or any
+         other entry path (the landing page, including its DIVE
+         handoff onto the game page) - spawns in front of the
+         downtown Art Gallery: the old picker's own 'gallery'
+         spot (3, 33), street-side south of the gallery footprint,
+         snapped to walkable ground, handed over as the spawn pick
+         (an explicit pick beats the saved position in
+         espilEntryStart, so the gallery wins there too).
+       The picker code above stays dormant for a future multi-spot
+       return. espil_last_pos keeps being recorded by the world;
+       it is only ever READ for the game-page resume above. */
+    var directGamePage = false;
+    try { directGamePage = window.__ESPIL_GAME_PAGE === true && !document.documentElement.classList.contains('espil-handoff'); } catch (_) {}
     var saved = null;
     try { saved = JSON.parse(localStorage.getItem('espil_last_pos') || 'null'); } catch (_) {}
-    if (saved && typeof saved.x === 'number' && typeof saved.z === 'number' && (!saved.city || saved.city === 'vancouver')) {
+    if (directGamePage && saved && typeof saved.x === 'number' && isFinite(saved.x) && typeof saved.z === 'number' && isFinite(saved.z) &&
+        (!saved.city || saved.city === 'vancouver') &&
+        saved.x >= VAN_BOUNDS.x0 - 50 && saved.x <= VAN_BOUNDS.x1 + 50 && saved.z >= VAN_BOUNDS.z0 - 50 && saved.z <= VAN_BOUNDS.z1 + 50) {
       if (typeof next === 'function') next();
       return;
     }

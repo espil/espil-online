@@ -313,7 +313,7 @@
        Every other city is shown but inactive (grey, not selectable
        by click, pin, Enter, arrows or by name). Selection behaviour
        for the active six is unchanged. */
-    var ESPIL_SELECTABLE_CITIES={'Tokyo':true,'Vancouver':true,'New York':true,'Paris':true,'London':true,'Auckland':true};
+    var ESPIL_SELECTABLE_CITIES={'Vancouver':true};
     var markers=[],markerGroup=new THREE.Group();
     earthSpin.add(markerGroup);
     function latLon(lat,lon,r){var phi=(90-lat)*Math.PI/180,theta=(lon+180)*Math.PI/180;return new THREE.Vector3(-r*Math.sin(phi)*Math.cos(theta),r*Math.cos(phi),r*Math.sin(phi)*Math.sin(theta));}

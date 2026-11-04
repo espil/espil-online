@@ -192,10 +192,40 @@
       return {
         on: !!cmpTarget, target: cmpTarget, owner: cmpOwner,
         dist: (typeof cmpDist === 'number') ? Math.round(cmpDist) : null,
+        autoNav: landingAutoNav,
         chip: { on: chipOn, angle: chipAngle, text: chipDistEl ? chipDistEl.textContent : '' }
       };
     }
   };
+  /* ---- landing auto-navigation (Han 2026-11-04) ------------------
+     On every world landing the Konbiniya compass navigation turns
+     ON by itself: once the player is in the map and on the ground,
+     the world's own Konbiniya target is shown once, and the
+     compass mirrors it in follow mode exactly as it does for the
+     tutorial's nav step. One-shot per page load - if the player
+     later hides the nav or picks another target, it is never
+     re-forced mid-session. The tutorial composes unchanged: its
+     nav step re-shows the same target (which re-arms the world's
+     arrival), and its own proximity check completes the step.
+     Vancouver only - the Konbiniya is a Vancouver anchor; another
+     city's landing retires the watcher untouched. */
+  var landingAutoNav = false;
+  var landingAutoNavTries = 0;
+  var landingAutoNavTimer = setInterval(function () {
+    if (landingAutoNav) { clearInterval(landingAutoNavTimer); return; }
+    if (!window.__ESPIL_GAME_PAGE) return;
+    if (!document.body.classList.contains('in-map')) return;
+    var key = '';
+    try { var k = window.__espilCityKey; key = String(typeof k === 'function' ? k() : (k || '')).toLowerCase(); } catch (e) {}
+    if (key && key.indexOf('vancouver') < 0) { clearInterval(landingAutoNavTimer); return; }
+    if (++landingAutoNavTries > 240) { clearInterval(landingAutoNavTimer); return; } /* ~2 min of in-map landing window */
+    var pose = null;
+    try { pose = (typeof window.__espilPlayerPose === 'function') ? window.__espilPlayerPose() : null; } catch (e) {}
+    if (!pose || typeof pose.y !== 'number' || pose.y >= 1.5) return; /* still diving */
+    var ok = false;
+    try { ok = !!(window.__espilNavToKonbiniya && window.__espilNavToKonbiniya()); } catch (e) {}
+    if (ok) { landingAutoNav = true; clearInterval(landingAutoNavTimer); }
+  }, 500);
   /* Batch A7: the tick runs per animation frame (it was a 100 ms
      interval) so the overhead arrow tracks the player continuously
      while walking or turning. */
