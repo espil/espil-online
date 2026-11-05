@@ -1284,13 +1284,11 @@
       .chat-msg .txt { display:inline; }
     }
     /* 2026-10-12 (Han): landscape-first on mobile — rotate prompt in portrait.
-       Batch M1 (Han 2026-11-03) SUPERSEDES the prompt: no "please
-       rotate" surface may ever appear - the game itself rotates to
-       landscape in portrait viewports (see the end of this file). */
+       Mobile revert (Han 2026-11-04): the Batch M1 forced-rotation
+       that superseded this prompt is REMOVED - no "please rotate"
+       surface may ever appear, and the game no longer rotates
+       itself either; the overlay stays display:none everywhere. */
     #rotate-overlay { display:none; }
-    @media (pointer:coarse) and (orientation:portrait) {
-      body.in-map #rotate-overlay { display:none !important; }
-    }
     @keyframes rotateHint { 0%,20% { transform:rotate(0deg); } 60%,100% { transform:rotate(90deg); } }
     /* City info panel: details before entering. Centered on screen (2026-10-06 QA). */
     .city-info {
@@ -1663,26 +1661,3 @@
       border-radius:8px; cursor:pointer; }
     .lang-opt:hover,.lang-opt:focus-visible{ background:rgba(134,238,228,.14); outline:none; }
     .lang-opt.on{ background:rgba(134,238,228,.2); }
-  
-/* ================================================================
-   Batch M1 (Han 2026-11-03): LANDSCAPE ONLY, ALWAYS, on touch
-   devices - from the landing to the map, however the phone is
-   held, and never a rotate prompt. In a portrait viewport the
-   whole body is rotated 90 degrees with swapped width/height and
-   the origin set so the rotated root exactly fills the screen;
-   the game therefore renders landscape in both holdings. If the
-   OS itself rotates the viewport to landscape (e.g. a successful
-   orientation lock), this media query stops matching and the
-   rotation disengages cleanly. Desktop (fine pointers) is
-   untouched. Pointer deltas are converted back into the rotated
-   frame by espilDragDelta in the world module.
-   ================================================================ */
-@media (pointer:coarse) and (orientation:portrait) {
-  body {
-    position:fixed; top:0; left:0;
-    width:100vh; height:100vw;
-    transform-origin:0 0;
-    transform:rotate(90deg) translateY(-100%);
-    overflow:hidden;
-  }
-}

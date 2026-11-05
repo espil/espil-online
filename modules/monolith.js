@@ -7909,22 +7909,15 @@
       mapDragId=e.pointerId;mapLastX=e.clientX;mapLastY=e.clientY;
       try{canvas.setPointerCapture(e.pointerId);}catch(err){}
     }
-    /* Batch M1 (Han 2026-11-03): pair.css rotates the whole body 90
-       degrees on touch devices in portrait viewports (landscape
-       always). Pointer deltas arrive in PHYSICAL screen axes; in
-       the rotated frame a physical delta (dx, dy) is the content
-       delta (dy, -dx). Every drag handler converts through here. */
-    function espilDragDelta(dx,dy){
-      if(window.matchMedia&&matchMedia('(pointer:coarse) and (orientation:portrait)').matches) return [dy,-dx];
-      return [dx,dy];
-    }
+    /* Mobile revert (Han 2026-11-04): the Batch M1 forced rotation
+       and its espilDragDelta pointer-frame conversion are REMOVED -
+       drag deltas are used in plain screen axes again. */
     function mapPointerMove(e){
       if(e.pointerId!==mapDragId)return;
       var dx=e.clientX-mapLastX,dy=e.clientY-mapLastY;
       mapLastX=e.clientX;mapLastY=e.clientY;
-      var dd=espilDragDelta(dx,dy);
-      walkCamYaw-=dd[0]*.0052;
-      walkCamPitch=Math.max(.12,Math.min(1.15,walkCamPitch+dd[1]*.004));
+      walkCamYaw-=dx*.0052;
+      walkCamPitch=Math.max(.12,Math.min(1.15,walkCamPitch+dy*.004));
     }
     function mapPointerUp(e){
       if(e.pointerId===mapDragId)mapDragId=null;
@@ -7969,9 +7962,8 @@
       if(e.pointerId!==gameDragId)return;
       var dx=e.clientX-gameDragX,dy=e.clientY-gameDragY;
       gameDragX=e.clientX;gameDragY=e.clientY;
-      var dd=espilDragDelta(dx,dy); /* Batch M1: rotated-frame deltas */
-      walkCamYaw-=dd[0]*.0052;
-      walkCamPitch=Math.max(.12,Math.min(1.15,walkCamPitch+dd[1]*.004));
+      walkCamYaw-=dx*.0052;
+      walkCamPitch=Math.max(.12,Math.min(1.15,walkCamPitch+dy*.004));
     });
     function gameDragEnd(e){ if(e.pointerId===gameDragId)gameDragId=null; }
     document.addEventListener('pointerup',gameDragEnd);
@@ -8595,7 +8587,6 @@
       joy.addEventListener('pointermove',function(e){
         if(!joyActive||!document.body.classList.contains('in-map'))return;
         var dx=e.clientX-joyCX,dy=e.clientY-joyCY;
-        var dd=espilDragDelta(dx,dy); dx=dd[0]; dy=dd[1]; /* Batch M1: the knob + vector live in the rotated frame */
         var len=Math.sqrt(dx*dx+dy*dy),max=joyMax;
         if(len>max){dx=dx/len*max;dy=dy/len*max;}
         setKnob(dx,dy);
@@ -9313,45 +9304,11 @@
       }
     }
     function cycleMapStage(){
-      /* Batch E (Han 2026-11-03, MOBILE ONLY): on touch devices the
-         map toggles small <-> fullscreen, matching the tap behaviour
-         below; the desktop 1->2->3->1 ladder is unchanged. */
-      if(window.matchMedia&&matchMedia('(pointer:coarse)').matches){ setMapStage(mapStage>=3?1:3); return; }
+      /* Mobile revert (Han 2026-11-04): the Batch E coarse-pointer
+         1<->3 toggle, the tap-to-expand handler and the minimize
+         button are REMOVED - one stage ladder for every pointer. */
       setMapStage(mapStage>=3?1:mapStage+1);
     }
-    /* Batch E (Han 2026-11-03, MOBILE ONLY): tapping the small
-       minimap expands it to the fullscreen stage; a minimize button
-       rides the wrap's top-right corner while expanded and returns
-       to the small minimap. Coarse pointers only - on desktop the
-       button never renders and taps keep the old behaviour. */
-    (function(){
-      var wrap=document.getElementById('minimap-wrap');
-      if(!wrap)return;
-      var st=document.createElement('style');
-      st.textContent=
-        '#minimap-wrap .map-min-btn{display:none;position:absolute;z-index:12;top:8px;right:8px;'+
-        'width:34px;height:34px;border-radius:50%;border:2px solid #d9b678;background:rgba(8,8,12,.72);'+
-        'color:#fff4cf;font:800 17px/1 "Manrope",sans-serif;cursor:pointer;place-items:center;padding:0}'+
-        '@media (pointer:coarse){'+
-        '#minimap-wrap[data-stage="3"]{transform:none}'+
-        '#minimap-wrap[data-stage="3"] .map-min-btn{display:grid}'+
-        '#minimap-wrap[data-stage="3"] .map-zoom-controls{right:52px}}';
-      document.head.appendChild(st);
-      var mb=document.createElement('button');
-      mb.type='button'; mb.className='map-min-btn'; mb.id='map-min-btn';
-      mb.setAttribute('aria-label','Minimize map'); mb.textContent='\u2212';
-      mb.addEventListener('click',function(e){ e.stopPropagation(); setMapStage(1); });
-      wrap.appendChild(mb);
-      var pd=null;
-      wrap.addEventListener('pointerdown',function(e){ pd={x:e.clientX,y:e.clientY}; });
-      wrap.addEventListener('click',function(e){
-        if(!(window.matchMedia&&matchMedia('(pointer:coarse)').matches))return;
-        if(mapStage!==1)return;
-        if(e.target&&e.target.closest&&(e.target.closest('.map-zoom-controls')||e.target.closest('.map-min-btn')))return;
-        if(pd&&Math.hypot(e.clientX-pd.x,e.clientY-pd.y)>8)return; /* a drag, not a tap */
-        setMapStage(3);
-      });
-    })();
     var lastFrameT=performance.now();
     function animate(){
       requestAnimationFrame(animate);

@@ -164,80 +164,11 @@
     '#espil-tut{background:rgba(255,251,240,.93);color:#6b4a1f;border:2px solid #d9b380;' +
       'border-radius:14px;box-shadow:0 8px 18px rgba(90,60,20,.22);text-shadow:none}' +
     '#espil-tut .kb{background:#fffdf6;border:1.5px solid #cfa96f;color:#6b4a1f;box-shadow:none}' +
-    /* ---- Batch M (Han 2026-11-03, mobile verdict) -------------------
-       M2: the status box moves to the TOP-LEFT on touch screens -
-       the chat row at the bottom is never covered again, so chat
-       can always be typed.
-       M3: the bottom bar keeps ONLY the HP/MP flask gauges: the
-       shortcut key rows, the menu button cluster and the gauge
-       strip are display:none, and the bar's own box styling goes
-       transparent so the flasks float alone. The joystick, chat
-       and the pair's jump / interact touch circles keep their own
-       dedicated spots (pair.css coarse layout) and are no longer
-       covered by the bar. Desktop (fine pointers) is unchanged. */
-    '@media (pointer:coarse){' +
-      '#espil-mmo-status{position:fixed;top:10px;left:10px;bottom:auto;max-width:190px;padding:6px 11px}' +
-      '#quickbar{background:none;border:none;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}' +
-      '#quickbar .mmo-keys{display:none}' +
-      '#quickbar #kb-menu{display:none}' +
-      '#espil-right{display:none}' +
-    '}' +
-    /* ---- Batch E (Han 2026-11-03, MOBILE ONLY) ---------------------
-       E1: the small minimap shrinks to exactly 100px on touch
-       screens (higher specificity than the pair's coarse 20vh rule
-       and the 140px base; stages 2-3 keep their own geometry, and
-       fine pointers never see this block).
-       E3: the chat window rests COLLAPSED on touch screens. The
-       #espil-chat-btn pill at the top-centre opens it DOWNWARD
-       (top-anchored just under the button); a second press
-       collapses it. Chip-clamp note: compass-nav's D7 clamp reads
-       the .chat-window rect live every frame - collapsed reads a
-       zero rect and is skipped by its size guard, open reads the
-       current top-anchored rect - so the clamp keeps working
-       against the chat's current rect in both states with no
-       compass-nav change.
-       E4: the HP/MP flasks leave the quickbar flow on touch
-       screens and sit BIGGER at the BOTTOM CENTRE (flask 4.7vmin
-       -> 6.8vmin, a 1.45x grow), clear of the joystick
-       (bottom-right) and of the Use/Jump cluster (centre-left).
-       E5: Han's explicit exception to M3 - the QWER move row (the
-       desktop quickbar's first four slots q/w/e/r, already wired
-       to doMove by the world script) shows again directly above
-       the Use/Jump cluster; the item row, the menu cluster and
-       the right column stay hidden, and slots 5-8 (ASDF) stay
-       hidden too. ----------------------------------------------- */
-    '#espil-chat-btn{display:none}' +
-    '@media (pointer:coarse){' +
-      '#minimap-wrap[data-stage="1"]{width:100px;height:100px}' +
-      'body:not(.chat-open) #chat-window{display:none!important}' +
-      'body.chat-open #chat-window{top:calc(54px + env(safe-area-inset-top));bottom:auto;left:50%;right:auto;' +
-        'transform:translateX(-50%);width:min(430px,92vw);max-height:54vh}' +
-      'body.chat-open #chat-window .chat-log{max-height:32vh}' +
-      '#espil-chat-btn{position:fixed;top:calc(10px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);' +
-        'z-index:66;display:flex;align-items:center;gap:6px;padding:9px 16px;border-radius:999px;' +
-        'border:1.5px solid rgba(255,221,140,.5);background:rgba(10,10,16,.55);color:#fff6da;' +
-        'font:800 13px/1 "Manrope",sans-serif;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.35)}' +
-      '#espil-chat-btn .cb-badge{position:absolute;top:-6px;right:-6px;min-width:19px;height:19px;padding:0 5px;' +
-        'border-radius:10px;background:#e5484d;color:#fff;font-size:11px;font-weight:800;display:none;place-items:center;' +
-        'border:1.5px solid #fff6da;box-sizing:border-box}' +
-      '#espil-chat-btn.has-unread .cb-badge{display:grid}' +
-      '#quickbar .flask-wrap{position:fixed;bottom:calc(10px + env(safe-area-inset-bottom));width:7.6vmin;height:7.6vmin;margin:0;z-index:31}' +
-      '#quickbar #hp-flask-wrap{left:calc(50% - 8vmin)}' +
-      '#quickbar #mp-flask-wrap{left:calc(50% + 0.4vmin)}' +
-      '#quickbar .flask{width:6.8vmin;height:6.8vmin}' +
-      '#quickbar .flask .pct{font-size:11px}' +
-      '#quickbar .mmo-keys{display:contents}' +
-      '#quickbar #move-row .move-slot:nth-child(n+5){display:none}' +
-      /* E5 geometry: pair.css's later small-screen rule pins the
-         quickbar to the very bottom of the screen, which would
-         leave the QWER row lying across the flasks' new ground.
-         On touch screens the quickbar carries ONLY the QWER row
-         now, so it takes the build's own above-the-circles offset
-         (the 2026-10-20 mobile layout value): the row sits
-         directly above the Use/Jump cluster. */
-      '#quickbar{bottom:calc(3.5vh + min(11vh,16vw) + 1.2vmin)}' +
-    '}' +
-    'body:not(.in-map) #espil-chat-btn{display:none}' +
+    /* Mobile revert (Han 2026-11-04): the Batch M (M2 status-box
+       move, M3 key-row/menu/right-column hiding) and Batch E (E1
+       100px minimap, E3 collapsed chat + pill, E4 bottom-centre
+       flasks, E5 QWER row) coarse-pointer style blocks are REMOVED -
+       one HUD layout for every pointer type again. */
     '';
   document.head.appendChild(st);
 
@@ -312,45 +243,13 @@
   var loc = document.createElement('div');
   loc.id = 'espil-loc';
   loc.textContent = 'Vancouver';
-  /* Batch E3 (Han 2026-11-03, MOBILE ONLY): the top-centre chat
-     button + unread badge. The button exists in the DOM on every
-     pointer type, but the Batch E styles render it only on coarse
-     pointers while in-map, so the desktop HUD is untouched. */
-  var chatBtn = document.createElement('button');
-  chatBtn.type = 'button';
-  chatBtn.id = 'espil-chat-btn';
-  chatBtn.setAttribute('aria-label', 'Toggle chat');
-  chatBtn.innerHTML = '<span aria-hidden="true">\uD83D\uDCAC</span><span>Chat</span>' +
-    '<span class="cb-badge" id="espil-chat-unread"></span>';
-  var chatUnread = 0;
-  function setChatOpen(open) {
-    if (!document.body) return;
-    document.body.classList.toggle('chat-open', !!open);
-    chatBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    if (open) {
-      chatUnread = 0;
-      chatBtn.classList.remove('has-unread');
-      var b = document.getElementById('espil-chat-unread');
-      if (b) b.textContent = '';
-    }
-  }
-  chatBtn.addEventListener('click', function () {
-    setChatOpen(!(document.body && document.body.classList.contains('chat-open')));
-  });
-  window.addEventListener('espil-chat-recv', function (e) {
-    if (!document.body || !document.body.classList.contains('in-map')) return;
-    if (document.body.classList.contains('chat-open')) return;
-    if (!e || !e.detail || e.detail.sys) return; /* real messages only, not system lines */
-    chatUnread++;
-    var b = document.getElementById('espil-chat-unread');
-    if (b) b.textContent = chatUnread > 99 ? '99+' : String(chatUnread);
-    chatBtn.classList.add('has-unread');
-  });
+  /* Mobile revert (Han 2026-11-04): the Batch E3 top-centre chat
+     button, its chat-open toggle and the unread-badge listener are
+     REMOVED - the chat window rests visible, as on desktop. */
   function mount() {
     if (!document.body) return;
     if (!document.getElementById('espil-mmo-status')) document.body.appendChild(status);
     if (!document.getElementById('espil-loc')) document.body.appendChild(loc);
-    if (!document.getElementById('espil-chat-btn')) document.body.appendChild(chatBtn);
     /* the gauge strip lives in the tray's right column once the
        quickbar structure is assembled (see the wiring below); until
        then it waits at the body level, hidden by the coarse rule and

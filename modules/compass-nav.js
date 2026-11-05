@@ -130,19 +130,9 @@
       if (sx < r.left - 14 || sx > r.right + 14) return;
       if (sy - chipH * 0.15 > r.top - 8) sy = r.top - 8 + chipH * 0.15;
     });
-    /* Batch M4 (Han 2026-11-03): the tutorial message stacks ABOVE
-       the chip - final vertical order from the character outward is
-       chat window (bottom), chip, tutorial message (top). When the
-       chip's box would cross under the tutorial card, it is pushed
-       down to start below the card. (The card is display:none
-       between steps, which reads as an empty rect and is skipped.) */
-    var tut = document.getElementById('espil-tut');
-    if (tut) {
-      var tr = tut.getBoundingClientRect();
-      if (tr && tr.height >= 2 && tr.width >= 2 && sx >= tr.left - 14 && sx <= tr.right + 14) {
-        if (sy - chipH * 1.15 < tr.bottom + 8) sy = tr.bottom + 8 + chipH * 1.15;
-      }
-    }
+    /* Mobile revert (Han 2026-11-04): the Batch M4 tutorial-stack
+       chip clamp is REMOVED - the D7 chat/bubble clamp above is the
+       only placement adjustment again. */
     var fwd = new THREE.Vector3(); cam.getWorldDirection(fwd);
     var rx = -fwd.z, rz = fwd.x;
     var rl = Math.hypot(rx, rz) || 1; rx /= rl; rz /= rl;
