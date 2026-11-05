@@ -104,25 +104,25 @@
     if (domReady) return; domReady = true;
     var st = document.createElement('style'); st.id = 'espil-social-style';
     st.textContent = [
-      '#espil-ctx{position:fixed;z-index:80;display:none;width:min(230px,86vw);border:2px solid #6b4a2f;border-radius:14px;background:linear-gradient(160deg,rgba(20,35,20,.97),rgba(10,20,12,.97));color:#f3e9d2;padding:10px;box-shadow:0 14px 34px rgba(0,0,0,.55)}',
+      '#espil-ctx{position:fixed;z-index:80;display:none;width:min(230px,86vw);border:2px solid #54381f;border-radius:14px;background-image:linear-gradient(160deg,rgba(62,42,22,.97),rgba(38,25,12,.98)),url("assets/tex/logwood.jpg");background-size:cover,280px;color:#f3e9d2;padding:10px;box-shadow:0 14px 34px rgba(0,0,0,.55)}',
       '#espil-ctx h4{margin:0 0 8px;font-size:13.5px;letter-spacing:.04em;color:#ffd97a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
-      '#espil-ctx button{display:flex;align-items:center;width:100%;margin:5px 0;padding:9px 10px;border-radius:9px;border:1px solid rgba(255,217,122,.35);background:rgba(255,255,255,.06);color:#fff;font:600 13.5px Manrope,sans-serif;cursor:pointer;text-align:left}',
+      '#espil-ctx button{display:flex;align-items:center;width:100%;margin:5px 0;padding:9px 10px;border-radius:9px;border:1px solid rgba(255,217,122,.35);background:rgba(202,160,106,.14);color:#fff;font:600 13.5px Manrope,sans-serif;cursor:pointer;text-align:left}',
       '#espil-ctx button:disabled{opacity:.45;cursor:default}',
       '#espil-ctx .soon{margin-left:auto;font-size:.56rem;font-weight:800;letter-spacing:.12em;color:#0b1518;background:#ffd97a;border-radius:999px;padding:3px 7px}',
-      '#espil-social-card{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:81;display:none;width:min(340px,90vw);max-height:94vh;overflow:hidden;border:2px solid rgba(201,168,106,.78);border-radius:18px;background:linear-gradient(168deg,rgba(23,48,31,.98),rgba(13,25,16,.98));color:#f3e9d2;padding:18px;box-shadow:0 24px 60px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,217,122,.28)}',
+      '#espil-social-card{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:81;display:none;width:min(340px,90vw);max-height:94vh;overflow:hidden;border:2px solid rgba(201,168,106,.78);border-radius:18px;background-image:linear-gradient(168deg,rgba(62,42,22,.98),rgba(38,25,12,.98)),url("assets/tex/logwood.jpg");background-size:cover,320px;color:#f3e9d2;padding:18px;box-shadow:0 24px 60px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,217,122,.28)}',
       '.espil-card-head{display:flex;align-items:center;gap:14px;margin:0 0 10px;padding-bottom:10px;border-bottom:1px solid rgba(201,168,106,.38)}',
-      '.espil-card-face{flex:none;width:76px;height:76px;border-radius:50%;border:2px solid rgba(245,197,66,.75);background:#17303a;box-shadow:0 4px 14px rgba(0,0,0,.4)}',
+      '.espil-card-face{flex:none;width:76px;height:76px;border-radius:50%;border:2px solid rgba(245,197,66,.75);background:#3a2817;box-shadow:0 4px 14px rgba(0,0,0,.4)}',
       '#espil-social-card h4{margin:0;color:#ffd97a;font-size:16px;letter-spacing:.04em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '#espil-social-card p{margin:5px 0;font-size:13.5px;line-height:1.55}',
-      '#espil-social-card p b{color:#8ef7e8;font-weight:700}',
+      '#espil-social-card p b{color:#e8b04b;font-weight:700}',
       '.espil-social-x{float:right;border:none;background:rgba(255,255,255,.1);color:#fff;width:26px;height:26px;border-radius:8px;cursor:pointer;font-size:14px}',
-      '#espil-invite-bar{position:fixed;left:50%;transform:translateX(-50%);top:calc(70px + env(safe-area-inset-top,0px));z-index:82;display:none;align-items:center;gap:10px;max-width:min(480px,92vw);border:2px solid #6b4a2f;border-radius:999px;background:linear-gradient(160deg,rgba(20,35,20,.97),rgba(10,20,12,.97));color:#f3e9d2;padding:9px 12px 9px 18px;box-shadow:0 14px 34px rgba(0,0,0,.55);font:600 13.5px Manrope,sans-serif}',
+      '#espil-invite-bar{position:fixed;left:50%;transform:translateX(-50%);top:calc(70px + env(safe-area-inset-top,0px));z-index:82;display:none;align-items:center;gap:10px;max-width:min(480px,92vw);border:2px solid #54381f;border-radius:999px;background-image:linear-gradient(160deg,rgba(62,42,22,.97),rgba(38,25,12,.98)),url("assets/tex/logwood.jpg");background-size:cover,300px;color:#f3e9d2;padding:9px 12px 9px 18px;box-shadow:0 14px 34px rgba(0,0,0,.55);font:600 13.5px Manrope,sans-serif}',
       '#espil-invite-bar button{border-radius:999px;padding:7px 14px;border:1px solid rgba(255,217,122,.5);background:rgba(255,217,122,.16);color:#ffd97a;font:700 13px Manrope,sans-serif;cursor:pointer}',
-      '#espil-invite-bar button.no{background:transparent;color:#dfe9d8;border-color:rgba(255,255,255,.3)}',
-      '.espil-social-row{display:flex;align-items:center;gap:8px;border:1px solid rgba(134,238,228,.25);border-radius:8px;padding:6px 9px;margin:0 0 6px;background:rgba(20,60,60,.3);color:#ddfffc;font-size:13.5px}',
+      '#espil-invite-bar button.no{background:transparent;color:#e8dcc0;border-color:rgba(202,160,106,.5)}',
+      '.espil-social-row{display:flex;align-items:center;gap:8px;border:1px solid rgba(202,160,106,.45);border-radius:8px;padding:6px 9px;margin:0 0 6px;background:rgba(62,42,22,.5);color:#f5e6c8;font-size:13.5px}',
       '.espil-social-row .grow{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '.espil-social-row .st{font-size:11.5px;opacity:.75}',
-      '.espil-tab-btn{padding:8px 16px;border-radius:999px;border:1px solid rgba(134,238,228,.35);background:transparent;color:#b9d8d4;font:800 12.5px Manrope,sans-serif;letter-spacing:.06em;cursor:pointer}',
+      '.espil-tab-btn{padding:8px 16px;border-radius:999px;border:1px solid rgba(202,160,106,.5);background:transparent;color:#e8dcc0;font:800 12.5px Manrope,sans-serif;letter-spacing:.06em;cursor:pointer}',
       '.espil-tab-btn.on{background:rgba(255,221,140,.18);color:#fff4cf;border-color:rgba(255,221,140,.6)}'
     ].join('\n');
     (document.head || document.documentElement).appendChild(st);

@@ -60,7 +60,8 @@
         'width:max-content;max-width:97vw;align-items:flex-start;gap:10px;order:2;padding:10px 12px;' +
         'background:none;border-color:transparent;border-radius:18px;box-shadow:none;' +
         'filter:drop-shadow(0 12px 16px rgba(20,10,0,.45))}' +
-      '#espil-tray{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;overflow:visible}' +
+      '#espil-tray{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;overflow:visible;' +
+        'filter:drop-shadow(0 5px 4px rgba(15,8,0,.45))}' +
       '#quickbar .mmo-keys{display:flex;flex-direction:column;gap:5px;position:relative;z-index:1;flex:none}' +
       '#quickbar .kb-main #item-row{display:flex;gap:5px}' +
       '#quickbar .kb-main #move-row{display:flex;gap:5px}' +
@@ -70,14 +71,14 @@
       '#quickbar .kb-main #kb-menu{display:flex;gap:5px;order:0;flex:none}' +
       '#quickbar #hp-flask-wrap{order:1}#quickbar #mp-flask-wrap{order:3}' +
       '#quickbar .flask-wrap{position:relative;z-index:2;width:118px;height:auto;background:none;border-radius:50%}' +
-      '#quickbar .flask{width:112px;height:112px;border:2px solid rgba(255,255,255,.75);' +
-        'box-shadow:0 8px 20px rgba(40,25,8,.35)}' +
+      '#quickbar .flask{width:112px;height:112px;border:3px solid #54381f;' +
+        'box-shadow:0 8px 20px rgba(40,25,8,.4),inset 0 0 0 2px rgba(255,235,200,.22)}' +
       '#quickbar .flask .pct{display:flex;font-size:20px}' +
       /* menu: one row of 34px round pastels, icon shown, key badged */
       '#quickbar #kb-menu .move-slot{position:relative;width:34px;height:34px;min-width:34px;border-radius:50%;' +
         'padding:0;display:flex;align-items:center;justify-content:center;' +
-        'border:2px solid #b98a4a;box-shadow:0 3px 6px rgba(30,15,0,.35),inset 0 1px 2px rgba(255,255,255,.9);' +
-        'background:radial-gradient(circle at 33% 28%,#fffdf4,#ffe9b8 58%,#f5cf87)}' +
+        'border:2px solid #54381f;box-shadow:0 3px 6px rgba(30,15,0,.35),inset 0 1px 2px rgba(255,255,255,.9);' +
+        'background:radial-gradient(circle at 33% 28%,#fff6dd,#ecd3a0 58%,#cfa96f)}' +
       '#quickbar #kb-menu .move-slot .sicon{font-size:15px;line-height:1}' +
       '#quickbar #kb-menu .move-slot .mn{display:none}' +
       '#quickbar #kb-menu .move-slot .key{position:absolute;top:-5px;left:-5px;z-index:2;min-width:15px;height:15px;' +
@@ -85,21 +86,22 @@
         'display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,233,168,.5)}' +
       '#quickbar #kb-menu .move-slot.mmo-set-icon .key{position:static;min-width:0;height:auto;padding:0;' +
         'border-radius:0;background:none;border:none;color:#6b4a1f;font-size:15px}' +
-      '#quickbar #kb-menu .move-slot:nth-child(2){background:radial-gradient(circle at 33% 28%,#ffffff,#cfe6ff 58%,#9cc4ee);border-color:#6d94bd}' +
-      '#quickbar #kb-menu .move-slot:nth-child(3){background:radial-gradient(circle at 33% 28%,#ffffff,#d8f3c8 58%,#a5d68d);border-color:#77a75c}' +
-      '#quickbar #kb-menu .move-slot:nth-child(4){background:radial-gradient(circle at 33% 28%,#ffffff,#ffd9e4 58%,#f2a9c0);border-color:#bd7d95}' +
-      '#quickbar #kb-menu .move-slot:nth-child(5){background:radial-gradient(circle at 33% 28%,#ffffff,#e6dcff 58%,#bda9ec);border-color:#8d7ab8}' +
-      '#quickbar #kb-menu .move-slot:nth-child(6){background:radial-gradient(circle at 33% 28%,#ffffff,#e8e8e8 58%,#c2c2c2);border-color:#8a8a8a}' +
+      '#quickbar #kb-menu .move-slot:nth-child(2){background:radial-gradient(circle at 33% 28%,#fdf6ec,#e3d3ae 58%,#c2a878);border-color:#54381f}' +
+      '#quickbar #kb-menu .move-slot:nth-child(3){background:radial-gradient(circle at 33% 28%,#f6f0dc,#dccfa4 58%,#b3a06b);border-color:#54381f}' +
+      '#quickbar #kb-menu .move-slot:nth-child(4){background:radial-gradient(circle at 33% 28%,#fbf0e2,#e6cfae 58%,#c09a6b);border-color:#54381f}' +
+      '#quickbar #kb-menu .move-slot:nth-child(5){background:radial-gradient(circle at 33% 28%,#f3ecdd,#d8c8a4 58%,#ac9060);border-color:#54381f}' +
+      '#quickbar #kb-menu .move-slot:nth-child(6){background:radial-gradient(circle at 33% 28%,#f7efdf,#e0d0aa 58%,#bfa26e);border-color:#54381f}' +
       /* the gauge: city pill + green track (client #z-expbar form) */
       '#espil-mmo-status{position:fixed;left:14px;bottom:86px;z-index:46;display:flex;align-items:center;' +
         'gap:10px;padding:8px 15px;border-radius:999px;' +
-        'background:linear-gradient(180deg,rgba(255,251,240,.96),rgba(255,243,220,.96));' +
-        'border:2px solid #d9b380;box-shadow:0 10px 24px rgba(90,60,20,.22);' +
-        'font-family:"Baloo 2","Manrope",sans-serif;color:#5a4020;max-width:min(78vw,340px)}' +
+        'background-image:linear-gradient(180deg,rgba(84,56,31,.93),rgba(52,35,19,.95)),url("assets/tex/logwood.jpg");' +
+        'background-size:cover,260px;' +
+        'border:2px solid #3a2817;box-shadow:inset 0 1px 0 rgba(255,224,170,.38),inset 0 -4px 7px rgba(0,0,0,.5),0 10px 24px rgba(40,25,8,.38);' +
+        'font-family:"Baloo 2","Manrope",sans-serif;color:#f5e6c8;max-width:min(78vw,340px)}' +
       '#espil-mmo-status .mmo-who{min-width:0}' +
       '#espil-mmo-status .mmo-name{font-weight:800;font-size:.92rem;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
       '#espil-mmo-status .mmo-sub{font-size:.66rem;letter-spacing:.08em;opacity:.72;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-      '#espil-mmo-status .mmo-leo{display:flex;align-items:center;gap:5px;font-size:.74rem;font-weight:800;color:#8a6a10;margin-top:1px}' +
+      '#espil-mmo-status .mmo-leo{display:flex;align-items:center;gap:5px;font-size:.74rem;font-weight:800;color:#ffd97a;margin-top:1px}' +
       '#espil-mmo-status .mmo-coin{width:11px;height:11px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe9a8,#f5b301 60%,#c77f02);border:1px solid #a86a00;flex:0 0 11px}' +
       'body:not(.in-map) #espil-mmo-status{display:none}' +
       '#espil-mmo-strip{position:relative;left:auto;transform:none;bottom:auto;width:268px;height:auto;' +
@@ -116,7 +118,8 @@
     '}' +
     /* ---- quickbar on touch screens: first-pass wooden tray --------- */
     '@media (pointer:coarse){' +
-      '#quickbar{background:linear-gradient(180deg,#7c5a36,#5e4023);' +
+      '#quickbar{background-image:linear-gradient(180deg,rgba(124,90,54,.93),rgba(94,64,35,.95)),url("assets/tex/logwood.jpg");' +
+        'background-size:cover,300px;' +
         'border:3px solid #3a2817;box-shadow:0 12px 28px rgba(40,25,8,.4)}' +
       '#quickbar .flask .pct{display:block;font-size:8.5px}' +
       '#espil-mmo-status{bottom:calc(118px + var(--kb-shift,0px))}' +
@@ -124,36 +127,39 @@
       '#espil-tray{display:none}' +
     '}' +
     /* ---- slots: cream storybook ------------------------------------ */
-    '#quickbar .move-slot{background:linear-gradient(180deg,#fffdf6,#ffeecd);' +
-      'border:2px solid #cfa96f;border-radius:12px;color:#6b4a1f;' +
-      'box-shadow:inset 0 -3px 0 rgba(207,169,111,.35),0 2px 4px rgba(90,60,20,.16);text-shadow:none}' +
-    '#quickbar .mmo-keys .move-slot .key{color:#b3854d;text-shadow:none}' +
-    '#quickbar .move-slot .mn{color:#8a6a3b;text-shadow:none}' +
+    '#quickbar .move-slot{background-image:linear-gradient(180deg,rgba(232,207,159,.96),rgba(202,160,106,.96)),url("assets/tex/logwood.jpg");' +
+      'background-size:cover,120px;' +
+      'border:2px solid #6b4a2f;border-radius:12px;color:#3a2817;' +
+      'box-shadow:inset 0 1px 0 rgba(255,244,214,.75),inset 0 -3px 0 rgba(84,56,31,.4),0 2px 4px rgba(40,25,8,.3);text-shadow:none}' +
+    '#quickbar .mmo-keys .move-slot .key{color:#7a5a30;text-shadow:none}' +
+    '#quickbar .move-slot .mn{color:#5e4023;text-shadow:none}' +
     '#quickbar .move-slot .cd{color:#a05a2c}' +
-    '#quickbar .move-slot:hover{border-color:#b57708}' +
-    '#quickbar .move-slot.is-locked{background:linear-gradient(180deg,#f1ebdb,#e6ddc9);' +
-      'border-color:#c9bb9d;opacity:.62;box-shadow:none}' +
+    '#quickbar .move-slot:hover{border-color:#54381f}' +
+    '#quickbar .move-slot.is-locked{background:linear-gradient(180deg,#d8c8a6,#c3ab7d);' +
+      'border-color:#8a6f45;opacity:.62;box-shadow:none}' +
     /* ---- minimap: circular, gold rim (stages 1-2) ------------------- */
-    '#minimap-wrap[data-stage="1"],#minimap-wrap[data-stage="2"]{border:3px solid #e7c88f;' +
-      'border-radius:50%;overflow:hidden;box-shadow:0 8px 20px rgba(90,60,20,.3)}' +
+    '#minimap-wrap[data-stage="1"],#minimap-wrap[data-stage="2"]{border:4px solid #3a2416;' +
+      'border-radius:50%;overflow:hidden;box-shadow:inset 0 0 0 3px #d9b678,0 12px 28px rgba(0,0,0,.45),0 0 0 2px rgba(255,244,207,.24)}' +
     /* ---- location pill above the minimap (client #z-loc form) ------- */
     '#espil-loc{position:fixed;top:calc(30px + env(safe-area-inset-top));right:14px;width:148px;z-index:31;' +
       'pointer-events:none;text-align:center;font-family:"Manrope",sans-serif;font-size:13.5px;font-weight:700;' +
-      'letter-spacing:.02em;color:#fff6e0;background:rgba(24,18,10,.52);' +
-      'border:1.5px solid rgba(231,200,143,.65);border-radius:999px;padding:5px 4px;' +
+      'letter-spacing:.02em;color:#fff6e0;background-image:linear-gradient(180deg,rgba(84,56,31,.9),rgba(52,35,19,.92)),url("assets/tex/logwood.jpg");' +
+      'background-size:cover,200px;' +
+      'border:1.5px solid #a97e46;border-radius:999px;padding:5px 4px;' +
       'text-shadow:0 1px 2px rgba(0,0,0,.5)}' +
     'body:not(.in-map) #espil-loc{display:none}' +
     /* ---- chat: transparent, the client's values ---------------------- */
-    '.chat-window{background:rgba(10,10,16,.16);border:1.5px solid rgba(255,221,140,.22);border-radius:14px;' +
-      'color:#fff6da;box-shadow:0 8px 18px rgba(0,0,0,.12)}' +
+    '.chat-window{background-image:linear-gradient(180deg,rgba(52,35,19,.82),rgba(36,24,12,.86)),url("assets/tex/logwood.jpg");' +
+      'background-size:cover,300px;border:1.5px solid #a97e46;border-radius:14px;' +
+      'color:#fff6da;box-shadow:inset 0 1px 0 rgba(255,224,170,.25),0 8px 18px rgba(20,10,0,.35)}' +
     '.chat-window .chat-log{color:#fff6da;text-shadow:0 1px 3px rgba(0,0,0,.5)}' +
     '.chat-window .chat-log .sys{color:#ffe9a8}' +
     '.chat-channel{color:rgba(255,246,218,.85);border-radius:999px}' +
-    '.chat-channel.is-active{background:rgba(255,221,140,.25);color:#fff6da}' +
-    '#chat-input{background:rgba(10,10,16,.25);border:1.5px solid rgba(255,221,140,.3);border-radius:10px;color:#fff6da}' +
-    '#chat-bubble{background:rgba(10,10,16,.55);color:#fff6da;border:1.5px solid rgba(255,221,140,.35)}' +
+    '.chat-channel.is-active{background:rgba(202,160,106,.38);color:#fff6da}' +
+    '#chat-input{background:rgba(24,15,7,.55);border:1.5px solid rgba(202,160,106,.75);border-radius:10px;color:#fff6da}' +
+    '#chat-bubble{background:rgba(42,29,16,.9);color:#fff6da;border:1.5px solid #caa06a}' +
     '#espil-chat{background:transparent;border:none;border-radius:0;padding:2px 4px;box-shadow:none}' +
-    '.espil-chat-line{background:rgba(10,10,16,.28);border:1px solid rgba(255,221,140,.18);color:#fff6da;' +
+    '.espil-chat-line{background:rgba(35,22,11,.55);border:1px solid rgba(202,160,106,.4);color:#fff6da;' +
       'text-shadow:0 1px 3px rgba(0,0,0,.55)}' +
     '@media (pointer:fine){' +
       '.chat-window{bottom:calc(198px + env(safe-area-inset-bottom))}' +
@@ -161,9 +167,10 @@
     /* the top-left EXP readout stays gone - the bar carries the gauge */
     '#map-status{display:none}' +
     /* ---- tutorial objective chip: cream card ------------------------- */
-    '#espil-tut{background:rgba(255,251,240,.93);color:#6b4a1f;border:2px solid #d9b380;' +
-      'border-radius:14px;box-shadow:0 8px 18px rgba(90,60,20,.22);text-shadow:none}' +
-    '#espil-tut .kb{background:#fffdf6;border:1.5px solid #cfa96f;color:#6b4a1f;box-shadow:none}' +
+    '#espil-tut{background-image:linear-gradient(180deg,rgba(84,56,31,.94),rgba(52,35,19,.96)),url("assets/tex/logwood.jpg");' +
+      'background-size:cover,240px;color:#f5e6c8;border:2px solid #54381f;' +
+      'border-radius:14px;box-shadow:inset 0 1px 0 rgba(255,224,170,.3),0 8px 18px rgba(40,25,8,.35);text-shadow:none}' +
+    '#espil-tut .kb{background:linear-gradient(180deg,#e8cf9f,#caa06a);border:1.5px solid #54381f;color:#3a2817;box-shadow:none}' +
     /* Mobile revert (Han 2026-11-04): the Batch M (M2 status-box
        move, M3 key-row/menu/right-column hiding) and Batch E (E1
        100px minimap, E3 collapsed chat + pill, E4 bottom-centre
@@ -213,10 +220,15 @@
       + ' A ' + rho + ' ' + rho + ' 0 0 1 ' + gxL + ' ' + (gy - rho)
       + ' A ' + rho + ' ' + rho + ' 0 0 1 0 ' + (gy - dxEdge)
       + ' L 0 ' + r + ' Q 0 0, ' + r + ' 0 Z';
-    ['espil-tray-fill', 'espil-tray-wood'].forEach(function (id) {
+    ['espil-tray-fill', 'espil-tray-wood', 'espil-tray-edge'].forEach(function (id) {
       var p = document.getElementById(id);
       if (p) p.setAttribute('d', d);
     });
+    /* Item 6 (Han 2026-11-04): the edge copy rides 6px lower, so the
+       log shows a dark underside - the tray reads as a thick plank,
+       not a flat sticker. */
+    var edge = document.getElementById('espil-tray-edge');
+    if (edge) edge.setAttribute('transform', 'translate(0 6)');
     var pat = document.getElementById('espilwood');
     if (pat) {
       pat.setAttribute('width', W); pat.setAttribute('height', H);
@@ -328,8 +340,9 @@
       svg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
       svg.innerHTML = '<defs><pattern id="espilwood" patternUnits="userSpaceOnUse" width="440" height="140">' +
         '<image href="assets/tex/logwood.jpg" xlink:href="assets/tex/logwood.jpg" width="440" height="140" preserveAspectRatio="none"></image></pattern></defs>' +
+        '<path id="espil-tray-edge" fill="#1d1106"></path>' +
         '<path id="espil-tray-fill" fill="#6d4c2c"></path>' +
-        '<path id="espil-tray-wood" fill="url(#espilwood)" stroke="#3a2817" stroke-width="3"></path>';
+        '<path id="espil-tray-wood" fill="url(#espilwood)" stroke="#2c1c0d" stroke-width="3.5"></path>';
       kbMain.insertBefore(svg, kbMain.firstChild);
     }
     /* keys column wrapping the two shortcut rows */

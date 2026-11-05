@@ -866,7 +866,7 @@
     var mapScene=null,mapCamera=null,mapBuilt=false;
     var WATER_Z=-100, WATER_Y=.25; /* swim boundary (QA #17) */
     var trafficCars=[],carTextures=[],carColliders=[]; /* hoisted from buildWalkMapOnce (2026-10-08): used by collideCircleAxis/updateWalkMap */
-    var updateTrafficCars=function(dt){}; /* replaced by buildWalkMapOnce */
+    var updateTrafficCars=function(dt){}; /* no-op since the traffic-car sprites were removed (Han 2026-11-04, item 2); the animate loop still calls it */
     /* 5km city (Han 2026-10-07): water bodies at scale.
        - Downtown harbor + Burrard Inlet: z < -100 (entire north)
        - English Bay: x < -2500 (west side)
@@ -1212,6 +1212,164 @@
       return {enabled:espilOccludeState.enabled,master:espilOccludeMaster,centrePx:espilOccludeState.centrePx,radiusPx:espilOccludeState.radiusPx,charDepth:espilOccludeState.charDepth,patchedMaterials:espilOccludePatchedCount,factor:ESPIL_OCCLUDE_RADIUS_FACTOR};
     };
     window.__espilOccludeState.setEnabled=function(b){ espilOccludeMaster=!!b; return espilOccludeMaster; };
+    /* ============ PLAYER GHOST COPY (Han 2026-11-04) ==============
+       On the live Mapbox line the visible buildings are fill
+       extrusions the fragment cutout above cannot cut, so the
+       character still vanishes behind them. Han's direction: while
+       the player is actually hidden by buildings, show a GREY COPY
+       of the character in front of everything. The copy is a skinned
+       clone of the walker avatar (same rebind pattern as the remote
+       avatar clones): every node's local transform is copied from
+       the source each frame, so it tracks position AND pose exactly
+       - idle, walk, run and one-shots alike, no second mixer.
+       Occlusion is measured, not guessed: rays from the camera to
+       the chest and head sample points are tested against the
+       building mesh set (district meshes + chunk instanced
+       buildings + large box meshes - the same set the P1 hide pass
+       treats as buildings), collected explicitly so meshes P1 has
+       hidden still count. The copy shows only while BOTH samples
+       are blocked; it hides the moment either is visible, and stays
+       off indoors, off-screen, while the store page pauses the
+       world, and in first person (camera at the body). */
+    var espilGhostGroup=null, espilGhostSrc=null, espilGhostPairs=null, espilGhostMat=null;
+    var espilGhostBldgs=[], espilGhostBldgBoxes=[], espilGhostSetAt=0, espilGhostTestAt=0;
+    var espilGhostStat={occluded:false,visible:false,buildings:0,built:false};
+    function espilGhostBuild(){
+      if(typeof mapScene==='undefined'||!mapScene)return false;
+      var av=(typeof walkPlayer!=='undefined'&&walkPlayer)?walkPlayer.av:null;
+      if(!av||!av.ready||!av.__visualRoot)return false;
+      var src=av.__visualRoot;
+      var clone=src.clone(true);
+      var srcNodes=[],cloneNodes=[];
+      src.traverse(function(o){srcNodes.push(o);});
+      clone.traverse(function(o){cloneNodes.push(o);});
+      for(var i=0;i<cloneNodes.length;i++){
+        var cn=cloneNodes[i], sn=srcNodes[i];
+        if(sn&&cn&&sn.isSkinnedMesh&&cn.isSkinnedMesh&&cn.skeleton){
+          var bones=cn.skeleton.bones.map(function(b){ return cloneNodes[srcNodes.indexOf(b)]; });
+          cn.skeleton=new THREE.Skeleton(bones,cn.skeleton.boneInverses);
+        }
+      }
+      if(!espilGhostMat)espilGhostMat=new THREE.MeshBasicMaterial({color:0x9aa1a8,transparent:true,opacity:0.5,depthTest:false,depthWrite:false,fog:false});
+      clone.traverse(function(o){
+        if(o.isMesh){ o.material=espilGhostMat; o.castShadow=false; o.receiveShadow=false; o.renderOrder=999; o.frustumCulled=false; }
+      });
+      var grp=new THREE.Group(); grp.add(clone); grp.visible=false; grp.frustumCulled=false;
+      mapScene.add(grp);
+      espilGhostGroup=grp; espilGhostSrc=src; espilGhostPairs=[];
+      for(var j=0;j<srcNodes.length;j++)espilGhostPairs.push([srcNodes[j],cloneNodes[j]]);
+      espilGhostStat.built=true;
+      return true;
+    }
+    function espilGhostCollect(){
+      var set=[], seen=new Set();
+      function push(m){ if(m&&!seen.has(m)){ seen.add(m); set.push(m); } }
+      var dm=window.__espilDistrictMeshes||[];
+      for(var i=0;i<dm.length;i++)push(dm[i]);
+      if(typeof mapScene!=='undefined'&&mapScene){
+        var avGrp=(typeof walkPlayer!=='undefined'&&walkPlayer&&walkPlayer.av)?walkPlayer.av.group:null;
+        var veh=(typeof walkPlayer!=='undefined'&&walkPlayer)?walkPlayer.vehicle:null;
+        mapScene.traverse(function(o){
+          if(o.isInstancedMesh){ push(o); return; }
+          if(o.isMesh&&o.geometry&&o.geometry.type==='BoxGeometry'){
+            /* buildings only: skip the avatar, the ride vehicle, the
+               ghost itself and small props (stalls, kiosk, interior) */
+            var n=o,skip=false;
+            while(n){ if(n===avGrp||n===veh||n===espilGhostGroup){skip=true;break;} n=n.parent; }
+            if(skip)return;
+            push(o); /* the world-box pass below keeps only building-sized boxes (unit geometries are mesh-scaled) */
+          }
+        });
+      }
+      /* world boxes for the segment pre-filter; instanced meshes get
+         a per-instance union (setFromObject alone would miss them) */
+      var tmpM=new THREE.Matrix4(), tmpB=new THREE.Box3();
+      espilGhostBldgBoxes=set.map(function(m){
+        try{
+          if(m.isInstancedMesh){
+            if(!m.geometry.boundingBox)m.geometry.computeBoundingBox();
+            var ub=new THREE.Box3(), gb=m.geometry.boundingBox;
+            for(var ii=0;ii<m.count;ii++){
+              m.getMatrixAt(ii,tmpM);
+              tmpB.copy(gb).applyMatrix4(tmpM).applyMatrix4(m.matrixWorld);
+              ub.union(tmpB);
+            }
+            return ub.isEmpty()?null:ub;
+          }
+          var b=new THREE.Box3().setFromObject(m);
+          return b.isEmpty()?null:b;
+        }catch(e){ return null; }
+      });
+      /* drop pure props that slipped in as small boxes */
+      espilGhostBldgs=[]; var keptBoxes=[];
+      for(var k=0;k<set.length;k++){
+        var wb=espilGhostBldgBoxes[k];
+        if(set[k].isInstancedMesh||!wb||(wb.max.y-wb.min.y)>=3.2){ espilGhostBldgs.push(set[k]); keptBoxes.push(wb); }
+      }
+      espilGhostBldgBoxes=keptBoxes;
+      espilGhostStat.buildings=espilGhostBldgs.length;
+    }
+    var _espilGhRay=new THREE.Raycaster(), _espilGhDir=new THREE.Vector3(), _espilGhSeg=new THREE.Ray();
+    var _espilGhFeet=new THREE.Vector3(), _espilGhChest=new THREE.Vector3(), _espilGhHead=new THREE.Vector3(), _espilGhProj=new THREE.Vector3();
+    function espilGhostPointBlocked(camPos,pt){
+      _espilGhDir.copy(pt).sub(camPos);
+      var dist=_espilGhDir.length(); if(dist<0.001)return false;
+      _espilGhDir.normalize();
+      _espilGhRay.set(camPos,_espilGhDir); _espilGhRay.far=dist-0.35;
+      _espilGhSeg.set(camPos,_espilGhDir);
+      for(var i=0;i<espilGhostBldgs.length;i++){
+        var box=espilGhostBldgBoxes[i];
+        if(box&&!_espilGhSeg.intersectsBox(box))continue;
+        var hits=_espilGhRay.intersectObject(espilGhostBldgs[i],false);
+        if(hits&&hits.length)return true;
+      }
+      return false;
+    }
+    function espilGhostMeasure(){
+      if(!document.body.classList.contains('in-map'))return false;
+      if(window.__espilInside||window.__espilStorePaused)return false;
+      var p=walkPlayer; if(!p||!p.pos||typeof mapCamera==='undefined'||!mapCamera)return false;
+      var cam=mapCamera.position;
+      _espilGhFeet.set(p.pos.x,p.pos.y,p.pos.z);
+      _espilGhChest.set(_espilGhFeet.x,_espilGhFeet.y+1.15,_espilGhFeet.z);
+      _espilGhHead.set(_espilGhFeet.x,_espilGhFeet.y+1.7,_espilGhFeet.z);
+      _espilGhProj.copy(_espilGhChest).project(mapCamera);
+      if(_espilGhProj.z<-1||_espilGhProj.z>1||Math.abs(_espilGhProj.x)>1.25||Math.abs(_espilGhProj.y)>1.25)return false; /* off-screen */
+      if(cam.distanceTo(_espilGhChest)<1.7)return false; /* first person: camera at the body */
+      return espilGhostPointBlocked(cam,_espilGhChest)&&espilGhostPointBlocked(cam,_espilGhHead);
+    }
+    function espilGhostTick(){
+      var show=false;
+      try{
+        var av=(typeof walkPlayer!=='undefined'&&walkPlayer)?walkPlayer.av:null;
+        if(av&&av.__visualRoot&&espilGhostSrc!==av.__visualRoot){
+          if(espilGhostGroup&&typeof mapScene!=='undefined'&&mapScene)mapScene.remove(espilGhostGroup);
+          espilGhostGroup=null; espilGhostSrc=null; espilGhostPairs=null; espilGhostStat.built=false;
+          espilGhostBuild();
+        }
+        if(espilGhostGroup&&av&&av.ready&&av.group){
+          /* pose copy: the group takes the avatar group's world
+             transform; every cloned node takes its source node's
+             local transform */
+          av.group.getWorldPosition(espilGhostGroup.position);
+          av.group.getWorldQuaternion(espilGhostGroup.quaternion);
+          espilGhostGroup.scale.set(1,1,1);
+          for(var i=0;i<espilGhostPairs.length;i++){
+            var s=espilGhostPairs[i][0], d=espilGhostPairs[i][1];
+            d.position.copy(s.position); d.quaternion.copy(s.quaternion); d.scale.copy(s.scale);
+          }
+          var now=(typeof performance!=='undefined'?performance.now():Date.now());
+          if(now-espilGhostSetAt>1500){ espilGhostSetAt=now; espilGhostCollect(); }
+          if(now-espilGhostTestAt>120){ espilGhostTestAt=now; espilGhostStat.occluded=espilGhostMeasure(); }
+          show=espilGhostStat.occluded;
+        }
+      }catch(e){ show=false; }
+      if(espilGhostGroup)espilGhostGroup.visible=show;
+      espilGhostStat.visible=show;
+    }
+    window.__espilGhostState=function(){
+      return {occluded:espilGhostStat.occluded,visible:espilGhostStat.visible,buildings:espilGhostStat.buildings,built:espilGhostStat.built};
+    };
     var curvedMatCache={};
     function curvedMat(color){
       var key='c'+color, m=curvedMatCache[key];
@@ -2900,7 +3058,7 @@
         if(s.flow>1)s.flow=1;
         /* Data-only: flow value simulates; no visual update (Han 2026-10-05). */
       }
-      syncTrafficCars(); /* 2D car placeholders mirror the new flow levels */
+      /* Traffic-car sprites removed (Han 2026-11-04, item 2): the flow simulation below keeps running for navigation data; nothing visual spawns from it. */
       syncIncidentMarkers();
     }
     /* Han 2026-10-10: incident hazard markers — flashing amber triangles above
@@ -2953,176 +3111,14 @@
         incidentMarkers.push({mesh:mesh,si:j});
       }
     }
-    /* Han 2026-10-11: hoisted from buildWalkMapOnce() to outer scope.
-       syncTrafficCars() is called from updateTraffic() (outer scope); the nested
-       definition was invisible there -> ReferenceError every traffic tick. */
-    var CAR_COLORS=['#d94f4f','#4f7ed9','#e8e8e8','#2b2f36','#f2b134','#7ed957','#9b59b6'];
-    var CAR_W=4.6,CAR_H=1.6,CAR_TOP=1.6; /* single jump apex ~1.56 + .55 step grace -> landable */
-    /* Han 2026-10-09: soft blob shadow under cars for 3D feel */
-    var carShadowTex=(function(){
-      var c=document.createElement('canvas');c.width=128;c.height=64;
-      var g=c.getContext('2d');
-      var grad=g.createRadialGradient(64,32,8,64,32,60);
-      grad.addColorStop(0,'rgba(0,0,0,0.45)');
-      grad.addColorStop(0.7,'rgba(0,0,0,0.25)');
-      grad.addColorStop(1,'rgba(0,0,0,0)');
-      g.fillStyle=grad;
-      g.fillRect(0,0,128,64);
-      var t=new THREE.CanvasTexture(c);return t;
-    })();
-    function carTexture(variant,color){
-      var c=document.createElement('canvas');c.width=72;c.height=25;
-      var g=c.getContext('2d');g.clearRect(0,0,72,25);
-      g.fillStyle='rgba(0,0,0,.25)';g.beginPath();g.ellipse(36,22,30,3,0,0,7);g.fill();
-      g.fillStyle=color;
-      if(variant===2){ /* van */
-        g.beginPath();g.roundRect(8,6,56,13,3);g.fill();
-        g.fillStyle='#bcd6f5';g.fillRect(50,8,10,6);
-      }else{
-        g.beginPath();g.roundRect(8,11,56,9,4);g.fill();
-        g.fillStyle=color;g.beginPath();g.roundRect(22,5,28,9,4);g.fill();
-        g.fillStyle='#bcd6f5';g.beginPath();g.roundRect(25,7,22,6,2);g.fill();
-        if(variant===3){g.fillStyle='#2b2f36';g.fillRect(32,2,8,4);} /* taxi sign */
-      }
-      g.fillStyle='#1c1e22';
-      g.beginPath();g.arc(20,20,4.5,0,7);g.fill();
-      g.beginPath();g.arc(52,20,4.5,0,7);g.fill();
-      g.fillStyle='#8a8f98';
-      g.beginPath();g.arc(20,20,2,0,7);g.fill();
-      g.beginPath();g.arc(52,20,2,0,7);g.fill();
-      var t=new THREE.CanvasTexture(c);t.anisotropy=4;return t;
-    }
-    function initCarTextures(){
-      /* Batch D4 (Han 2026-11-03): the van variant (v===2) is OUT of
-         the traffic pool - its tall boxy side profile on the traffic
-         billboard plane reads as a strange BUS IMAGE in front of the
-         Art Gallery (Georgia St runs along the gallery front). The
-         Georgia-St live-bus feature itself is long removed (comment
-         only); this van sprite was the only bus-like image left in
-         the build. Cars and the taxi variant remain. */
-      for(var v=0;v<4;v++){ if(v===2)continue; for(var k=0;k<3;k++)
-        carTextures.push(carTexture(v,CAR_COLORS[(v*3+k)%CAR_COLORS.length])); }
-    }
-    /* #5 (Han 2nd QA): top-view car sprite for N/S movement.
-       Simple top-down: body, windshield at front (+x), roof. */
-    var carTopTextures=[];
-    function carTopTexture(color){
-      var c=document.createElement('canvas');c.width=144;c.height=60;
-      var g=c.getContext('2d');g.clearRect(0,0,144,60);
-      g.fillStyle='rgba(0,0,0,.3)';g.beginPath();g.ellipse(72,52,60,6,0,0,7);g.fill();
-      /* Han 2026-10-09: vibrant colors for N/S cars */
-      g.fillStyle=color;
-      g.beginPath();g.roundRect(12,10,120,40,16);g.fill(); /* body from top */
-      g.fillStyle='#cfe4ff';g.beginPath();g.roundRect(88,18,28,24,6);g.fill(); /* windshield (front) */
-      g.fillStyle=color;g.globalAlpha=.9;
-      g.beginPath();g.roundRect(24,18,52,24,8);g.fill(); /* roof */
-      g.globalAlpha=1;
-      /* dark outline for pop */
-      g.strokeStyle='rgba(0,0,0,.45)';g.lineWidth=3;
-      g.beginPath();g.roundRect(12,10,120,40,16);g.stroke();
-      g.fillStyle='#ffe9a8';g.fillRect(128,16,6,8);g.fillRect(128,36,6,8); /* headlights */
-      g.fillStyle='#ff2d2d';g.fillRect(12,16,6,8);g.fillRect(12,36,6,8); /* taillights */
-      var t=new THREE.CanvasTexture(c);t.anisotropy=4;return t;
-    }
-    function initCarTopTextures(){
-      for(var k=0;k<CAR_COLORS.length;k++)
-        carTopTextures.push(carTopTexture(CAR_COLORS[k]));
-    }
-    function carCountFor(flow,len){
-      /* #4 (Han 2nd QA): reduced from 10 to 5 max per segment for perf */
-      var want=Math.round(5-4*flow); /* flow 1 -> 1 car, flow 0 -> 5 cars */
-      return Math.max(1,Math.min(want,Math.max(1,Math.floor(len/8))));
-    }
-    /* #4: object pool for car meshes (avoid create/dispose churn) */
-    var carPool=[];
-    function getCarMesh(){
-      if(carPool.length>0)return carPool.pop();
-      return null;
-    }
-    function releaseCarMesh(mesh){
-      mesh.visible=false;
-      if(mesh.userData.shadow)mesh.userData.shadow.visible=false;
-      carPool.push(mesh);
-    }
-    function spawnCar(si){
-      /* #4: distance culling — only spawn cars near player (400m) */
-      if(walkPlayer&&walkPlayer.pos){
-        var seg=trafficSegs[si];
-        var scx=(seg.x1+seg.x2)/2,scz=(seg.z1+seg.z2)/2;
-        var pdx=scx-walkPlayer.pos.x,pdz=scz-walkPlayer.pos.z;
-        if(pdx*pdx+pdz*pdz>400*400)return;
-      }
-      /* #4: total cap — max 80 cars */
-      if(trafficCars.length>=80)return;
-      var seg=trafficSegs[si],len=Math.hypot(seg.x2-seg.x1,seg.z2-seg.z1);
-      var lane=Math.random()<.5?1:-1;
-      var texIdx=(Math.random()*carTextures.length)|0;
-      var colorIdx=texIdx%carTopTextures.length;
-      var mesh=getCarMesh();
-      if(mesh){
-        /* Reuse pooled mesh */
-        mesh.material.map=carTextures[texIdx];
-        mesh.material.needsUpdate=true;
-        mesh.visible=true;
-        if(mesh.userData.shadow)mesh.userData.shadow.visible=true;
-      }else{
-        var mat=new THREE.MeshBasicMaterial({map:carTextures[texIdx],transparent:true,side:THREE.DoubleSide,fog:true,depthWrite:false});
-        mesh=new THREE.Mesh(new THREE.PlaneGeometry(CAR_W,CAR_H),mat);
-        mesh.renderOrder=2;mesh.frustumCulled=false;
-        /* Han 2026-10-09: blob shadow for 3D feel */
-        var shMat=new THREE.MeshBasicMaterial({map:carShadowTex,transparent:true,depthWrite:false});
-        var shMesh=new THREE.Mesh(new THREE.PlaneGeometry(CAR_W*1.3,CAR_H*2.2),shMat);
-        shMesh.rotation.x=-Math.PI/2;
-        shMesh.renderOrder=1;shMesh.frustumCulled=false;
-        mapScene.add(shMesh);
-        mesh.userData.shadow=shMesh;
-        mapScene.add(mesh);
-      }
-      var t0=Math.random(),dx=seg.x2-seg.x1,dz=seg.z2-seg.z1;
-      var off=1.4*lane,x0=seg.x1+dx*t0+(-dz/len)*off,z0=seg.z1+dz*t0+(dx/len)*off;
-      mesh.userData.car={si:si,t:t0,lane:lane,dir:lane>0?1:-1,len:len,x:x0,px:x0,z:z0,pz:z0,
-        sideTex:carTextures[texIdx],topTex:carTopTextures[colorIdx]};
-      var col={x0:0,x1:0,z0:0,z1:0,bottom:0,top:CAR_TOP,car:mesh};
-      mesh.userData.car.col=col;carColliders.push(col);
-      /* scale.x flip now handled per-frame in updateTrafficCars (screen-space direction) */
-      trafficCars.push(mesh);
-    }
-    function syncTrafficCars(){
-      var counts={};
-      for(var i=0;i<trafficCars.length;i++){var s=trafficCars[i].userData.car.si;counts[s]=(counts[s]||0)+1;}
-      for(var si=0;si<trafficSegs.length;si++){
-        var seg=trafficSegs[si],len=Math.hypot(seg.x2-seg.x1,seg.z2-seg.z1);
-        var want=carCountFor(seg.flow,len),have=counts[si]||0,diff=want-have;
-        var step=Math.max(-2,Math.min(2,diff));
-        if(step>0)for(var k=0;k<step;k++)spawnCar(si);
-        else if(step<0){
-          var removed=0;
-          for(var j=trafficCars.length-1;j>=0&&removed<-step;j--){
-            if(trafficCars[j].userData.car.si===si){
-              /* #4: pool instead of dispose */
-              var mesh=trafficCars[j];
-              var ci=carColliders.indexOf(mesh.userData.car.col);
-              if(ci>=0)carColliders.splice(ci,1);
-              releaseCarMesh(mesh);
-              trafficCars.splice(j,1);removed++;
-            }
-          }
-        }
-      }
-      /* #4: despawn cars that drifted too far from player (>500m) */
-      if(walkPlayer&&walkPlayer.pos){
-        for(var k=trafficCars.length-1;k>=0;k--){
-          var cm=trafficCars[k],cu=cm.userData.car;
-          var ddx=cu.x-walkPlayer.pos.x,ddz=cu.z-walkPlayer.pos.z;
-          if(ddx*ddx+ddz*ddz>500*500){
-            var ci2=carColliders.indexOf(cu.col);
-            if(ci2>=0)carColliders.splice(ci2,1);
-            releaseCarMesh(cm);
-            trafficCars.splice(k,1);
-          }
-        }
-      }
-    }
+    /* Traffic-car sprites REMOVED (Han 2026-11-04, item 2 - the flat
+       2D car billboards read as a floating car icon in the world): the
+       texture painters, spawn/sync, blob shadows and the car pool are
+       gone, and no writer remains for the hoisted trafficCars /
+       carColliders arrays - they stay declared, permanently empty,
+       because the generic collision sweep still reads them. The flow
+       simulation (updateTraffic) and the incident markers are data /
+       signage features and stay. */
     function updateProps(){
       for(var i=0;i<billboardProps.length;i++){
         var m=billboardProps[i],u=m.userData.prop;
@@ -3873,182 +3869,6 @@
           tm.bulb.material.color.setHex(col);
         }
       }
-      /* 2D traffic cars — Han 2026-10-07: placeholder 2D car sprites visualizing
-         live traffic level per segment. Jammed = many slow cars; clear = few fast
-         cars. Camera-facing billboards like other props (no 3D models). Random
-         models/colors; Han can swap art later via setCarSprite(). */
-      trafficCars.length=0;carTextures.length=0;carColliders.length=0; /* reset (hoisted vars) */
-      updateTrafficCars=function(dt){
-        /* Reusable temporaries (avoid per-car allocation) */
-        if(!updateTrafficCars._cr)updateTrafficCars._cr=new THREE.Vector3();
-        if(!updateTrafficCars._cu)updateTrafficCars._cu=new THREE.Vector3();
-        if(!updateTrafficCars._qz)updateTrafficCars._qz=new THREE.Quaternion();
-        if(!updateTrafficCars._zAxis)updateTrafficCars._zAxis=new THREE.Vector3(0,0,1);
-        var camRight=updateTrafficCars._cr.set(1,0,0).applyQuaternion(mapCamera.quaternion);
-        var camUp=updateTrafficCars._cu.set(0,1,0).applyQuaternion(mapCamera.quaternion);
-        for(var i=0;i<trafficCars.length;i++){
-          var m=trafficCars[i],u=m.userData.car,seg=trafficSegs[u.si];
-          /* Han 2026-10-10: traffic realism.
-             - Jam: flow<0.25 → stopped; 0.25-0.5 → crawl; else normal.
-             - Red light: stop before intersection. */
-          var nowS=Date.now()/1000;
-          var baseSpeed;
-          if(seg.flow<0.25)baseSpeed=0; /* jammed: stopped */
-          else if(seg.flow<0.5)baseSpeed=1.0+seg.flow*4; /* heavy: crawl */
-          else baseSpeed=1.5+seg.flow*16; /* normal */
-          /* Traffic light check: approaching intersection? */
-          var dx0=seg.x2-seg.x1,dz0=seg.z2-seg.z1;
-          var segLen=u.len;
-          /* Position along segment (0-1). Intersections at t=0 and t=1. */
-          var distToEnd=u.dir>0?(1-u.t)*segLen:u.t*segLen;
-          var speed=baseSpeed;
-          if(distToEnd<14&&distToEnd>2){
-            /* Near intersection — check light */
-            var ix=u.dir>0?seg.x2:seg.x1, iz=u.dir>0?seg.z2:seg.z1;
-            var ls=lightStateAt(ix,iz,nowS);
-            if(ls){
-              var isHoriz=Math.abs(dz0)<.01;
-              var myDir=isHoriz?'EW':'NS';
-              /* Yellow: stop if far, go if very close (can't stop safely) */
-              if(ls==='Y'){
-                if(distToEnd>6)speed=0;
-              }else if(ls!==myDir){
-                speed=0; /* red: stop */
-              }
-            }
-          }
-          /* Car queuing: don't drive through stopped car ahead */
-          if(speed>0){
-            for(var q=0;q<trafficCars.length;q++){
-              if(q===i)continue;
-              var ou=trafficCars[q].userData.car;
-              if(ou.si!==u.si||ou.lane!==u.lane)continue;
-              /* Same segment+lane: check distance ahead */
-              var ahead=(ou.t-u.t)*u.dir; /* >0 means ou is ahead in travel dir */
-              if(ahead>0&&ahead*segLen<9){
-                /* Car ahead within 9m — match its speed (stop if stopped) */
-                var ouSpeed=(ou._speed!==undefined)?ou._speed:0;
-                if(ouSpeed<0.5){speed=0;break;}
-                speed=Math.min(speed,ouSpeed);
-              }
-            }
-          }
-          u._speed=speed; /* store for queuing */
-          u.t+=u.dir*speed*dt/segLen;
-          if(u.t>1)u.t-=1;else if(u.t<0)u.t+=1;
-          var dx=seg.x2-seg.x1,dz=seg.z2-seg.z1;
-          var px=-dz/u.len,pz=dx/u.len,off=1.4*u.lane;
-          var x=seg.x1+dx*u.t+px*off,z=seg.z1+dz*u.t+pz*off;
-          u.px=u.x;u.pz=u.z;u.x=x;u.z=z;
-          m.position.set(x,CAR_H/2,z);
-          /* #5 (Han 2nd QA, revised): N/S = top view LAID FLAT on ground
-             (wheels on ground, hood/roof to sky), rotated to heading.
-             E/W = side view billboard with horizontal flip. */
-          var vx=x-u.px,vz=z-u.pz;
-          var screenVX=vx*camRight.x+vz*camRight.z;
-          var screenVY=vx*camUp.x+vz*camUp.z;
-          var spd=Math.sqrt(screenVX*screenVX+screenVY*screenVY);
-          if(spd>0.005){
-            var ang=Math.atan2(screenVY,screenVX);
-            var useTop=Math.abs(screenVY)>Math.abs(screenVX);
-            /* Swap texture if view changed */
-            var wantTex=useTop?u.topTex:u.sideTex;
-            if(m.material.map!==wantTex){m.material.map=wantTex;m.material.needsUpdate=true;}
-            if(useTop){
-              /* Flat on ground: rotation.x=-PI/2, heading via rotation.z.
-                 World heading: nose (+x) points along (vx,vz).
-                 After Rx(-90°), local +x stays +x, local +y → -z.
-                 So heading angle = atan2(-vz, vx). */
-              /* Han 2026-10-09: bigger N/S cars */
-              m.scale.set(1.6,1.6,1);
-              m.rotation.set(-Math.PI/2,0,Math.atan2(-vz,vx));
-              /* Lift slightly above ground */
-              m.position.y=CAR_H/2+0.15;
-            }else{
-              /* Side view: billboard, stay level, flip for leftward */
-              m.quaternion.copy(mapCamera.quaternion);
-              m.scale.x=(ang>Math.PI/2||ang<-Math.PI/2)?-1:1;
-              m.position.y=CAR_H/2;
-              updateTrafficCars._qz.setFromAxisAngle(updateTrafficCars._zAxis,0);
-              m.quaternion.multiply(updateTrafficCars._qz);
-            }
-          }else{
-            /* Stationary: default to side-view billboard */
-            m.quaternion.copy(mapCamera.quaternion);
-            m.position.y=CAR_H/2;
-          }
-          /* axis-aligned AABB collider follows the car */
-          var horiz=Math.abs(dz)<.01,ax=horiz?CAR_W/2:0.9,az=horiz?0.9:CAR_W/2;
-          var col=u.col;col.x0=x-ax;col.x1=x+ax;col.z0=z-az;col.z1=z+az;
-          /* Han 2026-10-09: shadow follows car on ground */
-          var sh=m.userData.shadow;
-          if(sh){
-            sh.position.set(x,0.06,z);
-            sh.visible=m.visible;
-          }
-        }
-      }
-      /* Han 2026-10-10: incident markers face camera + flash */
-      if(typeof incidentMarkers!=='undefined'&&incidentMarkers.length){
-        var _fl=Math.floor(Date.now()/500)%2===0;
-        for(var _mi=0;_mi<incidentMarkers.length;_mi++){
-          var _mk=incidentMarkers[_mi].mesh;
-          _mk.quaternion.copy(mapCamera.quaternion);
-          _mk.visible=_fl;
-        }
-      }
-      /* Han 2026-10-10: AI car sprites — loads Plushy-generated PNGs from
-         assets/sprites/manifest.json (generated by tools/generate_sprites.py
-         through the Plushy sprite API). Falls back to procedural canvas:
-         any missing/failed texture keeps its procedural version, and a
-         missing manifest is a silent no-op. Orientation contract for the
-         PNGs: side views nose pointing +x (right), top views nose +x. */
-      var CAR_SPRITE_COLORS=['red','blue','white','black','yellow','green','purple'];
-      function loadCarSprites(){
-        fetch('assets/sprites/manifest.json').then(function(r){
-          if(!r.ok) throw new Error('no sprite manifest');
-          return r.json();
-        }).then(function(m){
-          var byName={};
-          (m.sprites||[]).forEach(function(e){
-            if(e.status!=='failed'&&e.file) byName[e.name]='assets/sprites/'+e.file;
-          });
-          var colors=CAR_SPRITE_COLORS, n=colors.length, i;
-          var newSides=[], newTops=[];
-          for(i=0;i<n;i++){ newSides.push(null); newTops.push(null); }
-          var remaining=n*2;
-          var loader=new THREE.TextureLoader();
-          function done(){
-            if(--remaining>0) return;
-            if(!newSides.every(Boolean)||!newTops.every(Boolean)) return;
-            carTextures=newSides; carTopTextures=newTops;
-            for(var k=0;k<trafficCars.length;k++){
-              var u=trafficCars[k].userData.car;
-              var ti=(Math.random()*carTextures.length)|0;
-              u.sideTex=carTextures[ti];
-              u.topTex=carTopTextures[ti%carTopTextures.length];
-            }
-            /* per-frame swap logic picks up u.sideTex/u.topTex automatically */
-          }
-          colors.forEach(function(c,idx){
-            [['car_side_'+c,newSides],['car_top_'+c,newTops]].forEach(function(pair){
-              var url=byName[pair[0]], arr=pair[1];
-              if(!url){ done(); return; }
-              loader.load(url,
-                function(t){ t.anisotropy=4; arr[idx]=t; done(); },
-                undefined,
-                function(){ done(); });
-            });
-          });
-        }).catch(function(){ /* keep procedural canvas sprites */ });
-      }
-      function setCarSprite(url){ /* legacy single-texture hook; prefer loadCarSprites() */
-        var tex=new THREE.TextureLoader().load(url);
-        carTextures=[tex];
-        for(var i=0;i<trafficCars.length;i++){trafficCars[i].material.map=tex;trafficCars[i].material.needsUpdate=true;}
-      }
-      initCarTextures();initCarTopTextures();syncTrafficCars();
-      loadCarSprites();
       buildTrafficLightVisuals();
       /* Grass + cobblestone ground tiles (Han 2026-10-05). */
       function groundTexture(file,rx,ry){
@@ -4732,12 +4552,6 @@
                    (Math.abs(A.x1-B.x1)<2&&Math.abs(A.z1-B.z1)<2);
         if(touch){A.nb.push(b);B.nb.push(a);}
       }
-      /* Init car textures (was in skipped procedural block) */
-      if(typeof initCarTextures==='function'&&carTextures.length===0){
-        initCarTextures();
-        initCarTopTextures();
-      }
-      if(typeof syncTrafficCars==='function')syncTrafficCars();
     }
     function chunkRNG(seed){
       var s=seed>>>0;
@@ -6666,6 +6480,29 @@
        interior room (v1) - one room at a far world offset, the
        building's name on its sign, the door on the south wall. */
     var espilBldgPanelRec=null, espilBldgPanelCand=null, espilBldgName='Building';
+    /* Only the Konbiniya opens (Han 2026-11-04): every other store /
+       building stays shut - the panel shows no Enter affordance for
+       it (espilPaintEnterAffordance) and espilEnterInside refuses
+       outright, so no caller (panel click, Enter key, legacy shim)
+       can load another building's interior. The Konbiniya path is
+       untouched: its panel Enter click still routes to the store
+       page via store-page-link, and keyboard entry still loads its
+       in-world interior. Identity rule matches modules/store.js and
+       store-page-link.js: name or 1238 Robson address match, or the
+       record anchor within 40 m of the fixed Konbiniya anchor. */
+    function espilIsKonbiniyaRec(rec){
+      if(!rec)return false;
+      var nm=rec.name||rec.title||'';
+      if(/konbiniya/i.test(nm)||/1238\s+robson/i.test(nm))return true;
+      if(rec===espilBldgPanelRec&&espilBldgName&&(/konbiniya/i.test(espilBldgName)||/1238\s+robson/i.test(espilBldgName)))return true;
+      var k=window.__espilKonbiniyaPos; if(!k)return false;
+      var x=(typeof rec.cx==='number')?rec.cx:rec.x, z=(typeof rec.cz==='number')?rec.cz:rec.z;
+      return (typeof x==='number'&&typeof z==='number')&&Math.hypot(x-k.x,z-k.z)<40;
+    }
+    function espilPaintEnterAffordance(){
+      var e=document.getElementById('bldg-enter'); if(!e)return;
+      e.style.display=espilIsKonbiniyaRec(espilBldgPanelRec)?'':'none';
+    }
     window.__espilInterior=null; window.__espilInteriorReturn=null;
     var ESPIL_INT={x:0,z:8000};
     function espilNearestRecord(px,pz){
@@ -6691,6 +6528,7 @@
       if(metaEl)metaEl.textContent='Height '+Math.round(rec.h)+' m · about '+Math.max(1,Math.round(rec.h/3))+' floors · '+espilCityDisplayName();
       var panel=document.getElementById('bldg-panel');
       if(panel){panel.classList.add('open');panel.setAttribute('aria-hidden','false');}
+      espilPaintEnterAffordance(); /* Konbiniya only (Han 2026-11-04); repainted when the name resolves below */
       /* Name resolution probes the record's own coordinates through
          the same Places/OSM name path as the building pill (the
          mapBuildings candidate only links stores on Enter - the
@@ -6700,6 +6538,7 @@
         if(!nm||(nm==='Downtown Vancouver'&&espilCityKey()!=='vancouver'))nm='Unnamed Building';
         espilBldgName=nm;
         if(nameEl)nameEl.textContent=espilBldgName;
+        espilPaintEnterAffordance(); /* the resolved name can identify the Konbiniya */
         var on=document.getElementById('bldg-opts-name'); if(on)on.textContent=espilBldgName;
         if(window.__espilInside)window.__espilInside.name=espilBldgName;
       });
@@ -6735,6 +6574,14 @@
     var espilInsideRec=null, espilInsideDoor=null, espilInsideOutside=null, espilInsideHint=false;
     function espilEnterInside(rec){
       var p=walkPlayer; if(!p||!rec)return;
+      /* Only the Konbiniya opens (Han 2026-11-04): hard gate behind
+         the hidden Enter affordance - no path loads another
+         building's interior room. */
+      if(!espilIsKonbiniyaRec(rec)){
+        closeBuildingPanel();
+        if(window.__espilToast)window.__espilToast('Only the Konbiniya is open for now');
+        return;
+      }
       if(p.flying||p._fall)espilFlyClear(); /* Batch G: fly state clears on interior entry */
       if(!window.__espilInteriorBuilt)espilBuildInterior();
       if(!window.__espilShopBuilt)espilBuildShopFitout();
@@ -9313,6 +9160,7 @@
     function animate(){
       requestAnimationFrame(animate);
       espilOccludeTick(); /* wall-occlusion cutout uniforms (Han 2026-11-03) */
+      espilGhostTick(); /* grey player copy while building-occluded (Han 2026-11-04) */
       var nowMs=performance.now();
       var dt=Math.min(.05,(nowMs-lastFrameT)/1000);lastFrameT=nowMs;
       if(cityPhaseActive){

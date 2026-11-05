@@ -367,63 +367,78 @@
 
   /* ---------------- styles ---------------- */
   var LOGWOOD_URL = (typeof window.__espilLogwoodUrl === 'string' && window.__espilLogwoodUrl) || 'assets/tex/logwood.jpg';
-  var WOOD_BG = 'background-image:linear-gradient(rgba(26,17,9,.90),rgba(26,17,9,.93)),url("' + LOGWOOD_URL + '");background-size:cover,340px;';
-  var WOOD_PANEL = 'background-image:linear-gradient(rgba(30,20,11,.93),rgba(30,20,11,.95)),url("' + LOGWOOD_URL + '");background-size:cover,300px;';
+  var WOOD_BG = 'background-image:linear-gradient(rgba(26,17,9,.86),rgba(26,17,9,.90)),url("' + LOGWOOD_URL + '");background-size:cover,340px;';
+  var WOOD_PANEL = 'background-image:linear-gradient(rgba(30,20,11,.90),rgba(30,20,11,.93)),url("' + LOGWOOD_URL + '");background-size:cover,300px;';
   var CSS = [
-    '.espil-gear{grid-column:1/-1;color:#f5e6c8;font:13px Manrope,system-ui,sans-serif;padding:13px;border:2px solid #6b4a2f;border-radius:15px}',
+    '.espil-gear{grid-column:1/-1;color:#f5e6c8;font:12px Manrope,system-ui,sans-serif;padding:10px;border:2px solid #6b4a2f;border-radius:15px}',
     '.espil-gear *{box-sizing:border-box}',
-    '.eg-head{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:8px}',
-    '.eg-name{font-size:20px;font-weight:800;color:#ffd97a;letter-spacing:.02em}',
-    '.eg-lv{font-size:13px;opacity:.92}',
+    '.eg-head{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:5px}',
+    '.eg-name{font-size:16px;font-weight:800;color:#ffd97a;letter-spacing:.02em}',
+    '.eg-lv{font-size:12px;opacity:.92}',
     '.eg-title{font-size:12px;color:#e8b04b;font-weight:700}',
-    '.eg-titlebtn{margin-left:auto;padding:5px 14px;border-radius:6px;border:1px solid #a97e46;background:linear-gradient(#8a2f23,#6e241b);color:#ffe9b0;font:700 12px Manrope,sans-serif;cursor:pointer}',
-    '.eg-tabs{display:flex;gap:6px;margin:6px 0 10px}',
-    '.eg-tab{padding:6px 14px;border-radius:8px 8px 0 0;border:1px solid rgba(169,126,70,.55);border-bottom:none;background:rgba(59,42,28,.55);color:#d8c49a;font:700 12.5px Manrope,sans-serif;cursor:pointer}',
+    '.eg-titlebtn{margin-left:auto;padding:4px 11px;border-radius:6px;border:1px solid #a97e46;background:linear-gradient(#8a2f23,#6e241b);color:#ffe9b0;font:700 11.5px Manrope,sans-serif;cursor:pointer}',
+    '.eg-tabs{display:flex;gap:5px;margin:4px 0 7px}',
+    '.eg-tab{padding:5px 10px;border-radius:8px 8px 0 0;border:1px solid rgba(169,126,70,.55);border-bottom:none;background:rgba(59,42,28,.55);color:#d8c49a;font:700 11.5px Manrope,sans-serif;cursor:pointer}',
     '.eg-tab.on{background:#8a2f23;color:#ffe9b0;border-color:#a97e46}',
-    '.eg-main{display:flex;gap:10px;justify-content:center;align-items:flex-start}',
-    '.eg-col{display:flex;flex-direction:column;gap:8px}',
-    '.eg-slot{width:64px;padding:5px 2px 4px;border-radius:9px;border:1.6px solid rgba(169,126,70,.5);background:rgba(30,20,12,.66);text-align:center;color:#d8c49a}',
+    '.eg-main{display:flex;gap:7px;justify-content:center;align-items:flex-start}',
+    '.eg-col{display:flex;flex-direction:column;gap:6px}',
+    '.eg-slot{width:47px;padding:3px 1px 2px;border-radius:8px;border:1.6px solid rgba(169,126,70,.5);background:rgba(30,20,12,.66);text-align:center;color:#d8c49a}',
     '.eg-slot.filled{cursor:pointer;background:rgba(59,42,28,.9)}',
-    '.eg-slot .eg-slotlab{display:block;font-size:10px;letter-spacing:.05em;opacity:.75;margin-top:1px}',
-    '.eg-slot .eg-itemlab{display:block;font-size:9.5px;line-height:1.15;color:#ffe9b0;min-height:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
-    '.eg-stage{flex:none;border:1.6px solid rgba(169,126,70,.5);border-radius:12px;overflow:hidden;background:#1a120b}',
-    '.eg-bottom{display:flex;gap:8px;justify-content:center;margin-top:8px}',
-    '.eg-stats{display:flex;gap:14px;margin-top:12px;flex-wrap:wrap}',
-    '.eg-statbox{flex:1;min-width:210px;border:1px solid rgba(169,126,70,.5);border-radius:10px;background:rgba(30,20,12,.55);padding:9px 12px}',
-    '.eg-statbox h4{margin:0 0 6px;font-size:12px;letter-spacing:.1em;color:#e8b04b}',
-    '.eg-statrow{display:flex;justify-content:space-between;padding:2.5px 0;border-bottom:1px dashed rgba(216,196,154,.14)}',
+    '.eg-slot .eg-slotlab{display:block;font-size:9px;letter-spacing:.05em;opacity:.75;margin-top:1px}',
+    '.eg-slot .eg-itemlab{display:block;font-size:8.5px;line-height:1.15;color:#ffe9b0;min-height:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+    '.eg-stage{flex:none;border:1.6px solid rgba(169,126,70,.5);border-radius:10px;overflow:hidden;background:#1a120b}',
+    '.eg-bottom{display:flex;gap:6px;justify-content:center;margin-top:5px}',
+    '.eg-stats{display:flex;gap:10px;margin-top:7px;flex-wrap:wrap}',
+    '.eg-statbox{flex:1;min-width:128px;border:1px solid rgba(169,126,70,.5);border-radius:10px;background:rgba(30,20,12,.55);padding:6px 8px}',
+    '.eg-statbox h4{margin:0 0 4px;font-size:11px;letter-spacing:.1em;color:#e8b04b}',
+    '.eg-statrow{display:flex;justify-content:space-between;padding:1.2px 0;border-bottom:1px dashed rgba(216,196,154,.14)}',
     '.eg-statrow:last-child{border-bottom:none}',
     '.eg-statrow b{color:#fff3d6;font-variant-numeric:tabular-nums}',
-    '.eg-foot{margin:10px 0 0;font-size:12px;opacity:.85}',
-    '.eg-custom{margin-left:10px;padding:5px 14px;border-radius:999px;border:1px solid rgba(201,168,106,.85);background:rgba(201,168,106,.16);color:#ffd97a;font:700 12px Manrope,sans-serif;cursor:pointer}',
-    '.eg-mount{padding:26px 8px;text-align:center;opacity:.8}',
+    '.eg-foot{margin:7px 0 0;font-size:11px;opacity:.85}',
+    '.eg-custom{margin-left:8px;padding:4px 11px;border-radius:999px;border:1px solid rgba(201,168,106,.85);background:rgba(201,168,106,.16);color:#ffd97a;font:700 11.5px Manrope,sans-serif;cursor:pointer}',
+    '.eg-mount{padding:18px 6px;text-align:center;opacity:.8}',
     /* bag */
-    '.espil-bag{grid-column:1/-1;color:#f5e6c8;font:13px Manrope,system-ui,sans-serif}',
+    '.espil-bag{grid-column:1/-1;color:#f5e6c8;font:12px Manrope,system-ui,sans-serif}',
     '.espil-bag *{box-sizing:border-box}',
-    '.bag-tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}',
-    '.bag-tab{padding:6px 15px;border-radius:8px;border:1px solid rgba(169,126,70,.55);background:rgba(59,42,28,.55);color:#d8c49a;font:700 12.5px Manrope,sans-serif;cursor:pointer}',
+    '.bag-tabs{display:flex;gap:5px;margin-bottom:7px;flex-wrap:wrap}',
+    '.bag-tab{padding:5px 11px;border-radius:8px;border:1px solid rgba(169,126,70,.55);background:rgba(59,42,28,.55);color:#d8c49a;font:700 11.5px Manrope,sans-serif;cursor:pointer}',
     '.bag-tab.on{background:#8a2f23;color:#ffe9b0}',
-    '.bag-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}',
-    '.bag-cell{position:relative;border:1.6px solid rgba(169,126,70,.45);border-radius:8px;background:rgba(30,20,12,.66);aspect-ratio:1;display:flex;align-items:center;justify-content:center;cursor:pointer}',
+    '.bag-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:5px}',
+    '.bag-cell{position:relative;border:1.6px solid rgba(169,126,70,.45);border-radius:7px;background:rgba(30,20,12,.66);aspect-ratio:1;display:flex;align-items:center;justify-content:center;cursor:pointer}',
     '.bag-cell.sel{outline:2px solid #ffd97a}',
-    '.bag-cell .bag-n{position:absolute;right:3px;bottom:2px;font-size:10.5px;font-weight:800;color:#fff3d6;text-shadow:0 1px 2px #000}',
-    '.bag-cell .bag-e{position:absolute;left:3px;top:2px;font-size:9.5px;font-weight:800;color:#ffd97a}',
+    '.bag-cell .bag-n{position:absolute;right:2px;bottom:1px;font-size:9.5px;font-weight:800;color:#fff3d6;text-shadow:0 1px 2px #000}',
+    '.bag-cell .bag-e{position:absolute;left:2px;top:1px;font-size:8.5px;font-weight:800;color:#ffd97a}',
     '.bag-cell.empty{cursor:default;opacity:.35}',
-    '.bag-detail{display:flex;gap:14px;margin-top:12px;border:1px solid rgba(169,126,70,.5);border-radius:10px;background:rgba(30,20,12,.55);padding:11px 13px;min-height:96px}',
-    '.bag-dicon{flex:none;width:64px;height:64px;border-radius:9px;border:1.6px solid rgba(169,126,70,.5);display:flex;align-items:center;justify-content:center;background:rgba(59,42,28,.8)}',
+    '.bag-detail{display:flex;gap:10px;margin-top:9px;border:1px solid rgba(169,126,70,.5);border-radius:10px;background:rgba(30,20,12,.55);padding:8px 10px;min-height:74px}',
+    '.bag-dicon{flex:none;width:48px;height:48px;border-radius:8px;border:1.6px solid rgba(169,126,70,.5);display:flex;align-items:center;justify-content:center;background:rgba(59,42,28,.8)}',
     '.bag-dbody{flex:1;min-width:0}',
-    '.bag-dname{font-size:15px;font-weight:800;color:#fff3d6}',
-    '.bag-dmeta{font-size:11.5px;opacity:.85;margin:2px 0 4px}',
-    '.bag-dstats{font-size:12px;color:#ffd97a}',
-    '.bag-ddesc{font-size:12px;opacity:.9;margin-top:3px}',
-    '.bag-dbtns{flex:none;display:flex;flex-direction:column;gap:6px;justify-content:center}',
-    '.bag-dbtn{padding:6px 14px;border-radius:7px;border:1px solid #a97e46;background:linear-gradient(#8a5a2b,#6e4520);color:#ffe9b0;font:700 12px Manrope,sans-serif;cursor:pointer}',
+    '.bag-dname{font-size:13.5px;font-weight:800;color:#fff3d6}',
+    '.bag-dmeta{font-size:11px;opacity:.85;margin:2px 0 3px}',
+    '.bag-dstats{font-size:11.5px;color:#ffd97a}',
+    '.bag-ddesc{font-size:11.5px;opacity:.9;margin-top:2px}',
+    '.bag-dbtns{flex:none;display:flex;flex-direction:column;gap:5px;justify-content:center}',
+    '.bag-dbtn{padding:5px 11px;border-radius:7px;border:1px solid #a97e46;background:linear-gradient(#8a5a2b,#6e4520);color:#ffe9b0;font:700 11.5px Manrope,sans-serif;cursor:pointer}',
     '.bag-dbtn.sub{background:rgba(59,42,28,.8);color:#d8c49a}',
-    '.bag-foot{margin:10px 0 0;font-size:12px;opacity:.85;display:flex;justify-content:space-between}'
+    '.bag-foot{margin:7px 0 0;font-size:11px;opacity:.85;display:flex;justify-content:space-between}',
+    /* Item 5 (Han 2026-11-04): smaller cards, and when the profile
+       and the bag are open together they sit side by side (each
+       overlay takes one half) instead of stacking full-screen;
+       under 1020px they split top/bottom so neither is hidden. */
+    '.skill-tree#character-panel .st-card{width:min(408px,calc(100% - 20px));padding:13px 15px}',
+    '.skill-tree#character-panel .st-head{margin-bottom:7px;padding-bottom:7px}',
+    '.skill-tree#inventory-panel .st-card{width:min(440px,calc(100% - 20px))}',
+    'body.espil-panels-both #character-panel{left:0;right:auto;width:50%}',
+    'body.espil-panels-both #inventory-panel{left:auto;right:0;width:50%}',
+    'body.espil-panels-both #character-panel .st-card,body.espil-panels-both #inventory-panel .st-card{max-width:calc(100% - 14px)}',
+    '@media (max-width:1020px){' +
+      'body.espil-panels-both #character-panel{left:0;right:0;width:auto;top:0;bottom:auto;height:50%}' +
+      'body.espil-panels-both #inventory-panel{left:0;right:0;width:auto;top:auto;bottom:0;height:50%}' +
+      'body.espil-panels-both .st-card{max-height:calc(100% - 10px)}' +
+      'body.espil-panels-both #character-panel .st-grid{overflow-y:auto;scrollbar-width:thin}}'
   ].join('\n');
   var WOOD_CSS = [
     '.espil-gear,.espil-bag{' + WOOD_BG + '}',
-    '.espil-bag{padding:13px;border:2px solid #6b4a2f;border-radius:15px}',
+    '.espil-bag{padding:10px;border:2px solid #6b4a2f;border-radius:15px}',
     '.eg-slot{background:radial-gradient(circle at 50% 40%,rgba(146,102,56,.5),rgba(43,29,17,.94) 70%);box-shadow:inset 0 0 0 2px #54381f,inset 0 0 0 4px rgba(170,124,70,.45),inset 0 0 16px rgba(0,0,0,.55)}',
     '.eg-slot.filled{background:radial-gradient(circle at 50% 40%,rgba(178,128,70,.62),rgba(56,38,20,.95) 72%);box-shadow:inset 0 0 0 2px #6e4c2a,inset 0 0 0 4px rgba(190,142,84,.5),inset 0 0 16px rgba(0,0,0,.5)}',
     '.eg-tab,.bag-tab{background-image:linear-gradient(rgba(96,64,34,.88),rgba(70,47,24,.92)),url("' + LOGWOOD_URL + '");background-size:cover,200px}',
@@ -458,7 +473,7 @@
     return '<div class="eg-slot' + (it ? ' filled' : '') + '" data-gear-slot="' + slot + '"' +
       (it ? ' title="' + esc(it.kr || it.name) + '"' : '') +
       ' style="border-color:' + gradeCol + '">' +
-      (it ? iconSVG(it, 34) : '<span style="display:block;height:34px;line-height:34px;font-size:15px;opacity:.4">·</span>') +
+      (it ? iconSVG(it, 22) : '<span style="display:block;height:22px;line-height:22px;font-size:12px;opacity:.4">·</span>') +
       '<span class="eg-itemlab">' + (it ? esc(it.kr || it.name) : '') + '</span>' +
       '<span class="eg-slotlab">' + SLOT_KR[slot] + '</span></div>';
   }
@@ -478,7 +493,7 @@
     var bottom = SLOT_DEFS.filter(function (s) { return s.col === 'B'; }).map(function (s) { return slotCell(s.key, map[s.key], profTab === 'look'); }).join('');
     var stage = profTab === 'mount'
       ? '<div class="eg-stage"><div class="eg-mount">탈것은 준비 중입니다.<br><span style="font-size:11.5px">이동 수단이 생기면 이곳에 표시됩니다.</span></div></div>'
-      : '<div class="eg-stage"><canvas id="espil-gear-preview" width="512" height="512" style="display:block;width:252px;height:252px"></canvas></div>';
+      : '<div class="eg-stage"><canvas id="espil-gear-preview" width="512" height="512" style="display:block;width:172px;height:172px"></canvas></div>';
     wrap.innerHTML =
       '<div class="eg-head"><span class="eg-name">' + esc(info.name) + '</span>' +
       '<span class="eg-lv">레벨 ' + info.level + ' ' + esc(info.cls) + '</span>' +
@@ -491,7 +506,7 @@
       '<div class="eg-main"><div class="eg-col">' + left + '</div>' + stage + '<div class="eg-col">' + right + '</div></div>' +
       '<div class="eg-bottom">' + bottom + '</div>' +
       (profTab === 'look' ? '<p class="eg-foot">치장 아이템은 외형만 바꿉니다. 능력치는 장비 아이템 기준으로 계산됩니다.</p>' : '') +
-      '<p class="eg-foot" style="font-size:11px;opacity:.65;margin-top:4px">캐릭터는 커스터마이저 캐릭터이며 상의와 무기는 실제 부품으로 반영됩니다. 모자, 망토, 장갑, 장신구, 펫은 부품이 준비되는 대로 연결됩니다.</p>' +
+      '<p class="eg-foot" style="font-size:10px;opacity:.65;margin-top:3px">캐릭터는 커스터마이저 캐릭터이며 상의와 무기는 실제 부품으로 반영됩니다. 모자, 망토, 장갑, 장신구, 펫은 부품이 준비되는 대로 연결됩니다.</p>' +
       '<div class="eg-stats"><div class="eg-statbox"><h4>기본 능력치</h4>' +
       statRows(STAT_KEYS.map(function (k) { return [STAT_KR[k], st.tot[k]]; })) +
       '</div><div class="eg-statbox"><h4>주요 능력치</h4>' +
@@ -552,7 +567,7 @@
       var it = itemOf(c.name);
       var badge = eqNames[c.name] ? '<span class="bag-e">E</span>' : (lkNames[c.name] ? '<span class="bag-e">치장</span>' : '');
       return '<div class="bag-cell' + (bagSel === c.name ? ' sel' : '') + '" data-bag-item="' + esc(c.name) + '" title="' + esc(it.kr || it.name) + '" style="border-color:' + (GRADES[it.grade] || 'rgba(169,126,70,.45)') + '">' +
-        iconSVG(it, 34) + badge + (c.n > 1 ? '<span class="bag-n">' + c.n + '</span>' : '') + '</div>';
+        iconSVG(it, 26) + badge + (c.n > 1 ? '<span class="bag-n">' + c.n + '</span>' : '') + '</div>';
     });
     var total = Math.max(40, Math.ceil(items.length / 8) * 8);
     for (var i = items.length; i < total; i++) cells.push('<div class="bag-cell empty"></div>');
@@ -563,7 +578,7 @@
       var lines = itemStatLines(sit);
       var meta = (sit.kind === 'equip' ? SLOT_KR[resolveSlot(bagSel)] + ' · ' : '') +
         BAG_TABS.filter(function (t) { return t[0] === sit.kind; }).map(function (t) { return t[1]; })[0] + ' · ' + sit.grade;
-      detail = '<div class="bag-dicon">' + iconSVG(sit, 46) + '</div><div class="bag-dbody">' +
+      detail = '<div class="bag-dicon">' + iconSVG(sit, 38) + '</div><div class="bag-dbody">' +
         '<div class="bag-dname">' + esc(sit.kr || sit.name) + '</div>' +
         '<div class="bag-dmeta">' + esc(meta) + ' · 판매 가격: ' + sit.price + ' Leo</div>' +
         (lines.length ? '<div class="bag-dstats">' + esc(lines.join(' · ')) + '</div>' : '') +
@@ -606,18 +621,26 @@
 
   /* ---------------- wiring ---------------- */
   function renderAll() { if (profileOpen()) renderProfile(); if (bagOpen()) renderBag(); }
+  /* Item 5 (Han 2026-11-04): the profile and the bag are INDEPENDENT -
+     opening one no longer closes the other. When both are open the
+     body carries .espil-panels-both and the CSS above lays the two
+     overlays side by side. */
+  function syncBoth() {
+    if (document.body) document.body.classList.toggle('espil-panels-both', profileOpen() && bagOpen());
+  }
   function watch(panelId, fn) {
     var p = document.getElementById(panelId); if (!p) return;
-    new MutationObserver(function () { if (p.getAttribute('aria-hidden') === 'false') fn(); })
+    new MutationObserver(function () { syncBoth(); if (p.getAttribute('aria-hidden') === 'false') fn(); })
       .observe(p, { attributes: true, attributeFilter: ['aria-hidden'] });
   }
-  watch('inventory-panel', function () { var p = charPanel(); if (p) p.setAttribute('aria-hidden', 'true'); renderBag(); });
+  watch('inventory-panel', renderBag);
   watch('character-panel', renderProfile);
   function toggleProfile(force) {
     var p = charPanel(); if (!p) return;
     var open = typeof force === 'boolean' ? force : p.getAttribute('aria-hidden') !== 'false';
-    if (open) { var ip = invPanel(); if (ip) ip.setAttribute('aria-hidden', 'true'); renderProfile(); }
+    if (open) renderProfile();
     p.setAttribute('aria-hidden', String(!open));
+    syncBoth();
   }
   document.addEventListener('keydown', function (e) {
     var ae = document.activeElement, tag = (ae && ae.tagName) || '';

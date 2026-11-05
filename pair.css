@@ -1661,3 +1661,146 @@
       border-radius:8px; cursor:pointer; }
     .lang-opt:hover,.lang-opt:focus-visible{ background:rgba(134,238,228,.14); outline:none; }
     .lang-opt.on{ background:rgba(134,238,228,.2); }
+
+    /* ==== Item 6 theme unification (Han 2026-11-04): every UI
+       surface wears the HP/MP log's logwood. Palette sampled from
+       the upgraded assets/tex/logwood.jpg - deep #241608, seam
+       #482d14, dark #54351a, mid #5a3b1d, light #694726 - with the
+       family rims #3a2817 / #54381f / #6b4a2f, accent #a97e46,
+       tan #caa06a, cream #f5e6c8, gold #ffd97a. Colours, textures
+       and borders only; no layout changes. ==== */
+    /* panel frames: skill tree / stall / friends / settings /
+       profile / bag (game-ui.js paints these green; the body
+       prefix outranks its injected sheet) */
+    body .skill-tree { background:linear-gradient(180deg, rgba(16,10,4,.86) 0%, rgba(24,15,7,.9) 100%); }
+    body .skill-tree .st-card {
+      background-image:linear-gradient(180deg,rgba(46,29,15,.96),rgba(28,18,9,.97)),url("assets/tex/logwood.jpg");
+      background-size:cover,420px; border-color:#54381f; color:#f5e6c8;
+      box-shadow:0 24px 60px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,224,170,.2), inset 0 0 34px rgba(0,0,0,.5);
+    }
+    body .skill-tree .st-close { background:radial-gradient(circle at 35% 30%,#8a5f36,#54381f 72%); border-color:#3a2817; color:#ffe9b0; }
+    body .skill-tree .st-close:hover { border-color:#ffd97a; }
+    body .skill-tree .pill-btn { background:linear-gradient(180deg,#e8cf9f,#caa06a); border-color:#6b4a2f; color:#3a2817; box-shadow:inset 0 1px 0 rgba(255,244,214,.75),0 2px 10px rgba(0,0,0,.35); }
+    body .skill-tree .pill-btn:hover { background:linear-gradient(180deg,#f2ddae,#d3af74); border-color:#54381f; }
+    .st-sub,.st-foot,.st-knsub { color:rgba(232,220,192,.65); }
+    .st-study { background:linear-gradient(180deg,#8a5a2b,#6e4520); border-color:#54381f; box-shadow:0 2px 8px rgba(40,25,8,.4); }
+    .st-desc { background:#241708; border-color:rgba(169,126,70,.5); }
+    /* minimap zoom buttons */
+    .map-zoom-btn { border-color:#a97e46; background:rgba(42,29,16,.78); }
+    .map-zoom-btn:hover { background:rgba(62,42,22,.88); }
+    /* gate: sign-in / notice modals */
+    .modal {
+      background-image:linear-gradient(180deg,rgba(46,29,15,.97),rgba(28,18,9,.96)),url("assets/tex/logwood.jpg");
+      background-size:cover,380px; border-color:#54381f;
+      box-shadow:0 24px 80px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,224,170,.18);
+    }
+    .modal h2 { color:#ffe9b0; text-shadow:0 0 14px rgba(255,217,122,.35); }
+    .provider { border-color:rgba(202,160,106,.4); background:rgba(42,29,16,.75); color:#f5e6c8; }
+    .provider:hover { border-color:#caa06a; background:rgba(62,42,22,.85); }
+    .provider.guest-enter { border-color:#a97e46; background:linear-gradient(180deg,#8a5a2b,#6e4520); color:#ffe9b0; }
+    .notice-tabs { border-bottom-color:rgba(202,160,106,.3); }
+    .notice-tab { border-color:rgba(202,160,106,.4); background:rgba(42,29,16,.7); color:#e8dcc0; }
+    .notice-tab.on { background:rgba(202,160,106,.3); color:#ffe9b0; border-color:#caa06a; }
+    .notice-sec h3 { color:#e8b04b; border-bottom-color:rgba(202,160,106,.3); }
+    .notice-list li::before { color:#caa06a; }
+    .notice-list li { color:#eee3cb; }
+    .notice-date { color:#caa06a; }
+    .modal-divider::before,.modal-divider::after { background:rgba(202,160,106,.3); }
+    .creator-link { color:#ffd97a; border-bottom-color:rgba(255,217,122,.45); }
+    .toast { border-color:rgba(202,160,106,.55); background:rgba(36,24,12,.95); color:#f5e6c8; }
+    /* gate: character cards */
+    .char-custom { background:rgba(16,10,4,.82); }
+    .char-card-wrap {
+      border-color:#54381f;
+      background-image:linear-gradient(180deg,rgba(46,29,15,.96),rgba(28,18,9,.97)),url("assets/tex/logwood.jpg");
+      background-size:cover,420px; box-shadow:0 24px 60px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,224,170,.18);
+    }
+    .char-card-wrap h2 { color:#ffe9b0; text-shadow:0 0 12px rgba(255,217,122,.35); }
+    .char-sub { color:rgba(232,220,192,.65); }
+    .char-card { border-color:rgba(202,160,106,.4); background:rgba(42,29,16,.65); color:#f5e6c8; }
+    .char-card.is-selected { border-color:#ffd97a; box-shadow:0 0 22px rgba(255,217,122,.3); }
+    .char-tag { border-color:rgba(202,160,106,.5); color:#e8b04b; }
+    .char-confirm { background:linear-gradient(180deg,#8a5a2b,#6e4520); color:#ffe9b0; box-shadow:0 6px 18px rgba(40,25,8,.45); }
+    .char-back { border-color:rgba(202,160,106,.5); color:#f5e6c8; }
+    /* landing top bar + language menu + city names */
+    .pill-btn { background:linear-gradient(180deg,#e8cf9f,#caa06a); border-color:#6b4a2f; color:#3a2817; }
+    .pill-btn:hover,.pill-btn:focus-visible { background:linear-gradient(180deg,#f2ddae,#d3af74); border-color:#54381f; box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 2px 12px rgba(0,0,0,.4),0 0 16px rgba(202,160,106,.45); }
+    .lang-menu { background:rgba(36,24,12,.94); border-color:rgba(202,160,106,.5); }
+    .lang-opt { color:#f5e6c8; }
+    .lang-opt:hover,.lang-opt:focus-visible { background:rgba(202,160,106,.18); }
+    .lang-opt.on { background:rgba(202,160,106,.28); }
+    .city-name { color:rgba(232,220,192,.38); }
+
+    /* Item 6, gate depth: the shells carry a cream "Zealandia skin"
+       block with ID selectors (#signin-modal / #char-custom) and
+       entry-flow.js paints the auth zone inside the modal. The
+       body-prefixed rules below outrank both, colours only. */
+    body #signin-modal .modal {
+      background-image:linear-gradient(180deg,rgba(46,29,15,.97),rgba(28,18,9,.96)),url("assets/tex/logwood.jpg");
+      background-size:cover,380px; border:2px solid #54381f; color:#f5e6c8;
+      box-shadow:0 24px 60px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,224,170,.18);
+    }
+    body #signin-modal .modal h2 { color:#ffe9b0; text-shadow:0 0 14px rgba(255,217,122,.3); }
+    body #signin-modal .modal-sub { color:rgba(232,220,192,.75); }
+    body #signin-modal .modal-close { color:#caa06a; }
+    body #signin-modal .modal-divider { color:#caa06a; }
+    body #signin-modal .provider {
+      background-image:linear-gradient(180deg,rgba(84,56,31,.9),rgba(52,35,19,.92)),url("assets/tex/logwood.jpg");
+      background-size:cover,220px; border:2px solid #6b4a2f; color:#f5e6c8;
+      box-shadow:inset 0 1px 0 rgba(255,224,170,.25), inset 0 -3px 0 rgba(0,0,0,.35);
+    }
+    body #signin-modal .provider.guest-enter { background:linear-gradient(180deg,#8a5a2b,#6e4520); border-color:#54381f; color:#ffe9b0; text-shadow:0 1px 2px rgba(40,20,0,.5); box-shadow:0 4px 12px rgba(20,10,0,.45); }
+    body #signin-modal .provider-logo { border-color:#6b4a2f; background:linear-gradient(180deg,#e8cf9f,#caa06a); box-shadow:inset 0 -3px 0 rgba(84,56,31,.35); }
+    body #signin-modal .provider-note { color:rgba(232,220,192,.7); }
+    body #char-custom { background:rgba(16,10,4,.82); }
+    body #char-custom .char-card-wrap {
+      background-image:linear-gradient(180deg,rgba(46,29,15,.96),rgba(28,18,9,.97)),url("assets/tex/logwood.jpg");
+      background-size:cover,420px; border:2px solid #54381f; color:#f5e6c8;
+      box-shadow:0 24px 60px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,224,170,.18);
+    }
+    body #char-custom .char-card-wrap h2 { color:#ffe9b0; text-shadow:0 0 12px rgba(255,217,122,.3); }
+    body #char-custom .char-sub { color:rgba(232,220,192,.7); }
+    body #char-custom .char-card {
+      background-image:linear-gradient(180deg,rgba(84,56,31,.88),rgba(52,35,19,.92)),url("assets/tex/logwood.jpg");
+      background-size:cover,240px; border:2px solid #6b4a2f; color:#f5e6c8;
+      box-shadow:inset 0 1px 0 rgba(255,224,170,.22), inset 0 -3px 0 rgba(0,0,0,.35);
+    }
+    body #char-custom .char-card.is-selected { border-color:#ffd97a; background-image:linear-gradient(180deg,rgba(122,79,40,.92),rgba(84,56,31,.94)),url("assets/tex/logwood.jpg"); box-shadow:0 2px 8px rgba(20,10,0,.4); }
+    body #char-custom .char-tag { border-color:rgba(202,160,106,.55); color:#e8b04b; }
+    body #char-custom #char-confirm { background:linear-gradient(180deg,#8a5a2b,#6e4520); border:2px solid #54381f; color:#ffe9b0; text-shadow:0 1px 2px rgba(40,20,0,.5); box-shadow:0 4px 12px rgba(20,10,0,.45); }
+    body #char-custom .char-back { border-color:rgba(202,160,106,.5); color:#f5e6c8; }
+    body #char-custom input[type="text"] { background:rgba(24,15,7,.55); border:1.5px solid rgba(202,160,106,.75); color:#fff4cf; }
+    /* the auth zone entry-flow.js builds inside the modal */
+    body .eauth-tab { background:linear-gradient(180deg,#e8cf9f,#caa06a); border-color:#6b4a2f; color:#5e4023; }
+    body .eauth-tab.on { background:linear-gradient(180deg,#8a5a2b,#6e4520); color:#ffe9b0; border-color:#54381f; }
+    body .eauth-label { color:#caa06a; }
+    body .eauth-pane input { background:rgba(24,15,7,.55); border-color:rgba(202,160,106,.75); color:#fff4cf; }
+    body .eauth-pane .espil-auth-btn { background:linear-gradient(180deg,#8a5a2b,#6e4520); border-color:#54381f; color:#ffe9b0; text-shadow:0 1px 2px rgba(40,20,0,.5); box-shadow:0 4px 12px rgba(20,10,0,.45); }
+    body #auth-session { color:#caa06a; }
+    /* entry-flow's location picker card */
+    body #espil-locpick { background:rgba(16,10,4,.82); }
+    body .locpick-card {
+      background-image:linear-gradient(180deg,rgba(46,29,15,.97),rgba(28,18,9,.97)),url("assets/tex/logwood.jpg");
+      background-size:cover,340px; border:2px solid #54381f; color:#f5e6c8;
+      box-shadow:0 24px 60px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,224,170,.18);
+    }
+    body .locpick-btn { background:linear-gradient(180deg,#e8cf9f,#caa06a); border-color:#6b4a2f; color:#3a2817; box-shadow:inset 0 1px 0 rgba(255,244,214,.7), inset 0 -3px 0 rgba(84,56,31,.35); }
+    body .locpick-btn:hover,body .locpick-btn:focus-visible { border-color:#54381f; background:linear-gradient(180deg,#f2ddae,#d3af74); }
+    body .locpick-btn.wide { background:linear-gradient(180deg,#8a5a2b,#6e4520); border-color:#54381f; color:#ffe9b0; text-shadow:0 1px 2px rgba(40,20,0,.5); }
+    body .locpick-msg { color:#e8b04b; }
+
+    /* Item 6, inline-styled form fields: the shells carry these
+       inputs' colours in style attributes (dark navy + teal rim).
+       Colour-only !important so they sit inside the logwood cards
+       like everything else. */
+    body #char-custom #char-name,
+    body #signin-modal #auth-id,
+    body #signin-modal #auth-pw,
+    body #friend-add-input,
+    body #stall-name,
+    body #stall-title,
+    body #stall-price {
+      background:rgba(24,15,7,.55) !important;
+      border-color:rgba(202,160,106,.65) !important;
+      color:#fff4cf !important;
+    }

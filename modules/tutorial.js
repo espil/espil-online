@@ -119,14 +119,15 @@
     st.textContent =
       '#espil-tut{position:fixed;top:86px;left:50%;transform:translateX(-50%);z-index:60;' +
       'display:none;align-items:center;gap:10px;max-width:92vw;padding:10px 18px;border-radius:999px;' +
-      'background:rgba(255,251,240,.93);border:2px solid #d9b380;color:#6b4a1f;' +
+      'background-image:linear-gradient(180deg,rgba(84,56,31,.94),rgba(52,35,19,.96)),url("assets/tex/logwood.jpg");' +
+      'background-size:cover,240px;border:2px solid #54381f;color:#f5e6c8;' +
       'font:700 .92rem/1.35 Manrope,sans-serif;letter-spacing:.02em;pointer-events:none;' +
-      'box-shadow:0 8px 18px rgba(90,60,20,.22);text-align:center}' +
+      'box-shadow:inset 0 1px 0 rgba(255,224,170,.3),0 8px 18px rgba(40,25,8,.35);text-align:center}' +
       '#espil-tut .tx{display:inline-flex;align-items:center}' +
       '#espil-tut .kb{display:inline-flex;align-items:center;justify-content:center;min-width:23px;height:23px;' +
-      'padding:0 4px;margin-right:4px;border-radius:6px;background:linear-gradient(180deg,#fffdf6,#ffeecd);' +
-      'border:1.5px solid #cfa96f;border-bottom-width:3px;color:#6b4a1f;font-size:.8rem;font-weight:800}' +
-      '#espil-tut.done{border-color:#b57708}';
+      'padding:0 4px;margin-right:4px;border-radius:6px;background:linear-gradient(180deg,#e8cf9f,#caa06a);' +
+      'border:1.5px solid #54381f;border-bottom-width:3px;color:#3a2817;font-size:.8rem;font-weight:800}' +
+      '#espil-tut.done{border-color:#ffd97a}';
       /* Mobile revert (Han 2026-11-04): the Batch E2 coarse-pointer
          top:52px tutorial offset is REMOVED - top:86px everywhere. */
     document.head.appendChild(st);
