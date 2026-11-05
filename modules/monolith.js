@@ -865,8 +865,7 @@
        ================================================================ */
     var mapScene=null,mapCamera=null,mapBuilt=false;
     var WATER_Z=-100, WATER_Y=.25; /* swim boundary (QA #17) */
-    var trafficCars=[],carTextures=[],carColliders=[]; /* hoisted from buildWalkMapOnce (2026-10-08): used by collideCircleAxis/updateWalkMap */
-    var updateTrafficCars=function(dt){}; /* no-op since the traffic-car sprites were removed (Han 2026-11-04, item 2); the animate loop still calls it */
+    var carColliders=[]; /* hoisted from buildWalkMapOnce (2026-10-08): read by collideCircleAxis/updateWalkMap; stays declared, permanently empty - the traffic-car sprites that fed it were removed (Han 2026-11-04, item 2) and the dead traffic-car declarations went with the last stub on 2026-11-05 (Han: cars still visible) */
     /* 5km city (Han 2026-10-07): water bodies at scale.
        - Downtown harbor + Burrard Inlet: z < -100 (entire north)
        - English Bay: x < -2500 (west side)
@@ -1212,28 +1211,47 @@
       return {enabled:espilOccludeState.enabled,master:espilOccludeMaster,centrePx:espilOccludeState.centrePx,radiusPx:espilOccludeState.radiusPx,charDepth:espilOccludeState.charDepth,patchedMaterials:espilOccludePatchedCount,factor:ESPIL_OCCLUDE_RADIUS_FACTOR};
     };
     window.__espilOccludeState.setEnabled=function(b){ espilOccludeMaster=!!b; return espilOccludeMaster; };
-    /* ============ PLAYER GHOST COPY (Han 2026-11-04) ==============
-       On the live Mapbox line the visible buildings are fill
-       extrusions the fragment cutout above cannot cut, so the
-       character still vanishes behind them. Han's direction: while
-       the player is actually hidden by buildings, show a GREY COPY
-       of the character in front of everything. The copy is a skinned
-       clone of the walker avatar (same rebind pattern as the remote
-       avatar clones): every node's local transform is copied from
-       the source each frame, so it tracks position AND pose exactly
-       - idle, walk, run and one-shots alike, no second mixer.
-       Occlusion is measured, not guessed: rays from the camera to
-       the chest and head sample points are tested against the
-       building mesh set (district meshes + chunk instanced
-       buildings + large box meshes - the same set the P1 hide pass
-       treats as buildings), collected explicitly so meshes P1 has
-       hidden still count. The copy shows only while BOTH samples
-       are blocked; it hides the moment either is visible, and stays
-       off indoors, off-screen, while the store page pauses the
-       world, and in first person (camera at the body). */
+    /* ============ PLAYER SILHOUETTE (Han 2026-11-05) ==============
+       Replaces the 2026-11-04 raycast grey ghost, which Han's live
+       check still failed: its occlusion rays only ever tested the
+       game's OWN building meshes, while on the live line the
+       buildings that actually hide the character are the Mapbox
+       fill extrusions - never in the raycast set - so the copy
+       stayed off exactly where it was needed; and where it did
+       fire, #9aa1a8 at 0.5 opacity was too faint to read. Han's
+       prescribed fix, verbatim intent: when occlusion of the
+       character by a building is detected, SHOW THE CHARACTER'S
+       SILHOUETTE. Detection is now the depth buffer itself: a
+       skinned clone of the walker avatar (same rebind pattern as
+       the remote avatar clones; every node's local transform is
+       copied each frame, so it tracks position AND pose exactly,
+       no second mixer) renders in one flat high-visibility colour
+       with depthTest ON, depthWrite OFF and depthFunc GREATER -
+       a fragment survives only where nearer geometry already wrote
+       a SMALLER depth, i.e. exactly the character's occluded
+       pixels, whoever drew the occluder. No raycasts, no building
+       lists, no collection passes. The Mapbox custom layer renders
+       this scene into the map's own GL context (one shared depth
+       buffer - "true occlusion both ways"), and the extrusion
+       layer sits BELOW the game layer in the stack, so on the live
+       line the extrusions' depth is already in the buffer when the
+       silhouette tests against it; on the fallback canvas the
+       game's own buildings write the depth instead. Either way the
+       silhouette covers every depth-writing building.
+       The equal-depth edge (the clone over the VISIBLE character):
+       the clone is scaled ESPIL_SILHOUETTE_SCALE about the avatar
+       group's ground origin, so its camera-facing surface sits
+       slightly NEARER than the real surface and the GREATER test
+       rejects it there - the visible character is never painted
+       over. Indoors, while the store page pauses the world, and in
+       first person (camera at the body) the silhouette stays off,
+       as the ghost did. Colour is ONE constant - a one-word change:
+       bright cyan, picked for contrast against the greige/beige
+       extrusion tone (#c9c4bb) and grey roads. */
+    var ESPIL_SILHOUETTE_COLOR=0x22d3ee;
+    var ESPIL_SILHOUETTE_SCALE=1.03;
     var espilGhostGroup=null, espilGhostSrc=null, espilGhostPairs=null, espilGhostMat=null;
-    var espilGhostBldgs=[], espilGhostBldgBoxes=[], espilGhostSetAt=0, espilGhostTestAt=0;
-    var espilGhostStat={occluded:false,visible:false,buildings:0,built:false};
+    var espilGhostStat={occluded:false,visible:false,buildings:0,built:false,silhouetteRendered:0,mode:'depth-silhouette'};
     function espilGhostBuild(){
       if(typeof mapScene==='undefined'||!mapScene)return false;
       var av=(typeof walkPlayer!=='undefined'&&walkPlayer)?walkPlayer.av:null;
@@ -1250,7 +1268,7 @@
           cn.skeleton=new THREE.Skeleton(bones,cn.skeleton.boneInverses);
         }
       }
-      if(!espilGhostMat)espilGhostMat=new THREE.MeshBasicMaterial({color:0x9aa1a8,transparent:true,opacity:0.5,depthTest:false,depthWrite:false,fog:false});
+      if(!espilGhostMat)espilGhostMat=new THREE.MeshBasicMaterial({color:ESPIL_SILHOUETTE_COLOR,transparent:true,opacity:0.9,depthTest:true,depthWrite:false,depthFunc:THREE.GreaterDepth,fog:false});
       clone.traverse(function(o){
         if(o.isMesh){ o.material=espilGhostMat; o.castShadow=false; o.receiveShadow=false; o.renderOrder=999; o.frustumCulled=false; }
       });
@@ -1261,83 +1279,12 @@
       espilGhostStat.built=true;
       return true;
     }
-    function espilGhostCollect(){
-      var set=[], seen=new Set();
-      function push(m){ if(m&&!seen.has(m)){ seen.add(m); set.push(m); } }
-      var dm=window.__espilDistrictMeshes||[];
-      for(var i=0;i<dm.length;i++)push(dm[i]);
-      if(typeof mapScene!=='undefined'&&mapScene){
-        var avGrp=(typeof walkPlayer!=='undefined'&&walkPlayer&&walkPlayer.av)?walkPlayer.av.group:null;
-        var veh=(typeof walkPlayer!=='undefined'&&walkPlayer)?walkPlayer.vehicle:null;
-        mapScene.traverse(function(o){
-          if(o.isInstancedMesh){ push(o); return; }
-          if(o.isMesh&&o.geometry&&o.geometry.type==='BoxGeometry'){
-            /* buildings only: skip the avatar, the ride vehicle, the
-               ghost itself and small props (stalls, kiosk, interior) */
-            var n=o,skip=false;
-            while(n){ if(n===avGrp||n===veh||n===espilGhostGroup){skip=true;break;} n=n.parent; }
-            if(skip)return;
-            push(o); /* the world-box pass below keeps only building-sized boxes (unit geometries are mesh-scaled) */
-          }
-        });
-      }
-      /* world boxes for the segment pre-filter; instanced meshes get
-         a per-instance union (setFromObject alone would miss them) */
-      var tmpM=new THREE.Matrix4(), tmpB=new THREE.Box3();
-      espilGhostBldgBoxes=set.map(function(m){
-        try{
-          if(m.isInstancedMesh){
-            if(!m.geometry.boundingBox)m.geometry.computeBoundingBox();
-            var ub=new THREE.Box3(), gb=m.geometry.boundingBox;
-            for(var ii=0;ii<m.count;ii++){
-              m.getMatrixAt(ii,tmpM);
-              tmpB.copy(gb).applyMatrix4(tmpM).applyMatrix4(m.matrixWorld);
-              ub.union(tmpB);
-            }
-            return ub.isEmpty()?null:ub;
-          }
-          var b=new THREE.Box3().setFromObject(m);
-          return b.isEmpty()?null:b;
-        }catch(e){ return null; }
-      });
-      /* drop pure props that slipped in as small boxes */
-      espilGhostBldgs=[]; var keptBoxes=[];
-      for(var k=0;k<set.length;k++){
-        var wb=espilGhostBldgBoxes[k];
-        if(set[k].isInstancedMesh||!wb||(wb.max.y-wb.min.y)>=3.2){ espilGhostBldgs.push(set[k]); keptBoxes.push(wb); }
-      }
-      espilGhostBldgBoxes=keptBoxes;
-      espilGhostStat.buildings=espilGhostBldgs.length;
-    }
-    var _espilGhRay=new THREE.Raycaster(), _espilGhDir=new THREE.Vector3(), _espilGhSeg=new THREE.Ray();
-    var _espilGhFeet=new THREE.Vector3(), _espilGhChest=new THREE.Vector3(), _espilGhHead=new THREE.Vector3(), _espilGhProj=new THREE.Vector3();
-    function espilGhostPointBlocked(camPos,pt){
-      _espilGhDir.copy(pt).sub(camPos);
-      var dist=_espilGhDir.length(); if(dist<0.001)return false;
-      _espilGhDir.normalize();
-      _espilGhRay.set(camPos,_espilGhDir); _espilGhRay.far=dist-0.35;
-      _espilGhSeg.set(camPos,_espilGhDir);
-      for(var i=0;i<espilGhostBldgs.length;i++){
-        var box=espilGhostBldgBoxes[i];
-        if(box&&!_espilGhSeg.intersectsBox(box))continue;
-        var hits=_espilGhRay.intersectObject(espilGhostBldgs[i],false);
-        if(hits&&hits.length)return true;
-      }
-      return false;
-    }
-    function espilGhostMeasure(){
-      if(!document.body.classList.contains('in-map'))return false;
-      if(window.__espilInside||window.__espilStorePaused)return false;
-      var p=walkPlayer; if(!p||!p.pos||typeof mapCamera==='undefined'||!mapCamera)return false;
-      var cam=mapCamera.position;
-      _espilGhFeet.set(p.pos.x,p.pos.y,p.pos.z);
-      _espilGhChest.set(_espilGhFeet.x,_espilGhFeet.y+1.15,_espilGhFeet.z);
-      _espilGhHead.set(_espilGhFeet.x,_espilGhFeet.y+1.7,_espilGhFeet.z);
-      _espilGhProj.copy(_espilGhChest).project(mapCamera);
-      if(_espilGhProj.z<-1||_espilGhProj.z>1||Math.abs(_espilGhProj.x)>1.25||Math.abs(_espilGhProj.y)>1.25)return false; /* off-screen */
-      if(cam.distanceTo(_espilGhChest)<1.7)return false; /* first person: camera at the body */
-      return espilGhostPointBlocked(cam,_espilGhChest)&&espilGhostPointBlocked(cam,_espilGhHead);
-    }
+    /* (The raycast measurement set - espilGhostCollect /
+       espilGhostPointBlocked / espilGhostMeasure - is GONE: the
+       depth test above replaces detection wholesale, which also
+       removes the 1.5 s whole-scene collection pass and the
+       120 ms instanced-mesh raycasts from the frame budget.) */
+    var _espilSilChest=new THREE.Vector3();
     function espilGhostTick(){
       var show=false;
       try{
@@ -1350,25 +1297,37 @@
         if(espilGhostGroup&&av&&av.ready&&av.group){
           /* pose copy: the group takes the avatar group's world
              transform; every cloned node takes its source node's
-             local transform */
+             local transform. The group scale is the silhouette bias:
+             the clone stands ESPIL_SILHOUETTE_SCALE larger about the
+             ground origin, so its near surface beats the GREATER
+             test against the visible character's own depth. */
           av.group.getWorldPosition(espilGhostGroup.position);
           av.group.getWorldQuaternion(espilGhostGroup.quaternion);
-          espilGhostGroup.scale.set(1,1,1);
+          espilGhostGroup.scale.set(ESPIL_SILHOUETTE_SCALE,ESPIL_SILHOUETTE_SCALE,ESPIL_SILHOUETTE_SCALE);
           for(var i=0;i<espilGhostPairs.length;i++){
             var s=espilGhostPairs[i][0], d=espilGhostPairs[i][1];
             d.position.copy(s.position); d.quaternion.copy(s.quaternion); d.scale.copy(s.scale);
           }
-          var now=(typeof performance!=='undefined'?performance.now():Date.now());
-          if(now-espilGhostSetAt>1500){ espilGhostSetAt=now; espilGhostCollect(); }
-          if(now-espilGhostTestAt>120){ espilGhostTestAt=now; espilGhostStat.occluded=espilGhostMeasure(); }
-          show=espilGhostStat.occluded;
+          /* suppression gates (cheap state checks only - the depth
+             test does all occlusion detection): in-map only, never
+             indoors, never while the store page pauses the world,
+             and off in first person (camera at the body). The old
+             off-screen projection gate is gone with the raycasts:
+             off-screen fragments simply never rasterize. */
+          show=document.body.classList.contains('in-map')&&!window.__espilInside&&!window.__espilStorePaused;
+          if(show&&typeof mapCamera!=='undefined'&&mapCamera&&walkPlayer&&walkPlayer.pos){
+            _espilSilChest.set(walkPlayer.pos.x,walkPlayer.pos.y+1.15,walkPlayer.pos.z);
+            if(mapCamera.position.distanceTo(_espilSilChest)<1.7)show=false; /* first person */
+          }
         }
       }catch(e){ show=false; }
       if(espilGhostGroup)espilGhostGroup.visible=show;
       espilGhostStat.visible=show;
+      espilGhostStat.occluded=show; /* legacy field name: now reads "silhouette active" */
+      if(show)espilGhostStat.silhouetteRendered++;
     }
     window.__espilGhostState=function(){
-      return {occluded:espilGhostStat.occluded,visible:espilGhostStat.visible,buildings:espilGhostStat.buildings,built:espilGhostStat.built};
+      return {occluded:espilGhostStat.occluded,visible:espilGhostStat.visible,buildings:espilGhostStat.buildings,built:espilGhostStat.built,silhouetteRendered:espilGhostStat.silhouetteRendered,mode:espilGhostStat.mode,color:'#'+ESPIL_SILHOUETTE_COLOR.toString(16),scale:ESPIL_SILHOUETTE_SCALE};
     };
     var curvedMatCache={};
     function curvedMat(color){
@@ -3038,6 +2997,13 @@
       if(flow>.3)return 'heavy';
       return 'stopped';
     }
+    /* Pedestrian feed (Han 2026-11-05): the walking-NPC module
+       (modules/npcs.js) reads THE SAME live segment state and this
+       level function through these read-only hooks, so the NPC
+       population can never diverge from the traffic the game itself
+       simulates. There is no second traffic source. */
+    window.__espilTrafficSegs=function(){ return trafficSegs; };
+    window.__espilTrafficLevel=trafficLevel;
     function updateTraffic(dt){
       if(!trafficSegs.length)return;
       trafficTimer+=dt;
@@ -3114,11 +3080,12 @@
     /* Traffic-car sprites REMOVED (Han 2026-11-04, item 2 - the flat
        2D car billboards read as a floating car icon in the world): the
        texture painters, spawn/sync, blob shadows and the car pool are
-       gone, and no writer remains for the hoisted trafficCars /
-       carColliders arrays - they stay declared, permanently empty,
-       because the generic collision sweep still reads them. The flow
-       simulation (updateTraffic) and the incident markers are data /
-       signage features and stay. */
+       gone, and no writer remains for the hoisted carColliders array -
+       it stays declared, permanently empty, because the generic
+       collision sweep still reads it (the dead traffic-car
+       declarations were dropped 2026-11-05). The flow simulation
+       (updateTraffic) and the incident markers are data / signage
+       features and stay. */
     function updateProps(){
       for(var i=0;i<billboardProps.length;i++){
         var m=billboardProps[i],u=m.userData.prop;
@@ -7001,6 +6968,19 @@
       Array.prototype.forEach.call(chips,function(c){ c.addEventListener('click',function(){ Array.prototype.forEach.call(chips,function(x){x.classList.remove('is-active');}); c.classList.add('is-active'); }); });
       var expBtn=document.getElementById('chat-expand');
       if(expBtn)expBtn.addEventListener('click',function(){ chatWindow.classList.toggle('is-expanded'); expBtn.textContent=chatWindow.classList.contains('is-expanded')?'\u2212':'+'; });
+      /* Mobile chat (Han 2026-11-05): on coarse pointers the chat sits
+         at the TOP of the screen (pair.css coarse block) - tapping the
+         window toggles the half-screen state (.is-expanded = 50dvh in
+         the coarse CSS, log scrollable, input shown). Taps landing on
+         the input or the head buttons keep their own job. Desktop is
+         untouched: the expand button above stays its only toggle. */
+      if(window.matchMedia&&matchMedia('(pointer:coarse)').matches){
+        chatWindow.addEventListener('click',function(e){
+          if(e.target&&e.target.closest&&e.target.closest('input,button'))return;
+          chatWindow.classList.toggle('is-expanded');
+          if(chatWindow.classList.contains('is-expanded'))chatLog.scrollTop=chatLog.scrollHeight;
+        });
+      }
     }
     function setChatTyping(on){
       chatTyping=!!on;
@@ -9112,18 +9092,12 @@
       leafletMap.setView(ll,leafletMap.getZoom(),{animate:false});
       if(playerMarker)playerMarker.setLatLng(ll);
     }
-    /* 2026-10-12 (Han): mobile starts in landscape — try to lock it on the
-       ENTER CITY tap (a user gesture); the rotate overlay covers the rest. */
-    function tryLandscapeLock(){
-      try{
-        if(!window.matchMedia||!matchMedia('(pointer:coarse)').matches)return;
-        var de=document.documentElement;
-        if(de.requestFullscreen){var fp=de.requestFullscreen();if(fp&&fp.catch)fp.catch(function(){});}
-        if(screen.orientation&&screen.orientation.lock){var op=screen.orientation.lock('landscape');if(op&&op.catch)op.catch(function(){});}
-      }catch(e){}
-    }
-    var __infoEnterBtn=document.getElementById('city-info-enter');
-    if(__infoEnterBtn)__infoEnterBtn.addEventListener('click',tryLandscapeLock);
+    /* Orientation is NEVER forced (Han 2026-11-05, correcting the
+       2026-10-12 landscape lock): the old tryLandscapeLock() requested
+       fullscreen plus an orientation lock to landscape on the ENTER
+       CITY (DIVE) tap - the screen rotated on the tap and released
+       again on the /vancouver navigation. It is removed outright:
+       portrait stays portrait, landscape stays landscape, both pages. */
     function espilMinimapResize(){
       if(leafletMap){ try{ leafletMap.invalidateSize(); }catch(e){} }
     }
@@ -9160,7 +9134,7 @@
     function animate(){
       requestAnimationFrame(animate);
       espilOccludeTick(); /* wall-occlusion cutout uniforms (Han 2026-11-03) */
-      espilGhostTick(); /* grey player copy while building-occluded (Han 2026-11-04) */
+      espilGhostTick(); /* depth-tested player silhouette while building-occluded (Han 2026-11-05) */
       var nowMs=performance.now();
       var dt=Math.min(.05,(nowMs-lastFrameT)/1000);lastFrameT=nowMs;
       if(cityPhaseActive){
@@ -9174,7 +9148,6 @@
         updateMapSky();
         updateProps();
         updateTraffic(dt);
-        updateTrafficCars(dt);
         if(typeof updateTrafficLightVisuals==='function')updateTrafficLightVisuals();
         updateLeafletMap();
         if(espilP1.layerLive&&espilP1.map&&!espilP1.failed){ /* CUSTOM LAYER: mapScene is drawn inside the map's render pass this frame - the game's own context stays idle (CarInMap conversion, 2026-10-17) */ }

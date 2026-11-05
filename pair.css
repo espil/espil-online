@@ -1804,3 +1804,78 @@
       border-color:rgba(202,160,106,.65) !important;
       color:#fff4cf !important;
     }
+
+    /* ==== Mobile UI (Han 2026-11-05): orientation free, three controls,
+       chat at the top ====
+       Orientation is the user's own (the monolith landscape lock is
+       removed in the same batch) - nothing here rotates or re-lays-out
+       per orientation; the SAME coarse rules serve portrait and
+       landscape, and the layout below is overlap-checked at both.
+       Buttons: on touch the ONLY standing control buttons are the
+       direction joystick, USE (#map-interact) and JUMP (#map-jump) -
+       every other standing button is hidden below. Windows and
+       displays (minimap, flasks, status, panels) are not buttons and
+       stay. Chat: the resting window moves to the TOP of the screen
+       with the latest message readable (the log already auto-scrolls
+       to the newest line in addChatMsg); tapping it expands it to
+       half the screen (monolith initChat toggles .is-expanded). */
+    @media (pointer:coarse) {
+      /* Button purge - skill slots (QWER), item slots, the menu
+         cluster, the minimap zoom buttons, and the in-map settings /
+         exit buttons are gone on touch. (#map-attack and
+         #sprint-toggle are already display:none !important above.) */
+      #move-row, #item-row, #kb-menu,
+      .map-zoom-controls,
+      body.in-map #city-settings, body.in-map #city-exit { display:none !important; }
+      /* The three kept controls paint above the quickbar cluster
+         (equal z-index today, and the quickbar comes later in the
+         DOM, so it would win ties at their edges). */
+      body.in-map #map-interact, body.in-map .map-jump { z-index:34; }
+      .joystick { z-index:34; }
+      /* Chat at the top: full-width band under the safe area. The
+         log rests at ~2 lines - the newest message sits at its
+         bottom, fully readable; the input appears only expanded. */
+      .chat-window {
+        top:calc(10px + env(safe-area-inset-top,0px)); bottom:auto;
+        left:10px; right:10px; width:auto; max-height:none;
+        padding:8px 10px; pointer-events:auto;
+      }
+      .chat-log { min-height:0; max-height:46px; overflow-y:auto; }
+      .chat-input { display:none; }
+      .chat-window.is-expanded {
+        height:50dvh; width:auto; display:flex; flex-direction:column;
+        /* Above the mid-screen overlays (map guidance banner z-30,
+           compass chip z-45, tutorial chip z-60): an open half-screen
+           chat takes the taps inside its own rect. */
+        z-index:70;
+      }
+      .chat-window.is-expanded .chat-log { flex:1 1 auto; max-height:none; }
+      .chat-window.is-expanded .chat-input { display:block; }
+      /* The quickbar's remaining contents (HP/MP flasks + zone
+         strip - displays, not buttons) lift clear above USE/JUMP:
+         the late global #quickbar rule otherwise leaves the tray's
+         bottom edge across the buttons' lower halves (measured
+         overlap: tray bottom 826 vs USE top 752 at 390x844). */
+      #quickbar { bottom:calc(3.5vh + min(11vh,16vw) + 2vmin + env(safe-area-inset-bottom,0px)); }
+      /* Top stack under the resting chat band (which ends ~78px
+         down): the location pill drops under the band (it used to
+         sit at top:30, inside the band's right side), and the
+         minimap starts under the pill. The EXP readout (.map-status)
+         is display:none in the current build; its rule only keeps
+         the stack coherent if it ever returns. */
+      body #espil-loc { top:calc(86px + env(safe-area-inset-top,0px)); }
+      .map-status { top:calc(94px + env(safe-area-inset-top,0px)); }
+      #minimap-wrap { top:calc(120px + env(safe-area-inset-top,0px)); }
+      /* Presence transients: the DM chip drops under the chat band
+         and the player-interact prompt lifts clear of the joystick
+         (their styles are injected later by presence.js - the
+         !important here is what lets this earlier sheet win). */
+      #espil-dm-chip { top:calc(96px + env(safe-area-inset-top,0px)) !important; }
+      #espil-interact-prompt { bottom:calc(172px + env(safe-area-inset-bottom,0px)) !important; }
+    }
+    /* The Mapbox guidance banner (#espil-map-guidance, monolith
+       espilP1Banner) is a pure text notice - it has no control and
+       no click handler, but as a body-level fixed card it used to
+       swallow taps over whatever sits under it (measured: the
+       expanded mobile chat's log centre). Click-through everywhere. */
+    #espil-map-guidance { pointer-events:none; }
