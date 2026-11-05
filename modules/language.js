@@ -84,7 +84,6 @@ charPanelSub:{en:'Status and outfit. Press P to close.',ko:'상태와 복장입�
 charPanelFoot:{en:'Outfit system arrives with the character update.',ko:'복장 시스템은 캐릭터 업데이트와 함께 옵니다.',fr:'Le système de tenues arrivera avec la mise à jour des personnages.',zh:'服装系统将随角色更新到来。'},
 friendsTitle:{en:'FRIENDS / PARTY',ko:'친구 / 파티',fr:'AMIS / GROUPE',zh:'好友 / 队伍'},
 friendsSub:{en:'Press P to close. Right-click a character to invite or add a friend.',ko:'P를 눌러 닫습니다. 캐릭터를 우클릭하면 파티 초대와 친구 등록을 할 수 있습니다.',fr:'Appuyez sur P pour fermer. Clic droit sur un personnage pour inviter ou ajouter un ami.',zh:'按 P 关闭。右键单击角色可邀请或添加好友。'},
-humanMark:{en:'\u2713 Human-checked \u00b7 every page is read by me before it goes live',ko:'\u2713 사람이 직접 확인합니다 \u00b7 올라가기 전에 한 페이지씩 읽고 올립니다',fr:'\u2713 V\u00e9rifi\u00e9 par un humain \u00b7 chaque page est relue avant publication',zh:'\u2713 真人确认 \u00b7 每页发布前都由真人阅读'},
 friendsNone:{en:'No friends yet. Add by username:',ko:'아직 친구가 없습니다. 사용자 이름으로 추가하세요:',fr:"Pas encore d'amis. Ajoutez par nom d'utilisateur :",zh:'还没有好友。通过用户名添加：'},
 usernamePh:{en:'Username',ko:'사용자 이름',fr:"Nom d'utilisateur",zh:'用户名'},
 add:{en:'ADD',ko:'추가',fr:'AJOUTER',zh:'添加'},
