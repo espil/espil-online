@@ -258,7 +258,9 @@ function buildCounter() {
    Meshy-downloaded Zealandia variant set (female_v1: long black hair,
    white blouse, navy skirt), re-encoded for this page's r128 loader -
    textures at 1024, the Idle clip only, no GLB extensions, 1.70 m tall
-   at native scale. Loaded FRESH here, never through the place() cache:
+   at native scale, displayed at 1.24x (~2.11 m; Han 2026-11-05 - she
+   read too small behind the counter at native size). Loaded FRESH
+   here, never through the place() cache:
    a cloned SkinnedMesh keeps the original scene's skeleton and draws
    nothing. No collider: she stands behind the counter body, which
    already blocks the player. */
@@ -271,6 +273,7 @@ function buildClerk() {
     var obj = gltf.scene;
     obj.position.set(STORE.counter.x - 1.6, 0, -14.3); /* same spot as the old clerk */
     obj.rotation.y = 0;                                /* glTF forward is +z: she faces the entrance */
+    obj.scale.setScalar(1.24); /* Han 2026-11-05: native 1.70 m read too small behind the counter - ~2.11 m at display scale */
     obj.traverse(function (n) { n.frustumCulled = false; });
     scene.add(obj); loadState.placed++; clerkLoaded = true;
     if (gltf.animations && gltf.animations.length) {
