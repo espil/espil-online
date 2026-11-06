@@ -1211,123 +1211,281 @@
       return {enabled:espilOccludeState.enabled,master:espilOccludeMaster,centrePx:espilOccludeState.centrePx,radiusPx:espilOccludeState.radiusPx,charDepth:espilOccludeState.charDepth,patchedMaterials:espilOccludePatchedCount,factor:ESPIL_OCCLUDE_RADIUS_FACTOR};
     };
     window.__espilOccludeState.setEnabled=function(b){ espilOccludeMaster=!!b; return espilOccludeMaster; };
-    /* ============ PLAYER SILHOUETTE (Han 2026-11-05) ==============
-       Replaces the 2026-11-04 raycast grey ghost, which Han's live
-       check still failed: its occlusion rays only ever tested the
-       game's OWN building meshes, while on the live line the
-       buildings that actually hide the character are the Mapbox
-       fill extrusions - never in the raycast set - so the copy
-       stayed off exactly where it was needed; and where it did
-       fire, #9aa1a8 at 0.5 opacity was too faint to read. Han's
-       prescribed fix, verbatim intent: when occlusion of the
-       character by a building is detected, SHOW THE CHARACTER'S
-       SILHOUETTE. Detection is now the depth buffer itself: a
-       skinned clone of the walker avatar (same rebind pattern as
-       the remote avatar clones; every node's local transform is
-       copied each frame, so it tracks position AND pose exactly,
-       no second mixer) renders in one flat high-visibility colour
-       with depthTest ON, depthWrite OFF and depthFunc GREATER -
-       a fragment survives only where nearer geometry already wrote
-       a SMALLER depth, i.e. exactly the character's occluded
-       pixels, whoever drew the occluder. No raycasts, no building
-       lists, no collection passes. The Mapbox custom layer renders
-       this scene into the map's own GL context (one shared depth
-       buffer - "true occlusion both ways"), and the extrusion
-       layer sits BELOW the game layer in the stack, so on the live
-       line the extrusions' depth is already in the buffer when the
-       silhouette tests against it; on the fallback canvas the
-       game's own buildings write the depth instead. Either way the
-       silhouette covers every depth-writing building.
-       The equal-depth edge (the clone over the VISIBLE character):
-       the clone is scaled ESPIL_SILHOUETTE_SCALE about the avatar
-       group's ground origin, so its camera-facing surface sits
-       slightly NEARER than the real surface and the GREATER test
-       rejects it there - the visible character is never painted
-       over. Indoors, while the store page pauses the world, and in
-       first person (camera at the body) the silhouette stays off,
-       as the ghost did. Colour is ONE constant - a one-word change:
-       bright cyan, picked for contrast against the greige/beige
-       extrusion tone (#c9c4bb) and grey roads. */
+    /* ============ PLAYER SILHOUETTE - COLOUR DETECTOR (Han 2026-11-05, third round) ==============
+       Two earlier generations failed Han's live check. The raycast
+       grey ghost (2026-11-04) only ever tested the game's own
+       building meshes. The depth-func silhouette (earlier today)
+       assumed the Mapbox fill extrusions' depth is sitting in the
+       shared buffer when the custom layer renders; on the live line
+       the buildings that hide the character ARE those extrusions
+       (in layer mode the game's own building meshes are hidden by
+       espilP1Hide - the extrusions are the only buildings drawn),
+       and whether their depth is usable by the game layer depends
+       on Mapbox's internal render order and GL state management
+       around custom layers, which the game does not control.
+       Han's prescribed method for this round, verbatim intent:
+       use a COLOUR DETECTOR - if the character is not at the pixel
+       position where it should be, switch to silhouette mode at
+       maximum z-index. That is what runs now:
+       - Every ESPIL_DET_INTERVAL ms the game renders the scene
+         TWICE into one low-res offscreen target (long edge 288 px)
+         from the live camera, back to back and identical except
+         that the second pass hides the character's visual root.
+         Pixels inside an ellipse around the character's projected
+         chest that CHANGE between the two renders are exactly the
+         character's visible fragments. In layer mode both passes
+         force-show the building classes espilP1Hide hides (the
+         same records the Mapbox extrusions are drawn from), so
+         the detector judges occlusion by the same buildings Han
+         sees, without touching Mapbox's depth state at all.
+       - Changed fraction of the ellipse under ESPIL_DET_ON (0.10)
+         = the character is NOT THERE -> occluded. Over
+         ESPIL_DET_OFF (0.22) = present again -> silhouette off.
+         Hysteresis between the two.
+       - Silhouette mode: NO clone and NO material swap - the rig
+         proved exhaustively that in this build a cloned avatar
+         mesh never rasterizes and the avatar mesh itself renders
+         only with its exact original material object (any swapped
+         material - basic, standard, even a faithful clone of its
+         own - draws nothing). So silhouette mode toggles STATE on
+         the character's own materials: diffuse to black, emissive
+         to the flat silhouette colour, depthTest OFF, and the
+         meshes' renderOrder to 999 - Han's 'zindex at maximum'.
+         The character himself becomes the flat silhouette, drawn
+         through the occluder on the exact render path he already
+         uses, in the exact pose he already has. Detector passes
+         force depthTest back ON for their two renders, so a shown
+         silhouette never fools the detector into switching off.
+         When the detector sees the character again every value is
+         restored - no double-draw, no residue.
+       Cost: two 288-px scene renders + two sub-rectangle readbacks
+       (the ellipse's bounding box only) every ~130 ms; no
+       per-frame readbacks, no raycasts, no per-frame pose copies.
+       Suppression gates unchanged: in-map only, never indoors,
+       never while the store page pauses the world, off in first
+       person. Colour is ONE constant, bright cyan. */
     var ESPIL_SILHOUETTE_COLOR=0x22d3ee;
-    var ESPIL_SILHOUETTE_SCALE=1.03;
-    var espilGhostGroup=null, espilGhostSrc=null, espilGhostPairs=null, espilGhostMat=null;
-    var espilGhostStat={occluded:false,visible:false,buildings:0,built:false,silhouetteRendered:0,mode:'depth-silhouette'};
-    function espilGhostBuild(){
-      if(typeof mapScene==='undefined'||!mapScene)return false;
-      var av=(typeof walkPlayer!=='undefined'&&walkPlayer)?walkPlayer.av:null;
-      if(!av||!av.ready||!av.__visualRoot)return false;
-      var src=av.__visualRoot;
-      var clone=src.clone(true);
-      var srcNodes=[],cloneNodes=[];
-      src.traverse(function(o){srcNodes.push(o);});
-      clone.traverse(function(o){cloneNodes.push(o);});
-      for(var i=0;i<cloneNodes.length;i++){
-        var cn=cloneNodes[i], sn=srcNodes[i];
-        if(sn&&cn&&sn.isSkinnedMesh&&cn.isSkinnedMesh&&cn.skeleton){
-          var bones=cn.skeleton.bones.map(function(b){ return cloneNodes[srcNodes.indexOf(b)]; });
-          cn.skeleton=new THREE.Skeleton(bones,cn.skeleton.boneInverses);
-        }
-      }
-      if(!espilGhostMat)espilGhostMat=new THREE.MeshBasicMaterial({color:ESPIL_SILHOUETTE_COLOR,transparent:true,opacity:0.9,depthTest:true,depthWrite:false,depthFunc:THREE.GreaterDepth,fog:false});
-      clone.traverse(function(o){
-        if(o.isMesh){ o.material=espilGhostMat; o.castShadow=false; o.receiveShadow=false; o.renderOrder=999; o.frustumCulled=false; }
+    var ESPIL_DET_INTERVAL=130;
+    var ESPIL_DET_RT_LONG=288;
+    var ESPIL_DET_ON=0.10, ESPIL_DET_OFF=0.22;
+    var espilGhostSrc=null, espilSilMats=null, espilSilMeshes=null, espilSilApplied=false;
+    var espilGhostStat={occluded:false,visible:false,buildings:0,built:false,silhouetteRendered:0,mode:'color-detector',detector:'color',markerPx:0,discFrac:0,silhouetteOn:false,checks:0,detRt:''};
+    /* Capture the avatar's own materials + mesh render orders once
+       per avatar build. Silhouette mode only ever writes UNIFORM /
+       STATE values on these exact material objects (colour,
+       emissive, depthTest) - never a replacement material, never a
+       cloned mesh - because those are the operations the rig proved
+       this build actually renders. NPC materials are separate
+       objects (verified in the rig), so remote/NPC figures are
+       never touched. */
+    function espilSilCapture(av){
+      espilSilMats=[]; espilSilMeshes=[];
+      var seen=[];
+      av.__visualRoot.traverse(function(o){
+        if(!o.isMesh)return;
+        espilSilMeshes.push({m:o,ro:o.renderOrder});
+        (Array.isArray(o.material)?o.material:[o.material]).forEach(function(mt){
+          if(mt&&seen.indexOf(mt)<0){ seen.push(mt);
+            espilSilMats.push({mat:mt,
+              color:(mt.color?mt.color.getHex():0),
+              emissive:(mt.emissive?mt.emissive.getHex():0),
+              ei:(mt.emissiveIntensity!==undefined?mt.emissiveIntensity:1),
+              depthTest:mt.depthTest});
+          }
+        });
       });
-      var grp=new THREE.Group(); grp.add(clone); grp.visible=false; grp.frustumCulled=false;
-      mapScene.add(grp);
-      espilGhostGroup=grp; espilGhostSrc=src; espilGhostPairs=[];
-      for(var j=0;j<srcNodes.length;j++)espilGhostPairs.push([srcNodes[j],cloneNodes[j]]);
-      espilGhostStat.built=true;
-      return true;
+      espilGhostStat.built=espilSilMats.length>0;
+      return espilGhostStat.built;
     }
-    /* (The raycast measurement set - espilGhostCollect /
-       espilGhostPointBlocked / espilGhostMeasure - is GONE: the
-       depth test above replaces detection wholesale, which also
-       removes the 1.5 s whole-scene collection pass and the
-       120 ms instanced-mesh raycasts from the frame budget.) */
+    function espilSilApply(on){
+      if(!espilSilMats||on===espilSilApplied)return;
+      espilSilApplied=on;
+      for(var i=0;i<espilSilMats.length;i++){
+        var s=espilSilMats[i];
+        if(on){ if(s.mat.color)s.mat.color.setHex(0x000000); if(s.mat.emissive)s.mat.emissive.setHex(ESPIL_SILHOUETTE_COLOR); if(s.mat.emissiveIntensity!==undefined)s.mat.emissiveIntensity=1; s.mat.depthTest=false; }
+        else{ if(s.mat.color)s.mat.color.setHex(s.color); if(s.mat.emissive)s.mat.emissive.setHex(s.emissive); if(s.mat.emissiveIntensity!==undefined)s.mat.emissiveIntensity=s.ei; s.mat.depthTest=s.depthTest; }
+      }
+      for(var j=0;j<espilSilMeshes.length;j++)espilSilMeshes[j].m.renderOrder=on?999:espilSilMeshes[j].ro;
+    }
+    /* ============ COLOUR DETECTOR (Han 2026-11-05) ============
+       Pixel-evidence occlusion detection, twice per check at most
+       and throttled to ESPIL_DET_INTERVAL: the scene renders into a
+       small offscreen target from the live camera TWICE, back to
+       back, identical except that the second pass hides the
+       character's visual root. Pixels inside an ellipse around the
+       character's projected chest that CHANGE between the two
+       renders are exactly the character's visible fragments; ~none
+       means a building covers him. No material swaps anywhere -
+       the rig proved a runtime-swapped material never rasterizes
+       the avatar in this build (its own material or nothing), so
+       the detector touches visibility only, which is proven to
+       work. In layer mode the classes espilP1Hide hides are
+       force-shown for both passes - they are the same building
+       records the Mapbox extrusions are drawn from. The mesh list
+       is cached and rebuilt only when the scene population or the
+       avatar changes. */
+    var espilDetRT=null, espilDetW=0, espilDetH=0;
+    var espilDetCache=null, espilDetCacheSig='';
+    var espilDetLast=0, espilDetOn=false;
+    var _espilDetF=new THREE.Vector3(), _espilDetC=new THREE.Vector3(), _espilDetH=new THREE.Vector3();
+    function espilDetSig(av){
+      var dm=window.__espilDistrictMeshes||[];
+      return (mapScene?mapScene.children.length:0)+'/'+dm.length+'/'+(av&&av.__visualRoot?av.__visualRoot.uuid:'-');
+    }
+    function espilDetRebuild(av){
+      espilDetCache=[];
+      var dmSet={};
+      (window.__espilDistrictMeshes||[]).forEach(function(m){ dmSet[m.uuid]=1; });
+      if(!mapScene)return;
+      mapScene.traverse(function(o){
+        if(!o.isMesh)return;
+        /* force-show classes mirror espilP1Hide: district meshes,
+           instanced chunk meshes, BoxGeometry AABB/core meshes and
+           the big ground planes - hidden in layer mode only because
+           Mapbox draws their twins */
+        var force=!!dmSet[o.uuid]||!!o.isInstancedMesh;
+        if(!force){
+          var g=o.geometry;
+          if(g&&g.type==='BoxGeometry')force=true;
+          else if(g&&g.type==='PlaneGeometry'){
+            var mt=Array.isArray(o.material)?o.material[0]:o.material;
+            var w=(g.parameters&&g.parameters.width)||0;
+            if(w>=400||(mt&&mt.map))force=true;
+          }
+        }
+        espilDetCache.push({m:o,force:force});
+      });
+      espilDetCacheSig=espilDetSig(av);
+    }
+    function espilDetMeasure(av){
+      var useLayer=(typeof espilP1!=='undefined'&&espilP1.layerLive&&!espilP1.failed&&espilP1.layerRenderer&&espilP1.layerCam);
+      var R=useLayer?espilP1.layerRenderer:(typeof renderer!=='undefined'?renderer:null);
+      var cam=useLayer?espilP1.layerCam:(typeof mapCamera!=='undefined'?mapCamera:null);
+      if(!R||!cam||!mapScene||!walkPlayer||!walkPlayer.pos)return null;
+      var cv=R.domElement, bw=cv.width||1280, bh=cv.height||800;
+      var W=ESPIL_DET_RT_LONG, H=Math.max(96,Math.round(ESPIL_DET_RT_LONG*bh/Math.max(1,bw)));
+      if(!espilDetRT){ espilDetRT=new THREE.WebGLRenderTarget(W,H); espilDetW=W; espilDetH=H; }
+      else if(espilDetW!==W||espilDetH!==H){ espilDetRT.setSize(W,H); espilDetW=W; espilDetH=H; }
+      espilGhostStat.detRt=W+'x'+H;
+      if(!espilDetCache||espilDetCacheSig!==espilDetSig(av))espilDetRebuild(av);
+      /* project feet / chest / head with the active camera (in layer
+         mode the composed projection matrix maps game-world points
+         directly - the layer camera's view is the identity) */
+      var K=1; if(av.__visualRoot&&av.__visualRoot.scale)K=av.__visualRoot.scale.y/1.5;
+      var p=walkPlayer.pos;
+      function proj(x,y,z,out){ out.set(x,y,z); if(useLayer)out.applyMatrix4(cam.projectionMatrix); else out.project(cam); return out; }
+      var fN=proj(p.x,p.y,p.z,_espilDetF), cN=proj(p.x,p.y+1.15*K,p.z,_espilDetC), hN=proj(p.x,p.y+1.8*K,p.z,_espilDetH);
+      if(!(cN.z<1&&cN.z>-1)||Math.abs(cN.x)>1.3||Math.abs(cN.y)>1.3)return null; /* off-frame: cannot judge, keep the previous decision */
+      var cxPx=(cN.x*0.5+0.5)*W, cyPx=(cN.y*0.5+0.5)*H; /* render-target pixel space, origin bottom-left (the readback convention) */
+      var hPx=Math.abs(hN.y-fN.y)*0.5*H;
+      if(hPx<4)return null;
+      var rxPx=Math.max(3,0.30*hPx), ryPx=Math.max(3,0.45*hPx);
+      /* difference pass (visibility only, no material swaps):
+         contact shadow + sky dome out for both renders,
+         espilP1Hide classes force-shown for both renders; pass A
+         renders the scene as-is, pass B renders it again with the
+         character's visual root hidden. Pixels that change inside
+         the ellipse are the character's visible fragments. */
+      var cache=espilDetCache, savedVis=[];
+      /* while the silhouette is applied the character's materials
+         have depthTest OFF - force it back ON for both passes so
+         the occluder hides him here exactly as it does on screen,
+         then restore the applied state */
+      var silGuard=false;
+      if(espilSilApplied&&espilSilMats){ silGuard=true; for(var q=0;q<espilSilMats.length;q++)espilSilMats[q].mat.depthTest=true; }
+      var shadowWas=null; if(av.shadow){ shadowWas=av.shadow.visible; av.shadow.visible=false; }
+      var domeWas=null; if(typeof mapSkyDome!=='undefined'&&mapSkyDome){ domeWas=mapSkyDome.visible; mapSkyDome.visible=false; }
+      for(var i=0;i<cache.length;i++){
+        var e=cache[i];
+        if(!e.m.visible&&e.force){ savedVis.push(e.m); e.m.visible=true; }
+      }
+      var rootWas=(av.__visualRoot?av.__visualRoot.visible:null);
+      var x0=Math.max(0,Math.floor(cxPx-rxPx)), x1=Math.min(W-1,Math.ceil(cxPx+rxPx));
+      var y0=Math.max(0,Math.floor(cyPx-ryPx)), y1=Math.min(H-1,Math.ceil(cyPx+ryPx));
+      var rw=x1-x0+1, rh=y1-y0+1;
+      var bufA=null, bufB=null, cnt=0;
+      var oldRT=null, oldCC=null, oldCA=1;
+      try{
+        oldRT=R.getRenderTarget();
+        if(R.getClearColor){ oldCC=R.getClearColor(new THREE.Color()); oldCA=R.getClearAlpha(); }
+        R.setRenderTarget(espilDetRT);
+        R.setClearColor(0x000000,1);
+        if(rw>0&&rh>0){
+          bufA=new Uint8Array(rw*rh*4); bufB=new Uint8Array(rw*rh*4);
+          R.clear(true,true,false);
+          R.render(mapScene,cam);
+          R.readRenderTargetPixels(espilDetRT,x0,y0,rw,rh,bufA);
+          if(av.__visualRoot)av.__visualRoot.visible=false;
+          R.clear(true,true,false);
+          R.render(mapScene,cam);
+          R.readRenderTargetPixels(espilDetRT,x0,y0,rw,rh,bufB);
+          for(var yy=0;yy<rh;yy++)for(var xx=0;xx<rw;xx++){
+            var dxn=(x0+xx-cxPx)/rxPx, dyn=(y0+yy-cyPx)/ryPx;
+            if(dxn*dxn+dyn*dyn>1)continue;
+            var o4=(yy*rw+xx)*4;
+            if(Math.abs(bufA[o4]-bufB[o4])>26||Math.abs(bufA[o4+1]-bufB[o4+1])>26||Math.abs(bufA[o4+2]-bufB[o4+2])>26)cnt++;
+          }
+        }
+      }catch(err){}
+      try{ R.setRenderTarget(oldRT); if(oldCC)R.setClearColor(oldCC,oldCA); if(useLayer&&R.state&&R.state.reset)R.state.reset(); }catch(err){}
+      if(av.__visualRoot&&rootWas!==null)av.__visualRoot.visible=rootWas;
+      for(var j=0;j<savedVis.length;j++)savedVis[j].visible=false;
+      if(silGuard&&espilSilMats)for(var q2=0;q2<espilSilMats.length;q2++)espilSilMats[q2].mat.depthTest=false;
+      if(av.shadow&&shadowWas!==null)av.shadow.visible=shadowWas;
+      if(typeof mapSkyDome!=='undefined'&&mapSkyDome&&domeWas!==null)mapSkyDome.visible=domeWas;
+      if(!bufA||!bufB)return null; /* a pass failed: cannot judge, keep the previous decision */
+      return {frac:cnt/(Math.PI*rxPx*ryPx), px:cnt};
+    }
     var _espilSilChest=new THREE.Vector3();
     function espilGhostTick(){
-      var show=false;
+      var gates=false;
       try{
         var av=(typeof walkPlayer!=='undefined'&&walkPlayer)?walkPlayer.av:null;
         if(av&&av.__visualRoot&&espilGhostSrc!==av.__visualRoot){
-          if(espilGhostGroup&&typeof mapScene!=='undefined'&&mapScene)mapScene.remove(espilGhostGroup);
-          espilGhostGroup=null; espilGhostSrc=null; espilGhostPairs=null; espilGhostStat.built=false;
-          espilGhostBuild();
+          if(espilSilApplied)espilSilApply(false);
+          espilGhostSrc=av.__visualRoot; espilSilMats=null; espilSilMeshes=null; espilGhostStat.built=false;
+          if(av.ready)espilSilCapture(av);
+          espilDetCache=null; /* avatar swapped: the pass cache rebuilds on the next check */
         }
-        if(espilGhostGroup&&av&&av.ready&&av.group){
-          /* pose copy: the group takes the avatar group's world
-             transform; every cloned node takes its source node's
-             local transform. The group scale is the silhouette bias:
-             the clone stands ESPIL_SILHOUETTE_SCALE larger about the
-             ground origin, so its near surface beats the GREATER
-             test against the visible character's own depth. */
-          av.group.getWorldPosition(espilGhostGroup.position);
-          av.group.getWorldQuaternion(espilGhostGroup.quaternion);
-          espilGhostGroup.scale.set(ESPIL_SILHOUETTE_SCALE,ESPIL_SILHOUETTE_SCALE,ESPIL_SILHOUETTE_SCALE);
-          for(var i=0;i<espilGhostPairs.length;i++){
-            var s=espilGhostPairs[i][0], d=espilGhostPairs[i][1];
-            d.position.copy(s.position); d.quaternion.copy(s.quaternion); d.scale.copy(s.scale);
-          }
-          /* suppression gates (cheap state checks only - the depth
-             test does all occlusion detection): in-map only, never
-             indoors, never while the store page pauses the world,
-             and off in first person (camera at the body). The old
-             off-screen projection gate is gone with the raycasts:
-             off-screen fragments simply never rasterize. */
-          show=document.body.classList.contains('in-map')&&!window.__espilInside&&!window.__espilStorePaused;
-          if(show&&typeof mapCamera!=='undefined'&&mapCamera&&walkPlayer&&walkPlayer.pos){
+        if(espilSilMats&&av&&av.ready&&av.group){
+          /* suppression gates (cheap state checks): in-map only,
+             never indoors, never while the store page pauses the
+             world, off in first person (camera at the body) */
+          gates=document.body.classList.contains('in-map')&&!window.__espilInside&&!window.__espilStorePaused;
+          if(gates&&typeof mapCamera!=='undefined'&&mapCamera&&walkPlayer&&walkPlayer.pos){
             _espilSilChest.set(walkPlayer.pos.x,walkPlayer.pos.y+1.15,walkPlayer.pos.z);
-            if(mapCamera.position.distanceTo(_espilSilChest)<1.7)show=false; /* first person */
+            if(mapCamera.position.distanceTo(_espilSilChest)<1.7)gates=false;
           }
         }
-      }catch(e){ show=false; }
-      if(espilGhostGroup)espilGhostGroup.visible=show;
+        if(!gates){
+          espilDetOn=false;
+          espilGhostStat.detector='suppressed';
+        }else{
+          espilGhostStat.detector='color';
+          var now=performance.now();
+          if(now-espilDetLast>=ESPIL_DET_INTERVAL){
+            espilDetLast=now;
+            var meas=null;
+            try{ meas=espilDetMeasure(av); }catch(e){ meas=null; }
+            if(meas){
+              espilGhostStat.checks++;
+              espilGhostStat.markerPx=meas.px;
+              espilGhostStat.discFrac=Math.round(meas.frac*1000)/1000;
+              if(meas.frac<ESPIL_DET_ON)espilDetOn=true;
+              else if(meas.frac>ESPIL_DET_OFF)espilDetOn=false;
+            }
+          }
+        }
+      }catch(e){ gates=false; espilDetOn=false; }
+      var show=gates&&espilDetOn;
+      espilSilApply(show);
+      espilGhostStat.silhouetteOn=show;
       espilGhostStat.visible=show;
-      espilGhostStat.occluded=show; /* legacy field name: now reads "silhouette active" */
+      espilGhostStat.occluded=espilDetOn; /* detector decision (legacy field name kept for the probes) */
       if(show)espilGhostStat.silhouetteRendered++;
     }
     window.__espilGhostState=function(){
-      return {occluded:espilGhostStat.occluded,visible:espilGhostStat.visible,buildings:espilGhostStat.buildings,built:espilGhostStat.built,silhouetteRendered:espilGhostStat.silhouetteRendered,mode:espilGhostStat.mode,color:'#'+ESPIL_SILHOUETTE_COLOR.toString(16),scale:ESPIL_SILHOUETTE_SCALE};
+      return {occluded:espilGhostStat.occluded,visible:espilGhostStat.visible,buildings:espilGhostStat.buildings,built:espilGhostStat.built,silhouetteRendered:espilGhostStat.silhouetteRendered,mode:espilGhostStat.mode,color:'#'+ESPIL_SILHOUETTE_COLOR.toString(16),scale:1,detector:espilGhostStat.detector,markerPx:espilGhostStat.markerPx,discFrac:espilGhostStat.discFrac,silhouetteOn:espilGhostStat.silhouetteOn,checks:espilGhostStat.checks,detRt:espilGhostStat.detRt};
     };
     var curvedMatCache={};
     function curvedMat(color){
@@ -2406,6 +2564,17 @@
        style fails to load, a visible guidance banner is shown instead
        of a silent skip. */
     var ESPIL_P1=true;
+    /* AVATAR SIZE HELD CONSTANT (Han 2026-11-05): the layer-mode
+       avatar growth factor is FROZEN at its approved default-framing
+       (zoom 19.3) value, 4.67 x 2^(-(19.3-18.3)/2) = 3.302. It used to
+       be a function of the live zoom - F(z) = 4.67 x 2^(-(z-18.3)/2) -
+       so zooming OUT grew the character's WORLD size (at zoom 16 the
+       figure stood some 18.7 m tall against a 5.9 m default; Han:
+       'when I zoom out the character grows with it - hold the
+       character size'). With F constant the character keeps ONE world
+       size at every zoom and its screen size scales with the map,
+       like every other object in the world. */
+    var ESPIL_AVATAR_F=4.67*Math.pow(2,-0.5);
     var espilP1={map:null,ready:false,failed:null,hiddenApplied:false,initTried:false,bannerEl:null,mapEl:null,layerAdded:false,layerLive:false,layerRenderer:null,layerCam:null,gameCanvasHidden:false,layerSignaled:false,zoom:null,zoomT:null,zoomDrive:false,style3dOff:false,style3dTries:0};
     espilP1.envReady=false;
     (window.__ESPIL_ENV_READY__||Promise.resolve()).then(function(){espilP1.envReady=true;},function(){espilP1.envReady=true;});
@@ -2857,24 +3026,26 @@
         var zoom=espilP1.zoom;
         try{ espilP1.map.jumpTo({center:ll,bearing:brg,pitch:52,zoom:zoom}); }catch(e){}
         if(espilP1.layerLive){ try{ espilP1.map.triggerRepaint(); }catch(e){} } /* the map's render pass draws the game scene via the custom layer */
-        /* AVATAR SCALE (Han 2026-10-17): in layer mode the avatar draws
-           at true map scale - about 11 px tall at the default zoom
-           18.3 (measured), which reads as invisible on a real map.
-           Layer mode ONLY, the visual root is grown by a zoom-linked
-           factor F(z) = 4.67 x 2^(-(z-18.3)/2), chosen so the screen
-           height follows H(z) = 52 x 2^((z-18.3)/2) px: about 75 px
-           at the 19.3 default framing (Han PC QA round 2, 2026-10-18:
-           the 227 px figure read too big against the map - one third
-           of it; the 19.3 default zoom itself was approved and stays),
-           about 183 px at the max 22, about 23 px at 16. Physics, collision
-           and support keep the
-           true 1.8 m body - only the drawing grows; outside layer mode
-           the base scale is restored. The contact shadow follows at a
-           capped factor so it stays a contact shadow. */
+        /* AVATAR SCALE (Han 2026-10-17; SIZE HELD 2026-11-05): in
+           layer mode the avatar draws at true map scale - about 11 px
+           tall at the default zoom 18.3 (measured), which reads as
+           invisible on a real map, so the visual root is grown by a
+           factor over its base scale. That factor was zoom-linked,
+           F(z) = 4.67 x 2^(-(z-18.3)/2), and zooming out visibly grew
+           the character's world size - Han ordered the size HELD
+           (2026-11-05), so F is now the constant ESPIL_AVATAR_F (the
+           old formula's value at the approved 19.3 default framing,
+           so the default look is unchanged): one world size at every
+           zoom, screen height scaling with the map like everything
+           else (about 75 px at 19.3, as approved in Han PC QA round
+           2, 2026-10-18). Physics, collision and support keep the
+           true 1.8 m body - only the drawing is grown; outside layer
+           mode the base scale is restored. The contact shadow follows
+           at a capped factor so it stays a contact shadow. */
         if(typeof walkPlayer!=='undefined'&&walkPlayer&&walkPlayer.av){
           var _av=walkPlayer.av,_vr=_av.__visualRoot;
           if(_vr){
-            var _F=espilP1.layerLive&&!espilP1.failed?4.67*Math.pow(2,-((espilP1.zoom||19.3)-18.3)/2):1;
+            var _F=espilP1.layerLive&&!espilP1.failed?ESPIL_AVATAR_F:1;
             var _bs=_vr.userData.__avBaseScale||1.5;
             _vr.scale.setScalar(_bs*_F);
             _vr.position.y=(_vr.userData.__avBaseY||0)*_F;
@@ -9134,7 +9305,7 @@
     function animate(){
       requestAnimationFrame(animate);
       espilOccludeTick(); /* wall-occlusion cutout uniforms (Han 2026-11-03) */
-      espilGhostTick(); /* depth-tested player silhouette while building-occluded (Han 2026-11-05) */
+      espilGhostTick(); /* colour-detector player silhouette while building-occluded (Han 2026-11-05) */
       var nowMs=performance.now();
       var dt=Math.min(.05,(nowMs-lastFrameT)/1000);lastFrameT=nowMs;
       if(cityPhaseActive){

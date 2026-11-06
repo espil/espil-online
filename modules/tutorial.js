@@ -8,7 +8,11 @@
    buy the onigiri (the shop sells it as Triangle Kimbap) -> open a
    stall -> open the map. Progress persists per device; a Settings
    button replays it. The chip is pointer-events:none - it can never
-   block play. */
+   block play. Mobile (Han 2026-11-05): on coarse pointers the chip
+   renders compact and DOES take taps - a tap toggles it between the
+   compact chip and a minimized pill (short step label only); the
+   minimized state persists across steps until tapped again. Fine
+   pointers keep the original pointer-events:none behaviour. */
 (function () {
   'use strict';
 
@@ -84,6 +88,24 @@
   }
   function t(k) { return (STR[lang()] || STR.en)[k] || STR.en[k] || k; }
 
+  /* Short step labels for the minimized mobile pill (Han 2026-11-05).
+     landingNav/move reuse the existing lookShort/moveShort strings. */
+  var SHORT = {
+    en: { landingEnter: 'Dive in', jump: 'Jump', nav: 'To Konbiniya', enter: 'Go inside', buy: 'Buy onigiri', stall: 'Open stall', map: 'Open map', done: 'Done' },
+    ko: { landingEnter: '입장하기', jump: '점프', nav: '콘비니야로', enter: '들어가기', buy: '오니기리 사기', stall: '좌판 열기', map: '맵 열기', done: '완료' },
+    fr: { landingEnter: 'Plonger', jump: 'Sauter', nav: 'Au Konbiniya', enter: 'Entrer', buy: 'Acheter l\'onigiri', stall: 'Ouvrir l\'étal', map: 'Ouvrir la carte', done: 'Terminé' },
+    zh: { landingEnter: '进入城市', jump: '跳跃', nav: '去 Konbiniya', enter: '进店', buy: '买饭团', stall: '摆摊', map: '打开地图', done: '完成' }
+  };
+  function shortText(key) {
+    if (key === 'landingNav') return t('lookShort');
+    if (key === 'move') return t('moveShort');
+    var l = lang();
+    return (SHORT[l] && SHORT[l][key]) || SHORT.en[key] || t(key);
+  }
+  function coarse() {
+    try { return !!(window.matchMedia && window.matchMedia('(pointer:coarse)').matches); } catch (e) { return false; }
+  }
+
   /* The four arrow keys as key-cap graphics (Han 2026-10-28). */
   var KEYCAPS = '<span class="kb">&#8592;</span><span class="kb">&#8593;</span><span class="kb">&#8595;</span><span class="kb">&#8594;</span>';
   /* The globe scene takes Up/Down only (Han 2026-10-29), so the
@@ -93,6 +115,7 @@
   var FIRST_GAME_STEP = 2; /* STEPS index of the first in-map step */
   function onLanding() { return !window.__ESPIL_GAME_PAGE; }
   var step = -1;               /* -1 = not running */
+  var minimized = false;       /* mobile pill state (coarse pointers only) */
   var chip = null;
   var stepStartPose = null;
   var groundY = null;
@@ -127,13 +150,30 @@
       '#espil-tut .kb{display:inline-flex;align-items:center;justify-content:center;min-width:23px;height:23px;' +
       'padding:0 4px;margin-right:4px;border-radius:6px;background:linear-gradient(180deg,#e8cf9f,#caa06a);' +
       'border:1.5px solid #54381f;border-bottom-width:3px;color:#3a2817;font-size:.8rem;font-weight:800}' +
-      '#espil-tut.done{border-color:#ffd97a}';
+      '#espil-tut.done{border-color:#ffd97a}' +
+      /* Mobile compact + touch-minimize (Han 2026-11-05): coarse
+         pointers get a chip at roughly half the footprint, and the
+         chip takes taps so it can be minimized to a pill and back. */
+      '@media (pointer:coarse){' +
+      '#espil-tut{pointer-events:auto;gap:6px;padding:5px 11px;font-size:.70rem;border-width:1.5px;max-width:88vw;cursor:pointer}' +
+      '#espil-tut .kb{min-width:16px;height:16px;padding:0 2px;margin-right:2px;border-radius:4px;font-size:.60rem;border-bottom-width:2px}' +
+      '#espil-tut.tut-min{gap:5px;padding:4px 10px;font-size:.68rem}' +
+      '#espil-tut .mini-ic{color:#ffd97a;font-size:.66rem;line-height:1}' +
+      '}';
       /* Mobile revert (Han 2026-11-04): the Batch E2 coarse-pointer
          top:52px tutorial offset is REMOVED - top:86px everywhere. */
     document.head.appendChild(st);
     chip = document.createElement('div');
     chip.id = 'espil-tut';
     chip.innerHTML = '<span class="tx"></span>';
+    /* Touch minimize toggle (coarse only; on fine pointers the chip
+       keeps pointer-events:none, so this listener can never fire). */
+    chip.addEventListener('click', function () {
+      if (!coarse()) return;
+      if (step < 0) return;
+      minimized = !minimized;
+      show();
+    });
     document.body.appendChild(chip);
     return chip;
   }
@@ -145,10 +185,20 @@
        The arrow keys are drawn as key-cap graphics, not words. */
     var tx = chip.querySelector('.tx');
     var key = STEPS[step];
-    if (key === 'landingNav' || key === 'move') {
-      tx.innerHTML = (key === 'move' ? KEYCAPS : KEYCAPS_UD) + '<span>' + t(key === 'move' ? 'moveShort' : 'lookShort') + '</span>';
+    if (minimized && coarse()) {
+      /* Minimized pill: only the current step's essence (Han
+         2026-11-05). The minimized state persists across steps -
+         a new step updates the pill label silently and does NOT
+         re-expand the chip; only a tap restores it. */
+      chip.classList.add('tut-min');
+      tx.innerHTML = '<span class="mini-ic">&#10022;</span><span>' + shortText(key) + '</span>';
     } else {
-      tx.textContent = t(key);
+      chip.classList.remove('tut-min');
+      if (key === 'landingNav' || key === 'move') {
+        tx.innerHTML = (key === 'move' ? KEYCAPS : KEYCAPS_UD) + '<span>' + t(key === 'move' ? 'moveShort' : 'lookShort') + '</span>';
+      } else {
+        tx.textContent = t(key);
+      }
     }
     chip.classList.remove('done');
     chip.style.display = 'flex';
@@ -156,6 +206,11 @@
   function hide() { if (chip) chip.style.display = 'none'; }
   function showDone() {
     ensureChip();
+    /* The completion message announces itself once in full (it
+       hides itself after 4.2 s anyway), even if the player had the
+       chip minimized for the last step. */
+    minimized = false;
+    chip.classList.remove('tut-min');
     chip.querySelector('.tx').textContent = t('done');
     chip.classList.add('done');
     chip.style.display = 'flex';
@@ -196,6 +251,7 @@
   function restart() {
     try { localStorage.removeItem(DONE_KEY); localStorage.removeItem(STEP_KEY); } catch (e) {}
     step = -1;
+    minimized = false; /* a replay starts expanded */
     started = false; /* the boot watcher restarts it on the next tick */
   }
 
@@ -319,7 +375,7 @@
   setInterval(wireReplay, 2500);
 
   window.__espilTutorialState = function () {
-    return { step: step < 0 ? null : STEPS[step], stepIdx: step, done: done(), running: step >= 0 };
+    return { step: step < 0 ? null : STEPS[step], stepIdx: step, done: done(), running: step >= 0, minimized: minimized };
   };
   window.__espilTutorialRestart = restart;
 })();

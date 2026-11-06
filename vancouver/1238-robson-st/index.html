@@ -27,6 +27,17 @@
   #toast { left:50%; top:70px; transform:translateX(-50%); padding:11px 20px; font-size:.88rem; font-weight:800;
     color:#ffe9a8; opacity:0; transition:opacity .3s; pointer-events:none; z-index:9; }
   #toast.on { opacity:1; }
+  /* touch joystick - coarse pointers only (see bindStick below).
+     Bottom-left, lifted clear of the controls note (bottom:18px) and
+     the counter hint (bottom:96px); the shop modal (z 10) covers it. */
+  #stick { display:none; }
+  @media (pointer:coarse) {
+    #stick { display:block; position:fixed; left:18px; bottom:144px; width:112px; height:112px; z-index:8;
+      border-radius:50%; background:rgba(8,18,22,.45); border:1.5px solid rgba(134,238,228,.5);
+      touch-action:none; }
+    #stick-knob { position:absolute; left:50%; top:50%; width:50px; height:50px; margin:-25px 0 0 -25px;
+      border-radius:50%; background:rgba(142,247,232,.5); border:1.5px solid rgba(234,255,253,.85); }
+  }
   #loading { position:fixed; inset:0; z-index:20; background:#10151a; display:flex; align-items:center;
     justify-content:center; font-weight:800; letter-spacing:.14em; color:#8ef7e8; }
   /* shop panel - same concepts/keys as the pair's shop */
@@ -68,6 +79,7 @@
 <div class="chip" id="hint">Press SPACE to pay at the counter</div>
 <div class="chip" id="controls-note">arrows - walk &nbsp;·&nbsp; A / D - turn camera &nbsp;·&nbsp; W / S - zoom &nbsp;·&nbsp; drag - look &nbsp;·&nbsp; SPACE at the counter - shop</div>
 <div class="chip" id="toast" role="status"></div>
+<div id="stick"><div id="stick-knob"></div></div>
 
 <div id="shop-ui" aria-hidden="true">
   <div class="shop-card">
@@ -458,6 +470,69 @@ function bindLook(el) {
   el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
 }
 
+/* ---------- touch joystick (Han 2026-11-05: mobile needs a stick in the store too) ----------
+   Coarse pointers only - the CSS above shows #stick solely under
+   (pointer:coarse); fine pointers never see it. The stick does NOT
+   move the player itself: it writes the same keys[] arrow flags
+   the keyboard writes, so stepMove()/collide() remain the one and
+   only movement path (same 4.5 m/s walk, same camera-relative
+   direction math, same collision). Stick up = ArrowUp (forward,
+   away from the camera facing), stick right = ArrowRight, and a
+   diagonal sets two flags, which stepMove normalizes exactly like
+   two held arrow keys. Releasing the stick clears only the flags
+   the stick itself set.
+   No fight with drag-look / pinch: bindLook is bound to the
+   renderer canvas, and a touch that starts on #stick targets the
+   stick element, so it never reaches the canvas handler; the
+   stick captures its own pointer for the whole drag. */
+var stickVec = { x: 0, y: 0 };   /* knob deflection / TRAVEL, -1..1 (screen y down) */
+function bindStick() {
+  var base = document.getElementById('stick'), knob = document.getElementById('stick-knob');
+  if (!base || !knob) return;
+  var TRAVEL = 30;               /* knob travel radius, px */
+  var pid = null, cx = 0, cy = 0;
+  var held = {};                 /* arrow codes this stick currently holds down */
+  function applyFlags(up, down, left, right) {
+    var want = { ArrowUp: up, ArrowDown: down, ArrowLeft: left, ArrowRight: right };
+    for (var k in want) {
+      if (want[k]) { keys[k] = true; held[k] = true; }
+      else if (held[k]) { keys[k] = false; delete held[k]; }
+    }
+  }
+  function release() {
+    for (var k in held) keys[k] = false;
+    held = {};
+    stickVec.x = 0; stickVec.y = 0;
+    knob.style.transform = '';
+  }
+  function apply(dx, dy) {
+    var d = Math.hypot(dx, dy);
+    var cl = d > TRAVEL ? TRAVEL / d : 1;
+    knob.style.transform = 'translate(' + (dx * cl).toFixed(1) + 'px,' + (dy * cl).toFixed(1) + 'px)';
+    stickVec.x = +(dx * cl / TRAVEL).toFixed(2); stickVec.y = +(dy * cl / TRAVEL).toFixed(2);
+    if (d < 10) { applyFlags(false, false, false, false); return; }   /* dead zone */
+    var ux = dx / d, uy = dy / d;      /* screen y is down: stick up (-uy) = forward */
+    applyFlags(-uy > 0.38, uy > 0.38, ux < -0.38, ux > 0.38);
+  }
+  base.addEventListener('pointerdown', function (e) {
+    if (shopIsOpen || pid !== null) return;
+    pid = e.pointerId;
+    var rc = base.getBoundingClientRect();
+    cx = rc.left + rc.width / 2; cy = rc.top + rc.height / 2;
+    try { base.setPointerCapture(e.pointerId); } catch (err) {}
+    apply(e.clientX - cx, e.clientY - cy);
+    e.preventDefault();
+  });
+  base.addEventListener('pointermove', function (e) {
+    if (e.pointerId !== pid) return;
+    if (shopIsOpen) { pid = null; release(); return; }
+    apply(e.clientX - cx, e.clientY - cy);
+  });
+  function end(e) { if (e.pointerId === pid) { pid = null; release(); } }
+  base.addEventListener('pointerup', end);
+  base.addEventListener('pointercancel', end);
+}
+
 /* ---------- parent pause contract (child side) ---------- */
 function notifyParent(type) {
   try { if (window.opener && !window.opener.closed) window.opener.postMessage({ type: type, store: STORE.slug }, '*'); } catch (e) {}
@@ -484,6 +559,7 @@ function init() {
   buildLights(); buildRoom(); buildCounter(); loadLayout();
   clock = new THREE.Clock();
   bindLook(renderer.domElement);
+  bindStick();
   addEventListener('resize', function () {
     camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
@@ -552,6 +628,7 @@ window.__storePage = {
       layoutLoaded: layoutState.loaded, layoutCount: layoutState.count,
       placed: loadState.placed, failed: loadState.failed.slice(),
       colliders: colliders.length,
+      stick: [stickVec.x, stickVec.y],
       stock: stock().Onigiri, leo: leoBalance()
     };
   }
