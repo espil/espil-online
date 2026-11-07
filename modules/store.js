@@ -5,9 +5,12 @@
    convenience store from the Kenney Mini Market set (CC0) - shelf
    aisles, displays, freezers, and a serving counter with the till
    and the clerk. Browse the shelves, then pay AT THE COUNTER: the
-   counter zone opens the shop, and the stocked goods (starting
-   with the Onigiri, Leo 2) decrement the store's persisted stock
-   as they are bought into the inventory.
+   counter zone opens the shop, and the stocked goods (a food and
+   drink catalogue for HP/MP recovery, Onigiri Leo 2) decrement the
+   store's persisted stock as they are bought into the inventory.
+   S4 (Han 2026-11-06): the catalogue carries the Konbiniya's
+   ready food and drinks; prices follow panels.js FOOD_PRICE
+   (the bag's sell price is 1/3 of these), Onigiri keeps Leo 2.
    Entry routing framework: buildings enter directly today.
    Konbiniya is one floor, so it stays direct; the routing seam
    (__espilEntryRoute) is where 2F+ buildings will first land in
@@ -17,7 +20,21 @@
 (function () {
   'use strict';
   var STOCK_KEY = 'espil_shop_stock_v1';
-  var ONIGIRI = { name: 'Onigiri', price: 2, color: '#f2ead8', glyph: '\uD83C\uDF59', initial: 20 };
+  /* S4 catalogue: ready food and drinks that fit a konbini. Prices
+     follow panels.js FOOD_PRICE; Onigiri keeps Leo 2. Stock is a
+     per-item map under the same key as before. */
+  var CATALOG = [
+    { name: 'Onigiri', price: 2, color: '#f2ead8', glyph: '\uD83C\uDF59', initial: 20 },
+    { name: 'Triangle Kimbap', price: 100, color: '#e8d9a0', glyph: '\uD83C\uDF58', initial: 10 },
+    { name: 'Kimbap', price: 120, color: '#cfe8c0', glyph: '\uD83C\uDF71', initial: 10 },
+    { name: 'Cup Ramen', price: 130, color: '#f6c177', glyph: '\uD83C\uDF5C', initial: 10 },
+    { name: 'Banana Milk', price: 110, color: '#f7e38b', glyph: '\uD83C\uDF4C', initial: 10 },
+    { name: 'Canned Coffee', price: 100, color: '#c8a37a', glyph: '\u2615', initial: 10 },
+    { name: 'Orange Juice', price: 120, color: '#ffd9a0', glyph: '\uD83C\uDF4A', initial: 10 },
+    { name: 'Water', price: 50, color: '#bcd9f5', glyph: '\uD83D\uDCA7', initial: 10 },
+    { name: 'Cola', price: 120, color: '#e8b4b8', glyph: '\uD83E\uDD64', initial: 10 }
+  ];
+  var ONIGIRI = CATALOG[0];
   var loader = null, modelCache = {}, kenneyGroup = null, glowGroup = null;
   var activeBuilding = null, counterNear = false, fpHidden = false, lastHintAt = 0;
 
@@ -34,9 +51,30 @@
   }
   function leoBalance() { var v = parseInt(localStorage.getItem('espil_leo_balance'), 10); return isNaN(v) ? 1000 : v; }
   function leoSet(v) { try { localStorage.setItem('espil_leo_balance', String(v)); } catch (e) {} var p = document.getElementById('shop-purse'); if (p) p.textContent = 'Leo ' + v.toLocaleString('en-US'); }
+  function defaultStock() { var m = {}; CATALOG.forEach(function (it) { m[it.name] = it.initial; }); return m; }
   function stock() {
-    try { var s = JSON.parse(localStorage.getItem(STOCK_KEY) || 'null'); if (s && typeof s.Onigiri === 'number') return s; } catch (e) {}
-    return { Onigiri: ONIGIRI.initial };
+    var parsed = null;
+    try { parsed = JSON.parse(localStorage.getItem(STOCK_KEY) || 'null'); } catch (e) {}
+    var m = defaultStock();
+    /* Legacy shapes migrate to the per-item map on first read: a
+       bare number, or the old single-item object {Onigiri: n}
+       (the pre-S4 save), keeps the stored Onigiri count and fills
+       the rest with defaults. The migrated map is persisted at
+       once so later reads are plain map reads. */
+    if (typeof parsed === 'number' && isFinite(parsed)) {
+      m.Onigiri = Math.max(0, Math.floor(parsed)); stockSet(m); return m;
+    }
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      var saw = false, legacy = true;
+      CATALOG.forEach(function (it) {
+        if (typeof parsed[it.name] === 'number') {
+          m[it.name] = Math.max(0, Math.floor(parsed[it.name])); saw = true;
+          if (it.name !== 'Onigiri') legacy = false;
+        }
+      });
+      if (saw) { if (legacy) stockSet(m); return m; }
+    }
+    return m;
   }
   function stockSet(s) { try { localStorage.setItem(STOCK_KEY, JSON.stringify(s)); } catch (e) {} }
   function toast(m) { if (window.__espilToast) window.__espilToast(m); }
@@ -126,7 +164,7 @@
     }
   }
 
-  /* ---------- counter zone + Onigiri stock ---------- */
+  /* ---------- counter zone + catalogue stock ---------- */
   function counterDistance() {
     var fitout = window.__espilFitoutGroup, pose = window.__espilPlayerPose ? window.__espilPlayerPose() : null;
     if (!fitout || !pose || typeof THREE === 'undefined') return 99;
@@ -143,20 +181,18 @@
     if (window.__espilOpenShop) window.__espilOpenShop();
   }, true);
 
-  function injectOnigiri() {
-    if (!isKonbiniya() || !shopOpen()) return;
-    var grid = document.getElementById('shop-grid');
-    if (!grid || grid.querySelector('[data-store-onigiri]')) return;
-    var n = stock().Onigiri;
+  function itemCard(it) {
+    var n = stock()[it.name];
     var card = document.createElement('div');
-    card.setAttribute('data-store-onigiri', '1');
+    card.setAttribute('data-store-item', it.name);
+    if (it.name === 'Onigiri') card.setAttribute('data-store-onigiri', '1');
     card.style.cssText = 'border:1px solid rgba(255,233,168,.45);border-radius:10px;padding:8px;text-align:center;';
     var tile = document.createElement('div');
-    tile.style.cssText = 'height:34px;border-radius:6px;background:' + ONIGIRI.color + ';display:flex;align-items:center;justify-content:center;font-size:20px;';
-    tile.textContent = ONIGIRI.glyph;
-    var name = document.createElement('div'); name.textContent = ONIGIRI.name; name.style.cssText = 'margin-top:6px;font-size:.82rem;';
+    tile.style.cssText = 'height:34px;border-radius:6px;background:' + it.color + ';display:flex;align-items:center;justify-content:center;font-size:20px;';
+    tile.textContent = it.glyph;
+    var name = document.createElement('div'); name.textContent = it.name; name.style.cssText = 'margin-top:6px;font-size:.82rem;';
     var meta = document.createElement('div');
-    meta.textContent = 'Leo ' + ONIGIRI.price + ' · Stock ' + n;
+    meta.textContent = 'Leo ' + it.price + ' · Stock ' + n;
     meta.style.cssText = 'opacity:.75;font-size:.78rem;';
     var buy = document.createElement('button');
     buy.className = 'pill-btn'; buy.style.cssText = 'margin-top:6px;';
@@ -164,21 +200,31 @@
     buy.disabled = n <= 0;
     buy.addEventListener('click', function () {
       var s = stock();
-      if (s.Onigiri <= 0) { toast('Onigiri is sold out'); return; }
+      if (s[it.name] <= 0) { toast(it.name + ' is sold out'); return; }
       var bal = leoBalance();
-      if (bal < ONIGIRI.price) { toast('Not enough Leo for Onigiri'); return; }
-      leoSet(bal - ONIGIRI.price);
-      s.Onigiri -= 1; stockSet(s);
+      if (bal < it.price) { toast('Not enough Leo for ' + it.name); return; }
+      leoSet(bal - it.price);
+      s[it.name] -= 1; stockSet(s);
       var bag = document.getElementById('shop-bag');
-      if (bag) bag.textContent = (bag.textContent && bag.textContent.indexOf('Your bag:') === 0 && bag.textContent !== 'Your bag: ') ? bag.textContent + ', Onigiri' : 'Your bag: Onigiri';
-      try { window.dispatchEvent(new CustomEvent('espil-guide', { detail: { type: 'bought', item: 'Onigiri' } })); } catch (e) {}
-      toast('Bought Onigiri for Leo ' + ONIGIRI.price + ' (' + s.Onigiri + ' left)');
-      card.remove(); injectOnigiri();
+      if (bag) bag.textContent = (bag.textContent && bag.textContent.indexOf('Your bag:') === 0 && bag.textContent !== 'Your bag: ') ? bag.textContent + ', ' + it.name : 'Your bag: ' + it.name;
+      try { window.dispatchEvent(new CustomEvent('espil-guide', { detail: { type: 'bought', item: it.name } })); } catch (e) {}
+      toast('Bought ' + it.name + ' for Leo ' + it.price + ' (' + s[it.name] + ' left)');
+      var grid2 = document.getElementById('shop-grid');
+      if (grid2) { var old = grid2.querySelectorAll('[data-store-item]'); for (var i = 0; i < old.length; i++) old[i].remove(); }
+      injectCatalogue();
     });
     card.appendChild(tile); card.appendChild(name); card.appendChild(meta); card.appendChild(buy);
-    grid.insertBefore(card, grid.firstChild);
+    return card;
   }
-  var gridObs = new MutationObserver(function () { setTimeout(injectOnigiri, 0); });
+  function injectCatalogue() {
+    if (!isKonbiniya() || !shopOpen()) return;
+    var grid = document.getElementById('shop-grid');
+    if (!grid || grid.querySelector('[data-store-item]')) return;
+    /* insert at the head in reverse so the catalogue's own order
+       (Onigiri first) is the visual order */
+    for (var i = CATALOG.length - 1; i >= 0; i--) grid.insertBefore(itemCard(CATALOG[i]), grid.firstChild);
+  }
+  var gridObs = new MutationObserver(function () { setTimeout(injectCatalogue, 0); });
   function watchGrid() {
     var grid = document.getElementById('shop-grid');
     if (grid && !grid.__storeWatched) { grid.__storeWatched = true; gridObs.observe(grid, { childList: true }); }
@@ -226,7 +272,7 @@
     return {
       inside: !!inside(), building: inside() ? (inside().name || null) : null,
       konbiniya: isKonbiniya(), kenneyReady: !!kenneyGroup,
-      counterNear: counterNear, onigiriStock: stock().Onigiri,
+      counterNear: counterNear, onigiriStock: stock().Onigiri, stock: stock(),
       doorGlow: !!glowGroup, firstPerson: fpHidden
     };
   };

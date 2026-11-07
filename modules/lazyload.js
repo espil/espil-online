@@ -48,6 +48,10 @@
      walking pedestrians are a world feature, so they arm with the
      same seams as the arrival bundle; the module self-gates on
      being in the map and on the Vancouver city key.
+   - monsters: the same seams as npcs (arrival + in-map backstop) -
+     the survival-game monster layer is a world feature too; it
+     self-gates identically, so the pairing keeps their population
+     systems armed together.
    Every import is fire-and-forget with a console warning on
    failure; a failed lazy load never breaks the page.
    __espilLazyState() reports what has landed (rig probes). */
@@ -97,7 +101,7 @@
   window.addEventListener('espil-dive-start', function () { load('tutorial.js'); });
   window.addEventListener('espil-guide', function (e) {
     var d = e && e.detail; if (!d) return;
-    if (d.type === 'arrival') { socialBundle(); load('npcs.js'); }
+    if (d.type === 'arrival') { socialBundle(); load('npcs.js'); load('monsters.js'); }
     if (d.type === 'interior') { storePair(); load('panels.js'); }
   });
   window.addEventListener('espil-party-frame', socialBundle);
@@ -139,7 +143,7 @@
      interception must be resident before the Enter click. 600 ms,
      and each arm is a no-op once loaded. */
   setInterval(function () {
-    if (document.body && document.body.classList.contains('in-map')) { socialBundle(); load('npcs.js'); }
+    if (document.body && document.body.classList.contains('in-map')) { socialBundle(); load('npcs.js'); load('monsters.js'); }
     if (window.__espilInside) storePair();
     var bp = document.getElementById('bldg-panel');
     if (bp && bp.getAttribute('aria-hidden') === 'false') load('store-page-link.js');

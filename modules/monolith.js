@@ -1012,11 +1012,157 @@
       }
       return best;
     }
+    /* ============ STORE NAME LABELS (Han 2026-11-06, built 2026-11-07) ============
+       Names float ON the building in-world (projected divs), NOT on a
+       top-of-screen display: the old #building-name pill is retired -
+       nothing in this module shows or writes it anymore (the modal
+       open/close handlers no longer restore it either).
+       Rules:
+       - A label renders only for a district record whose baked
+         open-data entry carries a displayable name (building name,
+         else its street address - the same resolution the building
+         panel uses). A record with neither gets NO label at all:
+         no name, no label (the blank-pill defect class ends here).
+         Tenant store names never become the label (Han 2026-10-27).
+       - Only records whose footprint is within ESPIL_LABEL_RADIUS
+         (35 m, signed ring distance) of the player show a label;
+         moving out of radius removes it.
+       - The label floats at ESPIL_LABEL_HEAD_H (2.2 m - about the
+         approaching character's head height) above the record's
+         ground anchor, in a colour-highlighted logwood div.
+       - The anchor (the ground point UNDER the label) is the
+         storefront point: the closest point on the record's ring to
+         its own centre (the main facade), pushed 0.6 m outward.
+       - The Use key's judgment position is that ground anchor: on
+         the P1 line Space opens the panel of the record whose
+         anchor is within ESPIL_LABEL_INTERACT_R (3.5 m), replacing
+         both the old centre rule and the 2 m ring gate. */
+    var ESPIL_LABEL_RADIUS=35, ESPIL_LABEL_HEAD_H=2.2, ESPIL_LABEL_INTERACT_R=3.5, ESPIL_LABEL_MAX=12;
+    var espilLabelLayer=null, espilLabelEntries=[], espilLabelPool=[], espilLabelNear=null;
+    function espilLabelAnchor(rec){
+      if(rec._espilAnchor)return rec._espilAnchor;
+      var pr=espilPolyProbe(rec,rec.cx,rec.cz);
+      rec._espilAnchor={x:pr.cx+pr.nx*0.6, z:pr.cz+pr.nz*0.6};
+      return rec._espilAnchor;
+    }
+    function espilCollectRecsNear(px,pz,r){
+      var out=[], stamp=espilCollectRecsNear._s=(espilCollectRecsNear._s||0)+1;
+      var bx0=Math.floor((px-r-2)/ESPIL_POLY_CELL), bx1=Math.floor((px+r+2)/ESPIL_POLY_CELL);
+      var bz0=Math.floor((pz-r-2)/ESPIL_POLY_CELL), bz1=Math.floor((pz+r+2)/ESPIL_POLY_CELL);
+      for(var bx=bx0;bx<=bx1;bx++)for(var bz=bz0;bz<=bz1;bz++){
+        var arr=espilPolyHash&&(espilPolyHash[bx+','+bz]);
+        if(!arr)continue;
+        for(var i=0;i<arr.length;i++){
+          var rec=arr[i];
+          if(rec._espilSeen===stamp)continue;
+          rec._espilSeen=stamp; out.push(rec);
+        }
+      }
+      return out;
+    }
+    function espilNearestLabelAnchor(px,pz){
+      if(!espilPolyHash)return null;
+      var recs=espilCollectRecsNear(px,pz,ESPIL_LABEL_INTERACT_R), best=null, bestD=1e9;
+      for(var i=0;i<recs.length;i++){
+        var a=espilLabelAnchor(recs[i]);
+        var d=Math.hypot(px-a.x,pz-a.z);
+        if(d<bestD){bestD=d;best={rec:recs[i],d:d,ax:a.x,az:a.z};}
+      }
+      return (best&&bestD<=ESPIL_LABEL_INTERACT_R)?best:null;
+    }
+    function espilLabelResolveName(rec){
+      if(rec._espilLblName!==undefined||rec._espilLblBusy)return;
+      rec._espilLblBusy=true;
+      if(typeof window.__espilBakedFor!=='function'){rec._espilLblName=null;rec._espilLblBusy=false;return;}
+      window.__espilBakedFor({x:rec.cx,z:rec.cz,w:rec.x1-rec.x0,d:rec.z1-rec.z0}).then(function(bp){
+        var nm=(bp&&(bp.name||bp.addr))?String(bp.name||bp.addr):'';
+        rec._espilLblName=nm?nm:null;
+        rec._espilLblBusy=false;
+      }).catch(function(){ rec._espilLblName=null; rec._espilLblBusy=false; });
+    }
+    function espilLabelLayerGet(){
+      if(espilLabelLayer)return espilLabelLayer;
+      var st=document.createElement('style');
+      st.textContent='#espil-store-labels{position:fixed;inset:0;pointer-events:none;z-index:24;overflow:hidden}'
+        +'.espil-store-label{position:absolute;left:0;top:0;transform:translate(-50%,-100%);padding:4px 11px;border-radius:8px;'
+        +'background:linear-gradient(180deg,rgba(84,56,31,.93),rgba(36,22,8,.95));border:1.5px solid #a97e46;color:#f5e6c8;'
+        +'font:700 12.5px Manrope,"Segoe UI",sans-serif;letter-spacing:.02em;white-space:nowrap;'
+        +'box-shadow:0 3px 10px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,224,170,.25);text-shadow:0 1px 2px rgba(0,0,0,.65)}'
+        +'.espil-store-label.is-near{border-color:#ffd97a;box-shadow:0 0 14px rgba(255,217,122,.45),0 3px 10px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,224,170,.35)}';
+      document.head.appendChild(st);
+      espilLabelLayer=document.createElement('div');
+      espilLabelLayer.id='espil-store-labels';
+      document.body.appendChild(espilLabelLayer);
+      return espilLabelLayer;
+    }
+    function espilStoreLabelsRefresh(px,pz){
+      espilLabelNear=espilPolyHash?espilNearestLabelAnchor(px,pz):null;
+      var panel=document.getElementById('bldg-panel');
+      var sm=document.getElementById('store-modal');
+      var uiOpen=(panel&&panel.classList.contains('open'))||(sm&&!sm.classList.contains('hidden'))||!!window.__espilInside;
+      var entries=[];
+      if(espilPolyHash&&!uiOpen){
+        var recs=espilCollectRecsNear(px,pz,ESPIL_LABEL_RADIUS);
+        var cands=[];
+        for(var i=0;i<recs.length;i++){
+          var rec=recs[i];
+          var d=espilPolyProbe(rec,px,pz).d; if(d<0)d=0;
+          if(d>ESPIL_LABEL_RADIUS)continue;
+          espilLabelResolveName(rec);
+          if(!rec._espilLblName)continue; /* no displayable name -> no label */
+          cands.push({rec:rec,d:d});
+        }
+        cands.sort(function(a,b){return a.d-b.d;});
+        var layer=espilLabelLayerGet();
+        for(var j=0;j<cands.length&&j<ESPIL_LABEL_MAX;j++){
+          var c=cands[j], a=espilLabelAnchor(c.rec);
+          var el=espilLabelPool[j];
+          if(!el){
+            el=document.createElement('div');
+            el.className='espil-store-label';
+            layer.appendChild(el);
+            espilLabelPool[j]=el;
+          }
+          if(el.textContent!==c.rec._espilLblName)el.textContent=c.rec._espilLblName;
+          el.style.display='none'; /* the per-frame tick positions + shows */
+          entries.push({rec:c.rec,name:c.rec._espilLblName,ax:a.x,az:a.z,d:c.d,el:el});
+        }
+      }
+      for(var k=entries.length;k<espilLabelPool.length;k++){
+        if(espilLabelPool[k])espilLabelPool[k].style.display='none';
+      }
+      espilLabelEntries=entries;
+    }
+    var espilLabelV=null;
+    function espilStoreLabelsTick(){
+      if(!espilLabelEntries.length)return;
+      if(!document.body.classList.contains('in-map')||window.__espilInside||typeof mapCamera==='undefined'||!mapCamera)return;
+      var p=(typeof walkPlayer!=='undefined')?walkPlayer:null;
+      if(!espilLabelV)espilLabelV=new THREE.Vector3();
+      for(var i=0;i<espilLabelEntries.length;i++){
+        var e=espilLabelEntries[i];
+        var drop=(typeof espilGlobeDrop==='function')?espilGlobeDrop(e.ax,e.az):0;
+        espilLabelV.set(e.ax,ESPIL_LABEL_HEAD_H-drop,e.az).project(mapCamera);
+        if(espilLabelV.z>1||espilLabelV.z<-1||Math.abs(espilLabelV.x)>1.05||Math.abs(espilLabelV.y)>1.05){e.el.style.display='none';continue;}
+        e.el.style.left=((espilLabelV.x*.5+.5)*window.innerWidth)+'px';
+        e.el.style.top=((-espilLabelV.y*.5+.5)*window.innerHeight)+'px';
+        e.el.style.display='block';
+        var near=false;
+        if(p&&p.pos)near=Math.hypot(p.pos.x-e.ax,p.pos.z-e.az)<=ESPIL_LABEL_INTERACT_R;
+        e.el.classList.toggle('is-near',near);
+      }
+    }
+    window.__espilStoreLabelState=function(){
+      return {
+        radius:ESPIL_LABEL_RADIUS, headH:ESPIL_LABEL_HEAD_H, interactR:ESPIL_LABEL_INTERACT_R,
+        nearAnchor:espilLabelNear?{d:+espilLabelNear.d.toFixed(2),x:+espilLabelNear.ax.toFixed(1),z:+espilLabelNear.az.toFixed(1)}:null,
+        labels:espilLabelEntries.map(function(e){
+          return {name:e.name,x:+e.ax.toFixed(1),z:+e.az.toFixed(1),d:+e.d.toFixed(1),visible:e.el.style.display!=='none'};
+        })
+      };
+    };
     function updateBuildingProximity(px,pz,nowMs){
-      var bldgNameEl=document.getElementById('building-name');
-      var bldgNameText=document.getElementById('building-name-text');
       var interactEl=document.getElementById('interact-prompt');
-      if(!bldgNameEl||!bldgNameText)return;
       if(nowMs-nearCheckT<400)return; /* throttle: 2.5 checks/sec */
       nearCheckT=nowMs;
       var best=null,bestD=1e9;
@@ -1026,33 +1172,26 @@
         var d=Math.sqrt(dx*dx+dz*dz)-Math.max(b.w,b.d)/2;
         if(d<bestD){bestD=d;best=b;}
       }
-      if(best&&bestD<14){
-        /* Han: don't show pill/prompt while store modal is open */
-        var sm=document.getElementById('store-modal');
-        var modalOpen=sm&&!sm.classList.contains('hidden');
-        if(nearBldg!==best){
-          nearBldg=best;
-          bldgNameText.textContent='Locating…';
-          if(!modalOpen){
-            bldgNameEl.classList.remove('hidden');
-            if(interactEl)interactEl.classList.remove('hidden'); /* QA #8: interact active */
-          }
-          fetchBuildingName(best,function(nm){
-            if(nearBldg===best)bldgNameText.textContent=nm;
-          });
-        }
-      }else{
-        nearBldg=null;
-        bldgNameEl.classList.add('hidden');
-        if(interactEl)interactEl.classList.add('hidden');
-      }
-      /* P1: the interact prompt follows the tight record gate, not
-         the loose centre rule above (the name pill keeps its own). */
+      /* nearBldg is still tracked for the legacy (non-P1) store-modal
+         fallback in tryInteract. The top-of-screen name pill it used
+         to drive is retired (Han 2026-11-06): names now float on the
+         buildings themselves (espilStoreLabelsRefresh below), and
+         #building-name is never shown or written again. */
+      nearBldg=(best&&bestD<14)?best:null;
+      espilStoreLabelsRefresh(px,pz);
+      /* Interact prompt: on the P1 line it follows the label-anchor
+         gate (the Use judgment position is the ground point under
+         the name label); the legacy line keeps the centre rule. */
       if(interactEl&&typeof ESPIL_P1!=='undefined'&&ESPIL_P1){
         var sm2=document.getElementById('store-modal');
         var modalOpen2=sm2&&!sm2.classList.contains('hidden');
-        if(!modalOpen2&&espilRecordDistAt(px,pz)<=2)interactEl.classList.remove('hidden');
+        if(!modalOpen2&&espilLabelNear)interactEl.classList.remove('hidden');
         else if(!modalOpen2)interactEl.classList.add('hidden');
+      }else if(interactEl){
+        var sm=document.getElementById('store-modal');
+        var modalOpen=sm&&!sm.classList.contains('hidden');
+        if(!modalOpen&&nearBldg)interactEl.classList.remove('hidden');
+        else if(!modalOpen)interactEl.classList.add('hidden');
       }
     }
     var mapDragId=null,mapLastX=0,mapLastY=0;
@@ -5106,11 +5245,9 @@
         });
       }
       modal.classList.remove('hidden');
-      /* Han: hide SPACE interact prompt and location pill while store modal is open */
+      /* Han: hide SPACE interact prompt while store modal is open */
       var ip=document.getElementById('interact-prompt');
       if(ip)ip.classList.add('hidden');
-      var bn=document.getElementById('building-name');
-      if(bn)bn.classList.add('hidden');
     }
     function setStoreSel(idx){
       if(idx<0||idx>=currentStores.length)return;
@@ -5251,18 +5388,20 @@
          is handled by tryInteract's inside branch (the door leaves,
          anywhere else reopens the options panel) - no early return
          here, the normal wall-jump/interact flow decides. */
-      /* Han 2026-10-20 #5: on the Mapbox line, Space at a building
-         (record distance <= 2 m, Han's #7 gate) opens the building
-         selection window with its name; Enter goes inside (shops to
-         their store page, other buildings to the interior room). Past
-         the gate, Cauldron's too-far answer stands. */
+      /* Han 2026-11-06 (store-name rework): on the Mapbox line, Space
+         works from the ground point UNDER the building's name label -
+         the record whose label anchor is within ESPIL_LABEL_INTERACT_R
+         (3.5 m) opens its building selection window; Enter goes
+         inside (shops to their store page, other buildings to the
+         interior room). Past every anchor, Cauldron's too-far answer
+         stands. */
       if(typeof ESPIL_P1!=='undefined'&&ESPIL_P1){
-        var _nr=espilNearestRecord(walkPlayer.pos.x,walkPlayer.pos.z);
-        if(!_nr||_nr.d>2){espilSpaceTooFar();return;}
+        var _la=espilNearestLabelAnchor(walkPlayer.pos.x,walkPlayer.pos.z);
+        if(!_la){espilSpaceTooFar();return;}
         if(walkPlayer.av&&walkPlayer.av.playOneShot){
           walkPlayer.av.playOneShot(Math.random()>.5?'checkout':'chat');
         }
-        openBuildingPanel(_nr.rec);
+        openBuildingPanel(_la.rec);
         if(window.EspilAudio&&window.EspilAudio.tick)window.EspilAudio.tick();
         return;
       }
@@ -5299,11 +5438,10 @@
         var closeBtn=document.getElementById('store-modal-close');
         if(closeBtn)closeBtn.addEventListener('click',function(){
           document.getElementById('store-modal').classList.add('hidden');
-          /* Han: restore SPACE prompt and location pill if still near a building */
+          /* Han: restore SPACE prompt if still near a building (the
+             top name pill is retired - names float on buildings now) */
           var ip=document.getElementById('interact-prompt');
-          if(ip&&typeof nearBldg!=='undefined'&&nearBldg&&!(typeof ESPIL_P1!=='undefined'&&ESPIL_P1))ip.classList.remove('hidden'); /* P1: the proximity tick restores it under the tight gate */
-          var bn=document.getElementById('building-name');
-          if(bn&&typeof nearBldg!=='undefined'&&nearBldg)bn.classList.remove('hidden');
+          if(ip&&typeof nearBldg!=='undefined'&&nearBldg&&!(typeof ESPIL_P1!=='undefined'&&ESPIL_P1))ip.classList.remove('hidden'); /* P1: the proximity tick restores it under the anchor gate */
         });
         var backBtn=document.getElementById('store-back');
         if(backBtn)backBtn.addEventListener('click',function(){
@@ -5328,11 +5466,10 @@
           var isList=!listView.classList.contains('hidden');
           if(e.key==='Escape'){
             m.classList.add('hidden');
-            /* Han: restore SPACE prompt and location pill if still near a building */
+            /* Han: restore SPACE prompt if still near a building (the
+               top name pill is retired - names float on buildings now) */
             var ip=document.getElementById('interact-prompt');
-            if(ip&&typeof nearBldg!=='undefined'&&nearBldg&&!(typeof ESPIL_P1!=='undefined'&&ESPIL_P1))ip.classList.remove('hidden'); /* P1: the proximity tick restores it under the tight gate */
-            var bn=document.getElementById('building-name');
-            if(bn&&typeof nearBldg!=='undefined'&&nearBldg)bn.classList.remove('hidden');
+            if(ip&&typeof nearBldg!=='undefined'&&nearBldg&&!(typeof ESPIL_P1!=='undefined'&&ESPIL_P1))ip.classList.remove('hidden'); /* P1: the proximity tick restores it under the anchor gate */
           }else if(isList&&currentStores.length>0){
             if(e.key==='ArrowDown'){
               e.preventDefault();
@@ -5639,6 +5776,7 @@
       p.guarding=dur;
     }
     function updateSkillFx(dt){
+      espilGameT+=dt; /* SURVIVAL S1: the combat clock is game time */
       var i;
       var anyCd=false;
       for(i=0;i<MOVE_ORDER.length;i++){
@@ -5667,6 +5805,7 @@
     }
     function doMove(id){
       if(!cityPhaseActive||!walkPlayer||skillTreeOpen)return;
+      if(espilDead)return; /* SURVIVAL S1: the death choice owns the body */
       var m=MOVES[id];
       if(!m)return;
       if(skillState.cd[id]>0)return;
@@ -5676,6 +5815,7 @@
       if(p.av&&p.av.playOneShot)p.av.playOneShot('attack');
       p.lungeT=(id==='throw'?.16:(id==='defense'?.12:.22)); /* fallback procedural motion */
       if(m.guard){
+        espilDefenseAt=espilGameT; /* SURVIVAL S1: perfect-window clock */
         spawnGuard(m,st.guardDur);
         skillSfx('guard');
       }else if(m.proj){
@@ -5689,6 +5829,7 @@
         if(id==='kick'){skillSfx('whoosh-lo');skillSfx('thud');}
         else{skillSfx('whoosh');}
       }
+      if(!m.guard)espilApplyMoveHit(id,st); /* SURVIVAL S1: hits land */
       paintCooldowns();
     }
     /* ---- HUD ---- */
@@ -7861,6 +8002,254 @@
         if(el)el.setAttribute('aria-hidden','true');
       });
     }
+    /* ================================================================
+       SURVIVAL S1 - canonical combat core (Han ruling 2026-11-06).
+       Damage = fixed move damage (the MOVES table) x weapon factor:
+       the panels __espilWeaponAtkMid mid-range / 5, clamped to
+       0.8..3.0, factor 1 when the hook is absent. Crit is the
+       Zealandia canon (FEEL.md item 3): 15% chance, x1.5, rolled
+       here and passed to the monster as opts.crit. The MONSTER side
+       then mitigates (defense / evasion / traits, in monsters.js);
+       the number the player sees is the mitigated applied damage.
+       Guard (ruling): leaving the strike point already fizzles a
+       monster's strike (monsters.js wind-up); a Defense triggered
+       inside the perfect window EVADES outright; guarding outside
+       the window soaks max(0, monster ATK - player DEF), DEF from
+       panels __espilPlayerDef(). Death is a CHOICE (ruling): return
+       to the village (Art Gallery spawn) at HP/MP 10%, or spend a
+       Revival Potion to revive in place at 50%/50%. The potion is a
+       cash item (10 for $1 in the cash shop) - the cash shop is
+       CLOSED by Han's order, so no purchase path exists; the item
+       can be owned and used, nothing more. Falls still cannot kill
+       (espilChargeFallDamage clamps at 1). MP costs stay 0. All
+       combat timing runs on accumulated game time (espilGameT,
+       advanced in updateSkillFx), the same dt-clamped clock the
+       rest of the build lives on.
+       ================================================================ */
+    var ESPIL_CRIT_CHANCE=.15, ESPIL_CRIT_MULT=1.5;
+    var ESPIL_PERFECT_WINDOW_S=.25;      /* Defense timing-evade window */
+    var ESPIL_REVIVE_GRACE_S=1.5;        /* combat-damage grace after a revive */
+    var ESPIL_SPAWN={x:3,z:33};          /* Art Gallery front (the village) */
+    /* Leo per kill (Han: monster kills earn Leo): zone base + grade
+       bonus. rat/wisp 1, stray 4, shambler 5, brute 9, wraith 10,
+       hound 18, titan 20. */
+    var ESPIL_LEO_ZONE={tutorial:1,low:3,mid:6,high:12};
+    var ESPIL_LEO_GRADE={white:0,yellow:1,green:2,blue:3,purple:4,red:6,gold:8,pink:8};
+    var espilGameT=0;
+    var espilDead=false, espilGraceEnd=0, espilDefenseAt=-1e9, espilLastHit=null;
+    function espilWeaponFactor(){
+      var mid=null;
+      try{ if(typeof window.__espilWeaponAtkMid==='function')mid=window.__espilWeaponAtkMid(); }catch(e){}
+      if(typeof mid!=='number'||!isFinite(mid))return 1;
+      return Math.max(.8,Math.min(3,mid/5));
+    }
+    function espilWeaponElementTag(){
+      try{ if(typeof window.__espilWeaponElement==='function')return window.__espilWeaponElement()||'neutral'; }catch(e){}
+      return 'neutral';
+    }
+    function espilPlayerDefValue(){
+      try{ if(typeof window.__espilPlayerDef==='function')return window.__espilPlayerDef()||0; }catch(e){}
+      return 0;
+    }
+    function espilLeoBalance(){
+      var v=parseInt(localStorage.getItem('espil_leo_balance'),10);
+      return isNaN(v)?1000:v;
+    }
+    function espilGrantKillLeo(res){
+      var amt=(ESPIL_LEO_ZONE[res.zone]||0)+(ESPIL_LEO_GRADE[res.grade]||0);
+      if(amt<=0)return;
+      try{ localStorage.setItem('espil_leo_balance',String(espilLeoBalance()+amt)); }catch(e){}
+      try{ window.dispatchEvent(new CustomEvent('espil-guide',{detail:{type:'monster-kill',id:res.id,kind:res.kind,grade:res.grade,leo:amt}})); }catch(e){}
+    }
+    /* One move's hit application. Melee hits every target inside
+       the move's range and frontal arc (the arc the FX draws);
+       the thrown tool flies the facing ray and lands on the
+       nearest target it would cross. */
+    function espilApplyMoveHit(id,st){
+      if(!walkPlayer)return;
+      if(typeof window.__espilMonsterHit!=='function'||typeof window.__espilMonsterTargets!=='function')return;
+      var p=walkPlayer;
+      var factor=espilWeaponFactor(), element=espilWeaponElementTag();
+      var fx=-Math.sin(p.faceY), fz=-Math.cos(p.faceY);
+      var targets=[];
+      try{ targets=window.__espilMonsterTargets()||[]; }catch(e){}
+      var hits=[],i,t;
+      if(st.m.proj){
+        var best=null,bestAlong=1e12;
+        for(i=0;i<targets.length;i++){
+          t=targets[i];
+          var vx=t.x-p.pos.x, vz=t.z-p.pos.z;
+          var along=vx*fx+vz*fz;
+          if(along<0||along>st.range)continue;
+          var ox=t.x-(p.pos.x+fx*along), oz=t.z-(p.pos.z+fz*along);
+          if(Math.sqrt(ox*ox+oz*oz)<=t.r+.45&&along<bestAlong){bestAlong=along;best=t;}
+        }
+        if(best)hits.push(best);
+      }else{
+        var cosLim=Math.cos((st.m.arc||1.9)/2+.3);
+        for(i=0;i<targets.length;i++){
+          t=targets[i];
+          var wx=t.x-p.pos.x, wz=t.z-p.pos.z;
+          var d=Math.sqrt(wx*wx+wz*wz);
+          if(d>st.range+t.r)continue;
+          if(d<.01||(wx*fx+wz*fz)/d>=cosLim)hits.push(t);
+        }
+      }
+      for(i=0;i<hits.length;i++){
+        var crit=Math.random()<ESPIL_CRIT_CHANCE;
+        var raw=st.m.dmg*factor*(crit?ESPIL_CRIT_MULT:1);
+        var res=null;
+        try{ res=window.__espilMonsterHit(hits[i].id,raw,p.pos.x,p.pos.z,{crit:crit,element:element}); }catch(e){}
+        if(res&&res.killed)espilGrantKillLeo(res);
+      }
+    }
+    /* ---- incoming damage: timing evade, guard soak, death ---- */
+    window.__espilPlayerDamage=function(n,sx,sz){
+      var out={applied:0,evaded:false,guarded:false,dead:espilDead,ignored:false,def:0};
+      if(espilDead||!walkPlayer){out.ignored=true;espilLastHit=out;return out;}
+      if(espilGameT<espilGraceEnd){out.ignored=true;espilLastHit=out;return out;}
+      /* timing evade: Defense went up inside the perfect window */
+      if(espilGameT-espilDefenseAt<=ESPIL_PERFECT_WINDOW_S){
+        out.evaded=true; espilLastHit=out; espilShowEvade(); return out;
+      }
+      var dmg=Math.max(0,Math.round(n||0));
+      if(walkPlayer.guarding>0){
+        out.guarded=true; out.def=espilPlayerDefValue();
+        dmg=Math.max(0,dmg-out.def);
+      }
+      out.applied=dmg;
+      if(dmg>0){
+        skillState.hp-=dmg;
+        if(skillState.hp<=0){
+          skillState.hp=0; out.dead=true;
+          saveSkills(); paintStatus();
+          espilEnterDeath();
+        }else{ saveSkills(); paintStatus(); }
+      }
+      espilLastHit=out;
+      return out;
+    };
+    /* S4 contract: panels' food-use listener restores through here. */
+    window.__espilApplyRecovery=function(hp,mp){
+      hp=Math.max(0,Math.floor(hp||0)); mp=Math.max(0,Math.floor(mp||0));
+      if(!espilDead&&(hp>0||mp>0)){
+        skillState.hp=Math.min(skillState.maxhp,skillState.hp+hp);
+        skillState.mp=Math.min(skillState.maxmp,skillState.mp+mp);
+        saveSkills(); paintStatus();
+      }
+      return {hp:skillState.hp,mp:skillState.mp};
+    };
+    window.__espilCombatState=function(){
+      return { dead:espilDead, hp:skillState.hp, maxhp:skillState.maxhp,
+        mp:skillState.mp, maxmp:skillState.maxmp,
+        guarding:!!(walkPlayer&&walkPlayer.guarding>0),
+        guardAge:espilDefenseAt<0?null:Math.round((espilGameT-espilDefenseAt)*1000)/1000,
+        graceLeft:Math.max(0,Math.round((espilGraceEnd-espilGameT)*1000)/1000),
+        potions:espilPotionCount(), lastHit:espilLastHit };
+    };
+    /* ---- Revival Potion ownership (panels' bag list format) ---- */
+    function espilOwnedList(){
+      try{ var a=JSON.parse(localStorage.getItem('espil_owned_items')||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; }
+    }
+    function espilPotionCount(){
+      var a=espilOwnedList(),c=0;
+      for(var i=0;i<a.length;i++)if(a[i]==='Revival Potion')c++;
+      return c;
+    }
+    function espilConsumePotion(){
+      var a=espilOwnedList(),i=a.indexOf('Revival Potion');
+      if(i<0)return false;
+      a.splice(i,1);
+      try{ localStorage.setItem('espil_owned_items',JSON.stringify(a)); }catch(e){}
+      return true;
+    }
+    /* ---- death choice UI ---- */
+    var espilDeathEl=null;
+    function espilEnsureDeathUI(){
+      if(espilDeathEl)return espilDeathEl;
+      var el=document.createElement('div');
+      el.id='espil-death-ui';
+      el.setAttribute('aria-hidden','true');
+      el.style.cssText='position:fixed;inset:0;display:none;align-items:center;justify-content:center;'+
+        'background:rgba(10,6,4,.55);z-index:9995;';
+      el.innerHTML='<div style="background:linear-gradient(180deg,#3a2a1c,#241a10);border:2px solid #8a6a44;'+
+        'border-radius:14px;padding:26px 30px;text-align:center;color:#f2e3c2;max-width:420px;'+
+        'box-shadow:0 12px 40px rgba(0,0,0,.6);font-family:sans-serif;">'+
+        '<div style="font-size:26px;font-weight:800;margin-bottom:8px;">You have fallen</div>'+
+        '<p style="margin:0 0 18px;font-size:14px;line-height:1.5;">The city still needs you, Keeper.<br>Choose how you return.</p>'+
+        '<button id="espil-death-village" type="button" style="display:block;width:100%;margin:0 0 10px;padding:12px;'+
+        'border-radius:9px;border:1px solid #8a6a44;background:#57402a;color:#ffe9bd;font-size:15px;font-weight:700;cursor:pointer;">'+
+        '🏛 Return to the Village<br><span style="font-weight:400;font-size:12px;">Revive at the Art Gallery · HP 10% · MP 10%</span></button>'+
+        '<button id="espil-death-potion" type="button" style="display:block;width:100%;padding:12px;'+
+        'border-radius:9px;border:1px solid #8a6a44;background:#6d2f3f;color:#ffd7e0;font-size:15px;font-weight:700;cursor:pointer;">'+
+        '🧪 Use a Revival Potion<br><span id="espil-death-potion-sub" style="font-weight:400;font-size:12px;">Revive here · HP 50% · MP 50%</span></button>'+
+        '</div>';
+      document.body.appendChild(el);
+      el.querySelector('#espil-death-village').addEventListener('click',espilReviveVillage);
+      el.querySelector('#espil-death-potion').addEventListener('click',espilRevivePotion);
+      espilDeathEl=el;
+      return el;
+    }
+    function espilShowDeathUI(){
+      var el=espilEnsureDeathUI();
+      var n=espilPotionCount();
+      var btn=el.querySelector('#espil-death-potion');
+      var sub=el.querySelector('#espil-death-potion-sub');
+      if(btn){ btn.disabled=n<=0; btn.style.opacity=n>0?'1':'.45'; btn.style.cursor=n>0?'pointer':'not-allowed'; }
+      if(sub)sub.textContent='Revive here · HP 50% · MP 50% · Owned: '+n;
+      el.style.display='flex';
+      el.setAttribute('aria-hidden','false');
+    }
+    function espilHideDeathUI(){
+      if(!espilDeathEl)return;
+      espilDeathEl.style.display='none';
+      espilDeathEl.setAttribute('aria-hidden','true');
+    }
+    function espilEnterDeath(){
+      espilDead=true;
+      espilShowDeathUI();
+      try{ window.dispatchEvent(new CustomEvent('espil-guide',{detail:{type:'player-died'}})); }catch(e){}
+    }
+    function espilReviveCommon(frac){
+      skillState.hp=Math.max(1,Math.ceil(skillState.maxhp*frac));
+      skillState.mp=Math.ceil(skillState.maxmp*frac);
+      espilDead=false;
+      espilGraceEnd=espilGameT+ESPIL_REVIVE_GRACE_S;
+      espilHideDeathUI();
+      saveSkills(); paintStatus();
+    }
+    function espilReviveVillage(){
+      if(!espilDead)return;
+      if(walkPlayer){
+        try{ if(walkPlayer.flying&&typeof dismountVehicle==='function')dismountVehicle(); }catch(e){}
+        walkPlayer.pos.set(ESPIL_SPAWN.x,.05,ESPIL_SPAWN.z);
+        walkPlayer.velY=0; walkPlayer.onGround=true;
+      }
+      espilReviveCommon(.10);
+    }
+    function espilRevivePotion(){
+      if(!espilDead)return;
+      if(!espilConsumePotion()){ espilShowDeathUI(); return; }
+      espilReviveCommon(.50);
+    }
+    /* ---- evade indicator ---- */
+    var espilEvadeEl=null, espilEvadeTimer=0;
+    function espilShowEvade(){
+      try{
+        if(!espilEvadeEl){
+          espilEvadeEl=document.createElement('div');
+          espilEvadeEl.id='espil-evade-flash';
+          espilEvadeEl.style.cssText='position:fixed;left:50%;top:34%;transform:translate(-50%,-50%);'+
+            'font-family:sans-serif;font-weight:900;font-size:30px;color:#bfe9ff;letter-spacing:2px;'+
+            'text-shadow:0 2px 6px rgba(0,0,0,.8);pointer-events:none;z-index:9994;opacity:0;transition:opacity .18s;';
+          espilEvadeEl.textContent='EVADED!';
+          document.body.appendChild(espilEvadeEl);
+        }
+        espilEvadeEl.style.opacity='1';
+        if(espilEvadeTimer)clearTimeout(espilEvadeTimer);
+        espilEvadeTimer=setTimeout(function(){ if(espilEvadeEl)espilEvadeEl.style.opacity='0'; },650);
+      }catch(e){}
+    }
     window.__espilSkills={state:skillState,gainKnowledge:gainKnowledge,
       move:doMove,tree:toggleSkillTree};
     initChat();
@@ -8246,6 +8635,7 @@
       if(window.__joyVec){ix+=window.__joyVec.x;iz+=window.__joyVec.y;}
       if(p._espilLanding){ix=0;iz=0;} /* ESPIL TILES BRIDGE: the land clip owns input until it settles */
       if(p._espilClimb){ix=0;iz=0;} /* ESPIL CLIMB: the climb step owns movement while attached */
+      if(espilDead){ix=0;iz=0;} /* SURVIVAL S1: input frozen while the death choice is open */
       var il=Math.sqrt(ix*ix+iz*iz);
       if(il>1){ix/=il;iz/=il;}
       var fx=-Math.sin(walkCamYaw),fz=-Math.cos(walkCamYaw);
@@ -8408,8 +8798,9 @@
       mapCamera.position.lerp(want,k);
       mapCamera.lookAt(p.pos.x,p.pos.y+1.7,p.pos.z);
       if(typeof espilOwnerChipTick==='function')espilOwnerChipTick(false);
-      /* Building name pill when near a building. */
+      /* Building proximity: store-name labels + interact prompt. */
       updateBuildingProximity(p.pos.x,p.pos.z,performance.now());
+      espilStoreLabelsTick();
       /* QA #6: save position every 5s (throttled). */
       if(!p._lastSave||performance.now()-p._lastSave>5000){
         p._lastSave=performance.now();

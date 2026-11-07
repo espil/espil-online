@@ -92,8 +92,8 @@
   </div>
 </div>
 
-<script src="../../assets/three.min.js"></script>
-<script src="../../assets/GLTFLoader.js"></script>
+<script src="/assets/three.min.js"></script>
+<script src="/assets/GLTFLoader.js"></script>
 <script>
 'use strict';
 /* ================================================================
@@ -114,6 +114,27 @@ var STORE = {
   city: 'Vancouver',
   counter: { x: 2.0, z: -11.6 }   /* counter interaction point */
 };
+
+/* ---- slash-proof page directory (2026-11-07, empty-store fix) ----
+   Served WITHOUT a trailing slash (/vancouver/1238-robson-st), the
+   browser takes /vancouver/ as this document's base directory, so
+   the relative fetch('layout.json') resolved to
+   /vancouver/layout.json (404) and the page silently opened on its
+   empty-floor fallback even though the interior data was fine.
+   PAGE_DIR derives the page's OWN directory from the path itself:
+   an extension-less last segment is this page's slug directory,
+   with or without the trailing slash; a file-like last segment
+   (index.html) is stripped. Every page-local reference below
+   resolves against PAGE_DIR, and shared assets use root-absolute
+   /assets/ paths (the same resolved URLs the slash form produced),
+   so both URL forms behave identically. */
+var PAGE_DIR = (function () {
+  var p = location.pathname;
+  if (p.charAt(p.length - 1) === '/') return p;
+  var last = p.slice(p.lastIndexOf('/') + 1);
+  if (last.indexOf('.') >= 0) return p.slice(0, p.lastIndexOf('/') + 1);
+  return p + '/';
+})();
 
 /* ---- shared state: the SAME localStorage keys as the pair ---- */
 var STOCK_KEY = 'espil_shop_stock_v1';
@@ -202,7 +223,7 @@ function loadModel(name, done) {
   if (modelCache[name]) { done(modelCache[name].clone()); return; }
   if (!loader) loader = new THREE.GLTFLoader();
   loadState.pending++;
-  loader.load('../../assets/kenney-mini-market/' + name + '.glb', function (gltf) {
+  loader.load('/assets/kenney-mini-market/' + name + '.glb', function (gltf) {
     loadState.pending--;
     var skinned = false;
     gltf.scene.traverse(function (n) { if (n.isSkinnedMesh) skinned = true; });
@@ -280,7 +301,7 @@ var clerkMixer = null, clerkLoaded = false, clerkAnim = null;
 function buildClerk() {
   if (!loader) loader = new THREE.GLTFLoader();
   loadState.pending++;
-  loader.load('../../assets/store-clerk/clerk.glb', function (gltf) {
+  loader.load('/assets/store-clerk/clerk.glb', function (gltf) {
     loadState.pending--;
     var obj = gltf.scene;
     obj.position.set(STORE.counter.x - 1.6, 0, -14.3); /* same spot as the old clerk */
@@ -320,7 +341,7 @@ function buildFromLayout(layout) {
   });
 }
 function loadLayout() {
-  fetch('layout.json').then(function (r) {
+  fetch(PAGE_DIR + 'layout.json').then(function (r) {
     if (!r.ok) throw new Error('layout.json HTTP ' + r.status);
     return r.json();
   }).then(function (layout) {

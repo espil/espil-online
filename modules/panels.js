@@ -77,11 +77,11 @@
      wil; atk / matk are [min, max] ranges on weapons. */
   var GRADES = { '일반': '#b8c4c9', '고급': '#79c26a', '희귀': '#5ea9e6', '영웅': '#b07fe8', '전설': '#f2a93b' };
   var DB = [
-    { name: 'Worn Wooden Sword', kr: '낡은 목검', slot: 'weapon', kind: 'equip', grade: '일반', atk: [3, 7], def: 0, mdef: 0, price: 30, ep: { weapon: 'greatsword' }, app: { shape: 'sword', c1: '#b08954', c2: '#7a5a34' }, desc: '연습용으로 깎은 목검. 가볍고 손에 익습니다.' },
-    { name: 'Practice Staff', kr: '연습용 지팡이', slot: 'weapon', kind: 'equip', grade: '일반', matk: [4, 9], int: 2, def: 0, mdef: 0, price: 35, ep: { weapon: 'staff' }, app: { shape: 'staff', c1: '#8a6844', c2: '#57a7e8' }, desc: '끝에 작은 마력석이 박힌 연습용 지팡이.' },
-    { name: 'Iron Sword', kr: '철검', slot: 'weapon', kind: 'equip', grade: '고급', atk: [9, 15], str: 2, def: 0, mdef: 0, price: 140, ep: { weapon: 'greatsword' }, app: { shape: 'sword', c1: '#cfd8de', c2: '#5d6d78' }, desc: '단단하게 벼린 철검. 균형이 좋습니다.' },
-    { name: 'Hunter Bow', kr: '사냥꾼 활', slot: 'weapon', kind: 'equip', grade: '고급', atk: [7, 13], acc: 4, dex: 2, def: 0, mdef: 0, price: 130, ep: { weapon: 'bow' }, app: { shape: 'bow', c1: '#8a6844', c2: '#e8e0cc' }, desc: '사냥꾼들이 애용하는 단단한 활.' },
-    { name: 'Silver Dagger', kr: '은 단검', slot: 'weapon', kind: 'equip', grade: '희귀', atk: [11, 17], dex: 3, acc: 3, def: 0, mdef: 0, price: 320, ep: { weapon: 'dagger' }, app: { shape: 'dagger', c1: '#e8eef2', c2: '#7a4a8c' }, desc: '은으로 날을 세운 단검. 빠르고 조용합니다.' },
+    { name: 'Worn Wooden Sword', kr: '낡은 목검', slot: 'weapon', kind: 'equip', element: 'neutral', grade: '일반', atk: [3, 7], def: 0, mdef: 0, price: 30, ep: { weapon: 'greatsword' }, app: { shape: 'sword', c1: '#b08954', c2: '#7a5a34' }, desc: '연습용으로 깎은 목검. 가볍고 손에 익습니다.' },
+    { name: 'Practice Staff', kr: '연습용 지팡이', slot: 'weapon', kind: 'equip', element: 'neutral', grade: '일반', matk: [4, 9], int: 2, def: 0, mdef: 0, price: 35, ep: { weapon: 'staff' }, app: { shape: 'staff', c1: '#8a6844', c2: '#57a7e8' }, desc: '끝에 작은 마력석이 박힌 연습용 지팡이.' },
+    { name: 'Iron Sword', kr: '철검', slot: 'weapon', kind: 'equip', element: 'neutral', grade: '고급', atk: [9, 15], str: 2, def: 0, mdef: 0, price: 140, ep: { weapon: 'greatsword' }, app: { shape: 'sword', c1: '#cfd8de', c2: '#5d6d78' }, desc: '단단하게 벼린 철검. 균형이 좋습니다.' },
+    { name: 'Hunter Bow', kr: '사냥꾼 활', slot: 'weapon', kind: 'equip', element: 'neutral', grade: '고급', atk: [7, 13], acc: 4, dex: 2, def: 0, mdef: 0, price: 130, ep: { weapon: 'bow' }, app: { shape: 'bow', c1: '#8a6844', c2: '#e8e0cc' }, desc: '사냥꾼들이 애용하는 단단한 활.' },
+    { name: 'Silver Dagger', kr: '은 단검', slot: 'weapon', kind: 'equip', element: 'neutral', grade: '희귀', atk: [11, 17], dex: 3, acc: 3, def: 0, mdef: 0, price: 320, ep: { weapon: 'dagger' }, app: { shape: 'dagger', c1: '#e8eef2', c2: '#7a4a8c' }, desc: '은으로 날을 세운 단검. 빠르고 조용합니다.' },
     { name: 'Cloth Cap', kr: '천 모자', slot: 'head', kind: 'equip', grade: '일반', def: 2, mdef: 0, price: 20, app: { shape: 'cap', c1: '#c95f4f', c2: '#8f3a30' }, desc: '부드러운 천으로 만든 모자.' },
     { name: 'Leather Hood', kr: '가죽 후드', slot: 'head', kind: 'equip', grade: '고급', def: 4, mdef: 1, dex: 1, price: 90, app: { shape: 'hood', c1: '#7a5a34', c2: '#54401f' }, desc: '비바람을 막아 주는 가죽 후드.' },
     { name: 'Knight Helm', kr: '기사단 투구', slot: 'head', kind: 'equip', grade: '희귀', def: 8, mdef: 2, vit: 2, price: 300, app: { shape: 'helm', c1: '#c7d0d6', c2: '#8f2f2f' }, desc: '기사단의 문양이 새겨진 투구.' },
@@ -99,20 +99,58 @@
     { name: 'Shell Necklace', kr: '조개 목걸이', slot: 'necklace', kind: 'equip', grade: '일반', def: 0, mdef: 1, wil: 2, price: 30, app: { shape: 'necklace', c1: '#e8dcc8', c2: '#e88ca0' }, desc: '바닷가 조개로 엮은 목걸이.' },
     { name: 'Pearl Earring', kr: '진주 귀걸이', slot: 'earring', kind: 'equip', grade: '고급', def: 0, mdef: 1, acc: 2, int: 1, price: 110, app: { shape: 'earring', c1: '#f2ead8', c2: '#cfc4a8' }, desc: '작은 진주가 달린 귀걸이.' },
     { name: 'Leather Belt', kr: '가죽 벨트', slot: 'belt', kind: 'equip', grade: '일반', def: 2, mdef: 0, vit: 1, price: 20, app: { shape: 'belt', c1: '#7a5a34', c2: '#c9a227' }, desc: '버클이 단단한 가죽 벨트.' },
-    { name: 'Mochi Pet', kr: '모찌 펫', slot: 'pet', kind: 'equip', grade: '희귀', def: 0, mdef: 0, wil: 3, price: 500, app: { shape: 'pet', c1: '#f2b8c6', c2: '#e88ca0' }, desc: '말랑말랑한 작은 친구. 늘 곁을 따라다닙니다.' }
+    { name: 'Mochi Pet', kr: '모찌 펫', slot: 'pet', kind: 'equip', grade: '희귀', def: 0, mdef: 0, wil: 3, price: 500, app: { shape: 'pet', c1: '#f2b8c6', c2: '#e88ca0' }, desc: '말랑말랑한 작은 친구. 늘 곁을 따라다닙니다.' },
+    { name: 'Revival Potion', kr: '부활 포션', slot: null, kind: 'use', grade: '캐시', cash: true, def: 0, mdef: 0, price: 0, app: { shape: 'drink', c1: '#e86a8a', c2: '#ffd23c' }, desc: '캐시 아이템 (10개에 $1). 쓰러졌을 때 그 자리에서 HP/MP 50%로 부활합니다. 캐시상점은 아직 닫혀 있어 구매할 수 없습니다.' }
   ];
   var DB_LOOKUP = {};
   DB.forEach(function (it) { DB_LOOKUP[it.name.toLowerCase()] = it; });
   var FOOD_PRICE = { 'Kimbap': 120, 'Triangle Kimbap': 100, 'Cup Ramen': 130, 'Hotteok': 150, 'Tteokbokki': 220, 'Fish Cake Skewer': 90, 'Banana Milk': 110, 'Canned Coffee': 100, 'Orange Juice': 120, 'Water': 50, 'Burger': 350, 'Fries': 180, 'Cola': 120, 'Fried Chicken': 420, 'Pizza Slice': 300, 'Hot Dog': 260, 'Milkshake': 240, 'Salad': 200 };
+  /* RECOVERY - HP/MP restored when a kind:'use' item is consumed
+     from the bag. DRAFT VALUES ONLY (Han decision D4 pending):
+     tuned for review, not final. Foods lean HP, drinks lean MP,
+     magnitude roughly scales with FOOD_PRICE. Covers every
+     FOOD_PRICE name plus the shop's Onigiri. Exposed as
+     window.__espilFoodRestore - the table the S1 combat core's
+     'espil-item-used' listener (monolith.js) reads to apply the
+     restores; this module's own listener below uses it too. */
+  var RECOVERY = {
+    'Onigiri': { hp: 30 },
+    'Triangle Kimbap': { hp: 25 },
+    'Kimbap': { hp: 40 },
+    'Cup Ramen': { hp: 35, mp: 5 },
+    'Banana Milk': { hp: 10, mp: 20 },
+    'Canned Coffee': { mp: 25 },
+    'Orange Juice': { hp: 5, mp: 15 },
+    'Water': { mp: 10 },
+    'Hotteok': { hp: 20 },
+    'Tteokbokki': { hp: 45 },
+    'Fish Cake Skewer': { hp: 15 },
+    'Cola': { mp: 12 },
+    'Burger': { hp: 55 },
+    'Fries': { hp: 18 },
+    'Fried Chicken': { hp: 65 },
+    'Pizza Slice': { hp: 48 },
+    'Hot Dog': { hp: 38 },
+    'Milkshake': { hp: 22, mp: 10 },
+    'Salad': { hp: 28 }
+  };
+  /* DRAFT - Han decision D4 pending. */
+  window.__espilFoodRestore = RECOVERY;
   function itemOf(name) {
     var it = DB_LOOKUP[String(name).toLowerCase()];
     if (it) return it;
     var slot = null; for (var i = 0; i < SLOT_RE.length; i++) if (SLOT_RE[i][1].test(name)) { slot = SLOT_RE[i][0]; break; }
     if (slot === 'accessory') slot = 'necklace';
-    var isFood = Object.prototype.hasOwnProperty.call(FOOD_PRICE, name);
+    /* Foods/drinks are anything in FOOD_PRICE or in the restore
+       table - the latter also catches Onigiri (shop price Leo 2,
+       not a FOOD_PRICE entry), so a bought Onigiri lands in the
+       bag's use tab like every other consumable. */
+    var isFood = Object.prototype.hasOwnProperty.call(FOOD_PRICE, name) ||
+      Object.prototype.hasOwnProperty.call(RECOVERY, name);
+    var buyPrice = Object.prototype.hasOwnProperty.call(FOOD_PRICE, name) ? FOOD_PRICE[name] : (name === 'Onigiri' ? 2 : 0);
     var foodShape = /ramen/i.test(name) ? 'cup' : (/milk|cola|coffee|juice|water|shake/i.test(name) ? 'drink' : 'food');
     return { name: name, kr: name, slot: slot, kind: slot ? 'equip' : (isFood ? 'use' : 'etc'),
-      grade: '일반', def: 0, mdef: 0, price: isFood ? Math.floor(FOOD_PRICE[name] / 3) : 10,
+      grade: '일반', def: 0, mdef: 0, price: isFood ? Math.max(1, Math.floor(buyPrice / 3)) : 10,
       app: { shape: slot || (isFood ? foodShape : 'box'), c1: '#9aa7ad', c2: '#5d6d78' },
       desc: isFood ? '먹으면 기운이 나는 음식.' : '' };
   }
@@ -146,11 +184,74 @@
   function unequipLook(slot) { var m = lookMap(); delete m[slot]; saveLook(m); gearChanged(); renderAll(); }
   window.__espilGear = { owned: ownedCounts, equipped: equippedMap, slotOf: slotOf, equip: equip, unequip: unequip };
 
+  /* S4 weapon stat hook for the S1 damage path (consumed guarded):
+     the mid-range of the equipped weapon's atk, or matk when its
+     mid is higher - same 0.4 cross-conversion as computeStats().
+     Null when no weapon is equipped (or it carries no atk/matk). */
+  window.__espilWeaponAtkMid = function () {
+    var wname = equippedMap().weapon;
+    if (!wname) return null;
+    var it = itemOf(wname); if (!it) return null;
+    var atk = it.atk || null, matk = it.matk || null;
+    if (!atk && !matk) return null;
+    var wAtk = atk || [Math.round(matk[0] * 0.4), Math.round(matk[1] * 0.4)];
+    var wMatk = matk || [Math.round(atk[0] * 0.4), Math.round(atk[1] * 0.4)];
+    return Math.max((wAtk[0] + wAtk[1]) / 2, (wMatk[0] + wMatk[1]) / 2);
+  };
+
+  /* S1 weapon element hook (consumed guarded): the equipped
+     weapon's element tag from its item data. All five current
+     weapons are 'neutral' - the field exists so an elemental
+     weapon only has to change its data. */
+  window.__espilWeaponElement = function () {
+    var wname = equippedMap().weapon;
+    if (!wname) return 'neutral';
+    var it = itemOf(wname); if (!it) return 'neutral';
+    return it.element || 'neutral';
+  };
+
+  /* S1 player DEF hook (consumed guarded): the character sheet's
+     own Defense figure - computeStats().def, i.e. the sum of the
+     equipped pieces' def plus the VIT contribution
+     (round(vit x 1.5)), exactly what the profile panel shows. */
+  window.__espilPlayerDef = function () {
+    try { return computeStats().def; } catch (e) { return 0; }
+  };
+
   /* purchase mirror (v1 semantics): the shop fires espil-guide
      'bought' - record the item so the bag shows it */
   window.addEventListener('espil-guide', function (e) {
     var d = e.detail || {}; if (d.__fromGuide) return;
     if (d.type === 'bought' && d.item) { var a = ownedList(); a.push(String(d.item)); saveOwned(a); if (bagOpen()) renderBag(); }
+  });
+
+  /* S4 recovery listener: the bag's 'use' action has already
+     removed the item when this fires. Recovery goes through the
+     S1 hook __espilApplyRecovery(hp, mp) when present; when the
+     hook is absent the consumption still completes and only a
+     neutral toast shows - no numbers are claimed. The RECOVERY
+     values are DRAFTS pending Han's D4 decision. */
+  window.addEventListener('espil-item-used', function (e) {
+    var d = e.detail || {}; var name = d.item ? String(d.item) : '';
+    if (name === 'Revival Potion') {
+      /* cash item: its only use is the death choice in the combat
+         core. The bag's generic use path has already removed it -
+         hand it back and say why. */
+      var back = ownedList(); back.push(name); saveOwned(back); renderAll();
+      if (window.__espilToast) window.__espilToast('Revival Potion is used when you fall');
+      return;
+    }
+    var rec = RECOVERY[name]; if (!rec) return;
+    var applied = false;
+    if (typeof window.__espilApplyRecovery === 'function') {
+      try { window.__espilApplyRecovery(rec.hp, rec.mp); applied = true; } catch (err) {}
+    }
+    if (!window.__espilToast) return;
+    if (!applied) { window.__espilToast(name + ' used'); return; }
+    var parts = [];
+    if (rec.hp) parts.push('+' + rec.hp + ' HP');
+    if (rec.mp) parts.push('+' + rec.mp + ' MP');
+    window.__espilToast(parts.length ? name + ': ' + parts.join(' · ') : name + ' used');
   });
 
   /* ---------------- character info + stats ---------------- */
@@ -547,6 +648,13 @@
     if (it.def) out.push('방어력 +' + it.def);
     if (it.mdef) out.push('마법 방어력 +' + it.mdef);
     STAT_KEYS.forEach(function (k) { if (typeof it[k] === 'number' && it[k]) out.push(STAT_KR[k] + ' +' + it[k]); });
+    var rec = RECOVERY[it.name];
+    if (rec && (rec.hp || rec.mp)) {
+      var rp = [];
+      if (rec.hp) rp.push('HP +' + rec.hp);
+      if (rec.mp) rp.push('MP +' + rec.mp);
+      out.push('회복 ' + rp.join(' · '));
+    }
     return out;
   }
   function renderBag() {
