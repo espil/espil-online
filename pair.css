@@ -1879,3 +1879,30 @@
        swallow taps over whatever sits under it (measured: the
        expanded mobile chat's log centre). Click-through everywhere. */
     #espil-map-guidance { pointer-events:none; }
+
+    /* ==== Mobile minimap size (Han 2026-11-06: smaller, tap to
+       expand) ====
+       On touch the resting (stage-1) minimap halves: 10vh a side
+       with a 52px floor (in a 390px-tall landscape viewport 10vh
+       alone is 39px - too small to read as a map at all). Tapping
+       the minimap toggles the .mm-big expanded view (the tap
+       handler lives in mmo-hud.js; Leaflet re-measures through the
+       monolith's own debounced window-resize path, so the canvas
+       follows the CSS size instead of stretching). The expanded
+       size is capped on BOTH viewport axes so the circle always
+       fits on screen - min(78vw, 78dvh), plus the height left
+       under its own 120px top edge (in a 390px-tall landscape
+       viewport 78dvh alone would push the circle 34px past the
+       bottom edge). Only the height shrank -
+       the top edge stays at 120px, so the location pill above it
+       (top:86 in the block above) does not move. Both rules are
+       scoped to data-stage="1" - the district and fullscreen
+       stages keep their own sizes - and the .mm-big rule outranks
+       the shrink rule while it is on. The tutorial chip's matching
+       right-column anchor (directly under this shrunk circle)
+       lives in tutorial.js; its coarse top is derived from this
+       exact size (120px top + max(52px,10vh) + 8px gap). */
+    @media (pointer:coarse) {
+      #minimap-wrap[data-stage="1"] { width:max(52px,10vh); height:max(52px,10vh); }
+      #minimap-wrap[data-stage="1"].mm-big { width:min(78vw,78dvh,calc(100dvh - 136px)); height:min(78vw,78dvh,calc(100dvh - 136px)); }
+    }

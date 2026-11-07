@@ -3,21 +3,27 @@
    population follows the game's traffic level:
      traffic ORANGE -> 1-6 people, RED -> 7-15, free flow -> 0,
    with a hard pool cap of 30 alive at once (Han's order).
-   TRAFFIC SOURCE: the game's own live simulation - the segment
-   flow values in modules/monolith.js (updateTraffic), read through
-   the read-only window.__espilTrafficSegs / __espilTrafficLevel
-   hooks the monolith exposes for this module. The segments are
-   built from real OSM roads (buildOsmTraffic) and their flow is an
-   internal simulation (random walk + neighbour smoothing + rush
-   hour bias + incidents) - there is NO live TomTom feed in the
-   build today, and this module adds none: it reads exactly the
-   state the game itself uses, so the two can never diverge.
+   TRAFFIC SOURCE (Plan B, Han 2026-11-06): the REAL TomTom feed,
+   polled server-side - this module polls GET /api/traffic (a Vercel
+   Function in this project; the TomTom key lives only in the server
+   env var TOMTOM_API_KEY and never reaches the client), which samples
+   TomTom flow around the Art Gallery and returns one prevailing
+   level {level, ratio, sampled}. Poll cadence ~60 s; the endpoint
+   itself memoizes ~600 s upstream. FALLBACK: whenever the endpoint
+   is unreachable or errors (a local rig with no /api route, a
+   preview without the key, an upstream outage), the level falls
+   back to the game's own internal simulation - the segment flow
+   values in modules/monolith.js (updateTraffic), read through the
+   read-only window.__espilTrafficSegs / __espilTrafficLevel hooks,
+   exactly as this module worked before the feed existed.
+   __espilNpcState().source reports which source is live
+   ('tomtom' | 'sim-fallback'), with feedRatio alongside.
    Colour mapping (the game's trafficLevel bands -> TomTom-style
    colours): clear -> green, slow -> yellow, heavy -> orange,
-   stopped -> red. The prevailing colour is the most common colour
-   among segments whose midpoint lies within 200 m of the Art
-   Gallery anchor (the player spawn front, (3, 33)); ties break
-   toward the more severe colour. Level + target re-roll every
+   stopped -> red. The sim fallback's prevailing colour is the most
+   common colour among segments whose midpoint lies within 200 m of
+   the Art Gallery anchor (the player spawn front, (3, 33)); ties
+   break toward the more severe colour. Level + target re-roll every
    ~30 s.
    Bodies: the game's own avatar GLBs (male.glb / female_idle.glb),
    one parsed master per gender, cloned per NPC with the remote
@@ -52,7 +58,7 @@
    own movement is never blocked (ambient NPCs, same contract as
    remote avatars).
    Hooks: window.__espilNpcState() -> {level, target, active, cap,
-   forced, sampled, entrances, npcs:[{x,z,state}]} and the test
+   forced, sampled, source, feedRatio, entrances, npcs:[{x,z,state}]} and the test
    override window.__espilNpcForceLevel('red'|'orange'|'green'|
    'yellow'|null) in the spirit of __espilNightForce - inert when
    null. Vancouver only: any other active city despawns the pool. */
@@ -69,6 +75,8 @@
 
   var S = {
     level: 'green', target: 0, forced: null, sampled: 0,
+    source: 'sim-fallback', feedRatio: null, feedLevel: null,
+    feedSampled: 0, feedOkAt: 0,
     entrances: [], entrancesBuilt: false, entranceTryAt: 0,
     npcs: [], pending: 0, spawnAcc: 0, everFilled: false,
     fillStartAt: 0, lastArrivedRec: null, nextEval: 0,
@@ -141,12 +149,56 @@
     if (level === 'orange') return 1 + irand(6);     /* 1..6 */
     return 0;
   }
+  /* ------- live feed: /api/traffic (server-side TomTom poll) ------- */
+  var FEED_URL = '/api/traffic';
+  var FEED_POLL_MS = 60000;            /* client poll cadence */
+  var FEED_FIRST_MS = 3000;            /* first poll after init */
+  var FEED_FRESH_MS = 1500000;         /* feed level stays usable
+                                          this long after a good poll;
+                                          1500 s spans the endpoint's
+                                          600 s server cache window */
+  var FEED_TIMEOUT_MS = 8000;
+  var LEVELS = { green: 1, yellow: 1, orange: 1, red: 1 };
+  function pollFeed() {
+    if (typeof fetch !== 'function') return;
+    var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var timer = ctl ? setTimeout(function () { ctl.abort(); }, FEED_TIMEOUT_MS) : null;
+    fetch(FEED_URL, ctl ? { signal: ctl.signal } : undefined)
+      .then(function (resp) {
+        if (!resp || !resp.ok) throw new Error('feed http');
+        return resp.json();
+      })
+      .then(function (j) {
+        if (!j || !LEVELS[j.level]) throw new Error('feed shape');
+        S.feedLevel = j.level;
+        S.feedRatio = (typeof j.ratio === 'number') ? j.ratio : null;
+        S.feedSampled = (typeof j.sampled === 'number') ? j.sampled : 0;
+        S.feedOkAt = performance.now();
+        S.source = 'tomtom';
+      })
+      .catch(function () {
+        /* endpoint absent/erroring: the sim fallback in
+           evaluateLevel takes over (it reads S.feedLevel stale
+           checks, so just mark the source honestly) */
+        S.source = 'sim-fallback';
+        S.feedLevel = null;
+        S.feedRatio = null;
+      })
+      .then(function () { if (timer) clearTimeout(timer); });
+  }
   function evaluateLevel() {
     if (S.forced) {
       S.level = S.forced;
       S.target = Math.min(CAP, rollTarget(S.forced));
       return;
     }
+    if (S.feedLevel && performance.now() - S.feedOkAt < FEED_FRESH_MS) {
+      S.level = S.feedLevel;
+      S.sampled = S.feedSampled;
+      S.target = Math.min(CAP, rollTarget(S.feedLevel));
+      return;
+    }
+    if (S.source !== 'sim-fallback') S.source = 'sim-fallback';
     var segs = null;
     try {
       segs = (typeof window.__espilTrafficSegs === 'function')
@@ -694,7 +746,8 @@
   window.__espilNpcState = function () {
     return {
       level: S.level, target: S.target, active: S.npcs.length, cap: CAP,
-      forced: S.forced, sampled: S.sampled, entrances: S.entrances.length,
+      forced: S.forced, sampled: S.sampled, source: S.source,
+      feedRatio: S.feedRatio, entrances: S.entrances.length,
       pending: S.pending,
       doors: S.entrances.map(function (e) {
         return { x: Math.round(e.x * 100) / 100, z: Math.round(e.z * 100) / 100 };
@@ -797,5 +850,9 @@
     } catch (e) { /* the NPC layer never breaks the page */ }
   }
   S.booted = true;
+  try {
+    setTimeout(pollFeed, FEED_FIRST_MS);
+    setInterval(pollFeed, FEED_POLL_MS);
+  } catch (e) { /* no timers: sim fallback still drives the pool */ }
   requestAnimationFrame(tick);
 })();

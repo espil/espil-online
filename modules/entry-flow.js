@@ -294,7 +294,9 @@
          direct visit carries no landing handoff mark: the pair's
          head script adds the espil-handoff class when a landing
          DIVE's espil_pending_city is in sessionStorage) WITH a
-         valid cached last position resumes at that last location:
+         valid cached last position resumes at that last location
+         (LOGGED-IN sessions only - the session scope note below;
+         guests take the gallery branch even on this path):
          no pick is set, so espilEntryStart resumes exactly as
          before. Valid means espil_last_pos parses to numeric x/z,
          its city is 'vancouver' or unset, and it lies inside the
@@ -310,12 +312,37 @@
          espilEntryStart, so the gallery wins there too).
        The picker code above stays dormant for a future multi-spot
        return. espil_last_pos keeps being recorded by the world;
-       it is only ever READ for the game-page resume above. */
+       it is only ever READ for the game-page resume above.
+       Session scope (Han, clarified 2026-11-06 11:36, superseding
+       both earlier readings of his gallery line): the resume above
+       is a LOGGED-IN user's restore only - GUESTS are pinned to
+       the Art Gallery on EVERY entry path, regardless of any
+       espil_last_pos cache. isLoggedIn() below is the single
+       session signal for this gate, built on this module's own
+       account store (session() / accounts() - the same records
+       custmerge.js reads at its gate). Account login is disabled
+       in the current build (GUEST_ONLY stands; the sign-in form is
+       inert), so no live path writes a session today, every real
+       entry is a guest entry, and the gallery pick below is set
+       deterministically - the guest branch never consults the
+       cache for spawning. (The guest-enter handler above also
+       drops any stored session when the guest button is used, so
+       a session can only ever reach this gate via a real sign-in
+       through startSession.) The account stage only has to enable
+       sign-in and the restore branch goes live with no further
+       spawn changes. */
+    function isLoggedIn() {
+      var ses = session();
+      if (!ses) return false;
+      var accs = accounts();
+      return !!(accs[ses.id] || accs[String(ses.id).toLowerCase()]);
+    }
+    var loggedIn = isLoggedIn();
     var directGamePage = false;
     try { directGamePage = window.__ESPIL_GAME_PAGE === true && !document.documentElement.classList.contains('espil-handoff'); } catch (_) {}
     var saved = null;
     try { saved = JSON.parse(localStorage.getItem('espil_last_pos') || 'null'); } catch (_) {}
-    if (directGamePage && saved && typeof saved.x === 'number' && isFinite(saved.x) && typeof saved.z === 'number' && isFinite(saved.z) &&
+    if (loggedIn && directGamePage && saved && typeof saved.x === 'number' && isFinite(saved.x) && typeof saved.z === 'number' && isFinite(saved.z) &&
         (!saved.city || saved.city === 'vancouver') &&
         saved.x >= VAN_BOUNDS.x0 - 50 && saved.x <= VAN_BOUNDS.x1 + 50 && saved.z >= VAN_BOUNDS.z0 - 50 && saved.z <= VAN_BOUNDS.z1 + 50) {
       if (typeof next === 'function') next();

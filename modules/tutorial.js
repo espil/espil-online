@@ -159,6 +159,16 @@
       '#espil-tut .kb{min-width:16px;height:16px;padding:0 2px;margin-right:2px;border-radius:4px;font-size:.60rem;border-bottom-width:2px}' +
       '#espil-tut.tut-min{gap:5px;padding:4px 10px;font-size:.68rem}' +
       '#espil-tut .mini-ic{color:#ffd97a;font-size:.66rem;line-height:1}' +
+      /* Mobile placement (Han 2026-11-06): in the map the chip
+         leaves the top-centre and sits in the right column directly
+         under the (shrunk) mobile minimap, right-aligned with it -
+         top = the minimap's 120px top + its coarse height
+         max(52px,10vh) (pair.css) + an 8px gap. Scoped to
+         body.in-map so the landing-page hints keep their
+         top-centre spot. The minimized pill inherits this anchor,
+         and the chip's z-60 keeps it above - and tappable over -
+         the tap-expanded minimap (z-30). */
+      'body.in-map #espil-tut{left:auto;right:14px;transform:none;top:calc(128px + max(52px,10vh) + env(safe-area-inset-top,0px))}' +
       '}';
       /* Mobile revert (Han 2026-11-04): the Batch E2 coarse-pointer
          top:52px tutorial offset is REMOVED - top:86px everywhere. */

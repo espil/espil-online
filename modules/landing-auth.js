@@ -5,40 +5,65 @@
     var audio=document.getElementById('bgm');
     var toggle=document.getElementById('bgm-toggle');
     var started=false, muted=false, userPaused=false;
-    /* Track catalogue (2026-10-06 QA #2): the hover card shows the current song.
-       Adding a city theme = one line here + the mp3 in assets/bgm/cities/. */
-    var LANDING_THEME={title:'Green',artist:'Espil Ceil',src:'assets/Green_bgm_landing.mp3'};
-    var CITY_THEMES={
-      'Vancouver':{title:'Citrus Tree',artist:'Espil Ceil',src:'assets/bgm/cities/vancouver.mp3'}
-    };
-    var currentTheme=LANDING_THEME,pendingThemeUrl=null;
+    /* BGM set (Han's rule, confirmed 2026-10-26, re-applied 2026-11-06): NO
+       per-city themes. Every owned track is ONE set, played in random rotation
+       with no immediate repeat, on the landing screen and in the map alike.
+       Volume 0.3, 4 s fades, the previous song fades out before a swap
+       (fade-previous-on-overlap), and the mute toggle stays linked.
+       assets/bgm/waitemata.mp3 is the song "Croatia" (title corrected by Han,
+       2026-10-27; the file name predates the correction). */
+    var BGM_SET=[
+      {title:'Green',artist:'Espil Ceil',src:'assets/Green_bgm_landing.mp3'},
+      {title:'Citrus Tree',artist:'Espil Ceil',src:'assets/bgm/cities/vancouver.mp3'},
+      {title:'Croatia',artist:'Espil Ceil',src:'assets/bgm/waitemata.mp3'},
+      {title:'Fire End Dwelling Ash',artist:'Espil Ceil',src:'assets/bgm/fire-end-dwelling-ash.mp3'}
+    ];
+    var SET_FADE_MS=4000;
+    var currentTheme=BGM_SET[0];
+    /* Playback volume: the set standard is 0.3. A volume the user picked in
+       the settings panel is stored (localStorage 'espil_bgm_vol', mirrored to
+       window.__espilBgmVol by the game UI) and always wins over the default. */
+    function bgmVol(){
+      var stored=null;
+      try{stored=localStorage.getItem('espil_bgm_vol');}catch(e){}
+      if(stored!=null){
+        var v=(window.__espilBgmVol!=null)?window.__espilBgmVol:parseFloat(stored);
+        if(v!=null&&!isNaN(v))return Math.max(0,Math.min(1,v));
+      }
+      return 0.3;
+    }
     function paintBgmCard(){
       var t=document.getElementById('bgm-card-title'),
           a=document.getElementById('bgm-card-artist'),
           s=document.getElementById('bgm-card-state');
       if(t)t.textContent=currentTheme.title;
       if(a)a.textContent=currentTheme.artist;
-      if(s)s.textContent=(muted?'Muted':'Now playing')+' · loops forever';
+      if(s)s.textContent=(muted?'Muted':'Now playing')+' \u00b7 shuffled set';
     }
+    /* Missing-file bookkeeping: a track that fails to load is skipped for the
+       rest of the cycle; if EVERY track fails there is nothing to play, so the
+       toggle shows OFF instead of pretending (legacy landing behaviour). */
+    var failedSrcs={};
+    function failedCount(){ var n=0; for(var k in failedSrcs)n++; return n; }
     if(audio){
-      audio.volume=0.5;
-      audio.loop=true; /* songs loop forever (2026-10-06 QA #2) */
-      audio.addEventListener('playing',function(){pendingThemeUrl=null;});
+      audio.volume=bgmVol();
+      audio.loop=false; /* the set rotates on 'ended'; no track loops */
+      audio.addEventListener('playing',function(){ failedSrcs={}; });
+      audio.addEventListener('ended',function(){
+        if(muted||userPaused)return;
+        playSetTrack(pickNextTrack(null));
+      });
       audio.addEventListener('error',function(){
         var cur='';
         try{cur=audio.currentSrc||audio.src||'';}catch(e){}
-        if(pendingThemeUrl&&cur.slice(-pendingThemeUrl.length)===pendingThemeUrl){
-          /* A city theme file is missing: fall back to the landing theme, stay unmuted. */
-          pendingThemeUrl=null;
-          try{audio.src=LANDING_THEME.src;audio.loop=true;}catch(e){}
-          currentTheme=LANDING_THEME;paintBgmCard();
-          if(started&&!muted&&!userPaused)play();
+        for(var i=0;i<BGM_SET.length;i++){
+          if(cur.slice(-BGM_SET[i].src.length)===BGM_SET[i].src)failedSrcs[BGM_SET[i].src]=true;
+        }
+        if(failedCount()>=BGM_SET.length){
+          muted=true; userPaused=true; paintToggle(); paintBgmCard();
           return;
         }
-        /* Theme song file not uploaded yet: show OFF instead of pretending. */
-        if(audio.networkState===3||(audio.error&&audio.error.code===4)){
-          muted=true; userPaused=true; paintToggle(); paintBgmCard();
-        }
+        playSetTrack(pickNextTrack(failedSrcs));
       });
     }
     function paintToggle(){
@@ -90,12 +115,14 @@
         o.start(t);o.stop(t+.19);
       }catch(e){}
     }
-    /* Volume fade helper (~1.2s): slow fade-out on city enter, slow fade-in on return. */
+    /* Volume fade helper: ~1.2 s by default; set swaps pass SET_FADE_MS so
+       the incoming song fades in over 4 s after the outgoing one is silenced. */
     var fadeTimer=null;
-    function fadeTo(target,done){
+    function fadeTo(target,done,durationMs){
       if(!audio)return;
       if(fadeTimer){clearInterval(fadeTimer);fadeTimer=null;}
-      var step=(target-audio.volume)/20;
+      var steps=Math.max(1,Math.round((durationMs||1200)/60));
+      var step=(target-audio.volume)/steps;
       if(Math.abs(step)<.004){try{audio.volume=target;}catch(e){} if(done)done(); return;}
       fadeTimer=setInterval(function(){
         var v=audio.volume+step;
@@ -110,118 +137,56 @@
     document.addEventListener('pointerdown',unlock);
     document.addEventListener('keydown',unlock);
     document.addEventListener('touchstart',unlock,{passive:true});
-    /* Switch to a city theme song (loops forever); missing files fall back to the
-       landing theme via the error handler above. */
-    function playTheme(theme){
-      if(!audio)return;
-      pendingThemeUrl=theme.src;
-      fadeTo(0,function(){
-        try{audio.src=theme.src;audio.loop=true;}catch(e){}
-        currentTheme=theme;paintBgmCard();
-        if(!started||muted||userPaused)return;
-        try{audio.volume=0;}catch(e){}
-        var p=audio.play(); if(p&&p.catch)p.catch(function(){});
-        fadeTo(window.__espilBgmVol!=null?window.__espilBgmVol:.5);
-      });
-    }
-    /* Per-city theme songs (walkable-map BGM). To give a new city its own theme,
-       drop its mp3 in assets/bgm/cities/ and add one line here, e.g.
-       tokyo:{src:'assets/bgm/cities/tokyo.mp3',title:'...'}.
-       Vancouver's theme is "Citrus Tree" by Espil Ceil. */
-    /* 'vancouver' (walkable-map key) aliases the landing catalogue's 'Vancouver' theme entry. */
-    CITY_THEMES.vancouver={src:'assets/bgm/cities/vancouver.mp3',title:'Citrus Tree',artist:'Espil Ceil'};
-    var CITY_DWELL_MS=60000, CITY_FADE_MS=4000, CITY_VOLUME=0.5;
-    var cityAudio=null, cityTimer=null, cityFadeTimer=null;
-    var mapCity=null, cityDwellElapsed=false, cityThemeFailed=false;
-    function ensureCityAudio(){
-      if(cityAudio)return cityAudio;
-      var a=document.createElement('audio');
-      a.loop=true; a.preload='auto';
-      a.addEventListener('error',function(){ cityThemeFailed=true; });
-      cityAudio=a; return a;
-    }
-    function cityFadeTo(target,done){
-      var a=cityAudio;
-      if(!a){ if(done)done(); return; }
-      if(cityFadeTimer){clearInterval(cityFadeTimer);cityFadeTimer=null;}
-      var steps=Math.max(1,Math.round(CITY_FADE_MS/60));
-      var step=(target-a.volume)/steps;
-      if(Math.abs(target-a.volume)<0.004){
-        try{a.volume=target;}catch(e){}
-        if(done)done(); return;
+    /* Pick the next set track at random, never the one that just finished
+       (with two tracks this strictly alternates). skip, when given, also
+       excludes tracks that failed to load this cycle. A single-track set
+       simply returns its only track. */
+    function pickNextTrack(skip){
+      if(BGM_SET.length<2)return BGM_SET[0];
+      var pool=[],i,t;
+      for(i=0;i<BGM_SET.length;i++){
+        t=BGM_SET[i];
+        if(t===currentTheme)continue;
+        if(skip&&skip[t.src])continue;
+        pool.push(t);
       }
-      cityFadeTimer=setInterval(function(){
-        var v=a.volume+step;
-        if((step>0&&v>=target)||(step<0&&v<=target))v=target;
-        try{a.volume=Math.max(0,Math.min(1,v));}catch(e){}
-        if(v===target){clearInterval(cityFadeTimer);cityFadeTimer=null;if(done)done();}
-      },60);
-    }
-    function startCityTheme(){
-      if(muted||userPaused||!mapCity)return;
-      var theme=CITY_THEMES[mapCity];
-      if(!theme||!theme.src)return;
-      /* The entry sequence already switched the main BGM to this city theme:
-         don't layer a second copy of the same song. */
-      if(currentTheme&&currentTheme.src===theme.src&&audio&&!audio.paused)return;
-      var a=ensureCityAudio();
-      if(a.getAttribute('src')!==theme.src){
-        cityThemeFailed=false;
-        a.setAttribute('src',theme.src);
-        try{a.load();}catch(e){}
+      if(!pool.length){
+        for(i=0;i<BGM_SET.length;i++)if(BGM_SET[i]!==currentTheme)pool.push(BGM_SET[i]);
       }
-      if(cityThemeFailed)return;
-      try{a.volume=0;}catch(e){}
-      var p=a.play(); if(p&&p.catch)p.catch(function(){});
-      cityFadeTo(window.__espilBgmVol!=null?window.__espilBgmVol:CITY_VOLUME);
+      return pool[Math.floor(Math.random()*pool.length)];
     }
-    function stopCityTheme(){
-      if(cityTimer){clearTimeout(cityTimer);cityTimer=null;}
-      if(cityAudio&&!cityAudio.paused){
-        cityFadeTo(0,function(){ try{cityAudio.pause();}catch(e){} });
-      }
-      cityDwellElapsed=false;
+    /* Swap to a set track: the outgoing song is silenced first, the new song
+       starts at 0 and fades in over SET_FADE_MS - the previous song never
+       overlaps the next one. The card repaints on every rotation. */
+    function playSetTrack(theme){
+      if(!audio||!theme)return;
+      if(fadeTimer){clearInterval(fadeTimer);fadeTimer=null;}
+      try{audio.src=theme.src;audio.loop=false;}catch(e){}
+      currentTheme=theme;paintBgmCard();
+      if(!started||muted||userPaused)return;
+      try{audio.volume=0;}catch(e){}
+      var p=audio.play(); if(p&&p.catch)p.catch(function(){});
+      fadeTo(bgmVol(),null,SET_FADE_MS);
     }
     window.EspilAudio={
-      onCitySelect:function(){
-        if(audio&&!audio.paused)fadeTo(0,function(){try{audio.pause();}catch(e){}});
-      },
-      onCityEnter:function(cityName){
-        var theme=CITY_THEMES[cityName];
-        if(theme)playTheme(theme);
-      },
-      onReturnToOrbit:function(){
-        if(currentTheme!==LANDING_THEME&&audio){
-          try{audio.src=LANDING_THEME.src;audio.loop=true;}catch(e){}
-          currentTheme=LANDING_THEME;paintBgmCard();
-        }
-        if(!started||muted||userPaused||!audio)return;
-        try{audio.volume=0;}catch(e){}
-        var p=audio.play(); if(p&&p.catch)p.catch(function(){});
-        fadeTo(window.__espilBgmVol!=null?window.__espilBgmVol:.5);
-      },
-      /* Walkable map entered: after CITY_DWELL_MS in the map, fade the city's
-         theme in and loop it. Exiting the map cancels the timer/stops the song. */
-      onMapEnter:function(cityId){
-        stopCityTheme();
-        mapCity=cityId||null;
-        if(!mapCity||!CITY_THEMES[mapCity])return;
-        cityTimer=setTimeout(function(){
-          cityTimer=null; cityDwellElapsed=true; startCityTheme();
-        },CITY_DWELL_MS);
-      },
-      onMapExit:function(){
-        mapCity=null; stopCityTheme();
-      },
+      /* Scene hooks kept for the pair's callers. Per-city themes are
+         retired: selecting, entering or leaving a city no longer switches
+         songs - the set keeps rotating across the landing screen and the
+         map alike. */
+      onCitySelect:function(){},
+      onCityEnter:function(cityName){},
+      onReturnToOrbit:function(){},
+      onMapEnter:function(cityId){},
+      onMapExit:function(){},
       currentTrack:function(){return {title:currentTheme.title,artist:currentTheme.artist,muted:muted};},
       pop:pop,
       tick:tick,
       toggle:function(){
         muted=!muted; userPaused=muted;
-        if(audio){ if(muted)audio.pause(); else play(); }
-        if(cityAudio){
-          if(muted){ try{cityAudio.pause();}catch(e){} }
-          else if(mapCity&&cityDwellElapsed)startCityTheme();
+        if(audio){
+          if(muted)audio.pause();
+          else if(audio.ended)playSetTrack(pickNextTrack(null));
+          else play();
         }
         paintToggle();paintBgmCard();
       }

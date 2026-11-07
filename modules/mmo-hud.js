@@ -395,13 +395,78 @@
     requestAnimationFrame(paintEspilTray);
   }, 800);
 
+  /* ---- mobile minimap tap-to-expand (Han 2026-11-06) -------------
+     Coarse pointers only, and only while the wrap sits at stage 1:
+     a tap on the minimap toggles the .mm-big expanded view (sized
+     in pair.css); a tap anywhere else on screen collapses it back.
+     The tutorial chip is excluded from the collapse - its own tap
+     keeps meaning minimize/restore - and the chip paints above the
+     expanded map (z-60 over the wrap's z-30), so it is never
+     trapped under it. A drag still pans the Leaflet map: only a
+     short, near-stationary press counts as a tap. Leaflet learns
+     the new CSS size through the monolith's own resize path -
+     synthetic window resize events feed its 200ms-debounced
+     invalidateSize on the same 60/350/800ms ladder setMapStage
+     uses, so the map re-measures the settled size instead of
+     stretching. A watchdog drops the class if the stage ladder
+     ever leaves stage 1 (M key / zoom buttons on a hybrid device),
+     so .mm-big can never leak into the district/fullscreen stages.
+     Desktop never sees any of this: every handler gates on coarse. */
+  var mmBig = false;
+  function mmCoarse() {
+    try { return !!(window.matchMedia && window.matchMedia('(pointer:coarse)').matches); } catch (e) { return false; }
+  }
+  function mmWrap() { return document.getElementById('minimap-wrap'); }
+  function mmKickResize() {
+    [60, 350, 800].forEach(function (ms) {
+      setTimeout(function () {
+        try { window.dispatchEvent(new Event('resize')); }
+        catch (e) {
+          try { var ev = document.createEvent('Event'); ev.initEvent('resize', true, true); window.dispatchEvent(ev); } catch (e2) {}
+        }
+      }, ms);
+    });
+  }
+  function mmSetBig(on) {
+    var w = mmWrap(); if (!w) return;
+    if (on && w.getAttribute('data-stage') !== '1') on = false;
+    mmBig = !!on;
+    if (w.classList.contains('mm-big') === mmBig) return;
+    w.classList.toggle('mm-big', mmBig);
+    mmKickResize();
+  }
+  var mmDownAt = null;
+  document.addEventListener('pointerdown', function (e) {
+    if (!mmCoarse()) return;
+    var w = mmWrap(); if (!w) return;
+    if (w.contains(e.target)) { mmDownAt = { x: e.clientX, y: e.clientY, t: Date.now() }; return; }
+    if (mmBig && !(e.target && e.target.closest && e.target.closest('#espil-tut'))) mmSetBig(false);
+  }, true);
+  document.addEventListener('pointerup', function (e) {
+    if (!mmCoarse() || !mmDownAt) return;
+    var d = mmDownAt; mmDownAt = null;
+    var dx = e.clientX - d.x, dy = e.clientY - d.y;
+    if (dx * dx + dy * dy > 100 || Date.now() - d.t > 500) return; /* a drag pans; only a tap toggles */
+    var w = mmWrap(); if (!w || !w.contains(e.target)) return;
+    if (w.getAttribute('data-stage') !== '1') return;
+    mmSetBig(!mmBig);
+  }, true);
+  setInterval(function () {
+    if (!mmBig) return;
+    var w = mmWrap();
+    if (w && w.getAttribute('data-stage') !== '1') mmSetBig(false);
+  }, 500);
+
   window.__espilMMOHudState = function () {
+    var mw = document.getElementById('minimap-wrap');
     return {
       built: true,
       status: !!document.getElementById('espil-mmo-status'),
       strip: !!document.getElementById('espil-mmo-strip'),
       name: (document.getElementById('espil-mmo-name') || {}).textContent || '',
-      leo: (document.getElementById('espil-mmo-leo') || {}).textContent || ''
+      leo: (document.getElementById('espil-mmo-leo') || {}).textContent || '',
+      minimapBig: mmBig,
+      minimapStage: mw ? mw.getAttribute('data-stage') : null
     };
   };
 })();

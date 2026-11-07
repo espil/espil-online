@@ -1399,6 +1399,27 @@
         var e=cache[i];
         if(!e.m.visible&&e.force){ savedVis.push(e.m); e.m.visible=true; }
       }
+      /* root-cause fix: the force-shown classes were faded by
+         espilP1FadeMat (transparent, opacity 0, depthWrite off)
+         and are FrontSide, so in these two passes they painted
+         nothing, wrote no depth, and culled away whenever the
+         camera sat inside a building volume - the difference
+         then read "visible" while the player was fully occluded.
+         For exactly these two renders, force every material of
+         the force classes opaque, depth-writing and double-sided,
+         then restore each original below. */
+      var detMats=[];
+      for(var mi=0;mi<cache.length;mi++){
+        if(!cache[mi].force)continue;
+        var mm=cache[mi].m.material, mlist=Array.isArray(mm)?mm:(mm?[mm]:[]);
+        for(var mj=0;mj<mlist.length;mj++){
+          var mt2=mlist[mj];
+          if(!mt2||mt2.__espilDetOv)continue;
+          mt2.__espilDetOv=true;
+          detMats.push({mat:mt2,t:mt2.transparent,o:mt2.opacity,dw:mt2.depthWrite,sd:mt2.side});
+          mt2.transparent=false; mt2.opacity=1; mt2.depthWrite=true; mt2.side=THREE.DoubleSide;
+        }
+      }
       var rootWas=(av.__visualRoot?av.__visualRoot.visible:null);
       var x0=Math.max(0,Math.floor(cxPx-rxPx)), x1=Math.min(W-1,Math.ceil(cxPx+rxPx));
       var y0=Math.max(0,Math.floor(cyPx-ryPx)), y1=Math.min(H-1,Math.ceil(cyPx+ryPx));
@@ -1430,6 +1451,7 @@
       try{ R.setRenderTarget(oldRT); if(oldCC)R.setClearColor(oldCC,oldCA); if(useLayer&&R.state&&R.state.reset)R.state.reset(); }catch(err){}
       if(av.__visualRoot&&rootWas!==null)av.__visualRoot.visible=rootWas;
       for(var j=0;j<savedVis.length;j++)savedVis[j].visible=false;
+      for(var mk=0;mk<detMats.length;mk++){ var dm2=detMats[mk]; dm2.mat.transparent=dm2.t; dm2.mat.opacity=dm2.o; dm2.mat.depthWrite=dm2.dw; dm2.mat.side=dm2.sd; dm2.mat.__espilDetOv=false; }
       if(silGuard&&espilSilMats)for(var q2=0;q2<espilSilMats.length;q2++)espilSilMats[q2].mat.depthTest=false;
       if(av.shadow&&shadowWas!==null)av.shadow.visible=shadowWas;
       if(typeof mapSkyDome!=='undefined'&&mapSkyDome&&domeWas!==null)mapSkyDome.visible=domeWas;
@@ -2510,7 +2532,7 @@
          movement speed (moveSpeeds().run - the one run mode), lateral
          at the draft's 0.6 ratio, slide capped at the same speed. This
          supersedes the 2026-10-16 option-3 value of 1.0 m/s. */
-      var spd=(typeof moveSpeeds==='function')?moveSpeeds().run:12;
+      var spd=(typeof moveSpeeds==='function')?moveSpeeds().run:21.6;
       if(keyUp)cl.h+=spd*dt; else if(keyDown)cl.h-=spd*dt;
       /* Screen-right mapped onto the wall: the tangent is the
          character's right hand while facing into the wall. */
@@ -5415,8 +5437,8 @@
     function moveSpeeds(){
       var a=skillState.alloc;
       return {
-        walk:7.5*(1+.015*(a['m_walk']||0)),
-        run:12*(1+.02*(a['m_run']||0)),
+        walk:13.5*(1+.015*(a['m_walk']||0)),
+        run:21.6*(1+.02*(a['m_run']||0)),
         swim:4,
         jumpV:9*(1+.01*(a['m_jump']||0)),
         djumpV:9*(1+.02*(a['m_djump']||0))
