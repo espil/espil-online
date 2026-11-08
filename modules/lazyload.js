@@ -52,6 +52,9 @@
      the survival-game monster layer is a world feature too; it
      self-gates identically, so the pairing keeps their population
      systems armed together.
+   - tiles3d: the same seams as npcs - the Google 3D Tiles layer is
+     a world feature; the module itself is the LIGHT decision entry
+     (the heavy renderer loads only on a tilesEnabled:true decision).
    Every import is fire-and-forget with a console warning on
    failure; a failed lazy load never breaks the page.
    __espilLazyState() reports what has landed (rig probes). */
@@ -101,7 +104,7 @@
   window.addEventListener('espil-dive-start', function () { load('tutorial.js'); });
   window.addEventListener('espil-guide', function (e) {
     var d = e && e.detail; if (!d) return;
-    if (d.type === 'arrival') { socialBundle(); load('npcs.js'); load('monsters.js'); }
+    if (d.type === 'arrival') { socialBundle(); load('npcs.js'); load('monsters.js'); load('tiles3d.js'); }
     if (d.type === 'interior') { storePair(); load('panels.js'); }
   });
   window.addEventListener('espil-party-frame', socialBundle);
@@ -143,7 +146,7 @@
      interception must be resident before the Enter click. 600 ms,
      and each arm is a no-op once loaded. */
   setInterval(function () {
-    if (document.body && document.body.classList.contains('in-map')) { socialBundle(); load('npcs.js'); load('monsters.js'); }
+    if (document.body && document.body.classList.contains('in-map')) { socialBundle(); load('npcs.js'); load('monsters.js'); load('tiles3d.js'); }
     if (window.__espilInside) storePair();
     var bp = document.getElementById('bldg-panel');
     if (bp && bp.getAttribute('aria-hidden') === 'false') load('store-page-link.js');

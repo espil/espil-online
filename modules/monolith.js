@@ -6,17 +6,18 @@
        carries the CITY NAME ONLY - no status copy, no hints, no
        loading or progress text. Every existing status write is
        funnelled through this setter and rendered as the current
-       city name (selected city, else the reel-centred city, else
-       Vancouver). */
+       city name. Han 2026-11-08 (supersedes the default): before the
+       visitor chooses a city, the line is the selector's prompt
+       state - the text 'Choose your city'; no city is pre-selected.
+       Once a city is chosen it carries that city's name only, as
+       before. */
     (function(){
       if(!status)return;
       var d=Object.getOwnPropertyDescriptor(Node.prototype,'textContent');
       if(!d||!d.set)return;
       function landingCityName(){
-        var m=null;
-        if(typeof selected!=='undefined'&&selected)m=selected;
-        else if(typeof centeredMarker!=='undefined'&&centeredMarker)m=centeredMarker;
-        return (m&&m.userData&&m.userData.name)||'Vancouver';
+        if(typeof selected!=='undefined'&&selected&&selected.userData&&selected.userData.name)return selected.userData.name;
+        return 'Choose your city';
       }
       Object.defineProperty(status,'textContent',{
         configurable:true,
@@ -7803,6 +7804,8 @@
        the Globe View drop, so the menu opens on the character as
        rendered, bent ground included. */
     window.__espilMapCameraObj=function(){ try{ return (typeof mapCamera!=='undefined'&&mapCamera)?mapCamera:null; }catch(_){ return null; } };
+    window.__espilMapObj=function(){ try{ return (typeof espilP1!=='undefined'&&espilP1)?(espilP1.map||null):null; }catch(_){ return null; } };
+    window.__espilBakedBuildingCents=function(){ try{ return (typeof espilP1BldCache!=='undefined'&&espilP1BldCache)?espilP1BldCache.cents:null; }catch(_){ return null; } };
     window.__espilOwnGroup=function(){ try{ return (typeof walkPlayer!=='undefined'&&walkPlayer&&walkPlayer.av&&walkPlayer.av.group)?walkPlayer.av.group:null; }catch(_){ return null; } };
     /* __espilRemoteAvatars END */
     window.addEventListener('sell-bubble',function(e){
