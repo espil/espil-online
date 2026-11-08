@@ -32,9 +32,11 @@
    alternating, crit shakes), and a single hit sound replayed at a
    random rate (baritone on crit).
    Death dispatches espil-guide {type:'monster-drop', kind, grade,
-   parts:[...]} on the weapon-materials line for S5 crafting.
+   parts:[...], items:[{name, line, grade, count}]} - drops OPEN
+   (Batch 6) on three separated lines for S5 crafting.
    Hooks: __espilZoneAt(x,z), __espilMonsterState(),
    __espilMonsterTargets(), __espilMonsterHit(...),
+   __espilDropTable, __espilDropRoll(kindId, zone),
    __espilMonsterForceZone(zone|null) (test override, same spirit as
    __espilNpcForceLevel). */
 (function () {
@@ -68,10 +70,14 @@
                                           the same fill refills a zone
                                           after a death (zone respawn) */
 
-  /* ---- Hit feel tuning (FEEL.md) ---- */
-  var WINDUP_BASE = 0.45;              /* s of telegraph before a
+  /* ---- Hit feel tuning (FEEL.md) ----
+     Batch 6 (Han 2026-11-07): attack cycle x0.75 duration - the
+     wind-up base scales with the per-kind cooldowns below, so the
+     whole telegraph+recover cycle runs at 0.75x its Batch 5 length. */
+  var WINDUP_BASE = 0.34;              /* s of telegraph before a
                                           strike, plus a slice of the
-                                          kind's own attack cooldown */
+                                          kind's own attack cooldown
+                                          (Batch 5: 0.45, now x0.75) */
   var CANCEL_FRAC = 0.25;              /* damage taken during a wind-up
                                           at or above this fraction of
                                           maxHp cancels the attack */
@@ -104,8 +110,8 @@
     brute: { w: 2.3, h: 2.7 }      /* heavy mass */
   };
   var KINDS = [
-    { id: 'rat', name: 'Robson Rat', base: 'crawler', tint: '#8a7a66', scale: 1.55,
-      grade: 'white', level: 1, hp: 20, dmg: 3, aggro: 8, speed: 1.3, reach: 1.6, atkCd: 1.4, zone: 'tutorial', elite: false,
+    { id: 'rat', name: 'Robson Rat', base: 'crawler', tint: '#8a7a66', scale: 3.1,
+      grade: 'white', level: 1, hp: 20, dmg: 3, aggro: 8, speed: 1.69, reach: 1.6, atkCd: 1.05, zone: 'tutorial', elite: false,
       sprite: { base: 'assets/monsters/rat-plushy/', fps: 8, w: 1.2, h: 1.1, frames: {
         idle: ['idle_1.webp','idle_2.webp','idle_3.webp','idle_4.webp'],
         walk: ['walk_front_1.webp','walk_front_2.webp','walk_front_3.webp','walk_front_4.webp'],
@@ -115,11 +121,11 @@
         stun: ['stun_1.webp','stun_2.webp','stun_3.webp','stun_4.webp'],
         death: ['death_1.webp','death_2.webp','death_3.webp','death_4.webp'] } },
       def: 0, eva: 0, element: 'neutral', weak: null },
-    { id: 'wisp', name: 'Square Wisp', base: 'shambler', tint: '#9fc4e8', scale: 1.1,
-      grade: 'white', level: 2, hp: 25, dmg: 4, aggro: 9, speed: 1.0, reach: 1.8, atkCd: 1.6, zone: 'tutorial', elite: false,
+    { id: 'wisp', name: 'Square Wisp', base: 'shambler', tint: '#9fc4e8', scale: 2.2,
+      grade: 'white', level: 2, hp: 25, dmg: 4, aggro: 9, speed: 1.30, reach: 1.8, atkCd: 1.20, zone: 'tutorial', elite: false,
       def: 0, eva: 0, element: 'neutral', weak: null },
-    { id: 'stray', name: 'Alley Stray', base: 'crawler', tint: '#5d4632', scale: 1.55,
-      grade: 'yellow', level: 4, hp: 45, dmg: 6, aggro: 11, speed: 1.6, reach: 1.6, atkCd: 1.3, zone: 'low', elite: false,
+    { id: 'stray', name: 'Alley Stray', base: 'crawler', tint: '#5d4632', scale: 3.1,
+      grade: 'yellow', level: 4, hp: 45, dmg: 6, aggro: 11, speed: 2.08, reach: 1.6, atkCd: 0.98, zone: 'low', elite: false,
       sprite: { base: 'assets/monsters/stray-plushy/', fps: 8, w: 1.05, h: 1.1, frames: {
         idle: ['idle_1.webp','idle_2.webp','idle_3.webp','idle_4.webp'],
         walk: ['walk_front_1.webp','walk_front_2.webp','walk_front_3.webp','walk_front_4.webp'],
@@ -129,8 +135,8 @@
         stun: ['stun_1.webp','stun_2.webp','stun_3.webp','stun_4.webp'],
         death: ['death_1.webp','death_2.webp','death_3.webp','death_4.webp'] } },
       def: 5, eva: 0.10, element: 'neutral', weak: null },
-    { id: 'shambler', name: 'Sewer Shambler', base: 'shambler', tint: '#6fae5f', scale: 1.3,
-      grade: 'green', level: 6, hp: 70, dmg: 8, aggro: 12, speed: 1.1, reach: 1.9, atkCd: 1.5, zone: 'low', elite: false,
+    { id: 'shambler', name: 'Sewer Shambler', base: 'shambler', tint: '#6fae5f', scale: 2.6,
+      grade: 'green', level: 6, hp: 70, dmg: 8, aggro: 12, speed: 1.43, reach: 1.9, atkCd: 1.13, zone: 'low', elite: false,
       sprite: { base: 'assets/monsters/shambler-plushy/', fps: 8, w: 1.96, h: 2.1, frames: {
         idle: ['idle_1.webp','idle_2.webp','idle_3.webp','idle_4.webp','idle_5.webp','idle_6.webp'],
         walk: ['walk_front_1.webp','walk_front_2.webp','walk_front_3.webp','walk_front_4.webp','walk_front_5.webp','walk_front_6.webp'],
@@ -140,8 +146,8 @@
         stun: ['stun_1.webp','stun_2.webp','stun_3.webp','stun_4.webp'],
         death: ['death_1.webp','death_2.webp','death_3.webp','death_4.webp'] } },
       def: 20, eva: 0, element: 'earth', weak: 'fire' },
-    { id: 'brute', name: 'Gastown Brute', base: 'brute', tint: '#a85f3c', scale: 1.8,
-      grade: 'blue', level: 9, hp: 130, dmg: 12, aggro: 13, speed: 1.0, reach: 2.3, atkCd: 1.8, zone: 'mid', elite: false,
+    { id: 'brute', name: 'Gastown Brute', base: 'brute', tint: '#a85f3c', scale: 3.6,
+      grade: 'blue', level: 9, hp: 130, dmg: 12, aggro: 13, speed: 1.30, reach: 2.3, atkCd: 1.35, zone: 'mid', elite: false,
       sprite: { base: 'assets/monsters/brute-plushy/', fps: 6, w: 3.25, h: 2.7, frames: {
         idle: ['idle_1.webp','idle_2.webp','idle_3.webp','idle_4.webp','idle_5.webp'],
         walk: ['walk_front_1.webp','walk_front_2.webp','walk_front_3.webp','walk_front_4.webp','walk_front_5.webp','walk_front_6.webp'],
@@ -151,8 +157,8 @@
         stun: ['stun_1.webp','stun_2.webp','stun_3.webp','stun_4.webp'],
         death: ['death_1.webp','death_2.webp','death_3.webp','death_4.webp'] } },
       def: 35, eva: 0, element: 'neutral', weak: null },
-    { id: 'wraith', name: 'Harbour Wraith', base: 'shambler', tint: '#8f6fc9', scale: 1.4,
-      grade: 'purple', level: 12, hp: 180, dmg: 15, aggro: 14, speed: 1.4, reach: 2.0, atkCd: 1.4, zone: 'mid', elite: true,
+    { id: 'wraith', name: 'Harbour Wraith', base: 'shambler', tint: '#8f6fc9', scale: 2.8,
+      grade: 'purple', level: 12, hp: 180, dmg: 15, aggro: 14, speed: 1.82, reach: 2.0, atkCd: 1.05, zone: 'mid', elite: true,
       sprite: { base: 'assets/monsters/wraith-plushy/', fps: 8, w: 1.96, h: 2.1, frames: {
         idle: ['idle_1.webp','idle_2.webp','idle_3.webp','idle_4.webp','idle_5.webp','idle_6.webp'],
         walk: ['walk_front_1.webp','walk_front_2.webp','walk_front_3.webp','walk_front_4.webp','walk_front_5.webp','walk_front_6.webp'],
@@ -162,8 +168,8 @@
         stun: ['stun_1.webp','stun_2.webp','stun_3.webp','stun_4.webp'],
         death: ['death_1.webp','death_2.webp','death_3.webp','death_4.webp'] } },
       def: 25, eva: 0.35, element: 'dark', weak: 'light' },
-    { id: 'hound', name: 'Ember Hound', base: 'crawler', tint: '#d97b2e', scale: 1.6,
-      grade: 'red', level: 16, hp: 260, dmg: 20, aggro: 16, speed: 2.1, reach: 1.8, atkCd: 1.2, zone: 'high', elite: true,
+    { id: 'hound', name: 'Ember Hound', base: 'crawler', tint: '#d97b2e', scale: 3.2,
+      grade: 'red', level: 16, hp: 260, dmg: 20, aggro: 16, speed: 2.73, reach: 1.8, atkCd: 0.90, zone: 'high', elite: true,
       sprite: { base: 'assets/monsters/hound-plushy/', fps: 8, w: 1.2, h: 1.1, frames: {
         idle: ['idle_1.webp','idle_2.webp','idle_3.webp','idle_4.webp'],
         walk: ['walk_front_1.webp','walk_front_2.webp','walk_front_3.webp','walk_front_4.webp'],
@@ -173,8 +179,8 @@
         stun: ['stun_1.webp','stun_2.webp','stun_3.webp','stun_4.webp'],
         death: ['death_1.webp','death_2.webp','death_3.webp','death_4.webp'] } },
       def: 15, eva: 0.15, element: 'fire', weak: 'water' },
-    { id: 'titan', name: 'Deep Titan', base: 'brute', tint: '#d9a441', scale: 2.6,
-      grade: 'gold', level: 20, hp: 450, dmg: 28, aggro: 18, speed: 0.9, reach: 2.8, atkCd: 2.2, zone: 'high', elite: true,
+    { id: 'titan', name: 'Deep Titan', base: 'brute', tint: '#d9a441', scale: 5.2,
+      grade: 'gold', level: 20, hp: 450, dmg: 28, aggro: 18, speed: 1.17, reach: 2.8, atkCd: 1.65, zone: 'high', elite: true,
       sprite: { base: 'assets/monsters/titan-plushy/', fps: 6, w: 3.25, h: 2.7, frames: {
         idle: ['idle_1.webp','idle_2.webp','idle_3.webp','idle_4.webp','idle_5.webp'],
         walk: ['walk_front_1.webp','walk_front_2.webp','walk_front_3.webp','walk_front_4.webp','walk_front_5.webp','walk_front_6.webp'],
@@ -199,6 +205,65 @@
     white: 'Worn Iron Shard', yellow: 'Brass Shard', green: 'Copper Ingot',
     blue: 'Steel Ingot', purple: 'Mithril Shard', red: 'Dragonsteel Shard',
     gold: 'Sunsteel Shard', pink: 'Lunaris Shard'
+  };
+
+  /* ---- Drops OPEN (Batch 6 Item B, Han 2026-11-07) ----
+     Three separated drop lines, grades on the Zealandia 8-colour
+     ladder. Weapon materials stay the guaranteed line (1 part at
+     the kind's grade, 2 for elites - the Batch 4 behaviour).
+     Armour and accessory materials roll per kill with chances
+     scaled by ZONE (harder zones drop more); the rolled grade is
+     the kind's own grade 80% of the time and one ladder step
+     DOWN the other 20% (never below white). Everything rolled is
+     named here, lands in the bag via the panels espil-guide
+     listener, and is announced at the kill position by a grade-
+     coloured drop tag (spawnDropTag). */
+  var LADDER = ['white', 'yellow', 'green', 'blue', 'purple', 'red', 'gold', 'pink'];
+  var ARMOUR_PARTS = {
+    white: 'Worn Hide Scrap', yellow: 'Brass Stud', green: 'Copper Plate',
+    blue: 'Steel Plate', purple: 'Mithril Plate', red: 'Dragon Scale',
+    gold: 'Sunsteel Plate', pink: 'Lunaris Silk'
+  };
+  var ACC_PARTS = {
+    white: 'Cracked Bead', yellow: 'Brass Charm', green: 'Jade Bead',
+    blue: 'Sapphire Bead', purple: 'Amethyst Bead', red: 'Ruby Bead',
+    gold: 'Topaz Bead', pink: 'Lunaris Bead'
+  };
+  var ARMOUR_CHANCE = { tutorial: 0.25, low: 0.35, mid: 0.45, high: 0.55 };
+  var ACC_CHANCE = { tutorial: 0.10, low: 0.15, mid: 0.22, high: 0.30 };
+  function dropGradeFor(kindGrade) {
+    var i = LADDER.indexOf(kindGrade);
+    if (i < 0) i = 0;
+    if (i > 0 && Math.random() < 0.20) i -= 1;
+    return LADDER[i];
+  }
+  /* rollDrops(kind, zone) -> [{name, line, grade, count}] - the
+     pure roll used by the death path and exposed for probing. */
+  function rollDrops(kind, zone) {
+    var out = [];
+    var n = kind.elite ? 2 : 1;
+    out.push({ name: PARTS[kind.grade], line: 'weapon', grade: kind.grade, count: n });
+    var ac = ARMOUR_CHANCE[zone] != null ? ARMOUR_CHANCE[zone] : 0.25;
+    if (Math.random() < ac) {
+      var ag = dropGradeFor(kind.grade);
+      out.push({ name: ARMOUR_PARTS[ag], line: 'armour', grade: ag, count: 1 });
+    }
+    var cc = ACC_CHANCE[zone] != null ? ACC_CHANCE[zone] : 0.10;
+    if (Math.random() < cc) {
+      var cg = dropGradeFor(kind.grade);
+      out.push({ name: ACC_PARTS[cg], line: 'accessory', grade: cg, count: 1 });
+    }
+    return out;
+  }
+  window.__espilDropTable = {
+    ladder: LADDER.slice(), weapon: PARTS, armour: ARMOUR_PARTS, accessory: ACC_PARTS,
+    armourChance: ARMOUR_CHANCE, accessoryChance: ACC_CHANCE, gradeDownChance: 0.20
+  };
+  window.__espilDropRoll = function (kindId, zone) {
+    for (var i = 0; i < KINDS.length; i++) {
+      if (KINDS[i].id === kindId) return rollDrops(KINDS[i], zone || KINDS[i].zone);
+    }
+    return null;
   };
 
   /* ---- Real sprite frames (Batch 5, Han: monsters in 2D) ----
@@ -233,7 +298,16 @@
      the titan - a source limit, disclosed, not fixable here.
      SCALES carry the player-size floor (player ~1.7 m, Asset
      room): rendered height = base height x scale must reach
-     1.7 m, which raised rat and stray to 1.55 (1.71 m). */
+     1.7 m, which raised rat and stray to 1.55 (1.71 m).
+     BATCH 6 (Han 2026-11-07): every scale DOUBLED on the Batch 5
+     table (rat/stray 3.10, wisp 2.20, shambler 2.60, brute 3.60,
+     wraith 2.80, hound 3.20, titan 5.20); move speeds x1.3 and
+     attack cooldowns x0.75 per kind. Sprite planes, HP-bar/plate
+     offsets, hit radius and separation all derive from scale, so
+     they follow automatically. Knockback re-derives from the mass
+     formula kb = clamp(1.6/scale^2, 0.25, 1.8): at the doubled
+     scales wisp is 0.33 and every other kind sits at the 0.25
+     floor (Batch 5: rat 0.67, shambler 0.95, brute 0.49). */
   var TEXCACHE = {};
   function frameTexture(url) {
     if (TEXCACHE[url]) return TEXCACHE[url];
@@ -882,8 +956,35 @@
       S.feel.numbers++;
     } catch (e) { /* a number can never break a hit */ }
   }
+  /* ---- drop tags (Batch 6 Item B): the visible drop moment ----
+     On a kill, each dropped item gets a grade-coloured tag at the
+     kill position: a sparkle plus the item name (xN when stacked),
+     rising and fading over ~1.8 s, stacked vertically when several
+     lines pay out at once. Projected with the same camera math as
+     the damage numbers. */
+  var dropPool = [];
+  function spawnDropTag(m, items) {
+    try {
+      var layer = ensureDmgLayer();
+      if (!layer || !items || !items.length) return;
+      for (var i = 0; i < items.length; i++) {
+        var it = items[i];
+        var el = document.createElement('div');
+        el.className = 'espil-droptag';
+        el.setAttribute('data-line', it.line);
+        el.setAttribute('data-grade', it.grade);
+        el.style.cssText = 'position:absolute;left:0;top:0;display:none;white-space:nowrap;' +
+          'font-family:sans-serif;font-weight:800;font-size:13px;' +
+          'color:' + (GRADE_CSS[it.grade] || '#ffffff') + ';' +
+          'text-shadow:0 1px 2px rgba(0,0,0,0.9),0 0 8px rgba(0,0,0,0.55);';
+        el.textContent = '✦ ' + it.name + (it.count > 1 ? ' ×' + it.count : '');
+        layer.appendChild(el);
+        dropPool.push({ el: el, m: m, t: 0, life: 1.8, y: m.h + 1.5 + i * 0.55 });
+      }
+    } catch (e) { /* a drop tag can never break a kill */ }
+  }
   function stepDmgNumbers(dt) {
-    if (!dmgPool.length) return;
+    if (!dmgPool.length && !dropPool.length) return;
     var cam = null;
     try {
       cam = (typeof window.__espilMapCameraObj === 'function')
@@ -919,12 +1020,42 @@
       }
       n.el.style.display = shown ? 'block' : 'none';
     }
+    for (var j = dropPool.length - 1; j >= 0; j--) {
+      var dn = dropPool[j];
+      dn.t += dt;
+      if (dn.t >= dn.life || dn.m.gone) {
+        if (dn.el.parentNode) dn.el.parentNode.removeChild(dn.el);
+        dropPool.splice(j, 1);
+        continue;
+      }
+      var df = dn.t / dn.life;
+      var dop = df > 0.6 ? 1 - (df - 0.6) / 0.4 : 1;
+      var dshown = false;
+      if (cam && typeof THREE !== 'undefined') {
+        try {
+          var dv = new THREE.Vector3(dn.m.x, dn.y + df * 0.9, dn.m.z).project(cam);
+          if (dv.z < 1) {
+            var dsx = (dv.x * 0.5 + 0.5) * W;
+            var dsy = (-dv.y * 0.5 + 0.5) * H;
+            dn.el.style.transform = 'translate(' + dsx.toFixed(1) + 'px,' + dsy.toFixed(1) +
+              'px) translate(-50%,-100%)';
+            dn.el.style.opacity = dop.toFixed(2);
+            dshown = true;
+          }
+        } catch (e) {}
+      }
+      dn.el.style.display = dshown ? 'block' : 'none';
+    }
   }
   function clearDmgNumbers() {
     for (var i = 0; i < dmgPool.length; i++) {
       if (dmgPool[i].el.parentNode) dmgPool[i].el.parentNode.removeChild(dmgPool[i].el);
     }
     dmgPool = [];
+    for (var k = 0; k < dropPool.length; k++) {
+      if (dropPool[k].el.parentNode) dropPool[k].el.parentNode.removeChild(dropPool[k].el);
+    }
+    dropPool = [];
   }
 
   /* ---------------- hit sound (FEEL 3/4) ----------------
@@ -987,14 +1118,20 @@
       }),
       kinds: KINDS.map(function (k) {
         return { id: k.id, name: k.name, zone: k.zone, grade: k.grade, level: k.level, hp: k.hp, dmg: k.dmg,
-                 scale: k.scale, sprite: !!spriteCfgFor(k),
+                 scale: k.scale, speed: k.speed, atkCd: k.atkCd, sprite: !!spriteCfgFor(k),
                  def: k.def, eva: k.eva, element: k.element, weak: k.weak };
       }),
       feel: {
         hits: S.feel.hits, crits: S.feel.crits, cancels: S.feel.cancels,
         numbers: S.feel.numbers, flashes: S.feel.flashes, evades: S.feel.evades,
-        activeNumbers: dmgPool.length
+        activeNumbers: dmgPool.length, activeDropTags: dropPool.length
       },
+      drops: (S.lastDrops || []).map(function (d) {
+        return { kind: d.kind, zone: d.zone, grade: d.grade,
+                 items: d.items.map(function (it) {
+                   return { name: it.name, line: it.line, grade: it.grade, count: it.count };
+                 }) };
+      }),
       monsters: S.monsters.map(function (m) {
         return {
           id: m.id, kind: m.kind.id, x: Math.round(m.x * 100) / 100,
@@ -1082,17 +1219,30 @@
       if (walkable(m.x + kx, m.z + kz)) { m.x += kx; m.z += kz; }
       else if (walkable(m.x + kx * 0.5, m.z + kz * 0.5)) { m.x += kx * 0.5; m.z += kz * 0.5; }
       if (m.hp > 0) return { id: m.id, hp: m.hp, dead: false, killed: false, applied: applied, evaded: false, crit: crit, cancelled: cancelled, kind: m.kind.id, zone: m.zone, grade: m.kind.grade };
-      /* death: drop on the weapon-materials line, then fade/sink */
-      var n = m.kind.elite ? 2 : 1;
+      /* death (Batch 6 Item B): drops OPEN on the three separated
+         lines - weapon materials guaranteed, armour and accessory
+         materials rolled by zone. The parts array keeps the legacy
+         shape (weapon line names); items carries every line. */
+      var drops = rollDrops(m.kind, m.zone);
       var parts = [];
-      for (var p = 0; p < n; p++) parts.push(PARTS[m.kind.grade]);
+      drops.forEach(function (dr) {
+        if (dr.line !== 'weapon') return;
+        for (var p = 0; p < dr.count; p++) parts.push(dr.name);
+      });
+      spawnDropTag(m, drops);
+      S.lastDrops = S.lastDrops || [];
+      S.lastDrops.push({ kind: m.kind.id, zone: m.zone, grade: m.kind.grade,
+                         items: drops.map(function (dr) {
+                           return { name: dr.name, line: dr.line, grade: dr.grade, count: dr.count };
+                         }) });
+      if (S.lastDrops.length > 8) S.lastDrops.splice(0, S.lastDrops.length - 8);
       try {
         window.dispatchEvent(new CustomEvent('espil-guide', {
-          detail: { type: 'monster-drop', id: m.id, kind: m.kind.id, grade: m.kind.grade, parts: parts }
+          detail: { type: 'monster-drop', id: m.id, kind: m.kind.id, grade: m.kind.grade, parts: parts, items: drops }
         }));
       } catch (e) {}
       m.state = 'dying'; m.dieT = 0.9;
-      return { id: m.id, hp: 0, dead: true, killed: true, applied: applied, evaded: false, crit: crit, parts: parts, kind: m.kind.id, zone: m.zone, grade: m.kind.grade };
+      return { id: m.id, hp: 0, dead: true, killed: true, applied: applied, evaded: false, crit: crit, parts: parts, drops: drops, kind: m.kind.id, zone: m.zone, grade: m.kind.grade };
     }
     return null;
   };

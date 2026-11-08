@@ -3274,7 +3274,7 @@
       var old=walkPlayer.av;
       if(old.group&&old.group.parent)old.group.parent.remove(old.group);
       if(old.shadow&&old.shadow.parent)old.shadow.parent.remove(old.shadow);
-      var av=buildWalkerAvatar(gender);
+      var av=buildPlayerAvatar(gender);
       walkPlayer.av=av;
       mapScene.add(av.group);mapScene.add(av.shadow);
       av.shadow.position.set(walkPlayer.pos.x,.03,walkPlayer.pos.z);
@@ -4070,8 +4070,9 @@
          huge collider boxes (which caused far-side teleport when moving inward). */
       /* (Boundary walls removed; clamping applied in updateWalkMap after collision.) */
       } /* end if(!USE_OSM_REBUILD) — procedural grid skipped */
-      /* The walker. */
-      var av=buildWalkerAvatar(espilSavedGender());
+      /* The walker. Batch 6 Item D: guests build the 2D sprite
+         avatar; the GLB builder stays for signed-in sessions. */
+      var av=buildPlayerAvatar(espilSavedGender());
       mapScene.add(av.group);mapScene.add(av.shadow);
       walkPlayer={av:av,pos:new THREE.Vector3(3,.05,31),velY:0,onGround:true,jumps:0,faceY:.5,bobT:0,moving:false,flying:false,vehicle:null};
       av.shadow.position.set(3,.03,31);
@@ -5206,7 +5207,7 @@
        Skill points come from levels (EXP arrives with enemies); 3 starter
        points are granted so the tree works today.
        ================================================================ */
-    var MOVE_ORDER=['punch','kick','throw','defense'];
+    var MOVE_ORDER=['punch','kick','throw','defense','dash','spin','wave','art'];
     var MOVES={
       punch:{name:'Punch',key:'Q',icon:'👊',color:0xbfe9ff,css:'#bfe9ff',
         dmg:8,range:2.2,cd:.45,arc:1.9,y:1.05,
@@ -5219,7 +5220,23 @@
         desc:'Quote a tool from your knowledge. It flies forth and bursts on arrival.'},
       defense:{name:'Defense',key:'R',icon:'🛡️',color:0x9fe8b3,css:'#9fe8b3',
         dmg:0,range:0,cd:2.5,arc:0,y:1.0,guard:true,
-        desc:'Raise your guard. Blocks while active.'}
+        desc:'Raise your guard. Blocks while active.'},
+      /* Batch 6 Item C: unlockable skills (character tree nodes
+         m_dash / m_spin / m_wave gate them; 'art' is gated per
+         weapon family in the weapon tree). MP cost stays 0 - Han
+         decision D7 (MP costs) is undecided; do not invent costs. */
+      dash:{name:'Dash Strike',key:'A',icon:'💨',art:'dash',color:0x9fd8ff,css:'#9fd8ff',
+        dmg:11,range:3.4,cd:.8,arc:1.7,y:1.0,dashMove:true,
+        desc:'Dash forward and strike whatever you reach.'},
+      spin:{name:'Spinning Strike',key:'S',icon:'🌀',art:'spin',color:0x7dfce6,css:'#7dfce6',
+        dmg:15,range:2.6,cd:1.4,arc:6.3,y:.9,
+        desc:'A full-circle strike that hits everything around you.'},
+      wave:{name:'Ranged Wave',key:'D',icon:'🌊',art:'wave',color:0x6fb7ff,css:'#6fb7ff',
+        dmg:12,range:9,cd:1.1,arc:1.2,y:1.2,proj:true,
+        desc:'A wave of force down the facing line.'},
+      art:{name:'Weapon Art',key:'F',icon:'⚔️',art:'art',color:0xffd76e,css:'#ffd76e',
+        dmg:0,range:3,cd:2.2,arc:2.4,y:1.05,
+        desc:'Your equipped weapon\'s signature art. Its form follows the weapon family; unlocked per family in the weapon tree.'}
     };
     /* Skill bar slots, QWER row then ASDF row. Locked slots show a lock;
        empty ones are inert placeholders for future skills. */
@@ -5228,10 +5245,10 @@
       {key:'w',move:'kick'},
       {key:'e',move:'throw'},
       {key:'r',move:'defense'},
-      {key:'a',locked:'Cauldron Toss'},
-      {key:'s',locked:'Ember Guard'},
-      {key:'d',locked:null},
-      {key:'f',locked:null}
+      {key:'a',move:'dash'},
+      {key:'s',move:'spin'},
+      {key:'d',move:'wave'},
+      {key:'f',move:'art'}
     ];
     function skillSlotForKey(key){
       for(var i=0;i<SKILL_SLOTS.length;i++)if(SKILL_SLOTS[i].key===key)return SKILL_SLOTS[i];
@@ -5246,6 +5263,9 @@
       {id:'m_kick',name:'Kick',max:20,art:'kick',desc:'+5% Kick damage per rank.'},
       {id:'m_throw',name:'Quote Tool',max:20,art:'quote',desc:'+5% damage per rank.'},
       {id:'m_defense',name:'Defense',max:20,art:'defense',desc:'+0.06s guard duration per rank.'},
+      {id:'m_dash',name:'Dash Strike',max:20,art:'dash',needNode:'m_kick',needRank:3,desc:'Unlocks Dash Strike (A key). +5% damage per rank. Requires Kick Lv 3.'},
+      {id:'m_spin',name:'Spinning Strike',max:20,art:'spin',needNode:'m_punch',needRank:5,desc:'Unlocks Spinning Strike (S key). +5% damage per rank. Requires Punch Lv 5.'},
+      {id:'m_wave',name:'Ranged Wave',max:20,art:'wave',needNode:'m_throw',needRank:5,desc:'Unlocks Ranged Wave (D key). +5% damage per rank. Requires Quote Tool Lv 5.'},
       {id:'swift',name:'Swift Forge',max:5,need:2,art:'swift',desc:'+5% attack speed per rank.'},
       {id:'reach',name:'Long Reach',max:3,need:2,art:'reach',desc:'+7% range per rank.'},
       {id:'toss',name:'Cauldron Toss',locked:true,art:'throw',desc:'Hurl a whole burning cauldron. Arrives with the combat update.'},
@@ -5264,6 +5284,9 @@
       {id:'m_punch',x:68,y:68,parent:'keeper'},
       {id:'m_kick',x:78,y:58,parent:'m_punch'},
       {id:'m_throw',x:88,y:68,parent:'keeper'},
+      {id:'m_dash',x:64,y:48,parent:'m_kick'},
+      {id:'m_spin',x:80,y:42,parent:'m_kick'},
+      {id:'m_wave',x:90,y:50,parent:'m_throw'},
       {id:'toss',x:72,y:26,parent:null},
       {id:'guard',x:85,y:32,parent:null}
     ];
@@ -5278,15 +5301,18 @@
       if(n.needNode&&(skillState.alloc[n.needNode]||0)<(n.needRank||0))return false;
       return true;
     }
-    /* Movement skills feed back into the walk controller. */
+    /* Movement skills feed back into the walk controller.
+       Batch 6 Item C: the shoes tree stacks on top (s_swift all
+       gaits, s_stride run only, s_leap jump power). */
     function moveSpeeds(){
       var a=skillState.alloc;
+      var sw=espilTreeAlloc('s_swift'), st2=espilTreeAlloc('s_stride'), lp=espilTreeAlloc('s_leap');
       return {
-        walk:13.5*(1+.015*(a['m_walk']||0)),
-        run:21.6*(1+.02*(a['m_run']||0)),
+        walk:13.5*(1+.015*(a['m_walk']||0))*(1+.015*sw),
+        run:21.6*(1+.02*(a['m_run']||0))*(1+.015*sw+.03*st2),
         swim:4,
-        jumpV:9*(1+.01*(a['m_jump']||0)),
-        djumpV:9*(1+.02*(a['m_djump']||0))
+        jumpV:9*(1+.01*(a['m_jump']||0))*(1+.015*lp),
+        djumpV:9*(1+.02*(a['m_djump']||0))*(1+.015*lp)
       };
     }
     /* MapleStory-style pixel skill icons, drawn on a 16x16 canvas at runtime. */
@@ -5337,6 +5363,39 @@
           R(3,7,2,5,'#7dfce6');R(2,5,2,3,'#7dfce6');R(4,5,2,3,'#7dfce6');
           R(10,7,2,5,'#7dfce6');R(9,5,2,3,'#7dfce6');R(11,5,2,3,'#7dfce6');
           R(3,7,1,5,'#d8fff9');R(10,7,1,5,'#d8fff9');
+        }else if(art==='dash'){
+          R(2,6,5,2,'#9fd8ff');R(1,9,6,2,'#9fd8ff');R(3,12,4,2,'#9fd8ff');
+          R(9,5,4,6,'#e8f4ff');R(12,7,2,2,'#bfe9ff');
+        }else if(art==='spin'){
+          R(7,2,2,3,'#7dfce6');R(11,4,3,2,'#7dfce6');R(12,8,2,3,'#7dfce6');
+          R(9,12,3,2,'#7dfce6');R(4,11,2,3,'#7dfce6');R(2,7,3,2,'#7dfce6');
+          R(7,7,2,2,'#d8fff9');
+        }else if(art==='wave'){
+          R(3,4,2,8,'#6fb7ff');R(6,6,2,5,'#6fb7ff');R(9,7,2,3,'#6fb7ff');
+          R(12,8,2,2,'#bfe9ff');
+        }else if(art==='art'){
+          R(4,11,7,2,'#8a5a33');R(9,3,3,9,'#ffd76e');R(10,2,1,3,'#fff3b0');
+          R(3,12,3,1,'#ffd76e');
+        }else if(art==='sword'){
+          R(10,2,3,9,'#cfd8de');R(9,10,5,2,'#8a6a3f');R(10,12,2,3,'#5d4630');
+        }else if(art==='staff'){
+          R(7,5,2,10,'#8a6844');R(6,2,4,4,'#c9a6ff');R(7,3,2,2,'#efe6ff');
+        }else if(art==='bow'){
+          R(4,2,2,12,'#8a6844');R(4,2,8,1,'#e8e0cc');R(4,13,8,1,'#e8e0cc');R(11,7,2,1,'#ffd76e');
+        }else if(art==='dagger'){
+          R(10,3,3,7,'#e8eef2');R(9,10,4,2,'#7a4a8c');R(10,12,2,2,'#3a2a5e');
+        }else if(art==='shield'){
+          R(4,3,8,2,'#9fe8b3');R(4,5,8,5,'#3fae6a');R(7,5,2,5,'#2e8b52');
+          R(5,10,6,2,'#3fae6a');R(6,12,4,1,'#2e8b52');
+        }else if(art==='boot'){
+          R(5,3,4,7,'#8a6844');R(5,10,8,3,'#a06a3c');R(5,13,8,1,'#4e3018');
+        }else if(art==='vital'){
+          R(7,4,2,8,'#e86a8a');R(4,7,8,2,'#e86a8a');R(5,5,1,1,'#ffd7e2');
+        }else if(art==='regen'){
+          R(7,3,2,9,'#58c96b');R(5,5,2,2,'#58c96b');R(10,5,2,2,'#58c96b');
+          R(4,9,3,2,'#58c96b');R(9,9,3,2,'#58c96b');R(7,12,1,1,'#d8ffd2');
+        }else if(art==='ward'){
+          R(5,3,6,10,'#6fb7ff');R(6,5,4,2,'#bfe9ff');R(7,9,2,3,'#bfe9ff');
         }
         url=c.toDataURL();
       }catch(e){}
@@ -5382,12 +5441,14 @@
       if(window.__espilToast)window.__espilToast('📚 +'+n+' Knowledge'+(source?' — '+source:''));
     }
     function moveStatsAt(id,rank){
-      var m=MOVES[id];
+      var m=(id==='art')?espilArtMoveDef():MOVES[id];
+      var cd=m.cd/(1+.05*(skillState.alloc.swift||0));
+      if(id==='dash')cd*=Math.max(.4,1-.06*espilTreeAlloc('s_dashcd')); /* shoes tree */
       return {
         m:m,
-        dmg:Math.round(m.dmg*(1+.05*rank)),
-        range:m.range*(1+.07*(skillState.alloc.reach||0)),
-        cd:m.cd/(1+.05*(skillState.alloc.swift||0)),
+        dmg:Math.round(m.dmg*(1+.05*rank)*espilTreeDmgMul()),
+        range:m.range*(1+.07*(skillState.alloc.reach||0))+espilTreeRangeBonus(m),
+        cd:cd,
         guardDur:m.guard?(1.2+0.06*rank):0
       };
     }
@@ -5493,6 +5554,9 @@
       }
       if(anyCd)paintCooldowns();
       if(skillState.mp<skillState.maxmp){skillState.mp=Math.min(skillState.maxmp,skillState.mp+5*dt);paintStatus();}
+      /* Batch 6: armour tree regeneration (a_regen) */
+      var _rg=espilTreeAlloc('a_regen');
+      if(_rg>0&&skillState.hp>0&&skillState.hp<skillState.maxhp){skillState.hp=Math.min(skillState.maxhp,skillState.hp+.4*_rg*dt);paintStatus();}
       if(walkPlayer&&walkPlayer.guarding>0)walkPlayer.guarding-=dt;
       for(i=fxPool.length-1;i>=0;i--){
         var f=fxPool[i];f.t+=dt;var k=f.t/f.life;
@@ -5516,9 +5580,28 @@
       if(espilDead)return; /* SURVIVAL S1: the death choice owns the body */
       var m=MOVES[id];
       if(!m)return;
+      /* Batch 6 Item C: tree-gated skills stay shut until learned */
+      if(id==='dash'&&!(skillState.alloc.m_dash>0)){ if(window.__espilToast)window.__espilToast('Dash Strike is learned in the skill tree (K).'); return; }
+      if(id==='spin'&&!(skillState.alloc.m_spin>0)){ if(window.__espilToast)window.__espilToast('Spinning Strike is learned in the skill tree (K).'); return; }
+      if(id==='wave'&&!(skillState.alloc.m_wave>0)){ if(window.__espilToast)window.__espilToast('Ranged Wave is learned in the skill tree (K).'); return; }
+      if(id==='art'){
+        var _fam=espilFamilyEquipped();
+        if(!_fam||!(espilTreeAlloc(_fam+'_art')>0)){ if(window.__espilToast)window.__espilToast('Weapon Art unlocks in the weapon tree (K) for the equipped weapon family.'); return; }
+      }
       if(skillState.cd[id]>0)return;
       var st=moveStats(id),p=walkPlayer;
       skillState.cd[id]=st.cd;
+      /* Batch 6: Dash Strike first closes the gap (collision-grid
+         steps), then the strike lands from the new spot. */
+      if(m.dashMove){
+        var dfx=-Math.sin(p.faceY), dfz=-Math.cos(p.faceY), dleft=st.range*.8;
+        while(dleft>0){
+          var step=Math.min(.3,dleft), nx=p.pos.x+dfx*step, nz=p.pos.z+dfz*step, blocked=false;
+          try{ var pr=window.__espilCollisionProbe?window.__espilCollisionProbe(nx,nz):null; if(pr&&pr.blocked)blocked=true; }catch(e){}
+          if(blocked)break;
+          p.pos.x=nx; p.pos.z=nz; dleft-=step;
+        }
+      }
       /* Play attack animation (male_attack.glb) — replaces procedural lunge */
       if(p.av&&p.av.playOneShot)p.av.playOneShot('attack');
       p.lungeT=(id==='throw'?.16:(id==='defense'?.12:.22)); /* fallback procedural motion */
@@ -5526,17 +5609,20 @@
         espilDefenseAt=espilGameT; /* SURVIVAL S1: perfect-window clock */
         spawnGuard(m,st.guardDur);
         skillSfx('guard');
-      }else if(m.proj){
-        spawnArc(m.color,2.2,m.arc,m.y,.2,.5,1.1);
-        spawnFlash(m.color,1.5);
-        spawnProjectile(m);
+      }else if(st.m.proj){
+        spawnArc(st.m.color,2.2,st.m.arc,st.m.y,.2,.5,1.1);
+        spawnFlash(st.m.color,1.5);
+        spawnProjectile(st.m);
         skillSfx('whoosh-hi');
       }else{
-        spawnArc(m.color,st.range,m.arc,m.y,.24,.55,1.15);
-        spawnFlash(m.color,st.range*.6);
+        spawnArc(st.m.color,st.range,st.m.arc,st.m.y,.24,.55,1.15);
+        spawnFlash(st.m.color,st.range*.6);
         if(id==='kick'){skillSfx('whoosh-lo');skillSfx('thud');}
         else{skillSfx('whoosh');}
       }
+      /* Batch 6 FEEL: the new skills also stamp their range mesh -
+         a ground disc fading through a 50% gradient to the edge. */
+      if(id==='dash'||id==='spin'||id==='wave'||id==='art')spawnRangeMesh(st);
       if(!m.guard)espilApplyMoveHit(id,st); /* SURVIVAL S1: hits land */
       paintCooldowns();
     }
@@ -5667,6 +5753,8 @@
     }
     function renderSkillTree(){
       paintKnowledge();
+      espilEnsureTreeTabs();
+      if(espilTreeLayer!=='character'){ renderLayerTree(); return; }
       var tv=document.getElementById('st-treeview');
       if(tv){
         tv.innerHTML='';
@@ -7539,6 +7627,9 @@
     }
     var __espilPhaseSeq=0;
     function __espilBuildRemoteAvatar(gender){
+      /* Batch 6 Item D: peers are guests too (accounts disabled),
+         so remotes take the same 2D sprite renderer. */
+      if(espilGuestNow())return __espilBuildSpriteRemote(gender);
       var g=new THREE.Group();
       var shadow=new THREE.Mesh(new THREE.CircleGeometry(.55,20),
         new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.26,depthWrite:false}));
@@ -7853,8 +7944,9 @@
       return 'neutral';
     }
     function espilPlayerDefValue(){
-      try{ if(typeof window.__espilPlayerDef==='function')return window.__espilPlayerDef()||0; }catch(e){}
-      return 0;
+      var base=0;
+      try{ if(typeof window.__espilPlayerDef==='function')base=window.__espilPlayerDef()||0; }catch(e){}
+      return base+espilTreeDefBonus(); /* Batch 6: armour tree stacks */
     }
     function espilLeoBalance(){
       var v=parseInt(localStorage.getItem('espil_leo_balance'),10);
@@ -7902,10 +7994,10 @@
       }
       for(i=0;i<hits.length;i++){
         var crit=Math.random()<ESPIL_CRIT_CHANCE;
-        var raw=st.m.dmg*factor*(crit?ESPIL_CRIT_MULT:1);
+        var raw=st.m.dmg*factor*espilTreeDmgMul()*(crit?ESPIL_CRIT_MULT:1);
         var res=null;
         try{ res=window.__espilMonsterHit(hits[i].id,raw,p.pos.x,p.pos.z,{crit:crit,element:element}); }catch(e){}
-        if(res&&res.killed)espilGrantKillLeo(res);
+        if(res&&res.killed){ espilGrantKillLeo(res); espilTreeOnKill(); }
       }
     }
     /* ---- incoming damage: timing evade, guard soak, death ---- */
@@ -7924,6 +8016,7 @@
       }
       out.applied=dmg;
       if(dmg>0){
+        espilTreeOnHurt(); /* Batch 6: armour-tree use proficiency */
         espilHurtFeedback(dmg,sx,sz);
         skillState.hp-=dmg;
         if(skillState.hp<=0){
@@ -7972,6 +8065,9 @@
       }catch(e){}
     }
     function espilHurtFeedback(dmg,sx,sz){
+      /* Batch 6 Item D: the sprite avatar plays its hit set (the
+         GLB avatar has no 'hit' action, so this is a no-op there). */
+      try{ if(walkPlayer&&walkPlayer.av&&walkPlayer.av.playOneShot)walkPlayer.av.playOneShot('hit',450); }catch(e){}
       espilHurt.hits++; espilHurt.lastDmg=dmg;
       espilHurt.shakePeak=Math.min(14,4+dmg*.7);    /* px offset amplitude, scales with damage */
       espilHurt.shake=espilHurt.shakePeak;
@@ -8123,10 +8219,12 @@
     }
     function espilEnterDeath(){
       espilDead=true;
+      try{ if(walkPlayer&&walkPlayer.av&&walkPlayer.av.__espilSetState)walkPlayer.av.__espilSetState('dead'); }catch(e){} /* Batch 6 Item D: sprite death set */
       espilShowDeathUI();
       try{ window.dispatchEvent(new CustomEvent('espil-guide',{detail:{type:'player-died'}})); }catch(e){}
     }
     function espilReviveCommon(frac){
+      try{ if(walkPlayer&&walkPlayer.av&&walkPlayer.av.__espilSetState)walkPlayer.av.__espilSetState('idle'); }catch(e){} /* Batch 6 Item D */
       skillState.hp=Math.max(1,Math.ceil(skillState.maxhp*frac));
       skillState.mp=Math.ceil(skillState.maxmp*frac);
       espilDead=false;
@@ -8168,6 +8266,631 @@
     }
     window.__espilSkills={state:skillState,gainKnowledge:gainKnowledge,
       move:doMove,tree:toggleSkillTree};
+    /* ================================================================
+       BATCH 6 (Han 2026-11-07) - Item C gear skill trees + Item D
+       2D guest avatars.
+       ================================================================ */
+    /* ---------------- guest determination ----------------
+       Guests are sessions without espil_session_v1. The account
+       system is disabled in this build (entry-flow GUEST_ONLY), so
+       every local player and every peer is a guest in practice;
+       the moment sessions exist, the same check routes signed-in
+       players back to the GLB builder. */
+    function espilGuestNow(){
+      try{ return !window.localStorage.getItem('espil_session_v1'); }catch(e){ return true; }
+    }
+    function buildPlayerAvatar(gender){
+      return espilGuestNow()?buildSpriteAvatar(gender):buildWalkerAvatar(gender);
+    }
+
+    /* ---------------- Item C: the three gear trees ----------------
+       The character tree above spends Knowledge. The gear trees
+       spend USE: GROWTH RULE (chosen for this batch, stated) -
+       the weapon tree's currency is kills landed with that weapon
+       family equipped, and its Mastery ranks are ADDITIONALLY
+       gated by Item B crafting tiers (rank r needs an owned
+       weapon of the family crafted to tier r); the armour tree's
+       currency is applied hits weathered; the shoes tree's is
+       metres travelled. One node belongs to exactly one tree;
+       effects stack across trees; unequipping deactivates a gear
+       tree (bonuses read the CURRENTLY equipped family / nothing)
+       but spent points are never lost. */
+    var ESPIL_TREES_KEY='espil_trees_v1';
+    var espilTreesCache=null, espilTreesDirty=false;
+    function espilTrees(){
+      if(espilTreesCache)return espilTreesCache;
+      var t={prof:{weapon:{},armour:0,shoes:0},spent:{weapon:{},armour:0,shoes:0},alloc:{}};
+      try{
+        var raw=JSON.parse(window.localStorage.getItem(ESPIL_TREES_KEY)||'null');
+        if(raw){
+          if(raw.prof){ if(raw.prof.weapon)t.prof.weapon=raw.prof.weapon; if(typeof raw.prof.armour==='number')t.prof.armour=raw.prof.armour; if(typeof raw.prof.shoes==='number')t.prof.shoes=raw.prof.shoes; }
+          if(raw.spent){ if(raw.spent.weapon)t.spent.weapon=raw.spent.weapon; if(typeof raw.spent.armour==='number')t.spent.armour=raw.spent.armour; if(typeof raw.spent.shoes==='number')t.spent.shoes=raw.spent.shoes; }
+          if(raw.alloc)t.alloc=raw.alloc;
+        }
+      }catch(e){}
+      espilTreesCache=t;
+      return t;
+    }
+    function espilTreesSave(){ espilTreesDirty=false; try{ window.localStorage.setItem(ESPIL_TREES_KEY,JSON.stringify(espilTrees())); }catch(e){} }
+    function espilTreesMark(){ espilTreesDirty=true; }
+    setInterval(function(){ if(espilTreesDirty)espilTreesSave(); },2500);
+    function espilTreeAlloc(id){ try{ return espilTrees().alloc[id]||0; }catch(e){ return 0; } }
+    function espilFamilyEquipped(){
+      try{
+        var eq=JSON.parse(window.localStorage.getItem('espil_equipped')||'null');
+        if(!eq||!eq.weapon)return null;
+        if(window.__espilGearWindow&&window.__espilGearWindow.itemOf){
+          var it=window.__espilGearWindow.itemOf(eq.weapon);
+          if(it&&it.app&&it.app.shape)return it.app.shape;
+        }
+      }catch(e){}
+      return null;
+    }
+    function espilTreeDmgMul(){
+      try{
+        var fam=espilFamilyEquipped(); if(!fam)return 1;
+        return 1+.04*espilTreeAlloc(fam+'_edge')+.03*espilTreeAlloc(fam+'_master');
+      }catch(e){ return 1; }
+    }
+    function espilTreeRangeBonus(m){
+      try{
+        if(!m||m.guard||m.proj)return 0;
+        var fam=espilFamilyEquipped(); if(!fam)return 0;
+        return .1*espilTreeAlloc(fam+'_master');
+      }catch(e){ return 0; }
+    }
+    function espilTreeDefBonus(){ return 2*espilTreeAlloc('a_guard'); }
+    function espilTreeOnKill(){
+      var fam=espilFamilyEquipped(); if(!fam)return;
+      var t=espilTrees(); t.prof.weapon[fam]=(t.prof.weapon[fam]||0)+1; espilTreesMark();
+    }
+    function espilTreeOnHurt(){ var t=espilTrees(); t.prof.armour=(t.prof.armour||0)+1; espilTreesMark(); }
+    function espilTreeOnMove(d){ if(!(d>0))return; var t=espilTrees(); t.prof.shoes=(t.prof.shoes||0)+d; espilTreesMark(); }
+    /* Weapon Art forms, one per family (Item C). */
+    var ESPIL_ART_MOVES={
+      sword:{name:'Crescent Slash',icon:'⚔️',art:'art',color:0xffd76e,css:'#ffd76e',dmg:22,range:3.2,cd:2.0,arc:2.6,y:1.05,desc:'A wide crescent cut of the blade.'},
+      bow:{name:'Piercing Shot',icon:'🏹',art:'art',color:0x7dfce6,css:'#7dfce6',dmg:20,range:12,cd:2.2,arc:.8,y:1.25,proj:true,desc:'A shot that pierces down the facing line.'},
+      staff:{name:'Quote Burst',icon:'✨',art:'art',color:0xc9a6ff,css:'#c9a6ff',dmg:24,range:4.2,cd:2.4,arc:6.3,y:1.1,desc:'A burst of quoted force in every direction.'},
+      dagger:{name:'Flurry',icon:'🗡️',art:'art',color:0xbfe9ff,css:'#bfe9ff',dmg:18,range:2.4,cd:1.4,arc:1.8,y:1.0,desc:'A flurry of close cuts.'}
+    };
+    function espilArtMoveDef(){
+      var fam=espilFamilyEquipped();
+      if(fam&&ESPIL_ART_MOVES[fam])return ESPIL_ART_MOVES[fam];
+      return {name:'Weapon Art',icon:'⚔️',art:'art',color:0xffd76e,css:'#ffd76e',dmg:6,range:2.4,cd:2.2,arc:2.2,y:1.05,desc:'Equip a weapon to give the art its form.'};
+    }
+    var ESPIL_FAM_NAME={sword:'Sword',staff:'Staff',bow:'Bow',dagger:'Dagger'};
+    var ESPIL_WEAPON_NODES=function(fam){
+      var fn=ESPIL_FAM_NAME[fam]||fam;
+      return [
+        {id:fam+'_edge',layer:'weapon',name:fn+' Edge',art:fam,max:10,desc:'+4% damage with '+fam+' weapons per rank.'},
+        {id:fam+'_art',layer:'weapon',name:(ESPIL_ART_MOVES[fam]?ESPIL_ART_MOVES[fam].name:'Weapon Art'),art:'art',max:1,desc:'Unlock the '+fam+' weapon art (F key).'},
+        {id:fam+'_master',layer:'weapon',name:fn+' Mastery',art:fam,max:5,desc:'+3% damage and +0.1 m range per rank. Rank r requires an owned '+fam+' weapon crafted to tier r.'}
+      ];
+    };
+    var ESPIL_ARMOUR_NODES=[
+      {id:'a_vital',layer:'armour',name:'Vitality',art:'vital',max:10,desc:'+8 max HP per rank.'},
+      {id:'a_guard',layer:'armour',name:'Guard Plate',art:'shield',max:10,desc:'+2 Defense while guarding per rank.'},
+      {id:'a_regen',layer:'armour',name:'Second Wind',art:'regen',max:5,desc:'Regenerate +0.4 HP per second per rank.'},
+      {id:'a_ward',layer:'armour',name:'Mind Ward',art:'ward',max:5,desc:'+4 max MP per rank.'}
+    ];
+    var ESPIL_SHOES_NODES=[
+      {id:'s_swift',layer:'shoes',name:'Swift Steps',art:'boot',max:10,desc:'+1.5% move speed per rank.'},
+      {id:'s_stride',layer:'shoes',name:'Long Stride',art:'run',max:5,desc:'+3% run speed per rank.'},
+      {id:'s_leap',layer:'shoes',name:'Spring Heel',art:'jump',max:10,desc:'+1.5% jump power per rank.'},
+      {id:'s_dashcd',layer:'shoes',name:'Dash Cycle',art:'dash',max:5,desc:'Dash Strike cooldown -6% per rank.'}
+    ];
+    function espilTreeNodeDef(id){
+      var i,f,ns;
+      for(i=0;i<ESPIL_ARMOUR_NODES.length;i++)if(ESPIL_ARMOUR_NODES[i].id===id)return ESPIL_ARMOUR_NODES[i];
+      for(i=0;i<ESPIL_SHOES_NODES.length;i++)if(ESPIL_SHOES_NODES[i].id===id)return ESPIL_SHOES_NODES[i];
+      var fams=['sword','staff','bow','dagger'];
+      for(f=0;f<fams.length;f++){ ns=ESPIL_WEAPON_NODES(fams[f]); for(i=0;i<ns.length;i++)if(ns[i].id===id)return ns[i]; }
+      return null;
+    }
+    function espilTreeCost(rank){ return 1+Math.floor(rank/3); }
+    function espilTreeAvail(layer,fam){
+      var t=espilTrees();
+      if(layer==='weapon')return (t.prof.weapon[fam]||0)-(t.spent.weapon[fam]||0);
+      if(layer==='armour')return (t.prof.armour||0)-(t.spent.armour||0);
+      if(layer==='shoes')return Math.floor(t.prof.shoes||0)-(t.spent.shoes||0);
+      return 0;
+    }
+    function espilMasteryMet(fam,nextRank){
+      try{
+        if(!window.__espilGear||!window.__espilGearWindow||!window.__espilCraftTier)return false;
+        var owned=window.__espilGear.owned();
+        for(var i=0;i<owned.length;i++){
+          var it=window.__espilGearWindow.itemOf(owned[i].name);
+          if(it&&it.slot==='weapon'&&it.app&&it.app.shape===fam&&window.__espilCraftTier(owned[i].name)>=nextRank)return true;
+        }
+      }catch(e){}
+      return false;
+    }
+    function raiseTreeNode(id){
+      var n=espilTreeNodeDef(id); if(!n)return {ok:false,why:'unknown'};
+      var t=espilTrees(), rank=t.alloc[id]||0;
+      if(rank>=n.max)return {ok:false,why:'maxed'};
+      var fam=(n.layer==='weapon')?id.split('_')[0]:null;
+      var avail=espilTreeAvail(n.layer,fam), cost=espilTreeCost(rank);
+      if(avail<cost)return {ok:false,why:'currency',avail:avail,cost:cost};
+      if(fam&&id===fam+'_master'&&!espilMasteryMet(fam,rank+1))return {ok:false,why:'craft-tier',need:rank+1};
+      t.alloc[id]=rank+1;
+      if(n.layer==='weapon')t.spent.weapon[fam]=(t.spent.weapon[fam]||0)+cost;
+      else if(n.layer==='armour')t.spent.armour=(t.spent.armour||0)+cost;
+      else t.spent.shoes=(t.spent.shoes||0)+cost;
+      espilTreesSave();
+      if(id==='a_vital'){ skillState.maxhp=100+8*(t.alloc.a_vital||0); saveSkills(); paintStatus(); }
+      if(id==='a_ward'){ skillState.maxmp=50+4*(t.alloc.a_ward||0); saveSkills(); paintStatus(); }
+      if(skillTreeOpen)renderSkillTree();
+      return {ok:true,rank:rank+1};
+    }
+    (function espilTreesInit(){
+      var t=espilTrees();
+      skillState.maxhp=100+8*(t.alloc.a_vital||0);
+      skillState.maxmp=50+4*(t.alloc.a_ward||0);
+      if(skillState.hp>skillState.maxhp)skillState.hp=skillState.maxhp;
+      if(skillState.mp>skillState.maxmp)skillState.mp=skillState.maxmp;
+    })();
+    window.__espilTrees={raise:raiseTreeNode,state:function(){
+      var t=espilTrees(), fam=espilFamilyEquipped();
+      return { layer:espilTreeLayer, prof:t.prof, spent:t.spent, alloc:t.alloc,
+        avail:{ weapon:fam?espilTreeAvail('weapon',fam):0, armour:espilTreeAvail('armour'), shoes:espilTreeAvail('shoes') },
+        family:fam, dmgMul:espilTreeDmgMul(), defBonus:espilTreeDefBonus(),
+        maxhp:skillState.maxhp, maxmp:skillState.maxmp };
+    }};
+    /* ---- skill range mesh (FEEL spec): a ground disc whose
+       gradient texture runs from 50% opacity at the centre to
+       clear at the rim, stamped by the Batch 6 skills via fxPool. */
+    var espilRangeTex=null;
+    function espilRangeGradientTex(){
+      if(espilRangeTex)return espilRangeTex;
+      var cv=document.createElement('canvas'); cv.width=cv.height=128;
+      var g=cv.getContext('2d');
+      var gr=g.createRadialGradient(64,64,4,64,64,64);
+      gr.addColorStop(0,'rgba(255,255,255,0.5)');
+      gr.addColorStop(0.5,'rgba(255,255,255,0.25)');
+      gr.addColorStop(1,'rgba(255,255,255,0)');
+      g.fillStyle=gr; g.fillRect(0,0,128,128);
+      espilRangeTex=new THREE.CanvasTexture(cv);
+      return espilRangeTex;
+    }
+    function spawnRangeMesh(st){
+      if(!walkPlayer||!mapScene)return;
+      var geo=new THREE.CircleGeometry(1,40);
+      var mat=new THREE.MeshBasicMaterial({color:st.m.color,transparent:true,opacity:.5,map:espilRangeGradientTex(),depthWrite:false,side:THREE.DoubleSide});
+      var mesh=new THREE.Mesh(geo,mat);
+      mesh.rotation.x=-Math.PI/2;
+      var grp=new THREE.Group();
+      grp.add(mesh);
+      grp.position.set(walkPlayer.pos.x,.07,walkPlayer.pos.z);
+      mapScene.add(grp);
+      fxPool.push({grp:grp,mat:mat,geo:geo,t:0,life:.4,s0:st.range*.35,s1:st.range,o0:.5});
+    }
+    /* ---- four-layer tree UI. The character layer is the Keeper
+       tree; the gear layers render here with the Asset spec's ring
+       shapes (weapon hexagon, armour shield-square, shoes
+       triangle; character keeps the circle of the base CSS).
+       SKILL ICON STATUS: the Asset room delivered the icon SPEC
+       (SKILL-ICON-SPEC-v1, files icon_<tree>_<skill>.png) but no
+       icon files exist yet - nodes therefore carry the layer ring
+       shape + the runtime pixel glyph + a text label as UI chrome,
+       and the delivered icon set remains PENDING Asset delivery. */
+    var espilTreeLayer='character';
+    function espilEnsureTreeTabs(){
+      var panel=document.getElementById('skill-tree'), tv=document.getElementById('st-treeview');
+      if(!panel||!tv||!tv.parentNode)return;
+      if(!document.getElementById('espil-trees-style')){
+        var st=document.createElement('style'); st.id='espil-trees-style';
+        st.textContent=
+          '#espil-tree-tabs{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}'+
+          '#espil-tree-tabs button{flex:1 1 auto;min-width:100px;padding:7px 8px;border-radius:9px;border:1px solid rgba(169,126,70,.6);background:rgba(28,22,14,.72);color:#e8dcc0;font:800 11.5px Manrope,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px}'+
+          '#espil-tree-tabs button.on{background:rgba(122,84,32,.85);color:#ffe9ad;border-color:#d8a94e}'+
+          '#espil-tree-tabs .rg{width:14px;height:14px;flex:0 0 auto;background:#d8a94e;display:inline-block}'+
+          '.rg-circle{border-radius:50%}'+
+          '.rg-hex{clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%)}'+
+          '.rg-shield{clip-path:polygon(0 0,100% 0,100% 68%,50% 100%,0 68%)}'+
+          '.rg-tri{clip-path:polygon(50% 100%,0 0,100% 0)}'+
+          '.tnode-icon.ring-hex{border-radius:6px;clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%)}'+
+          '.tnode-icon.ring-shield{border-radius:4px;clip-path:polygon(0 0,100% 0,100% 68%,50% 100%,0 68%)}'+
+          '.tnode-icon.ring-tri{border-radius:0;clip-path:polygon(50% 100%,0 0,100% 0)}'+
+          '.espil-tree-note{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);width:78%;text-align:center;color:#e8dcc0;font:600 13px/1.5 Manrope,sans-serif;text-shadow:0 1px 3px #000}';
+        document.head.appendChild(st);
+      }
+      var bar=document.getElementById('espil-tree-tabs');
+      if(!bar){
+        bar=document.createElement('div');
+        bar.id='espil-tree-tabs';
+        var defs=[['character','Character','rg-circle'],['weapon','Weapon','rg-hex'],['armour','Armour','rg-shield'],['shoes','Shoes','rg-tri']];
+        defs.forEach(function(df){
+          var b=document.createElement('button');
+          b.type='button'; b.setAttribute('data-treelayer',df[0]);
+          b.innerHTML='<span class="rg '+df[2]+'"></span>'+df[1];
+          b.addEventListener('click',function(){
+            espilTreeLayer=df[0];
+            if(espilTreeLayer==='character')selectedSkillId='keeper';
+            renderSkillTree();
+          });
+          bar.appendChild(b);
+        });
+        tv.parentNode.insertBefore(bar,tv);
+      }
+      var btns=bar.querySelectorAll('[data-treelayer]');
+      for(var i=0;i<btns.length;i++)btns[i].classList.toggle('on',btns[i].getAttribute('data-treelayer')===espilTreeLayer);
+    }
+    function espilLayerNodes(){
+      if(espilTreeLayer==='weapon'){
+        var fam=espilFamilyEquipped();
+        return fam?ESPIL_WEAPON_NODES(fam):[];
+      }
+      if(espilTreeLayer==='armour')return ESPIL_ARMOUR_NODES;
+      if(espilTreeLayer==='shoes')return ESPIL_SHOES_NODES;
+      return [];
+    }
+    function espilLayerCurrencyLine(){
+      var t=espilTrees();
+      if(espilTreeLayer==='weapon'){
+        var fam=espilFamilyEquipped();
+        if(!fam)return 'No weapon equipped.';
+        return 'Kills with '+(ESPIL_FAM_NAME[fam]||fam)+' weapons: '+(t.prof.weapon[fam]||0)+' · unspent '+espilTreeAvail('weapon',fam);
+      }
+      if(espilTreeLayer==='armour')return 'Hits weathered: '+(t.prof.armour||0)+' · unspent '+espilTreeAvail('armour');
+      if(espilTreeLayer==='shoes')return 'Metres travelled: '+Math.floor(t.prof.shoes||0)+' · unspent '+espilTreeAvail('shoes');
+      return '';
+    }
+    function renderLayerTree(){
+      var tv=document.getElementById('st-treeview');
+      if(tv){
+        tv.innerHTML='';
+        var fam=espilTreeLayer==='weapon'?espilFamilyEquipped():null;
+        var nodes=espilLayerNodes();
+        var ringCls=espilTreeLayer==='weapon'?'ring-hex':(espilTreeLayer==='armour'?'ring-shield':'ring-tri');
+        if(espilTreeLayer==='weapon'&&!fam){
+          var note=document.createElement('div');
+          note.className='espil-tree-note';
+          note.textContent='Equip a weapon to open its tree. Each weapon family (sword, staff, bow, dagger) grows its own tree - swapping weapons swaps the active tree, and no points are ever lost.';
+          tv.appendChild(note);
+        }
+        var root=document.createElement('div');
+        root.className='tnode tnode-root';
+        root.style.left='50%'; root.style.top='88%';
+        var rootName=espilTreeLayer==='weapon'?(fam?((ESPIL_FAM_NAME[fam]||fam).toUpperCase()+' TREE'):'WEAPON TREE'):(espilTreeLayer==='armour'?'ARMOUR TREE':'SHOES TREE');
+        var rootGlyph=espilTreeLayer==='weapon'?'⚔️':(espilTreeLayer==='armour'?'🛡️':'👢');
+        root.innerHTML='<span class="tnode-icon '+ringCls+'" style="font-size:1.3rem">'+rootGlyph+'</span><span class="tnode-name">'+rootName+'</span>';
+        tv.appendChild(root);
+        var xs=nodes.length===3?[25,50,75]:(nodes.length===4?[16,38,62,84]:[50]);
+        nodes.forEach(function(n,ix){
+          var rank=espilTreeAlloc(n.id), maxed=rank>=n.max;
+          var cost=espilTreeCost(rank);
+          var avail=espilTreeAvail(n.layer,fam);
+          var okk=!maxed&&avail>=cost;
+          if(fam&&n.id===fam+'_master'&&!espilMasteryMet(fam,rank+1))okk=false;
+          var d=document.createElement('div');
+          d.className='tnode'+(maxed?' is-maxed':'')+(!okk&&!maxed?' is-dim':'')+(selectedSkillId===n.id?' is-selected':'');
+          d.style.left=xs[ix]+'%'; d.style.top='46%';
+          d.setAttribute('role','button');
+          var icon=pxIcon(n.art||n.id);
+          var inner='<span class="tnode-icon '+ringCls+'">'+(icon?'<img alt="" src="'+icon+'">':'')+'</span>'+
+            '<span class="tnode-name">'+n.name+'</span>'+
+            '<span class="tnode-lv'+(maxed?' is-max':'')+'">'+(maxed?'MASTER':'Lv '+rank+'/'+n.max)+'</span>';
+          if(!maxed&&okk)inner+='<button type="button" class="tnode-plus" aria-label="Raise '+n.name+'">+</button>';
+          d.innerHTML=inner;
+          d.addEventListener('click',function(e){
+            var tg=e&&e.target;
+            var isPlus=tg&&(tg.className==='tnode-plus'||(tg.classList&&typeof tg.classList.contains==='function'&&tg.classList.contains('tnode-plus')));
+            if(isPlus){
+              var r=raiseTreeNode(n.id);
+              if(!r.ok&&window.__espilToast){
+                window.__espilToast(r.why==='craft-tier'?('Craft a '+(ESPIL_FAM_NAME[fam]||fam)+' weapon to tier '+r.need+' first.')
+                  :r.why==='currency'?('Not enough '+(espilTreeLayer==='weapon'?'kills with this family':espilTreeLayer==='armour'?'hits weathered':'metres travelled')+'.')
+                  :'Cannot raise this node yet.');
+              }
+              renderSkillTree();
+              return;
+            }
+            selectedSkillId=n.id;
+            renderSkillTree();
+          });
+          tv.appendChild(d);
+        });
+      }
+      renderLayerDesc();
+    }
+    function renderLayerDesc(){
+      var d=document.getElementById('st-desc');
+      if(!d)return;
+      var n=selectedSkillId?espilTreeNodeDef(selectedSkillId):null;
+      if(!n||n.layer!==espilTreeLayer){
+        var titles={weapon:'The Weapon Tree',armour:'The Armour Tree',shoes:'The Shoes Tree'};
+        var bodies={
+          weapon:'One tree per weapon family. Only the equipped weapon\'s tree is active; swapping weapons swaps the tree. Kills with the family earn its points, and crafted tiers deepen Mastery.',
+          armour:'Defence and survival, grown by weathering hits. Its bonuses stack with every other tree and stay yours even with nothing equipped.',
+          shoes:'Movement, grown by travelling. Speed, stride, leap and dash cycling - earned on foot, kept forever.'};
+        d.innerHTML='<h3>'+(titles[espilTreeLayer]||'Tree')+'</h3><p>'+(bodies[espilTreeLayer]||'')+'</p><p class="cur">'+espilLayerCurrencyLine()+'</p>';
+        return;
+      }
+      var rank=espilTreeAlloc(n.id), maxed=rank>=n.max;
+      var fam=n.layer==='weapon'?n.id.split('_')[0]:null;
+      var costLine=maxed?'<p class="cost">MAX LEVEL</p>'
+        :'<p class="cost">Cost: '+espilTreeCost(rank)+' · '+espilLayerCurrencyLine()+'</p>';
+      var extra='';
+      if(fam&&n.id===fam+'_master')extra='<p class="cur">Crafted-tier gate: '+(espilMasteryMet(fam,rank+1)?'met for the next rank':'needs a '+(ESPIL_FAM_NAME[fam]||fam)+' weapon at tier '+(rank+1))+'</p>';
+      d.innerHTML='<h3>'+n.name+'</h3><p>'+n.desc+'</p><p class="cur">Current Lv '+rank+' / '+n.max+'</p>'+extra+costLine;
+    }
+    /* Locked ASDF slots read as locked until their skill is learned. */
+    setInterval(function(){
+      try{
+        var fam=espilFamilyEquipped();
+        var locks={a:!(skillState.alloc.m_dash>0),s:!(skillState.alloc.m_spin>0),d:!(skillState.alloc.m_wave>0),
+                   f:!(fam&&espilTreeAlloc(fam+'_art')>0)};
+        for(var k in locks){ var b=document.getElementById('slot-'+k); if(b)b.classList.toggle('is-locked',!!locks[k]); }
+      }catch(e){}
+    },800);
+
+    /* ---------------- Item D: the 2D sprite avatar ----------------
+       Guests render as billboard sprites from the delivered motion
+       sets, copied into assets/char2d/ with uniform fNN.webp names
+       (source: the Zealandia customizer-v3 production tree).
+       COVERAGE of the delivered sets:
+       - FEMALE (textured 'under' look - the only textured look
+         delivered): idle / walk in front+back+side; run, jump, hit,
+         dead in front+back; attack front only. Side run/jump/hit/
+         dead and back/side attack fall back to the front set of
+         the same state.
+       - MALE: walk front+back+side (walk sets); idle front+back+
+         side (the production idle sets, side is the 45-degree set);
+         attack per family front+back+side for sword / staff / bow;
+         a generic attack front (unarmed and dagger fallback); hit
+         front (the guard set; back/side fall back to it). Male run
+         reuses the walk set at a faster rate, male jump the walk
+         set; male death has NO delivered set - the body fades and
+         sinks in place (the monsters' own fallback language).
+       LOOK PARAMETERISATION: the delivered motion sets carry ONE
+       look per gender. The saved customizer look therefore selects
+       the GENDER only; skin tone / hair / eyes variants are not
+       parameterised in the delivered sets (the EP-parts profile
+       preview in panels remains the look-faithful surface). Side
+       facing follows the customizer app's own convention (side
+       art authored facing left; the mirrored side flips it). */
+    var ESPIL_AV2_BASE='assets/char2d/';
+    var ESPIL_AV2_SETS={
+      female:{
+        idle:{front:{d:'idle_front',n:22,f:6},back:{d:'idle_back',n:24,f:6},side:{d:'idle_side',n:28,f:6}},
+        walk:{front:{d:'walk_front',n:24,f:10},back:{d:'walk_back',n:32,f:10},side:{d:'walk_side',n:8,f:12}},
+        run:{front:{d:'run_front',n:28,f:13},back:{d:'run_back',n:20,f:13},side:{d:'run_front',n:28,f:13}},
+        jump:{front:{d:'jump_front',n:16,f:12},back:{d:'jump_back',n:8,f:12},side:{d:'jump_front',n:16,f:12}},
+        hit:{front:{d:'hit_front',n:8,f:12},back:{d:'hit_back',n:8,f:12},side:{d:'hit_front',n:8,f:12}},
+        dead:{front:{d:'dead_front',n:7,f:6},back:{d:'dead_back',n:8,f:6},side:{d:'dead_front',n:7,f:6}},
+        attack:{front:{d:'attack_front',n:13,f:14},back:{d:'attack_front',n:13,f:14},side:{d:'attack_front',n:13,f:14}}
+      },
+      male:{
+        idle:{front:{d:'idle_front',n:28,f:6},back:{d:'idle_back',n:28,f:6},side:{d:'idle_side',n:24,f:6}},
+        walk:{front:{d:'walk_front',n:28,f:10},back:{d:'walk_back',n:28,f:10},side:{d:'walk_side',n:28,f:10}},
+        run:{front:{d:'walk_front',n:28,f:16},back:{d:'walk_back',n:28,f:16},side:{d:'walk_side',n:28,f:16}},
+        jump:{front:{d:'walk_front',n:28,f:12},back:{d:'walk_back',n:28,f:12},side:{d:'walk_side',n:28,f:12}},
+        hit:{front:{d:'hit_front',n:15,f:12},back:{d:'hit_front',n:15,f:12},side:{d:'hit_front',n:15,f:12}},
+        attackFam:{
+          sword:{front:{d:'attack_sword_front',n:20,f:14},back:{d:'attack_sword_back',n:14,f:14},side:{d:'attack_sword_side',n:20,f:14}},
+          staff:{front:{d:'attack_staff_front',n:30,f:14},back:{d:'attack_staff_back',n:34,f:14},side:{d:'attack_staff_side',n:38,f:14}},
+          bow:{front:{d:'attack_bow_front',n:48,f:12},back:{d:'attack_bow_back',n:48,f:12},side:{d:'attack_bow_side',n:48,f:12}}
+        },
+        attackGeneric:{front:{d:'attack_front',n:15,f:14},back:{d:'attack_front',n:15,f:14},side:{d:'attack_front',n:15,f:14}}
+      }
+    };
+    var ESPIL_AV2_PLANE=1.97, ESPIL_AV2_CY=0.95;
+    var espilAv2TexCache={};
+    function espilAv2Textures(gender,setDir,n){
+      var key=gender+'/'+setDir;
+      var hit=espilAv2TexCache[key];
+      if(hit)return hit;
+      var arr=[], loader=new THREE.TextureLoader();
+      for(var i=0;i<n;i++){
+        var t=loader.load(ESPIL_AV2_BASE+gender+'/'+setDir+'/f'+(i<10?'0':'')+i+'.webp');
+        try{ t.colorSpace=THREE.SRGBColorSpace; }catch(e){}
+        arr.push(t);
+      }
+      espilAv2TexCache[key]=arr;
+      return arr;
+    }
+    function espilAv2Resolve(gender,state,dir,fam){
+      var G=ESPIL_AV2_SETS[gender]; if(!G)return null;
+      if(state==='attack'&&gender==='male'){
+        if(fam&&G.attackFam[fam])return G.attackFam[fam][dir]||G.attackFam[fam].front;
+        return G.attackGeneric[dir]||G.attackGeneric.front;
+      }
+      var S=G[state];
+      if(!S)return null;
+      return S[dir]||S.front||null;
+    }
+    var ESPIL_SPRITES=[];
+    function espilMakeSprite(gender){
+      var g=new THREE.Group();
+      var shadow=new THREE.Mesh(new THREE.CircleGeometry(.55,20),
+        new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.26,depthWrite:false}));
+      shadow.rotation.x=-Math.PI/2;
+      var body=new THREE.Sprite(new THREE.SpriteMaterial({transparent:true,depthWrite:false}));
+      body.scale.set(ESPIL_AV2_PLANE,ESPIL_AV2_PLANE,1);
+      body.position.y=ESPIL_AV2_CY;
+      g.add(body);
+      var weapon=new THREE.Sprite(new THREE.SpriteMaterial({transparent:true,depthWrite:false}));
+      weapon.scale.set(1.9,1.9,1);
+      weapon.position.y=0.99;
+      weapon.visible=false;
+      g.add(weapon);
+      return {group:g,shadow:shadow,body:body,weapon:weapon,gender:gender,
+        state:'idle',dir:'front',flip:false,setKey:'',frames:null,setFps:8,frameT:0,frameIdx:-1,
+        oneShot:null,dead:false,loco:'idle',weaponEp:null,weaponTex:null,fadeT:0};
+    }
+    function buildSpriteAvatar(gender){
+      gender=(gender==='female')?'female':'male';
+      var spr=espilMakeSprite(gender);
+      var av={group:spr.group,shadow:spr.shadow,ready:true,mixer:null,actions:{},curAnim:null,__gender:gender,__sprite:true,__spr:spr};
+      av.playAnim=function(name){
+        var map={idle:'idle',walk:'walk',run:'run',swim:'walk',swimIdle:'idle',climb:'walk',stop:'idle',chat:'idle',checkout:'idle'};
+        spr.loco=map[name]||'idle';
+        av.curAnim=name;
+      };
+      av.playOneShot=function(name,durMs){
+        if(name==='attack'){ spr.oneShot={state:'attack',t:0,dur:durMs?durMs/1000:2.5,byFrames:true}; av.curAnim='attack'; return true; }
+        if(name==='hit'){ spr.oneShot={state:'hit',t:0,dur:durMs?durMs/1000:1.2,byFrames:true}; av.curAnim='hit'; return true; }
+        return false;
+      };
+      av.playJump=function(isDouble){
+        spr.oneShot={state:'jump',t:0,dur:isDouble?1.15:0.69,byFrames:false};
+        av.curAnim=isDouble?'doubleJump':'jump';
+        return true;
+      };
+      av.__espilSetState=function(s){
+        if(s==='dead'){ spr.dead=true; spr.oneShot=null; spr.fadeT=0; }
+        else{ spr.dead=false; spr.fadeT=0; if(spr.state==='dead')spr.state='idle'; }
+      };
+      ESPIL_SPRITES.push({spr:spr,local:true,R:null});
+      return av;
+    }
+    function __espilBuildSpriteRemote(gender){
+      gender=(gender==='female')?'female':'male';
+      var spr=espilMakeSprite(gender);
+      var R={group:spr.group,shadow:spr.shadow,mixer:{update:function(){}},actions:{},curAnim:null,ready:true,visual:null,baseY:0,
+             cur:{x:0,y:0,z:0},tgt:{x:0,y:0,z:0,a:0},faceY:0,speed:0,fixSpeed:0,fixAt:0,lastAt:0,plate:null,
+             phase:(__espilPhaseSeq++)%7,acc:0,gone:false,bubble:null,bubbleCv:null,bubbleTex:null,bubbleUntil:0,__sprite:true,__spr:spr};
+      R.playAnim=function(name){
+        spr.loco=(name==='run')?'run':(name==='walk')?'walk':'idle';
+        R.curAnim=name;
+      };
+      ESPIL_SPRITES.push({spr:spr,local:false,R:R});
+      return R;
+    }
+    /* Item B appearance half: the equipped weapon rides on the
+       sprite as the EP weapon part layer (assets/ep-parts weapon
+       frames - the only delivered per-weapon art), front view,
+       locomotion states only. The male attack sets already carry
+       their family weapon in-hand; during female attacks and all
+       back/side views the overlay hides rather than misalign. */
+    var espilAv2WeaponCache={};
+    function espilAv2WeaponTick(spr,state,dir,isLocal,clock){
+      var ep=null;
+      if(isLocal&&!spr.dead&&!spr.oneShot&&dir==='front'&&(state==='idle'||state==='walk'||state==='run')){
+        try{
+          var eq=JSON.parse(window.localStorage.getItem('espil_equipped')||'null');
+          if(eq&&eq.weapon&&window.__espilGearWindow){
+            var it=window.__espilGearWindow.itemOf(eq.weapon);
+            if(it&&it.ep)ep=it.ep.weapon||null;
+          }
+        }catch(e){}
+      }
+      if(!ep){ spr.weapon.visible=false; spr.weaponEp=null; return; }
+      if(spr.weaponEp!==ep){
+        spr.weaponEp=ep;
+        if(!espilAv2WeaponCache[ep]){
+          var arr=[], loader=new THREE.TextureLoader();
+          for(var i=0;i<24;i++){
+            var t=loader.load('assets/ep-parts/weapon/front/'+ep+'/f'+(i<10?'0':'')+i+'.webp');
+            try{ t.colorSpace=THREE.SRGBColorSpace; }catch(e){}
+            arr.push(t);
+          }
+          espilAv2WeaponCache[ep]=arr;
+        }
+        spr.weaponTex=espilAv2WeaponCache[ep];
+      }
+      var widx=Math.floor(clock*8)%24;
+      if(spr.weaponTex&&spr.weaponTex[widx]){ spr.weapon.material.map=spr.weaponTex[widx]; spr.weapon.material.needsUpdate=true; }
+      var wf=spr.layerF||1;
+      spr.weapon.scale.set(1.9*wf,1.9*wf,1);
+      spr.weapon.position.y=0.99*wf;
+      spr.weapon.visible=true;
+    }
+    var espilAv2Last=0, espilAv2Clock=0;
+    function espilAv2Step(now){
+      requestAnimationFrame(espilAv2Step);
+      var dt=Math.min(.05,Math.max(0,(now-espilAv2Last)/1000||0));
+      espilAv2Last=now;
+      if(dt<=0)return;
+      espilAv2Clock+=dt;
+      var camYaw=(typeof walkCamYaw==='number')?walkCamYaw:0;
+      var F=1;
+      try{ F=(espilP1.layerLive&&!espilP1.failed&&typeof ESPIL_AVATAR_F==='number')?ESPIL_AVATAR_F:1; }catch(e){}
+      for(var i=ESPIL_SPRITES.length-1;i>=0;i--){
+        var e=ESPIL_SPRITES[i], spr=e.spr, faceY=0;
+        if(e.local){
+          if(!walkPlayer||!walkPlayer.av||walkPlayer.av.__spr!==spr){ ESPIL_SPRITES.splice(i,1); continue; }
+          faceY=walkPlayer.faceY;
+        }else{
+          var R=e.R;
+          if(!R||R.gone){ ESPIL_SPRITES.splice(i,1); continue; }
+          faceY=R.faceY;
+        }
+        spr.layerF=F;
+        var state;
+        if(spr.dead)state='dead';
+        else if(spr.oneShot){
+          spr.oneShot.t+=dt;
+          state=spr.oneShot.state;
+          if(spr.oneShot.byFrames){ if(spr.frames&&spr.frameT>=spr.frames.length)spr.oneShot=null; }
+          else if(spr.oneShot.t>=spr.oneShot.dur)spr.oneShot=null;
+          if(spr.oneShot&&spr.oneShot.t>3)spr.oneShot=null;
+          /* GLB parity: a finished one-shot releases av.curAnim,
+             or the walk loop's state selector stays skipped and
+             locomotion freezes at its last state. */
+          if(!spr.oneShot&&e.local&&walkPlayer&&walkPlayer.av&&walkPlayer.av.__spr===spr)walkPlayer.av.curAnim=null;
+        }
+        else state=spr.loco||'idle';
+        var rel=faceY-camYaw;
+        while(rel>Math.PI)rel-=Math.PI*2;
+        while(rel<-Math.PI)rel+=Math.PI*2;
+        var arel=Math.abs(rel), dir, flip=false;
+        if(arel<Math.PI/4)dir='back';
+        else if(arel>Math.PI*3/4)dir='front';
+        else{ dir='side'; flip=rel<0; }
+        spr.state=state; spr.dir=dir; spr.flip=flip;
+        var fam=(state==='attack'&&spr.gender==='male')?(e.local?espilFamilyEquipped():null):null;
+        var set=espilAv2Resolve(spr.gender,state,dir,fam);
+        if(!set){
+          /* male death fallback: fade and sink on the idle frame */
+          spr.fadeT+=dt;
+          spr.body.material.opacity=Math.max(.15,1-spr.fadeT*.8);
+          spr.body.position.y=ESPIL_AV2_CY-Math.min(.5,spr.fadeT*.35);
+          spr.weapon.visible=false;
+          continue;
+        }
+        if(spr.body.material.opacity<1){ spr.body.material.opacity=1; spr.body.position.y=ESPIL_AV2_CY; }
+        var key=spr.gender+'|'+state+'|'+dir+'|'+(fam||'');
+        if(key!==spr.setKey){
+          spr.setKey=key;
+          spr.frames=espilAv2Textures(spr.gender,set.d,set.n);
+          spr.setFps=set.f;
+          spr.frameT=0; spr.frameIdx=-1;
+        }
+        spr.frameT+=dt*spr.setFps;
+        var n2=spr.frames.length;
+        var idx=(state==='dead'||state==='jump'||state==='hit'||state==='attack')
+          ? Math.min(n2-1,Math.floor(spr.frameT))
+          : (Math.floor(spr.frameT)%n2);
+        if(idx!==spr.frameIdx){
+          spr.frameIdx=idx;
+          spr.body.material.map=spr.frames[idx];
+          spr.body.material.needsUpdate=true;
+        }
+        spr.body.scale.x=(spr.flip?-1:1)*ESPIL_AV2_PLANE*(spr.layerF||1);
+        spr.body.scale.y=ESPIL_AV2_PLANE*(spr.layerF||1);
+        if(spr.state!=='dead')spr.body.position.y=ESPIL_AV2_CY*(spr.layerF||1);
+        espilAv2WeaponTick(spr,state,dir,e.local,espilAv2Clock);
+      }
+    }
+    requestAnimationFrame(espilAv2Step);
+    window.__espilSpriteAvatarState=function(){
+      var out={mode:'glb',spriteRemotes:0};
+      for(var i=0;i<ESPIL_SPRITES.length;i++)if(!ESPIL_SPRITES[i].local)out.spriteRemotes++;
+      try{
+        var av=walkPlayer&&walkPlayer.av;
+        if(av&&av.__sprite){
+          var spr=av.__spr;
+          out.mode='sprite'; out.gender=av.__gender;
+          out.state=spr.state; out.dir=spr.dir; out.flip=spr.flip;
+          out.set=spr.setKey; out.frame=spr.frameIdx; out.dead=spr.dead;
+          out.weaponEp=spr.weaponEp||null; out.weaponVisible=!!(spr.weapon&&spr.weapon.visible);
+        }
+      }catch(e){}
+      return out;
+    };
     /* __espilCombatState lives by __espilApplyRecovery above (one
        merged definition - Batch 5). */
     initChat();
@@ -8669,6 +9392,7 @@
       var _ms=moveSpeeds();
       var SPEED=p.swimming?_ms.swim:((p.running?_ms.run:_ms.walk)*(window.__espilSpeedBoost||1)); /* fast track (Han 2026-10-28): street tiles x2 */
       p._dx=mx*SPEED*dt;p._dz=mz*SPEED*dt;
+      espilTreeOnMove(Math.sqrt(p._dx*p._dx+p._dz*p._dz)); /* Batch 6: shoes-tree metres */
       p.moving=il>.12;
       p.pos.x+=p._dx;collideCircleAxis(p,'x');
       p.pos.z+=p._dz;collideCircleAxis(p,'z');

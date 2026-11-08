@@ -516,6 +516,12 @@
       { move: 'punch', icon: '👊', label: 'PUNCH' },
       { move: 'kick', icon: '🦵', label: 'KICK' },
       { move: 'throw', icon: '「」', label: 'THROW' },
+      /* Batch 6 Item C: the tree-gated skills join the cluster;
+         doMove itself refuses (with a toast) until each is learned. */
+      { move: 'dash', icon: '💨', label: 'DASH' },
+      { move: 'spin', icon: '🌀', label: 'SPIN' },
+      { move: 'wave', icon: '🌊', label: 'WAVE' },
+      { move: 'art', icon: '⚔️', label: 'ART' },
       { move: 'defense', icon: '🛡️', label: 'DEFENSE' },
       { fly: true, icon: '✈️', label: 'TELEPORT' }
     ];

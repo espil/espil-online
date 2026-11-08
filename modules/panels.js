@@ -82,6 +82,12 @@
     { name: 'Iron Sword', kr: '철검', slot: 'weapon', kind: 'equip', element: 'neutral', grade: '고급', atk: [9, 15], str: 2, def: 0, mdef: 0, price: 140, ep: { weapon: 'greatsword' }, app: { shape: 'sword', c1: '#cfd8de', c2: '#5d6d78' }, desc: '단단하게 벼린 철검. 균형이 좋습니다.' },
     { name: 'Hunter Bow', kr: '사냥꾼 활', slot: 'weapon', kind: 'equip', element: 'neutral', grade: '고급', atk: [7, 13], acc: 4, dex: 2, def: 0, mdef: 0, price: 130, ep: { weapon: 'bow' }, app: { shape: 'bow', c1: '#8a6844', c2: '#e8e0cc' }, desc: '사냥꾼들이 애용하는 단단한 활.' },
     { name: 'Silver Dagger', kr: '은 단검', slot: 'weapon', kind: 'equip', element: 'neutral', grade: '희귀', atk: [11, 17], dex: 3, acc: 3, def: 0, mdef: 0, price: 320, ep: { weapon: 'dagger' }, app: { shape: 'dagger', c1: '#e8eef2', c2: '#7a4a8c' }, desc: '은으로 날을 세운 단검. 빠르고 조용합니다.' },
+    { name: 'Ember Saber', kr: '불꽃 세이버', slot: 'weapon', kind: 'equip', element: 'fire', grade: '희귀', atk: [13, 19], str: 2, def: 0, mdef: 0, price: 520, ep: { weapon: 'greatsword' }, app: { shape: 'sword', c1: '#e86a3a', c2: '#8f2f1a' }, desc: '날에 불꽃이 깃든 세이버. 이름처럼 붉게 타오릅니다.' },
+    { name: 'Frostbrand', kr: '서리검 프로스트브랜드', slot: 'weapon', kind: 'equip', element: 'water', grade: '희귀', atk: [12, 18], int: 2, def: 0, mdef: 0, price: 540, ep: { weapon: 'ice_sword' }, app: { shape: 'sword', c1: '#bfe9ff', c2: '#4f9cf2' }, desc: '닿는 것을 얼리는 서리 날의 검.' },
+    { name: 'Storm Bow', kr: '폭풍 활', slot: 'weapon', kind: 'equip', element: 'wind', grade: '영웅', atk: [15, 22], dex: 4, acc: 4, def: 0, mdef: 0, price: 890, ep: { weapon: 'bow' }, app: { shape: 'bow', c1: '#7dfce6', c2: '#2e8b74' }, desc: '시위를 당기면 바람이 운다는 활.' },
+    { name: 'Thorn Staff', kr: '가시 지팡이', slot: 'weapon', kind: 'equip', element: 'earth', grade: '고급', matk: [10, 16], int: 4, def: 0, mdef: 0, price: 460, ep: { weapon: 'staff' }, app: { shape: 'staff', c1: '#6a8a4a', c2: '#58c96b' }, desc: '덩굴 가시가 휘감긴 지팡이. 대지의 기운이 서려 있습니다.' },
+    { name: 'Moon Dagger', kr: '달빛 단검', slot: 'weapon', kind: 'equip', element: 'dark', grade: '영웅', atk: [16, 23], dex: 5, acc: 3, def: 0, mdef: 0, price: 920, ep: { weapon: 'dagger' }, app: { shape: 'dagger', c1: '#8f6fc9', c2: '#3a2a5e' }, desc: '달빛을 모아 벼린 단검. 어둠 속에서 더 빛납니다.' },
+    { name: 'Dawn Blade', kr: '새벽검', slot: 'weapon', kind: 'equip', element: 'light', grade: '전설', atk: [19, 27], str: 4, wil: 2, def: 0, mdef: 0, price: 1600, ep: { weapon: 'greatsword' }, app: { shape: 'sword', c1: '#ffd23c', c2: '#f28ad0' }, desc: '새벽빛을 머금은 검. 전설의 등급에 걸맞은 위용입니다.' },
     { name: 'Cloth Cap', kr: '천 모자', slot: 'head', kind: 'equip', grade: '일반', def: 2, mdef: 0, price: 20, app: { shape: 'cap', c1: '#c95f4f', c2: '#8f3a30' }, desc: '부드러운 천으로 만든 모자.' },
     { name: 'Leather Hood', kr: '가죽 후드', slot: 'head', kind: 'equip', grade: '고급', def: 4, mdef: 1, dex: 1, price: 90, app: { shape: 'hood', c1: '#7a5a34', c2: '#54401f' }, desc: '비바람을 막아 주는 가죽 후드.' },
     { name: 'Knight Helm', kr: '기사단 투구', slot: 'head', kind: 'equip', grade: '희귀', def: 8, mdef: 2, vit: 2, price: 300, app: { shape: 'helm', c1: '#c7d0d6', c2: '#8f2f2f' }, desc: '기사단의 문양이 새겨진 투구.' },
@@ -100,6 +106,30 @@
     { name: 'Pearl Earring', kr: '진주 귀걸이', slot: 'earring', kind: 'equip', grade: '고급', def: 0, mdef: 1, acc: 2, int: 1, price: 110, app: { shape: 'earring', c1: '#f2ead8', c2: '#cfc4a8' }, desc: '작은 진주가 달린 귀걸이.' },
     { name: 'Leather Belt', kr: '가죽 벨트', slot: 'belt', kind: 'equip', grade: '일반', def: 2, mdef: 0, vit: 1, price: 20, app: { shape: 'belt', c1: '#7a5a34', c2: '#c9a227' }, desc: '버클이 단단한 가죽 벨트.' },
     { name: 'Mochi Pet', kr: '모찌 펫', slot: 'pet', kind: 'equip', grade: '희귀', def: 0, mdef: 0, wil: 3, price: 500, app: { shape: 'pet', c1: '#f2b8c6', c2: '#e88ca0' }, desc: '말랑말랑한 작은 친구. 늘 곁을 따라다닙니다.' },
+    { name: 'Worn Iron Shard', kr: '낡은 철 파편', slot: null, kind: 'mat', grade: '일반', matLine: 'weapon', matGrade: 'white', def: 0, mdef: 0, price: 10, app: { shape: 'shard', c1: '#e8e8e8', c2: '#4a4238' }, desc: '무기 제작 재료 (white).' },
+    { name: 'Brass Shard', kr: '황동 파편', slot: null, kind: 'mat', grade: '일반', matLine: 'weapon', matGrade: 'yellow', def: 0, mdef: 0, price: 15, app: { shape: 'shard', c1: '#f2d54b', c2: '#4a4238' }, desc: '무기 제작 재료 (yellow).' },
+    { name: 'Copper Ingot', kr: '구리 주괴', slot: null, kind: 'mat', grade: '고급', matLine: 'weapon', matGrade: 'green', def: 0, mdef: 0, price: 25, app: { shape: 'shard', c1: '#58c96b', c2: '#4a4238' }, desc: '무기 제작 재료 (green).' },
+    { name: 'Steel Ingot', kr: '강철 주괴', slot: null, kind: 'mat', grade: '희귀', matLine: 'weapon', matGrade: 'blue', def: 0, mdef: 0, price: 45, app: { shape: 'shard', c1: '#4f9cf2', c2: '#4a4238' }, desc: '무기 제작 재료 (blue).' },
+    { name: 'Mithril Shard', kr: '미스릴 파편', slot: null, kind: 'mat', grade: '영웅', matLine: 'weapon', matGrade: 'purple', def: 0, mdef: 0, price: 85, app: { shape: 'shard', c1: '#a86fe0', c2: '#4a4238' }, desc: '무기 제작 재료 (purple).' },
+    { name: 'Dragonsteel Shard', kr: '용강 파편', slot: null, kind: 'mat', grade: '영웅', matLine: 'weapon', matGrade: 'red', def: 0, mdef: 0, price: 140, app: { shape: 'shard', c1: '#e04b4b', c2: '#4a4238' }, desc: '무기 제작 재료 (red).' },
+    { name: 'Sunsteel Shard', kr: '태양강 파편', slot: null, kind: 'mat', grade: '전설', matLine: 'weapon', matGrade: 'gold', def: 0, mdef: 0, price: 220, app: { shape: 'shard', c1: '#f2b63c', c2: '#4a4238' }, desc: '무기 제작 재료 (gold).' },
+    { name: 'Lunaris Shard', kr: '루나리스 파편', slot: null, kind: 'mat', grade: '전설', matLine: 'weapon', matGrade: 'pink', def: 0, mdef: 0, price: 350, app: { shape: 'shard', c1: '#f28ad0', c2: '#4a4238' }, desc: '무기 제작 재료 (pink).' },
+    { name: 'Worn Hide Scrap', kr: '낡은 가죽 조각', slot: null, kind: 'mat', grade: '일반', matLine: 'armour', matGrade: 'white', def: 0, mdef: 0, price: 10, app: { shape: 'plate', c1: '#e8e8e8', c2: '#4a4238' }, desc: '방어구 제작 재료 (white).' },
+    { name: 'Brass Stud', kr: '황동 징', slot: null, kind: 'mat', grade: '일반', matLine: 'armour', matGrade: 'yellow', def: 0, mdef: 0, price: 15, app: { shape: 'plate', c1: '#f2d54b', c2: '#4a4238' }, desc: '방어구 제작 재료 (yellow).' },
+    { name: 'Copper Plate', kr: '구리 판', slot: null, kind: 'mat', grade: '고급', matLine: 'armour', matGrade: 'green', def: 0, mdef: 0, price: 25, app: { shape: 'plate', c1: '#58c96b', c2: '#4a4238' }, desc: '방어구 제작 재료 (green).' },
+    { name: 'Steel Plate', kr: '강철 판', slot: null, kind: 'mat', grade: '희귀', matLine: 'armour', matGrade: 'blue', def: 0, mdef: 0, price: 45, app: { shape: 'plate', c1: '#4f9cf2', c2: '#4a4238' }, desc: '방어구 제작 재료 (blue).' },
+    { name: 'Mithril Plate', kr: '미스릴 판', slot: null, kind: 'mat', grade: '영웅', matLine: 'armour', matGrade: 'purple', def: 0, mdef: 0, price: 85, app: { shape: 'plate', c1: '#a86fe0', c2: '#4a4238' }, desc: '방어구 제작 재료 (purple).' },
+    { name: 'Dragon Scale', kr: '용 비늘', slot: null, kind: 'mat', grade: '영웅', matLine: 'armour', matGrade: 'red', def: 0, mdef: 0, price: 140, app: { shape: 'plate', c1: '#e04b4b', c2: '#4a4238' }, desc: '방어구 제작 재료 (red).' },
+    { name: 'Sunsteel Plate', kr: '태양강 판', slot: null, kind: 'mat', grade: '전설', matLine: 'armour', matGrade: 'gold', def: 0, mdef: 0, price: 220, app: { shape: 'plate', c1: '#f2b63c', c2: '#4a4238' }, desc: '방어구 제작 재료 (gold).' },
+    { name: 'Lunaris Silk', kr: '루나리스 실크', slot: null, kind: 'mat', grade: '전설', matLine: 'armour', matGrade: 'pink', def: 0, mdef: 0, price: 350, app: { shape: 'plate', c1: '#f28ad0', c2: '#4a4238' }, desc: '방어구 제작 재료 (pink).' },
+    { name: 'Cracked Bead', kr: '금이 간 구슬', slot: null, kind: 'mat', grade: '일반', matLine: 'accessory', matGrade: 'white', def: 0, mdef: 0, price: 10, app: { shape: 'bead', c1: '#e8e8e8', c2: '#4a4238' }, desc: '장신구 제작 재료 (white).' },
+    { name: 'Brass Charm', kr: '황동 부적', slot: null, kind: 'mat', grade: '일반', matLine: 'accessory', matGrade: 'yellow', def: 0, mdef: 0, price: 15, app: { shape: 'bead', c1: '#f2d54b', c2: '#4a4238' }, desc: '장신구 제작 재료 (yellow).' },
+    { name: 'Jade Bead', kr: '비취 구슬', slot: null, kind: 'mat', grade: '고급', matLine: 'accessory', matGrade: 'green', def: 0, mdef: 0, price: 25, app: { shape: 'bead', c1: '#58c96b', c2: '#4a4238' }, desc: '장신구 제작 재료 (green).' },
+    { name: 'Sapphire Bead', kr: '사파이어 구슬', slot: null, kind: 'mat', grade: '희귀', matLine: 'accessory', matGrade: 'blue', def: 0, mdef: 0, price: 45, app: { shape: 'bead', c1: '#4f9cf2', c2: '#4a4238' }, desc: '장신구 제작 재료 (blue).' },
+    { name: 'Amethyst Bead', kr: '자수정 구슬', slot: null, kind: 'mat', grade: '영웅', matLine: 'accessory', matGrade: 'purple', def: 0, mdef: 0, price: 85, app: { shape: 'bead', c1: '#a86fe0', c2: '#4a4238' }, desc: '장신구 제작 재료 (purple).' },
+    { name: 'Ruby Bead', kr: '루비 구슬', slot: null, kind: 'mat', grade: '영웅', matLine: 'accessory', matGrade: 'red', def: 0, mdef: 0, price: 140, app: { shape: 'bead', c1: '#e04b4b', c2: '#4a4238' }, desc: '장신구 제작 재료 (red).' },
+    { name: 'Topaz Bead', kr: '토파즈 구슬', slot: null, kind: 'mat', grade: '전설', matLine: 'accessory', matGrade: 'gold', def: 0, mdef: 0, price: 220, app: { shape: 'bead', c1: '#f2b63c', c2: '#4a4238' }, desc: '장신구 제작 재료 (gold).' },
+    { name: 'Lunaris Bead', kr: '루나리스 구슬', slot: null, kind: 'mat', grade: '전설', matLine: 'accessory', matGrade: 'pink', def: 0, mdef: 0, price: 350, app: { shape: 'bead', c1: '#f28ad0', c2: '#4a4238' }, desc: '장신구 제작 재료 (pink).' },
     { name: 'Revival Potion', kr: '부활 포션', slot: null, kind: 'use', grade: '캐시', cash: true, def: 0, mdef: 0, price: 0, app: { shape: 'drink', c1: '#e86a8a', c2: '#ffd23c' }, desc: '캐시 아이템 (10개에 $1). 쓰러졌을 때 그 자리에서 HP/MP 50%로 부활합니다. 캐시상점은 아직 닫혀 있어 구매할 수 없습니다.' }
   ];
   var DB_LOOKUP = {};
@@ -192,7 +222,7 @@
     var wname = equippedMap().weapon;
     if (!wname) return null;
     var it = itemOf(wname); if (!it) return null;
-    var atk = it.atk || null, matk = it.matk || null;
+    var atk = tieredAtk(it), matk = tieredMatk(it);
     if (!atk && !matk) return null;
     var wAtk = atk || [Math.round(matk[0] * 0.4), Math.round(matk[1] * 0.4)];
     var wMatk = matk || [Math.round(atk[0] * 0.4), Math.round(atk[1] * 0.4)];
@@ -218,11 +248,130 @@
     try { return computeStats().def; } catch (e) { return 0; }
   };
 
+  /* ================= Batch 6 Item B: crafting =================
+     Storage espil_craft_v1 {tiers: {weaponName: tier}}. A crafted
+     tier raises the weapon's atk range by +2 min / +3 max per
+     tier (matk likewise) in every stat path (computeStats,
+     __espilWeaponAtkMid, the bag stat lines) and is displayed as
+     a '+t' suffix. The tier also feeds the weapon-tree depth in
+     Item C (monolith reads window.__espilCraftTier).
+     RECIPES (data constants):
+       upgrade: weapon-line parts 2 + tier, armour-line parts
+         1 + floor(tier / 2), accessory-line parts 1 once tier >= 2;
+         every part must be at or above the weapon's minimum
+         material grade (GRADE_MIN_LADDER below).
+       convert: weapon 3 + armour 1 + accessory 1 parts of any
+         grade; the target must be another weapon of the same
+         family (app.shape); the converted weapon starts at tier 0. */
+  var LS_CRAFT = 'espil_craft_v1';
+  var MAT_LADDER = ['white', 'yellow', 'green', 'blue', 'purple', 'red', 'gold', 'pink'];
+  var GRADE_MIN_LADDER = { '일반': 0, '고급': 2, '희귀': 3, '영웅': 5, '전설': 6 };
+  var CRAFT_RECIPES = {
+    upgrade: { weaponPerTier: 1, weaponBase: 2, armourBase: 1, armourPerTwoTiers: 1, accessoryFromTier: 2, accessoryCount: 1 },
+    convert: { weapon: 3, armour: 1, accessory: 1 }
+  };
+  function craftMap() { var m = getJSON(LS_CRAFT, {}); return (m && typeof m === 'object' && m.tiers) ? m : { tiers: {} }; }
+  function craftTierOf(name) { var t = craftMap().tiers[name]; return (typeof t === 'number' && t > 0) ? Math.floor(t) : 0; }
+  window.__espilCraftTier = craftTierOf;
+  function saveCraft(m) { setJSON(LS_CRAFT, m); }
+  function tieredAtk(it) { if (!it || !it.atk) return null; var t = craftTierOf(it.name); return t ? [it.atk[0] + 2 * t, it.atk[1] + 3 * t] : it.atk; }
+  function tieredMatk(it) { if (!it || !it.matk) return null; var t = craftTierOf(it.name); return t ? [it.matk[0] + 2 * t, it.matk[1] + 3 * t] : it.matk; }
+  function familyOf(it) { return it && it.app ? (it.app.shape || null) : null; }
+  function upgradeCost(name) {
+    var t = craftTierOf(name), it = itemOf(name);
+    return { weapon: CRAFT_RECIPES.upgrade.weaponBase + CRAFT_RECIPES.upgrade.weaponPerTier * t,
+             armour: CRAFT_RECIPES.upgrade.armourBase + Math.floor(t / 2) * CRAFT_RECIPES.upgrade.armourPerTwoTiers,
+             accessory: t >= CRAFT_RECIPES.upgrade.accessoryFromTier ? CRAFT_RECIPES.upgrade.accessoryCount : 0,
+             minLadder: GRADE_MIN_LADDER[it.grade] != null ? GRADE_MIN_LADDER[it.grade] : 0, tier: t };
+  }
+  function convertCost() {
+    return { weapon: CRAFT_RECIPES.convert.weapon, armour: CRAFT_RECIPES.convert.armour,
+             accessory: CRAFT_RECIPES.convert.accessory, minLadder: 0 };
+  }
+  function matCounts(minLadder) {
+    var c = { weapon: 0, armour: 0, accessory: 0 };
+    ownedList().forEach(function (n) {
+      var it = DB_LOOKUP[String(n).toLowerCase()];
+      if (it && it.kind === 'mat' && it.matLine && MAT_LADDER.indexOf(it.matGrade) >= minLadder) c[it.matLine]++;
+    });
+    return c;
+  }
+  function canAffordCraft(cost) {
+    var c = matCounts(cost.minLadder || 0);
+    return c.weapon >= (cost.weapon || 0) && c.armour >= (cost.armour || 0) && c.accessory >= (cost.accessory || 0);
+  }
+  function consumeCraft(cost) {
+    var need = { weapon: cost.weapon || 0, armour: cost.armour || 0, accessory: cost.accessory || 0 };
+    var minLadder = cost.minLadder || 0;
+    var a = ownedList();
+    /* lowest qualifying grade first, so the best parts survive */
+    var order = a.map(function (n, i) {
+      var it = DB_LOOKUP[String(n).toLowerCase()];
+      return { n: n, i: i, line: (it && it.kind === 'mat') ? it.matLine : null,
+               lad: (it && it.kind === 'mat') ? MAT_LADDER.indexOf(it.matGrade) : -1 };
+    }).filter(function (o) { return o.line && o.lad >= minLadder && need[o.line] > 0; })
+      .sort(function (x, y) { return x.lad - y.lad; });
+    var dropIdx = {};
+    order.forEach(function (o) { if (need[o.line] > 0) { need[o.line]--; dropIdx[o.i] = 1; } });
+    if (need.weapon > 0 || need.armour > 0 || need.accessory > 0) return false;
+    saveOwned(a.filter(function (_, i) { return !dropIdx[i]; }));
+    return true;
+  }
+  function upgradeWeapon(name) {
+    var it = itemOf(name);
+    if (!it || it.slot !== 'weapon') return { ok: false, why: 'not-a-weapon' };
+    if (ownedList().indexOf(name) < 0) return { ok: false, why: 'not-owned' };
+    var cost = upgradeCost(name);
+    if (!canAffordCraft(cost)) return { ok: false, why: 'materials', cost: cost };
+    if (!consumeCraft(cost)) return { ok: false, why: 'materials', cost: cost };
+    var m = craftMap(); m.tiers[name] = (m.tiers[name] || 0) + 1; saveCraft(m);
+    gearChanged(); renderAll();
+    return { ok: true, tier: m.tiers[name], cost: cost };
+  }
+  function convertWeapon(name, target) {
+    var it = itemOf(name), tg = itemOf(target);
+    if (!it || it.slot !== 'weapon' || !tg || tg.slot !== 'weapon') return { ok: false, why: 'not-a-weapon' };
+    if (target === name) return { ok: false, why: 'same-weapon' };
+    if (familyOf(it) !== familyOf(tg)) return { ok: false, why: 'family-mismatch' };
+    var a = ownedList(), ix = a.indexOf(name);
+    if (ix < 0) return { ok: false, why: 'not-owned' };
+    var cost = convertCost();
+    if (!canAffordCraft(cost)) return { ok: false, why: 'materials', cost: cost };
+    if (!consumeCraft(cost)) return { ok: false, why: 'materials', cost: cost };
+    a = ownedList(); ix = a.indexOf(name); a.splice(ix, 1); a.push(target); saveOwned(a);
+    var m = craftMap(); if (m.tiers[target]) { delete m.tiers[target]; saveCraft(m); }
+    var eq = equippedMap();
+    if (eq.weapon === name) { eq.weapon = target; saveEq(eq); }
+    gearChanged(); renderAll();
+    return { ok: true, from: name, to: target, cost: cost };
+  }
+  window.__espilCraft = { recipes: CRAFT_RECIPES, tierOf: craftTierOf, tiers: function () { return craftMap().tiers; },
+    upgradeCost: upgradeCost, convertCost: convertCost, matCounts: matCounts, canAfford: canAffordCraft,
+    upgrade: upgradeWeapon, convert: convertWeapon, familyOf: function (name) { return familyOf(itemOf(name)); } };
+
   /* purchase mirror (v1 semantics): the shop fires espil-guide
      'bought' - record the item so the bag shows it */
+  /* Batch 6 Item B: monster drops land in the bag - the combat
+     module fires espil-guide 'monster-drop' with items on the
+     three separated lines (weapon / armour / accessory materials);
+     items is authoritative, parts is the legacy weapon-line
+     fallback for older emitters. */
   window.addEventListener('espil-guide', function (e) {
     var d = e.detail || {}; if (d.__fromGuide) return;
     if (d.type === 'bought' && d.item) { var a = ownedList(); a.push(String(d.item)); saveOwned(a); if (bagOpen()) renderBag(); }
+    if (d.type === 'monster-drop') {
+      var a2 = ownedList(), added = false;
+      if (Array.isArray(d.items) && d.items.length) {
+        d.items.forEach(function (it) {
+          var cnt = Math.max(1, it.count || 1);
+          for (var i = 0; i < cnt; i++) a2.push(String(it.name));
+          added = true;
+        });
+      } else if (Array.isArray(d.parts)) {
+        d.parts.forEach(function (pn) { a2.push(String(pn)); added = true; });
+      }
+      if (added) { saveOwned(a2); if (bagOpen()) renderBag(); }
+    }
   });
 
   /* S4 recovery listener: the bag's 'use' action has already
@@ -282,8 +431,8 @@
       meleeFlat += it.melee || 0; magicFlat += it.magic || 0;
       if (slot === 'weapon') weapon = it;
     });
-    var wAtk = weapon && weapon.atk ? weapon.atk : (weapon && weapon.matk ? [Math.round(weapon.matk[0] * 0.4), Math.round(weapon.matk[1] * 0.4)] : [1, 3]);
-    var wMatk = weapon && weapon.matk ? weapon.matk : (weapon && weapon.atk ? [Math.round(weapon.atk[0] * 0.4), Math.round(weapon.atk[1] * 0.4)] : [1, 2]);
+    var wAtk = weapon ? (tieredAtk(weapon) || [Math.round(tieredMatk(weapon)[0] * 0.4), Math.round(tieredMatk(weapon)[1] * 0.4)]) : [1, 3];
+    var wMatk = weapon ? (tieredMatk(weapon) || [Math.round(tieredAtk(weapon)[0] * 0.4), Math.round(tieredAtk(weapon)[1] * 0.4)]) : [1, 2];
     var mid = (wAtk[0] + wAtk[1]) / 2, mmid = (wMatk[0] + wMatk[1]) / 2;
     return { base: base, tot: tot, level: info.level,
       weaponAtk: wAtk,
@@ -322,6 +471,9 @@
       case 'food': b = '<path d="M18 5 L29 27 L7 27 Z" fill="#f2e3c2"/><path d="M18 5 L29 27 L7 27 Z" fill="none" stroke="' + c2 + '" stroke-width="2"/><circle cx="18" cy="19" r="3.4" fill="' + c1 + '"/>'; break;
       case 'drink': b = '<rect x="14" y="12" width="9" height="18" rx="2.4" fill="#f2e3c2"/><rect x="16" y="6" width="5" height="6" fill="' + c2 + '"/><rect x="14" y="18" width="9" height="5" fill="' + c1 + '"/>'; break;
       case 'cup': b = '<path d="M9 13 L27 13 L24.6 29 L11.4 29 Z" fill="#e8e0cc"/><rect x="9" y="10" width="18" height="3.6" rx="1.6" fill="' + c1 + '"/><path d="M13 7 Q14.6 4.6 13 2.6 M19 7 Q20.6 4.6 19 2.6" stroke="' + c2 + '" stroke-width="1.6" fill="none" stroke-linecap="round"/>'; break;
+      case 'shard': b = P('M18 3 L24 14 L20 30 L13 26 L10 12 Z', c1) + P('M18 3 L20 30', 'none', ' stroke="' + c2 + '" stroke-width="1.6"'); break;
+      case 'plate': b = P('M8 7 L28 7 L26 29 L10 29 Z', c1) + '<rect x="12" y="12" width="12" height="3" fill="' + c2 + '"/><rect x="12" y="19" width="12" height="3" fill="' + c2 + '"/>'; break;
+      case 'bead': b = '<circle cx="18" cy="18" r="10" fill="' + c1 + '"/><circle cx="14.6" cy="14" r="3.2" fill="#ffffff" opacity=".55"/><circle cx="18" cy="18" r="3.4" fill="' + c2 + '"/>'; break;
       default: b = '<rect x="8" y="9" width="20" height="18" rx="2.6" fill="' + c1 + '"/><rect x="8" y="15" width="20" height="3" fill="' + c2 + '"/>';
     }
     return '<svg viewBox="0 0 36 36" width="' + s + '" height="' + s + '" aria-hidden="true">' + b + '</svg>';
@@ -575,7 +727,7 @@
       (it ? ' title="' + esc(it.kr || it.name) + '"' : '') +
       ' style="border-color:' + gradeCol + '">' +
       (it ? iconSVG(it, 22) : '<span style="display:block;height:22px;line-height:22px;font-size:12px;opacity:.4">·</span>') +
-      '<span class="eg-itemlab">' + (it ? esc(it.kr || it.name) : '') + '</span>' +
+      '<span class="eg-itemlab">' + (it ? esc(it.kr || it.name) + (slot === 'weapon' && craftTierOf(name) ? ' +' + craftTierOf(name) : '') : '') + '</span>' +
       '<span class="eg-slotlab">' + SLOT_KR[slot] + '</span></div>';
   }
   function statRows(pairs) {
@@ -643,8 +795,10 @@
   var BAG_TABS = [['equip', '장비'], ['use', '소비'], ['mat', '재료'], ['quest', '퀘스트'], ['etc', '기타']];
   function itemStatLines(it) {
     var out = [];
-    if (it.atk) out.push('무기 공격력 ' + it.atk[0] + ' ~ ' + it.atk[1]);
-    if (it.matk) out.push('마법 공격력 ' + it.matk[0] + ' ~ ' + it.matk[1]);
+    var ta = tieredAtk(it), tm = tieredMatk(it), tier = craftTierOf(it.name);
+    if (ta) out.push('무기 공격력 ' + ta[0] + ' ~ ' + ta[1]);
+    if (tm) out.push('마법 공격력 ' + tm[0] + ' ~ ' + tm[1]);
+    if (tier > 0 && (ta || tm)) out.push('강화 +' + tier);
     if (it.def) out.push('방어력 +' + it.def);
     if (it.mdef) out.push('마법 방어력 +' + it.mdef);
     STAT_KEYS.forEach(function (k) { if (typeof it[k] === 'number' && it[k]) out.push(STAT_KR[k] + ' +' + it[k]); });
@@ -700,11 +854,36 @@
         btns = '<div class="bag-dbtns"><button class="bag-dbtn" data-bag-act="use" type="button">사용</button></div>';
       }
     }
+    /* ---- Batch 6 Item B: crafting strip (selected weapon) ---- */
+    var craftHtml = '';
+    if (bagSel) {
+      var cit = itemOf(bagSel);
+      if (cit.slot === 'weapon') {
+        var ct = craftTierOf(bagSel);
+        var uc = upgradeCost(bagSel), cc = convertCost();
+        var costTxt = function (c) {
+          var parts = [];
+          if (c.weapon) parts.push('무기 재료 ×' + c.weapon);
+          if (c.armour) parts.push('방어구 재료 ×' + c.armour);
+          if (c.accessory) parts.push('장신구 재료 ×' + c.accessory);
+          return parts.join(' · ') + ' (' + MAT_LADDER[c.minLadder] + ' 등급 이상)';
+        };
+        var famTargets = DB.filter(function (w) { return w.slot === 'weapon' && w.name !== bagSel && familyOf(w) === familyOf(cit); });
+        craftHtml = '<div class="bag-craft" style="margin-top:8px;padding:8px 10px;border:1px solid rgba(169,126,70,.55);border-radius:8px;background:rgba(46,32,16,.35)">' +
+          '<div style="font:800 12px Manrope,sans-serif;color:#f2d492">제작 · ' + esc(cit.kr || cit.name) + (ct ? ' +' + ct : '') + '</div>' +
+          '<div style="font-size:11px;margin-top:4px">강화 비용: ' + esc(costTxt(uc)) + ' → 공격 범위 +2~+3' +
+          ' <button class="bag-dbtn" data-craft-act="upgrade" type="button"' + (canAffordCraft(uc) ? '' : ' disabled style="opacity:.45"') + '>강화</button></div>' +
+          '<div style="font-size:11px;margin-top:4px">변환 비용: ' + esc(costTxt(cc)) +
+          ' <select id="eg-craft-target" style="max-width:150px">' + famTargets.map(function (w) { return '<option value="' + esc(w.name) + '">' + esc(w.kr || w.name) + '</option>'; }).join('') + '</select>' +
+          ' <button class="bag-dbtn" data-craft-act="convert" type="button"' + (famTargets.length && canAffordCraft(cc) ? '' : ' disabled style="opacity:.45"') + '>변환</button></div>' +
+          '<div style="font-size:10px;opacity:.7;margin-top:3px">재료는 몬스터 사냥 드랍으로 모읍니다. 변환하면 강화 단계는 초기화됩니다.</div></div>';
+      }
+    }
     var info = myInfo();
     wrap.innerHTML =
       '<div class="bag-tabs">' + BAG_TABS.map(function (t) { return '<button class="bag-tab' + (bagTab === t[0] ? ' on' : '') + '" data-bagtab="' + t[0] + '" type="button">' + t[1] + '</button>'; }).join('') + '</div>' +
       '<div class="bag-grid">' + cells.join('') + '</div>' +
-      '<div class="bag-detail">' + detail + btns + '</div>' +
+      '<div class="bag-detail">' + detail + btns + '</div>' + craftHtml +
       '<p class="bag-foot"><span>가방 ' + counts.reduce(function (a, c) { return a + c.n; }, 0) + ' / 96</span><span>Leo Coin: ' + info.leo + '</span></p>';
     g.innerHTML = ''; g.appendChild(wrap);
     wrap.querySelectorAll('[data-bagtab]').forEach(function (b) {
@@ -712,6 +891,23 @@
     });
     wrap.querySelectorAll('[data-bag-item]').forEach(function (el) {
       el.addEventListener('click', function () { bagSel = el.getAttribute('data-bag-item'); renderBag(); });
+    });
+    wrap.querySelectorAll('[data-craft-act]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (!bagSel) return;
+        var act = b.getAttribute('data-craft-act'), res = null;
+        if (act === 'upgrade') res = upgradeWeapon(bagSel);
+        else if (act === 'convert') {
+          var sel = document.getElementById('eg-craft-target');
+          if (sel) res = convertWeapon(bagSel, sel.value);
+        }
+        if (window.__espilToast) {
+          if (res && res.ok && act === 'upgrade') window.__espilToast('강화 성공: +' + res.tier);
+          else if (res && res.ok) window.__espilToast('변환 완료: ' + res.to);
+          else window.__espilToast('재료가 부족합니다');
+        }
+        renderBag();
+      });
     });
     wrap.querySelectorAll('[data-bag-act]').forEach(function (b) {
       b.addEventListener('click', function () {
