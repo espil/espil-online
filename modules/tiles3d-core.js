@@ -172,24 +172,50 @@ function setAttributionVisible(vis) {
   if (!attribEl) return;
   attribEl.style.display = vis ? 'block' : 'none';
 }
+var attribRefreshTimer = null;
 function buildAttribution() {
   try {
+    if (attribEl && attribEl.parentNode) attribEl.parentNode.removeChild(attribEl);
     attribEl = document.createElement('div');
     attribEl.id = 'espil-tiles-attrib';
     attribEl.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:5;'
       + 'background:rgba(255,255,255,.88);color:#222;font:11px/1.5 system-ui,sans-serif;'
-      + 'padding:2px 10px;display:none;pointer-events:none;';
+      + 'padding:2px 10px;pointer-events:none;'
+      + 'display:' + (state.on ? 'block' : 'none') + ';';
     var items = [];
-    var fromRenderer = (tiles && tiles.attributions && tiles.attributions.length)
-      ? tiles.attributions : null;
+    /* Direct-Google path: attribution is aggregated by the renderer
+       from each visible tile's asset.copyright (Google requirement).
+       In this vendored 3d-tiles-renderer build that aggregation is
+       exposed ONLY as tiles.getAttributions() (the GoogleCloudAuth
+       plugin collects copyright strings on tile-visibility-change);
+       there is no tiles.attributions property - reading one was the
+       ion-era path, when the endpoint supplied the strings. */
+    var fromRenderer = null;
+    if (tiles && typeof tiles.getAttributions === 'function') {
+      try {
+        var entries = tiles.getAttributions([]);
+        if (entries && entries.length) fromRenderer = entries;
+      } catch (e) {}
+    }
     var src = fromRenderer || state.attributions || [];
     for (var i = 0; i < src.length; i++) {
       var a = src[i];
-      items.push(typeof a === 'string' ? a : (a && a.html) || '');
+      if (typeof a === 'string') items.push(a);
+      else if (a && a.type === 'image') { /* logo entry: none configured */ }
+      else if (a && a.value) items.push(a.value);
+      else if (a && a.html) items.push(a.html);
     }
     attribEl.innerHTML = '<span>Data: </span>' + items.filter(Boolean).join(' ');
     document.body.appendChild(attribEl);
   } catch (e) {}
+}
+function scheduleAttributionRefresh() {
+  if (!state.on) return;
+  if (attribRefreshTimer) return;
+  attribRefreshTimer = setTimeout(function () {
+    attribRefreshTimer = null;
+    if (state.on) buildAttribution();
+  }, 750);
 }
 
 function setTilesOn(on, reason) {
@@ -307,6 +333,17 @@ export function start(sess, opts) {
   tiles = new TilesRenderer();
   (function configure(t) {
     t.rootURL = session.tilesetUrl;
+    /* Direct-Google root URL (root.json?key=...): the plugin takes
+       the key from the URL and attaches BOTH key and session to every
+       tile.googleapis.com child request - Google's child URIs are
+       relative, carry only the session parameter, and deny without
+       the key (Google docs, "Work with your own 3D Tiles renderer").
+       sessionOptions must NOT be passed: with it the plugin would
+       switch to calling createSession itself; without it, it points
+       its auth at rootURL and harvests the session token from the
+       tileset's own child URIs, exactly the direct-path flow. The
+       same plugin aggregates attribution from tiles' asset.copyright
+       (read back in buildAttribution via tiles.getAttributions()). */
     var key = null;
     try { key = new URL(session.tilesetUrl).searchParams.get('key'); } catch (e) { key = null; }
     if (key) t.registerPlugin(new GoogleCloudAuthPlugin({
@@ -333,6 +370,10 @@ export function start(sess, opts) {
   tiles.addEventListener('load-tile-set', function () {
     state.tilesetLoaded = true;
     if (state.on) { applySuppression(); buildAttribution(); }
+  });
+  tiles.addEventListener('tile-visibility-change', function () {
+    /* the copyright set changes as tiles stream in and out */
+    scheduleAttributionRefresh();
   });
   tiles.addEventListener('load-model', function () {
     if (state.firstTileAtMs === null) {
