@@ -19,6 +19,27 @@
   var DONE_KEY = 'espil_tut_done_v1';
   var STEP_KEY = 'espil_tut_step_v1';
 
+  /* ---- Batch 5 (Han 2026-11-07): guest quest non-persistence ----
+     The quest chain in this build is the guide/tutorial progress
+     (DONE_KEY / STEP_KEY). A guest's progress is never saved: the
+     entry is judged at the moment the tutorial would start (in
+     the boot watcher below) - if no live account session exists
+     then, both keys are cleared first, so every guest entry
+     restarts the chain. A logged-in entry keeps its progress -
+     the predicate mirrors entry-flow's own session() (a stored
+     espil_session_v1 record with an id). Judging at start time,
+     not at module load, keeps the call immune to module load
+     order and to the guest door dropping the session record on
+     its way in. ONLY these two keys are touched: Leo, gear,
+     skills and look storage are not quest progress. */
+  var espilGuestResetDone = false;
+  function espilSessionLive() {
+    try {
+      var s = JSON.parse(localStorage.getItem('espil_session_v1') || 'null');
+      return !!(s && s.id);
+    } catch (e) { return false; }
+  }
+
   var STR = {
     en: {
       landingNav: 'Look around the cities - use the arrow keys',
@@ -352,12 +373,21 @@
      flow at any time; it starts the tutorial once the player has
      landed, and resumes a saved step after a reload. --- */
   setInterval(function () {
-    if (done() || step >= 0) return;
-    var saved = 0;
-    try { saved = Number(localStorage.getItem(STEP_KEY) || '0') || 0; } catch (e) {}
+    if (step >= 0) return;
     if (onLanding()) return; /* Han 2026-11-02: NO tutorial inside the typewriter/entry sequence - the tutorial starts after the sequence, in the map */
     if (!inMap() || !landed()) return;
     if (!window.__espilKonbiniyaPos) return; /* not the tutorial city */
+    /* Batch 5: judge the entry HERE, at start time - a guest
+       entry clears the chain before done()/saved are read. */
+    if (!espilGuestResetDone) {
+      espilGuestResetDone = true;
+      if (!espilSessionLive()) {
+        try { localStorage.removeItem(DONE_KEY); localStorage.removeItem(STEP_KEY); } catch (e) {}
+      }
+    }
+    if (done()) return;
+    var saved = 0;
+    try { saved = Number(localStorage.getItem(STEP_KEY) || '0') || 0; } catch (e) {}
     start(saved);
   }, 700);
 

@@ -1350,304 +1350,6 @@
       return {enabled:espilOccludeState.enabled,master:espilOccludeMaster,centrePx:espilOccludeState.centrePx,radiusPx:espilOccludeState.radiusPx,charDepth:espilOccludeState.charDepth,patchedMaterials:espilOccludePatchedCount,factor:ESPIL_OCCLUDE_RADIUS_FACTOR};
     };
     window.__espilOccludeState.setEnabled=function(b){ espilOccludeMaster=!!b; return espilOccludeMaster; };
-    /* ============ PLAYER SILHOUETTE - COLOUR DETECTOR (Han 2026-11-05, third round) ==============
-       Two earlier generations failed Han's live check. The raycast
-       grey ghost (2026-11-04) only ever tested the game's own
-       building meshes. The depth-func silhouette (earlier today)
-       assumed the Mapbox fill extrusions' depth is sitting in the
-       shared buffer when the custom layer renders; on the live line
-       the buildings that hide the character ARE those extrusions
-       (in layer mode the game's own building meshes are hidden by
-       espilP1Hide - the extrusions are the only buildings drawn),
-       and whether their depth is usable by the game layer depends
-       on Mapbox's internal render order and GL state management
-       around custom layers, which the game does not control.
-       Han's prescribed method for this round, verbatim intent:
-       use a COLOUR DETECTOR - if the character is not at the pixel
-       position where it should be, switch to silhouette mode at
-       maximum z-index. That is what runs now:
-       - Every ESPIL_DET_INTERVAL ms the game renders the scene
-         TWICE into one low-res offscreen target (long edge 288 px)
-         from the live camera, back to back and identical except
-         that the second pass hides the character's visual root.
-         Pixels inside an ellipse around the character's projected
-         chest that CHANGE between the two renders are exactly the
-         character's visible fragments. In layer mode both passes
-         force-show the building classes espilP1Hide hides (the
-         same records the Mapbox extrusions are drawn from), so
-         the detector judges occlusion by the same buildings Han
-         sees, without touching Mapbox's depth state at all.
-       - Changed fraction of the ellipse under ESPIL_DET_ON (0.10)
-         = the character is NOT THERE -> occluded. Over
-         ESPIL_DET_OFF (0.22) = present again -> silhouette off.
-         Hysteresis between the two.
-       - Silhouette mode: NO clone and NO material swap - the rig
-         proved exhaustively that in this build a cloned avatar
-         mesh never rasterizes and the avatar mesh itself renders
-         only with its exact original material object (any swapped
-         material - basic, standard, even a faithful clone of its
-         own - draws nothing). So silhouette mode toggles STATE on
-         the character's own materials: diffuse to black, emissive
-         to the flat silhouette colour, depthTest OFF, and the
-         meshes' renderOrder to 999 - Han's 'zindex at maximum'.
-         The character himself becomes the flat silhouette, drawn
-         through the occluder on the exact render path he already
-         uses, in the exact pose he already has. Detector passes
-         force depthTest back ON for their two renders, so a shown
-         silhouette never fools the detector into switching off.
-         When the detector sees the character again every value is
-         restored - no double-draw, no residue.
-       Cost: two 288-px scene renders + two sub-rectangle readbacks
-       (the ellipse's bounding box only) every ~130 ms; no
-       per-frame readbacks, no raycasts, no per-frame pose copies.
-       Suppression gates unchanged: in-map only, never indoors,
-       never while the store page pauses the world, off in first
-       person. Colour is ONE constant, bright cyan. */
-    var ESPIL_SILHOUETTE_COLOR=0x22d3ee;
-    var ESPIL_DET_INTERVAL=130;
-    var ESPIL_DET_RT_LONG=288;
-    var ESPIL_DET_ON=0.10, ESPIL_DET_OFF=0.22;
-    var espilGhostSrc=null, espilSilMats=null, espilSilMeshes=null, espilSilApplied=false;
-    var espilGhostStat={occluded:false,visible:false,buildings:0,built:false,silhouetteRendered:0,mode:'color-detector',detector:'color',markerPx:0,discFrac:0,silhouetteOn:false,checks:0,detRt:''};
-    /* Capture the avatar's own materials + mesh render orders once
-       per avatar build. Silhouette mode only ever writes UNIFORM /
-       STATE values on these exact material objects (colour,
-       emissive, depthTest) - never a replacement material, never a
-       cloned mesh - because those are the operations the rig proved
-       this build actually renders. NPC materials are separate
-       objects (verified in the rig), so remote/NPC figures are
-       never touched. */
-    function espilSilCapture(av){
-      espilSilMats=[]; espilSilMeshes=[];
-      var seen=[];
-      av.__visualRoot.traverse(function(o){
-        if(!o.isMesh)return;
-        espilSilMeshes.push({m:o,ro:o.renderOrder});
-        (Array.isArray(o.material)?o.material:[o.material]).forEach(function(mt){
-          if(mt&&seen.indexOf(mt)<0){ seen.push(mt);
-            espilSilMats.push({mat:mt,
-              color:(mt.color?mt.color.getHex():0),
-              emissive:(mt.emissive?mt.emissive.getHex():0),
-              ei:(mt.emissiveIntensity!==undefined?mt.emissiveIntensity:1),
-              depthTest:mt.depthTest});
-          }
-        });
-      });
-      espilGhostStat.built=espilSilMats.length>0;
-      return espilGhostStat.built;
-    }
-    function espilSilApply(on){
-      if(!espilSilMats||on===espilSilApplied)return;
-      espilSilApplied=on;
-      for(var i=0;i<espilSilMats.length;i++){
-        var s=espilSilMats[i];
-        if(on){ if(s.mat.color)s.mat.color.setHex(0x000000); if(s.mat.emissive)s.mat.emissive.setHex(ESPIL_SILHOUETTE_COLOR); if(s.mat.emissiveIntensity!==undefined)s.mat.emissiveIntensity=1; s.mat.depthTest=false; }
-        else{ if(s.mat.color)s.mat.color.setHex(s.color); if(s.mat.emissive)s.mat.emissive.setHex(s.emissive); if(s.mat.emissiveIntensity!==undefined)s.mat.emissiveIntensity=s.ei; s.mat.depthTest=s.depthTest; }
-      }
-      for(var j=0;j<espilSilMeshes.length;j++)espilSilMeshes[j].m.renderOrder=on?999:espilSilMeshes[j].ro;
-    }
-    /* ============ COLOUR DETECTOR (Han 2026-11-05) ============
-       Pixel-evidence occlusion detection, twice per check at most
-       and throttled to ESPIL_DET_INTERVAL: the scene renders into a
-       small offscreen target from the live camera TWICE, back to
-       back, identical except that the second pass hides the
-       character's visual root. Pixels inside an ellipse around the
-       character's projected chest that CHANGE between the two
-       renders are exactly the character's visible fragments; ~none
-       means a building covers him. No material swaps anywhere -
-       the rig proved a runtime-swapped material never rasterizes
-       the avatar in this build (its own material or nothing), so
-       the detector touches visibility only, which is proven to
-       work. In layer mode the classes espilP1Hide hides are
-       force-shown for both passes - they are the same building
-       records the Mapbox extrusions are drawn from. The mesh list
-       is cached and rebuilt only when the scene population or the
-       avatar changes. */
-    var espilDetRT=null, espilDetW=0, espilDetH=0;
-    var espilDetCache=null, espilDetCacheSig='';
-    var espilDetLast=0, espilDetOn=false;
-    var _espilDetF=new THREE.Vector3(), _espilDetC=new THREE.Vector3(), _espilDetH=new THREE.Vector3();
-    function espilDetSig(av){
-      var dm=window.__espilDistrictMeshes||[];
-      return (mapScene?mapScene.children.length:0)+'/'+dm.length+'/'+(av&&av.__visualRoot?av.__visualRoot.uuid:'-');
-    }
-    function espilDetRebuild(av){
-      espilDetCache=[];
-      var dmSet={};
-      (window.__espilDistrictMeshes||[]).forEach(function(m){ dmSet[m.uuid]=1; });
-      if(!mapScene)return;
-      mapScene.traverse(function(o){
-        if(!o.isMesh)return;
-        /* force-show classes mirror espilP1Hide: district meshes,
-           instanced chunk meshes, BoxGeometry AABB/core meshes and
-           the big ground planes - hidden in layer mode only because
-           Mapbox draws their twins */
-        var force=!!dmSet[o.uuid]||!!o.isInstancedMesh;
-        if(!force){
-          var g=o.geometry;
-          if(g&&g.type==='BoxGeometry')force=true;
-          else if(g&&g.type==='PlaneGeometry'){
-            var mt=Array.isArray(o.material)?o.material[0]:o.material;
-            var w=(g.parameters&&g.parameters.width)||0;
-            if(w>=400||(mt&&mt.map))force=true;
-          }
-        }
-        espilDetCache.push({m:o,force:force});
-      });
-      espilDetCacheSig=espilDetSig(av);
-    }
-    function espilDetMeasure(av){
-      var useLayer=(typeof espilP1!=='undefined'&&espilP1.layerLive&&!espilP1.failed&&espilP1.layerRenderer&&espilP1.layerCam);
-      var R=useLayer?espilP1.layerRenderer:(typeof renderer!=='undefined'?renderer:null);
-      var cam=useLayer?espilP1.layerCam:(typeof mapCamera!=='undefined'?mapCamera:null);
-      if(!R||!cam||!mapScene||!walkPlayer||!walkPlayer.pos)return null;
-      var cv=R.domElement, bw=cv.width||1280, bh=cv.height||800;
-      var W=ESPIL_DET_RT_LONG, H=Math.max(96,Math.round(ESPIL_DET_RT_LONG*bh/Math.max(1,bw)));
-      if(!espilDetRT){ espilDetRT=new THREE.WebGLRenderTarget(W,H); espilDetW=W; espilDetH=H; }
-      else if(espilDetW!==W||espilDetH!==H){ espilDetRT.setSize(W,H); espilDetW=W; espilDetH=H; }
-      espilGhostStat.detRt=W+'x'+H;
-      if(!espilDetCache||espilDetCacheSig!==espilDetSig(av))espilDetRebuild(av);
-      /* project feet / chest / head with the active camera (in layer
-         mode the composed projection matrix maps game-world points
-         directly - the layer camera's view is the identity) */
-      var K=1; if(av.__visualRoot&&av.__visualRoot.scale)K=av.__visualRoot.scale.y/1.5;
-      var p=walkPlayer.pos;
-      function proj(x,y,z,out){ out.set(x,y,z); if(useLayer)out.applyMatrix4(cam.projectionMatrix); else out.project(cam); return out; }
-      var fN=proj(p.x,p.y,p.z,_espilDetF), cN=proj(p.x,p.y+1.15*K,p.z,_espilDetC), hN=proj(p.x,p.y+1.8*K,p.z,_espilDetH);
-      if(!(cN.z<1&&cN.z>-1)||Math.abs(cN.x)>1.3||Math.abs(cN.y)>1.3)return null; /* off-frame: cannot judge, keep the previous decision */
-      var cxPx=(cN.x*0.5+0.5)*W, cyPx=(cN.y*0.5+0.5)*H; /* render-target pixel space, origin bottom-left (the readback convention) */
-      var hPx=Math.abs(hN.y-fN.y)*0.5*H;
-      if(hPx<4)return null;
-      var rxPx=Math.max(3,0.30*hPx), ryPx=Math.max(3,0.45*hPx);
-      /* difference pass (visibility only, no material swaps):
-         contact shadow + sky dome out for both renders,
-         espilP1Hide classes force-shown for both renders; pass A
-         renders the scene as-is, pass B renders it again with the
-         character's visual root hidden. Pixels that change inside
-         the ellipse are the character's visible fragments. */
-      var cache=espilDetCache, savedVis=[];
-      /* while the silhouette is applied the character's materials
-         have depthTest OFF - force it back ON for both passes so
-         the occluder hides him here exactly as it does on screen,
-         then restore the applied state */
-      var silGuard=false;
-      if(espilSilApplied&&espilSilMats){ silGuard=true; for(var q=0;q<espilSilMats.length;q++)espilSilMats[q].mat.depthTest=true; }
-      var shadowWas=null; if(av.shadow){ shadowWas=av.shadow.visible; av.shadow.visible=false; }
-      var domeWas=null; if(typeof mapSkyDome!=='undefined'&&mapSkyDome){ domeWas=mapSkyDome.visible; mapSkyDome.visible=false; }
-      for(var i=0;i<cache.length;i++){
-        var e=cache[i];
-        if(!e.m.visible&&e.force){ savedVis.push(e.m); e.m.visible=true; }
-      }
-      /* root-cause fix: the force-shown classes were faded by
-         espilP1FadeMat (transparent, opacity 0, depthWrite off)
-         and are FrontSide, so in these two passes they painted
-         nothing, wrote no depth, and culled away whenever the
-         camera sat inside a building volume - the difference
-         then read "visible" while the player was fully occluded.
-         For exactly these two renders, force every material of
-         the force classes opaque, depth-writing and double-sided,
-         then restore each original below. */
-      var detMats=[];
-      for(var mi=0;mi<cache.length;mi++){
-        if(!cache[mi].force)continue;
-        var mm=cache[mi].m.material, mlist=Array.isArray(mm)?mm:(mm?[mm]:[]);
-        for(var mj=0;mj<mlist.length;mj++){
-          var mt2=mlist[mj];
-          if(!mt2||mt2.__espilDetOv)continue;
-          mt2.__espilDetOv=true;
-          detMats.push({mat:mt2,t:mt2.transparent,o:mt2.opacity,dw:mt2.depthWrite,sd:mt2.side});
-          mt2.transparent=false; mt2.opacity=1; mt2.depthWrite=true; mt2.side=THREE.DoubleSide;
-        }
-      }
-      var rootWas=(av.__visualRoot?av.__visualRoot.visible:null);
-      var x0=Math.max(0,Math.floor(cxPx-rxPx)), x1=Math.min(W-1,Math.ceil(cxPx+rxPx));
-      var y0=Math.max(0,Math.floor(cyPx-ryPx)), y1=Math.min(H-1,Math.ceil(cyPx+ryPx));
-      var rw=x1-x0+1, rh=y1-y0+1;
-      var bufA=null, bufB=null, cnt=0;
-      var oldRT=null, oldCC=null, oldCA=1;
-      try{
-        oldRT=R.getRenderTarget();
-        if(R.getClearColor){ oldCC=R.getClearColor(new THREE.Color()); oldCA=R.getClearAlpha(); }
-        R.setRenderTarget(espilDetRT);
-        R.setClearColor(0x000000,1);
-        if(rw>0&&rh>0){
-          bufA=new Uint8Array(rw*rh*4); bufB=new Uint8Array(rw*rh*4);
-          R.clear(true,true,false);
-          R.render(mapScene,cam);
-          R.readRenderTargetPixels(espilDetRT,x0,y0,rw,rh,bufA);
-          if(av.__visualRoot)av.__visualRoot.visible=false;
-          R.clear(true,true,false);
-          R.render(mapScene,cam);
-          R.readRenderTargetPixels(espilDetRT,x0,y0,rw,rh,bufB);
-          for(var yy=0;yy<rh;yy++)for(var xx=0;xx<rw;xx++){
-            var dxn=(x0+xx-cxPx)/rxPx, dyn=(y0+yy-cyPx)/ryPx;
-            if(dxn*dxn+dyn*dyn>1)continue;
-            var o4=(yy*rw+xx)*4;
-            if(Math.abs(bufA[o4]-bufB[o4])>26||Math.abs(bufA[o4+1]-bufB[o4+1])>26||Math.abs(bufA[o4+2]-bufB[o4+2])>26)cnt++;
-          }
-        }
-      }catch(err){}
-      try{ R.setRenderTarget(oldRT); if(oldCC)R.setClearColor(oldCC,oldCA); if(useLayer&&R.state&&R.state.reset)R.state.reset(); }catch(err){}
-      if(av.__visualRoot&&rootWas!==null)av.__visualRoot.visible=rootWas;
-      for(var j=0;j<savedVis.length;j++)savedVis[j].visible=false;
-      for(var mk=0;mk<detMats.length;mk++){ var dm2=detMats[mk]; dm2.mat.transparent=dm2.t; dm2.mat.opacity=dm2.o; dm2.mat.depthWrite=dm2.dw; dm2.mat.side=dm2.sd; dm2.mat.__espilDetOv=false; }
-      if(silGuard&&espilSilMats)for(var q2=0;q2<espilSilMats.length;q2++)espilSilMats[q2].mat.depthTest=false;
-      if(av.shadow&&shadowWas!==null)av.shadow.visible=shadowWas;
-      if(typeof mapSkyDome!=='undefined'&&mapSkyDome&&domeWas!==null)mapSkyDome.visible=domeWas;
-      if(!bufA||!bufB)return null; /* a pass failed: cannot judge, keep the previous decision */
-      return {frac:cnt/(Math.PI*rxPx*ryPx), px:cnt};
-    }
-    var _espilSilChest=new THREE.Vector3();
-    function espilGhostTick(){
-      var gates=false;
-      try{
-        var av=(typeof walkPlayer!=='undefined'&&walkPlayer)?walkPlayer.av:null;
-        if(av&&av.__visualRoot&&espilGhostSrc!==av.__visualRoot){
-          if(espilSilApplied)espilSilApply(false);
-          espilGhostSrc=av.__visualRoot; espilSilMats=null; espilSilMeshes=null; espilGhostStat.built=false;
-          if(av.ready)espilSilCapture(av);
-          espilDetCache=null; /* avatar swapped: the pass cache rebuilds on the next check */
-        }
-        if(espilSilMats&&av&&av.ready&&av.group){
-          /* suppression gates (cheap state checks): in-map only,
-             never indoors, never while the store page pauses the
-             world, off in first person (camera at the body) */
-          gates=document.body.classList.contains('in-map')&&!window.__espilInside&&!window.__espilStorePaused;
-          if(gates&&typeof mapCamera!=='undefined'&&mapCamera&&walkPlayer&&walkPlayer.pos){
-            _espilSilChest.set(walkPlayer.pos.x,walkPlayer.pos.y+1.15,walkPlayer.pos.z);
-            if(mapCamera.position.distanceTo(_espilSilChest)<1.7)gates=false;
-          }
-        }
-        if(!gates){
-          espilDetOn=false;
-          espilGhostStat.detector='suppressed';
-        }else{
-          espilGhostStat.detector='color';
-          var now=performance.now();
-          if(now-espilDetLast>=ESPIL_DET_INTERVAL){
-            espilDetLast=now;
-            var meas=null;
-            try{ meas=espilDetMeasure(av); }catch(e){ meas=null; }
-            if(meas){
-              espilGhostStat.checks++;
-              espilGhostStat.markerPx=meas.px;
-              espilGhostStat.discFrac=Math.round(meas.frac*1000)/1000;
-              if(meas.frac<ESPIL_DET_ON)espilDetOn=true;
-              else if(meas.frac>ESPIL_DET_OFF)espilDetOn=false;
-            }
-          }
-        }
-      }catch(e){ gates=false; espilDetOn=false; }
-      var show=gates&&espilDetOn;
-      espilSilApply(show);
-      espilGhostStat.silhouetteOn=show;
-      espilGhostStat.visible=show;
-      espilGhostStat.occluded=espilDetOn; /* detector decision (legacy field name kept for the probes) */
-      if(show)espilGhostStat.silhouetteRendered++;
-    }
-    window.__espilGhostState=function(){
-      return {occluded:espilGhostStat.occluded,visible:espilGhostStat.visible,buildings:espilGhostStat.buildings,built:espilGhostStat.built,silhouetteRendered:espilGhostStat.silhouetteRendered,mode:espilGhostStat.mode,color:'#'+ESPIL_SILHOUETTE_COLOR.toString(16),scale:1,detector:espilGhostStat.detector,markerPx:espilGhostStat.markerPx,discFrac:espilGhostStat.discFrac,silhouetteOn:espilGhostStat.silhouetteOn,checks:espilGhostStat.checks,detRt:espilGhostStat.detRt};
-    };
     var curvedMatCache={};
     function curvedMat(color){
       var key='c'+color, m=curvedMatCache[key];
@@ -3185,6 +2887,12 @@
           walkCamDist=espilP1DistFromZoom(espilP1.zoom);
         }
         var zoom=espilP1.zoom;
+        /* Batch 5 item 8: the occlusion cap also applies to the
+           Mapbox camera - a capped effective distance raises the
+           applied zoom for this frame only; the user's zoom state
+           (espilP1.zoom / zoomT) is never rewritten. */
+        if(typeof espilCamDEff==='number'&&espilCamDEff<espilP1DistFromZoom(zoom)-0.05)
+          zoom=espilP1ZoomFromDist(Math.max(2.2,espilCamDEff));
         try{ espilP1.map.jumpTo({center:ll,bearing:brg,pitch:52,zoom:zoom}); }catch(e){}
         if(espilP1.layerLive){ try{ espilP1.map.triggerRepaint(); }catch(e){} } /* the map's render pass draws the game scene via the custom layer */
         /* AVATAR SCALE (Han 2026-10-17; SIZE HELD 2026-11-05): in
@@ -6486,6 +6194,82 @@
         espilKbGlow.base.material.opacity=0.45+0.18*s;
       },150);
     })();
+    /* Batch 5 (Han 2026-11-07): entrance glow for EVERY enterable
+       building, same treatment as the Konbiniya's. One reusable
+       marker (light pool + beam, the Konbiniya glow's construction
+       at a smaller scale) follows the ground anchor of the nearest
+       label-carrying record within the label radius, so a player
+       can see which buildings open before reaching the Use point.
+       The Konbiniya keeps its own permanent glow - the marker
+       hides when the nearest anchor is the Konbiniya's, and while
+       the player is inside. */
+    var espilEntryGlow=null, espilEntryGlowName=null;
+    window.__espilEntryGlowState=function(){
+      return { built: !!espilEntryGlow,
+        visible: !!(espilEntryGlow&&espilEntryGlow.group.visible),
+        x: espilEntryGlow?Math.round(espilEntryGlow.group.position.x*10)/10:null,
+        z: espilEntryGlow?Math.round(espilEntryGlow.group.position.z*10)/10:null,
+        name: espilEntryGlowName };
+    };
+    (function espilEntryGlowInit(){
+      function build(){
+        if(espilEntryGlow) return true;
+        var sc=(typeof mapScene!=='undefined'&&mapScene)?mapScene:null;
+        if(!sc||typeof THREE==='undefined') return false;
+        var g=new THREE.Group();
+        var cv=document.createElement('canvas'); cv.width=cv.height=128;
+        var cx2=cv.getContext('2d');
+        var gr=cx2.createRadialGradient(64,64,2,64,64,64);
+        gr.addColorStop(0,'rgba(255,236,170,0.9)'); gr.addColorStop(0.4,'rgba(255,205,92,0.35)'); gr.addColorStop(1,'rgba(255,190,60,0)');
+        cx2.fillStyle=gr; cx2.fillRect(0,0,128,128);
+        var base=new THREE.Mesh(new THREE.PlaneGeometry(30,30),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(cv),transparent:true,opacity:.55,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+        base.rotation.x=-Math.PI/2; base.position.set(0,0.25,0); base.renderOrder=3;
+        g.add(base);
+        function beam(rTop,rBot,op){
+          var m=new THREE.Mesh(new THREE.CylinderGeometry(rTop,rBot,80,20,1,true),new THREE.MeshBasicMaterial({color:0xffdf8e,transparent:true,opacity:op,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,depthWrite:false,fog:false}));
+          m.position.set(0,40,0); m.renderOrder=3; return m;
+        }
+        g.add(beam(3,4.6,0.10)); g.add(beam(1.3,2.2,0.16));
+        g.visible=false;
+        sc.add(g);
+        espilEntryGlow={group:g,base:base};
+        return true;
+      }
+      var tries=0;
+      setInterval(function(){
+        if(!espilEntryGlow){
+          if(build()){ /* fall through */ }
+          else if(++tries>240){ return; }
+          else return;
+        }
+        var show=false, ax=0, az=0, nm=null;
+        try{
+          if(document.body.classList.contains('in-map')&&!window.__espilInside&&typeof walkPlayer!=='undefined'&&walkPlayer&&espilPolyHash){
+            var recs=espilCollectRecsNear(walkPlayer.pos.x,walkPlayer.pos.z,ESPIL_LABEL_RADIUS);
+            var bestD=1e9;
+            for(var i=0;i<recs.length;i++){
+              var rec=recs[i];
+              espilLabelResolveName(rec);
+              if(!rec._espilLblName)continue;
+              var a=espilLabelAnchor(rec);
+              var d=Math.hypot(walkPlayer.pos.x-a.x,walkPlayer.pos.z-a.z);
+              if(d<bestD){bestD=d;ax=a.x;az=a.z;nm=rec._espilLblName;}
+            }
+            /* the Konbiniya's own glow covers its entrance */
+            if(nm&&Math.hypot(ax-ESPIL_KONBINIYA.x,az-ESPIL_KONBINIYA.z)<40){ nm=null; }
+            show=!!nm;
+          }
+        }catch(e){ show=false; }
+        espilEntryGlow.group.visible=show;
+        espilEntryGlowName=show?nm:null;
+        if(show){
+          espilEntryGlow.group.position.set(ax,0,az);
+          var s=0.5+0.5*Math.sin(Date.now()/1400);
+          espilEntryGlow.group.children.forEach(function(m,i){ if(i===1)m.material.opacity=0.08+0.05*s; if(i===2)m.material.opacity=0.13+0.06*s; });
+          espilEntryGlow.base.material.opacity=0.45+0.18*s;
+        }
+      },300);
+    })();
     var espilNavGroup=null, espilNavPath=null, espilNavPathCum=null, espilNavPathTotal=0, espilNavTarget=null, espilNavFlow=[], espilNavFlowT=0, espilNavArrived=false, espilNavArrivedAt=0, espilNavLastRoute=0;
     function espilNavWalkable(x,z){ var pr=window.__espilCollisionProbe?window.__espilCollisionProbe(x,z):null; return !!(pr&&pr.walkable); }
     function espilNavSnap(x,z){ if(espilNavWalkable(x,z))return {x:x,z:z};
@@ -6781,16 +6565,26 @@
        interior room (v1) - one room at a far world offset, the
        building's name on its sign, the door on the south wall. */
     var espilBldgPanelRec=null, espilBldgPanelCand=null, espilBldgName='Building';
-    /* Only the Konbiniya opens (Han 2026-11-04): every other store /
-       building stays shut - the panel shows no Enter affordance for
-       it (espilPaintEnterAffordance) and espilEnterInside refuses
-       outright, so no caller (panel click, Enter key, legacy shim)
-       can load another building's interior. The Konbiniya path is
-       untouched: its panel Enter click still routes to the store
-       page via store-page-link, and keyboard entry still loads its
-       in-world interior. Identity rule matches modules/store.js and
-       store-page-link.js: name or 1238 Robson address match, or the
-       record anchor within 40 m of the fixed Konbiniya anchor. */
+    /* Entry rule (Han 2026-11-04, SUPERSEDED by Han 2026-11-07
+       batch 5): only the Konbiniya opened; every other building
+       stayed shut. The 2026-11-07 rule below replaces it. */
+    /* Entry rule (Han 2026-11-07): EVERY building with a rendered
+       shape is enterable - in this build that is a baked district
+       record whose places entry carries a displayable name (the
+       label-carrying records: 2,655 of 2,712 in the Vancouver
+       bake; the Art Gallery class). Entering any of them routes
+       the player into the KONBINIYA interior (the shared interior
+       room + shop fitout at ESPIL_INT), signed as the Konbiniya -
+       the panel never pretends the destination is that building's
+       own interior, and its Enter affordance says where it goes.
+       Single-colour extrusions with no named baked record get no
+       label, no panel and no entry, exactly as before. Identity
+       rule for the Konbiniya itself matches modules/store.js and
+       store-page-link.js: name or 1238 Robson address match, or
+       the record anchor within 40 m of the fixed Konbiniya anchor;
+       its own path is untouched (panel Enter click still routes
+       to the store page via store-page-link, keyboard entry still
+       loads its in-world interior under its own name). */
     function espilIsKonbiniyaRec(rec){
       if(!rec)return false;
       var nm=rec.name||rec.title||'';
@@ -6802,7 +6596,17 @@
     }
     function espilPaintEnterAffordance(){
       var e=document.getElementById('bldg-enter'); if(!e)return;
-      e.style.display=espilIsKonbiniyaRec(espilBldgPanelRec)?'':'none';
+      /* Batch 5 (Han 2026-11-07): every rendered building shows
+         Enter. A non-Konbiniya building's Enter is labelled with
+         its real destination - the Konbiniya interior - so the
+         panel never implies the building has its own interior. */
+      if(espilIsKonbiniyaRec(espilBldgPanelRec)){
+        e.style.display='';
+        e.textContent='Enter';
+      }else{
+        e.style.display='';
+        e.textContent='Enter · Konbiniya interior';
+      }
     }
     window.__espilInterior=null; window.__espilInteriorReturn=null;
     var ESPIL_INT={x:0,z:8000};
@@ -6829,7 +6633,7 @@
       if(metaEl)metaEl.textContent='Height '+Math.round(rec.h)+' m · about '+Math.max(1,Math.round(rec.h/3))+' floors · '+espilCityDisplayName();
       var panel=document.getElementById('bldg-panel');
       if(panel){panel.classList.add('open');panel.setAttribute('aria-hidden','false');}
-      espilPaintEnterAffordance(); /* Konbiniya only (Han 2026-11-04); repainted when the name resolves below */
+      espilPaintEnterAffordance(); /* Batch 5: every rendered building; repainted when the name resolves below */
       /* Name resolution probes the record's own coordinates through
          the same Places/OSM name path as the building pill (the
          mapBuildings candidate only links stores on Enter - the
@@ -6840,8 +6644,8 @@
         espilBldgName=nm;
         if(nameEl)nameEl.textContent=espilBldgName;
         espilPaintEnterAffordance(); /* the resolved name can identify the Konbiniya */
-        var on=document.getElementById('bldg-opts-name'); if(on)on.textContent=espilBldgName;
-        if(window.__espilInside)window.__espilInside.name=espilBldgName;
+        var on=document.getElementById('bldg-opts-name'); if(on)on.textContent=espilInsideRouted?'Konbiniya':espilBldgName;
+        if(window.__espilInside)window.__espilInside.name=espilInsideRouted?'Konbiniya':espilBldgName;
       });
     }
     function closeBuildingPanel(){
@@ -6873,16 +6677,17 @@
        shop UI opens on entry: the house stock grid (themed by the
        building's real stores), the purse, Contact, Leave. */
     var espilInsideRec=null, espilInsideDoor=null, espilInsideOutside=null, espilInsideHint=false;
+    /* Batch 5: for a routed (non-Konbiniya) entry, the interior's
+       public name - the Konbiniya's - regardless of which building
+       was entered; null when the Konbiniya itself was entered. */
+    var espilInsideRouted=null;
     function espilEnterInside(rec){
       var p=walkPlayer; if(!p||!rec)return;
-      /* Only the Konbiniya opens (Han 2026-11-04): hard gate behind
-         the hidden Enter affordance - no path loads another
-         building's interior room. */
-      if(!espilIsKonbiniyaRec(rec)){
-        closeBuildingPanel();
-        if(window.__espilToast)window.__espilToast('Only the Konbiniya is open for now');
-        return;
-      }
+      /* Batch 5 (Han 2026-11-07): no refusal - every rendered
+         building enters, routed into the Konbiniya interior. */
+      var isKb=espilIsKonbiniyaRec(rec);
+      espilInsideRouted=isKb?null:(espilBldgName||'Building');
+      var intName=isKb?espilBldgName:'Konbiniya';
       if(p.flying||p._fall)espilFlyClear(); /* Batch G: fly state clears on interior entry */
       if(!window.__espilInteriorBuilt)espilBuildInterior();
       if(!window.__espilShopBuilt)espilBuildShopFitout();
@@ -6906,12 +6711,12 @@
       espilInsideRec=rec;
       espilInsideDoor={x:ESPIL_INT.x,z:ESPIL_INT.z+7.3*sz};
       espilInsideOutside={x:p.pos.x,y:p.pos.y,z:p.pos.z};
-      espilInteriorSetSign(espilBldgName);
+      espilInteriorSetSign(intName);
       espilFadeThrough(function(){
         p.pos.set(ESPIL_INT.x,0.05,ESPIL_INT.z+5.2*sz); p.velY=0; p.onGround=true;
-        window.__espilInside={name:espilBldgName,interior:true,door:{x:ESPIL_INT.x,z:ESPIL_INT.z+7.3*sz},x:rec.cx,z:rec.cz};
+        window.__espilInside={name:intName,interior:true,routedFrom:espilInsideRouted,door:{x:ESPIL_INT.x,z:ESPIL_INT.z+7.3*sz},x:rec.cx,z:rec.cz};
         /* v3: no shop on entry - orders start at the kiosk inside. */
-        try{ window.dispatchEvent(new CustomEvent('espil-guide',{detail:{type:'interior',name:espilBldgName}})); }catch(e){} /* guide hook */
+        try{ window.dispatchEvent(new CustomEvent('espil-guide',{detail:{type:'interior',name:intName}})); }catch(e){} /* guide hook */
       });
     }
     function espilLeaveBuilding(){
@@ -6919,7 +6724,7 @@
       if(espilIntPrevZoom!==null&&typeof espilP1!=='undefined'&&espilP1&&espilP1.map){ espilP1.zoomT=espilIntPrevZoom; }
       espilIntPrevZoom=null; espilKioskHint=false;
       var out=espilInsideOutside;
-      espilInsideRec=null; espilInsideDoor=null; espilInsideOutside=null; espilInsideHint=false;
+      espilInsideRec=null; espilInsideDoor=null; espilInsideOutside=null; espilInsideHint=false; espilInsideRouted=null;
       window.__espilInside=null;
       closeBuildingOpts();
       espilCloseShop();
@@ -6927,7 +6732,7 @@
     }
     function openBuildingOpts(){
       var o=document.getElementById('bldg-opts'); if(!o)return;
-      var n=document.getElementById('bldg-opts-name'); if(n)n.textContent=espilBldgName;
+      var n=document.getElementById('bldg-opts-name'); if(n)n.textContent=espilInsideRouted?'Konbiniya':espilBldgName;
       var m=document.getElementById('bldg-opts-main'); if(m)m.style.display='flex';
       var c=document.getElementById('bldg-contact'); if(c)c.style.display='none';
       o.classList.add('open'); o.setAttribute('aria-hidden','false');
@@ -8119,6 +7924,7 @@
       }
       out.applied=dmg;
       if(dmg>0){
+        espilHurtFeedback(dmg,sx,sz);
         skillState.hp-=dmg;
         if(skillState.hp<=0){
           skillState.hp=0; out.dead=true;
@@ -8128,6 +7934,110 @@
       }
       espilLastHit=out;
       return out;
+    };
+    /* ---- Batch 5 item 7 (Han 2026-11-07): player being-hit feedback ----
+       Pre-batch audit: an applied hit changed ONLY the HP flask fill
+       (paintStatus) - no camera shake, no red vignette, no flask
+       punch, no hit sound, and the source coords (sx, sz) were
+       ignored, so no knockback. This block adds all five, driven
+       from the applied-damage branch above; the canonical combat
+       math is untouched. */
+    var espilHurt={hits:0,lastDmg:0,shake:0,shakePeak:0,vig:0,vigPeak:0,punch:0,kb:0,sound:0};
+    var espilHurtVigEl=null, espilHurtCtx=null, espilHurtCanvas=null, espilHurtLastTick=0;
+    function espilHurtEnsureVig(){
+      if(espilHurtVigEl)return espilHurtVigEl;
+      var el=document.createElement('div');
+      el.id='espil-hurt-vignette';
+      el.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:9993;opacity:0;'+
+        'background:radial-gradient(ellipse at center, rgba(190,10,10,0) 52%, rgba(190,10,10,.62) 100%);';
+      document.body.appendChild(el);
+      espilHurtVigEl=el; return el;
+    }
+    function espilHurtSound(){
+      try{
+        var AC=window.AudioContext||window.webkitAudioContext;
+        if(!AC)return;
+        if(!espilHurtCtx)espilHurtCtx=new AC();
+        if(espilHurtCtx.state==='suspended'){ var rp=espilHurtCtx.resume(); if(rp&&rp.catch)rp.catch(function(){}); }
+        var t=espilHurtCtx.currentTime;
+        var o=espilHurtCtx.createOscillator(), g=espilHurtCtx.createGain();
+        o.type='triangle';
+        o.frequency.setValueAtTime(165,t);
+        o.frequency.exponentialRampToValueAtTime(58,t+.16);
+        g.gain.setValueAtTime(.28,t);
+        g.gain.exponentialRampToValueAtTime(.001,t+.2);
+        o.connect(g); g.connect(espilHurtCtx.destination);
+        o.start(t); o.stop(t+.22);
+        espilHurt.sound++;
+      }catch(e){}
+    }
+    function espilHurtFeedback(dmg,sx,sz){
+      espilHurt.hits++; espilHurt.lastDmg=dmg;
+      espilHurt.shakePeak=Math.min(14,4+dmg*.7);    /* px offset amplitude, scales with damage */
+      espilHurt.shake=espilHurt.shakePeak;
+      espilHurt.vigPeak=Math.min(.92,.38+dmg*.022); /* vignette opacity peak */
+      espilHurt.vig=espilHurt.vigPeak;
+      espilHurtEnsureVig();
+      espilHurt.punch++;
+      try{
+        var wrap=document.getElementById('hp-flask-wrap');
+        if(wrap){
+          wrap.style.transition='transform .16s ease-out';
+          wrap.style.transform='scale(1.22)';
+          setTimeout(function(){ wrap.style.transform='scale(1)'; },170);
+        }
+      }catch(e){}
+      espilHurtSound();
+      /* knockback: away from the hit source, collision-substepped */
+      try{
+        if(walkPlayer&&!walkPlayer.flying&&isFinite(sx)&&isFinite(sz)){
+          var dx=walkPlayer.pos.x-sx, dz=walkPlayer.pos.z-sz;
+          var dl=Math.sqrt(dx*dx+dz*dz);
+          if(dl>.01){
+            var total=Math.min(1.15,.45+dmg*.05), steps=5, moved=0;
+            for(var si=0;si<steps;si++){
+              var nx=walkPlayer.pos.x+dx/dl*(total/steps), nz=walkPlayer.pos.z+dz/dl*(total/steps);
+              var pr=window.__espilCollisionProbe?window.__espilCollisionProbe(nx,nz):null;
+              if(pr&&pr.blocked)break;
+              walkPlayer.pos.x=nx; walkPlayer.pos.z=nz; moved+=total/steps;
+            }
+            espilHurt.kb=Math.round((espilHurt.kb+moved)*100)/100;
+          }
+        }
+      }catch(e){}
+      espilHurtLastTick=performance.now();
+    }
+    /* decay driver: shake the largest canvas (the map), fade the vignette */
+    setInterval(function(){
+      if(espilHurt.shake<=0&&espilHurt.vig<=0)return;
+      var now=performance.now();
+      var dt=Math.min(.1,(now-espilHurtLastTick)/1000||.033);
+      espilHurtLastTick=now;
+      espilHurt.shake=Math.max(0,espilHurt.shake-dt*26);
+      espilHurt.vig=Math.max(0,espilHurt.vig-dt*1.5);
+      try{
+        if(!espilHurtCanvas||!espilHurtCanvas.isConnected){
+          var cvs=document.querySelectorAll('canvas'), best=null, ba=0;
+          for(var ci=0;ci<cvs.length;ci++){
+            var a=cvs[ci].clientWidth*cvs[ci].clientHeight;
+            if(a>ba){ ba=a; best=cvs[ci]; }
+          }
+          espilHurtCanvas=best;
+        }
+        if(espilHurtCanvas){
+          if(espilHurt.shake>.05){
+            var ox=(Math.random()*2-1)*espilHurt.shake, oy=(Math.random()*2-1)*espilHurt.shake*.7;
+            espilHurtCanvas.style.transform='translate('+ox.toFixed(1)+'px,'+oy.toFixed(1)+'px)';
+          }else espilHurtCanvas.style.transform='';
+        }
+        if(espilHurtVigEl)espilHurtVigEl.style.opacity=espilHurt.vig.toFixed(3);
+      }catch(e){}
+    },33);
+    window.__espilHurtFxState=function(){
+      return { hits:espilHurt.hits, lastDmg:espilHurt.lastDmg,
+        shake:Math.round(espilHurt.shake*100)/100, shakePeak:espilHurt.shakePeak,
+        vig:Math.round(espilHurt.vig*1000)/1000, vigPeak:espilHurt.vigPeak,
+        punch:espilHurt.punch, kb:espilHurt.kb, sound:espilHurt.sound };
     };
     /* S4 contract: panels' food-use listener restores through here. */
     window.__espilApplyRecovery=function(hp,mp){
@@ -8140,12 +8050,18 @@
       return {hp:skillState.hp,mp:skillState.mp};
     };
     window.__espilCombatState=function(){
+      /* Batch 5 merge: ONE definition - the canonical fields plus
+         the mobile cluster's cooldown map. (A second definition
+         added for item 3 briefly shadowed this one and dropped
+         guardAge/graceLeft/potions; merged back the same day.) */
+      var cds={};
+      try{ for(var ck in skillState.cd) cds[ck]=Math.round(skillState.cd[ck]*100)/100; }catch(e){}
       return { dead:espilDead, hp:skillState.hp, maxhp:skillState.maxhp,
         mp:skillState.mp, maxmp:skillState.maxmp,
-        guarding:!!(walkPlayer&&walkPlayer.guarding>0),
+        guarding:(walkPlayer&&walkPlayer.guarding>0)?Math.round(walkPlayer.guarding*100)/100:0,
         guardAge:espilDefenseAt<0?null:Math.round((espilGameT-espilDefenseAt)*1000)/1000,
         graceLeft:Math.max(0,Math.round((espilGraceEnd-espilGameT)*1000)/1000),
-        potions:espilPotionCount(), lastHit:espilLastHit };
+        potions:espilPotionCount(), lastHit:espilLastHit, cd:cds };
     };
     /* ---- Revival Potion ownership (panels' bag list format) ---- */
     function espilOwnedList(){
@@ -8252,6 +8168,8 @@
     }
     window.__espilSkills={state:skillState,gainKnowledge:gainKnowledge,
       move:doMove,tree:toggleSkillTree};
+    /* __espilCombatState lives by __espilApplyRecovery above (one
+       merged definition - Batch 5). */
     initChat();
     (function wireSkillHud(){
       var atk=document.getElementById('map-attack');
@@ -8603,9 +8521,105 @@
         }
       }
     }
+    /* ============ CAMERA OCCLUSION CLAMP (Batch 5 item 8, Han 2026-11-07) ============
+       REPLACES the withdrawn colour-detector silhouette (removed
+       above in this batch): instead of drawing the player through
+       the building, the CAMERA pulls in along its own ray so the
+       player stays visible. Each frame the desired camera segment
+       (player chest -> desired camera position, from the CURRENT
+       user yaw/pitch/distance) is marched against the baked
+       collision volumes (the same grid movement uses): the first
+       step whose point sits inside a building cell BELOW its roof
+       height caps the distance at that step minus a margin. The
+       effective distance clamps IN fast (never clip through the
+       occluder) and releases SLOWLY back to the user's distance
+       when the segment is clear (no snapping). User inputs are
+       untouched - yaw/pitch/zoom keep their own state; only the
+       applied distance is capped, and the cap also feeds the
+       Mapbox zoom in layer mode (espilP1Tick), whose pitch is a
+       fixed 52 degrees - the segment test uses that geometry
+       there. Suppressed indoors, during scripted arrivals, and
+       while the store page pauses the world. */
+    var espilCamEff=99, espilCamDEff=99, espilCamAllowed=null, espilCamBlockedAt=null, espilCamChecks=0, espilCamSegClear=true;
+    var ESPIL_CAM_MIN=2.2, ESPIL_CAM_MARGIN=0.7;
+    /* march A->B (B at distance dist along the ray): the first
+       point inside a baked record's footprint BELOW its roof
+       (rec.h + margin) blocks; returns that distance or null.
+       The collision grid's building cells carry roofH 0 in this
+       build, so the volumes tested are the district records
+       themselves - the same records the game renders from. */
+    function espilCamMarch(ax, ay, az, bx, by, bz, dist, recs){
+      var steps=Math.max(2,Math.ceil(dist/0.4));
+      for(var i=2;i<=steps;i++){
+        var f=i/steps, s=dist*f;
+        var x=ax+(bx-ax)*f, y=ay+(by-ay)*f, z=az+(bz-az)*f;
+        for(var j=0;j<recs.length;j++){
+          var rec=recs[j];
+          if(x<rec.x0||x>rec.x1||z<rec.z0||z>rec.z1)continue;
+          if(y>rec.h+0.35)continue;
+          if(espilPolyProbe(rec,x,z).inside)return s;
+        }
+      }
+      return null;
+    }
+    function espilCamSegAllowed(p){
+      var layerLive=(typeof ESPIL_P1!=='undefined'&&ESPIL_P1&&ESPIL_P1.layerLive&&!ESPIL_P1.failed);
+      var pitch=layerLive?0.9076:walkCamPitch; /* layer mode jumpTo pitch is fixed at 52 deg */
+      var dist=walkCamDist;
+      var cp=Math.cos(pitch), sp=Math.sin(pitch);
+      var ax=p.pos.x, ay=p.pos.y+1.3, az=p.pos.z;
+      var bx=p.pos.x+Math.sin(walkCamYaw)*cp*dist, by=p.pos.y+sp*dist+1.2, bz=p.pos.z+Math.cos(walkCamYaw)*cp*dist;
+      if(dist<1||typeof espilPolyHash==='undefined'||!espilPolyHash)return dist;
+      var recs=espilCollectRecsNear((ax+bx)/2,(az+bz)/2,dist/2+6);
+      var hit=espilCamMarch(ax,ay,az,bx,by,bz,dist,recs);
+      if(hit===null){ espilCamBlockedAt=null; return dist; }
+      espilCamBlockedAt=Math.round(hit*100)/100;
+      return Math.max(ESPIL_CAM_MIN,hit-ESPIL_CAM_MARGIN);
+    }
+    function espilCamClampUpdate(dt){
+      var p=walkPlayer;
+      if(!p||!p.pos)return;
+      if(window.__espilInside||window.__espilStorePaused||p._espilArrive||p._espilLanding){ espilCamDEff=walkCamDist; return; }
+      espilCamChecks++;
+      var allowed=espilCamSegAllowed(p);
+      espilCamAllowed=allowed;
+      if(allowed<espilCamEff)espilCamEff=Math.max(allowed,espilCamEff-dt*30); /* clamp in fast */
+      else espilCamEff=Math.min(walkCamDist,espilCamEff+dt*6);                /* release slowly */
+      if(espilCamEff>walkCamDist)espilCamEff=walkCamDist;
+      espilCamDEff=Math.min(walkCamDist,espilCamEff);
+      /* self-check: the applied segment (chest -> camera at the
+         effective distance, same ray) must be clear of the volumes */
+      var layerLive=(typeof ESPIL_P1!=='undefined'&&ESPIL_P1&&ESPIL_P1.layerLive&&!ESPIL_P1.failed);
+      var pitch2=layerLive?0.9076:walkCamPitch;
+      var cp2=Math.cos(pitch2), sp2=Math.sin(pitch2), d2=espilCamDEff;
+      var recs2=(typeof espilPolyHash!=='undefined'&&espilPolyHash)?espilCollectRecsNear(p.pos.x+Math.sin(walkCamYaw)*cp2*d2/2,p.pos.z+Math.cos(walkCamYaw)*cp2*d2/2,d2/2+6):[];
+      espilCamSegClear=espilCamMarch(p.pos.x,p.pos.y+1.3,p.pos.z,
+        p.pos.x+Math.sin(walkCamYaw)*cp2*d2, p.pos.y+sp2*d2+1.2, p.pos.z+Math.cos(walkCamYaw)*cp2*d2, d2, recs2)===null;
+      /* the applied camera point itself (overlay want formula)
+         must sit outside every volume, below-roof test included */
+      var cpx=p.pos.x+Math.sin(walkCamYaw)*Math.cos(walkCamPitch)*d2,
+          cpy=p.pos.y+Math.sin(walkCamPitch)*d2+1.2,
+          cpz=p.pos.z+Math.cos(walkCamYaw)*Math.cos(walkCamPitch)*d2;
+      espilCamPos={x:Math.round(cpx*100)/100,y:Math.round(cpy*100)/100,z:Math.round(cpz*100)/100};
+      espilCamInside=false;
+      for(var q=0;q<recs2.length;q++){
+        var rq=recs2[q];
+        if(cpx<rq.x0||cpx>rq.x1||cpz<rq.z0||cpz>rq.z1)continue;
+        if(cpy>rq.h+0.35)continue;
+        if(espilPolyProbe(rq,cpx,cpz).inside){espilCamInside=true;break;}
+      }
+    }
+    var espilCamPos=null, espilCamInside=false;
+    window.__espilCamClampState=function(){
+      return { eff:Math.round(espilCamDEff*100)/100, allowed:(espilCamAllowed===null?null:Math.round(espilCamAllowed*100)/100),
+        userDist:Math.round(walkCamDist*100)/100, clamped:espilCamDEff<walkCamDist-0.05,
+        blockedAt:espilCamBlockedAt, checks:espilCamChecks, segClear:espilCamSegClear,
+        camPos:espilCamPos, camInside:espilCamInside };
+    };
     function updateWalkMap(dt,t){
       var p=walkPlayer;
       if(!p)return;
+      espilCamClampUpdate(dt); /* Batch 5 item 8: occlusion-capped camera distance for this frame */
       /* Fly/ride mode (Batch G): the flight update owns movement;
          the follow camera below uses the ground tail's own math (the
          updateWalkCamera this branch used to call never existed). */
@@ -8613,9 +8627,9 @@
         if(typeof updateVehicle==='function')updateVehicle(dt);
         var fcp=Math.cos(walkCamPitch),fsp=Math.sin(walkCamPitch);
         var fwant=new THREE.Vector3(
-          p.pos.x+Math.sin(walkCamYaw)*fcp*walkCamDist,
-          p.pos.y+fsp*walkCamDist+1.2,
-          p.pos.z+Math.cos(walkCamYaw)*fcp*walkCamDist
+          p.pos.x+Math.sin(walkCamYaw)*fcp*espilCamDEff,
+          p.pos.y+fsp*espilCamDEff+1.2,
+          p.pos.z+Math.cos(walkCamYaw)*fcp*espilCamDEff
         );
         if(fwant.y<1.4)fwant.y=1.4;
         mapCamera.position.lerp(fwant,Math.min(1,dt*7));
@@ -8789,9 +8803,9 @@
       /* --- follow camera --- */
       var cp=Math.cos(walkCamPitch),sp=Math.sin(walkCamPitch);
       var want=new THREE.Vector3(
-        p.pos.x+Math.sin(walkCamYaw)*cp*walkCamDist,
-        p.pos.y+sp*walkCamDist+1.2,
-        p.pos.z+Math.cos(walkCamYaw)*cp*walkCamDist
+        p.pos.x+Math.sin(walkCamYaw)*cp*espilCamDEff,
+        p.pos.y+sp*espilCamDEff+1.2,
+        p.pos.z+Math.cos(walkCamYaw)*cp*espilCamDEff
       );
       if(want.y<1.4)want.y=1.4;
       var k=Math.min(1,dt*7);
@@ -9718,7 +9732,6 @@
     function animate(){
       requestAnimationFrame(animate);
       espilOccludeTick(); /* wall-occlusion cutout uniforms (Han 2026-11-03) */
-      espilGhostTick(); /* colour-detector player silhouette while building-occluded (Han 2026-11-05) */
       var nowMs=performance.now();
       var dt=Math.min(.05,(nowMs-lastFrameT)/1000);lastFrameT=nowMs;
       if(cityPhaseActive){

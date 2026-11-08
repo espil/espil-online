@@ -104,29 +104,85 @@
     brute: { w: 2.3, h: 2.7 }      /* heavy mass */
   };
   var KINDS = [
-    { id: 'rat', name: 'Robson Rat', base: 'crawler', tint: '#8a7a66', scale: 0.7,
+    { id: 'rat', name: 'Robson Rat', base: 'crawler', tint: '#8a7a66', scale: 1.55,
       grade: 'white', level: 1, hp: 20, dmg: 3, aggro: 8, speed: 1.3, reach: 1.6, atkCd: 1.4, zone: 'tutorial', elite: false,
+      sprite: { base: 'assets/monsters/rat-plushy/', fps: 8, w: 1.2, h: 1.1, frames: {
+        idle: ['idle_1.webp','idle_2.webp','idle_3.webp','idle_4.webp'],
+        walk: ['walk_front_1.webp','walk_front_2.webp','walk_front_3.webp','walk_front_4.webp'],
+        aggro: ['aggro_1.webp','aggro_2.webp','aggro_3.webp','aggro_4.webp'],
+        attack: ['attack_1.webp','attack_2.webp','attack_3.webp','attack_4.webp'],
+        hit: ['hit_1.webp','hit_2.webp','hit_3.webp','hit_4.webp'],
+        stun: ['stun_1.webp','stun_2.webp','stun_3.webp','stun_4.webp'],
+        death: ['death_1.webp','death_2.webp','death_3.webp','death_4.webp'] } },
       def: 0, eva: 0, element: 'neutral', weak: null },
-    { id: 'wisp', name: 'Square Wisp', base: 'shambler', tint: '#9fc4e8', scale: 0.9,
+    { id: 'wisp', name: 'Square Wisp', base: 'shambler', tint: '#9fc4e8', scale: 1.1,
       grade: 'white', level: 2, hp: 25, dmg: 4, aggro: 9, speed: 1.0, reach: 1.8, atkCd: 1.6, zone: 'tutorial', elite: false,
       def: 0, eva: 0, element: 'neutral', weak: null },
-    { id: 'stray', name: 'Alley Stray', base: 'crawler', tint: '#5d4632', scale: 0.9,
+    { id: 'stray', name: 'Alley Stray', base: 'crawler', tint: '#5d4632', scale: 1.55,
       grade: 'yellow', level: 4, hp: 45, dmg: 6, aggro: 11, speed: 1.6, reach: 1.6, atkCd: 1.3, zone: 'low', elite: false,
+      sprite: { base: 'assets/monsters/stray-plushy/', fps: 8, w: 1.05, h: 1.1, frames: {
+        idle: ['idle_1.webp','idle_2.webp','idle_3.webp','idle_4.webp'],
+        walk: ['walk_front_1.webp','walk_front_2.webp','walk_front_3.webp','walk_front_4.webp'],
+        aggro: ['aggro_1.webp','aggro_2.webp','aggro_3.webp','aggro_4.webp'],
+        attack: ['attack_1.webp','attack_2.webp','attack_3.webp','attack_4.webp'],
+        hit: ['hit_1.webp','hit_2.webp','hit_3.webp','hit_4.webp'],
+        stun: ['stun_1.webp','stun_2.webp','stun_3.webp','stun_4.webp'],
+        death: ['death_1.webp','death_2.webp','death_3.webp','death_4.webp'] } },
       def: 5, eva: 0.10, element: 'neutral', weak: null },
-    { id: 'shambler', name: 'Sewer Shambler', base: 'shambler', tint: '#6fae5f', scale: 1.0,
+    { id: 'shambler', name: 'Sewer Shambler', base: 'shambler', tint: '#6fae5f', scale: 1.3,
       grade: 'green', level: 6, hp: 70, dmg: 8, aggro: 12, speed: 1.1, reach: 1.9, atkCd: 1.5, zone: 'low', elite: false,
+      sprite: { base: 'assets/monsters/shambler-plushy/', fps: 8, w: 1.96, h: 2.1, frames: {
+        idle: ['idle_1.webp','idle_2.webp','idle_3.webp','idle_4.webp','idle_5.webp','idle_6.webp'],
+        walk: ['walk_front_1.webp','walk_front_2.webp','walk_front_3.webp','walk_front_4.webp','walk_front_5.webp','walk_front_6.webp'],
+        aggro: ['aggro_1.webp','aggro_2.webp','aggro_3.webp','aggro_4.webp','aggro_5.webp','aggro_6.webp'],
+        attack: ['attack_1.webp','attack_2.webp','attack_3.webp','attack_4.webp','attack_5.webp','attack_6.webp'],
+        hit: ['hit_1.webp','hit_2.webp','hit_3.webp','hit_4.webp','hit_5.webp'],
+        stun: ['stun_1.webp','stun_2.webp','stun_3.webp','stun_4.webp'],
+        death: ['death_1.webp','death_2.webp','death_3.webp','death_4.webp'] } },
       def: 20, eva: 0, element: 'earth', weak: 'fire' },
-    { id: 'brute', name: 'Gastown Brute', base: 'brute', tint: '#a85f3c', scale: 1.4,
+    { id: 'brute', name: 'Gastown Brute', base: 'brute', tint: '#a85f3c', scale: 1.8,
       grade: 'blue', level: 9, hp: 130, dmg: 12, aggro: 13, speed: 1.0, reach: 2.3, atkCd: 1.8, zone: 'mid', elite: false,
+      sprite: { base: 'assets/monsters/brute-plushy/', fps: 6, w: 3.25, h: 2.7, frames: {
+        idle: ['idle_1.webp','idle_2.webp','idle_3.webp','idle_4.webp','idle_5.webp'],
+        walk: ['walk_front_1.webp','walk_front_2.webp','walk_front_3.webp','walk_front_4.webp','walk_front_5.webp','walk_front_6.webp'],
+        aggro: ['aggro_1.webp','aggro_2.webp','aggro_3.webp','aggro_4.webp'],
+        attack: ['attack_1.webp','attack_2.webp','attack_3.webp','attack_4.webp'],
+        hit: ['hit_1.webp','hit_2.webp','hit_3.webp','hit_4.webp'],
+        stun: ['stun_1.webp','stun_2.webp','stun_3.webp','stun_4.webp'],
+        death: ['death_1.webp','death_2.webp','death_3.webp','death_4.webp'] } },
       def: 35, eva: 0, element: 'neutral', weak: null },
-    { id: 'wraith', name: 'Harbour Wraith', base: 'shambler', tint: '#8f6fc9', scale: 1.1,
+    { id: 'wraith', name: 'Harbour Wraith', base: 'shambler', tint: '#8f6fc9', scale: 1.4,
       grade: 'purple', level: 12, hp: 180, dmg: 15, aggro: 14, speed: 1.4, reach: 2.0, atkCd: 1.4, zone: 'mid', elite: true,
+      sprite: { base: 'assets/monsters/wraith-plushy/', fps: 8, w: 1.96, h: 2.1, frames: {
+        idle: ['idle_1.webp','idle_2.webp','idle_3.webp','idle_4.webp','idle_5.webp','idle_6.webp'],
+        walk: ['walk_front_1.webp','walk_front_2.webp','walk_front_3.webp','walk_front_4.webp','walk_front_5.webp','walk_front_6.webp'],
+        aggro: ['aggro_1.webp','aggro_2.webp','aggro_3.webp','aggro_4.webp','aggro_5.webp','aggro_6.webp'],
+        attack: ['attack_1.webp','attack_2.webp','attack_3.webp','attack_4.webp','attack_5.webp','attack_6.webp'],
+        hit: ['hit_1.webp','hit_2.webp','hit_3.webp','hit_4.webp','hit_5.webp'],
+        stun: ['stun_1.webp','stun_2.webp','stun_3.webp','stun_4.webp'],
+        death: ['death_1.webp','death_2.webp','death_3.webp','death_4.webp'] } },
       def: 25, eva: 0.35, element: 'dark', weak: 'light' },
-    { id: 'hound', name: 'Ember Hound', base: 'crawler', tint: '#d97b2e', scale: 1.2,
+    { id: 'hound', name: 'Ember Hound', base: 'crawler', tint: '#d97b2e', scale: 1.6,
       grade: 'red', level: 16, hp: 260, dmg: 20, aggro: 16, speed: 2.1, reach: 1.8, atkCd: 1.2, zone: 'high', elite: true,
+      sprite: { base: 'assets/monsters/hound-plushy/', fps: 8, w: 1.2, h: 1.1, frames: {
+        idle: ['idle_1.webp','idle_2.webp','idle_3.webp','idle_4.webp'],
+        walk: ['walk_front_1.webp','walk_front_2.webp','walk_front_3.webp','walk_front_4.webp'],
+        aggro: ['aggro_1.webp','aggro_2.webp','aggro_3.webp','aggro_4.webp'],
+        attack: ['attack_1.webp','attack_2.webp','attack_3.webp','attack_4.webp'],
+        hit: ['hit_1.webp','hit_2.webp','hit_3.webp','hit_4.webp'],
+        stun: ['stun_1.webp','stun_2.webp','stun_3.webp','stun_4.webp'],
+        death: ['death_1.webp','death_2.webp','death_3.webp','death_4.webp'] } },
       def: 15, eva: 0.15, element: 'fire', weak: 'water' },
-    { id: 'titan', name: 'Deep Titan', base: 'brute', tint: '#d9a441', scale: 2.0,
+    { id: 'titan', name: 'Deep Titan', base: 'brute', tint: '#d9a441', scale: 2.6,
       grade: 'gold', level: 20, hp: 450, dmg: 28, aggro: 18, speed: 0.9, reach: 2.8, atkCd: 2.2, zone: 'high', elite: true,
+      sprite: { base: 'assets/monsters/titan-plushy/', fps: 6, w: 3.25, h: 2.7, frames: {
+        idle: ['idle_1.webp','idle_2.webp','idle_3.webp','idle_4.webp','idle_5.webp'],
+        walk: ['walk_front_1.webp','walk_front_2.webp','walk_front_3.webp','walk_front_4.webp','walk_front_5.webp','walk_front_6.webp'],
+        aggro: ['aggro_1.webp','aggro_2.webp','aggro_3.webp','aggro_4.webp'],
+        attack: ['attack_1.webp','attack_2.webp','attack_3.webp','attack_4.webp'],
+        hit: ['hit_1.webp','hit_2.webp','hit_3.webp','hit_4.webp'],
+        stun: ['stun_1.webp','stun_2.webp','stun_3.webp','stun_4.webp'],
+        death: ['death_1.webp','death_2.webp','death_3.webp','death_4.webp'] } },
       def: 50, eva: 0, element: 'earth', weak: 'wind' }
   ];
   /* trait multiplier for an incoming element against a kind */
@@ -144,6 +200,84 @@
     blue: 'Steel Ingot', purple: 'Mithril Shard', red: 'Dragonsteel Shard',
     gold: 'Sunsteel Shard', pink: 'Lunaris Shard'
   };
+
+  /* ---- Real sprite frames (Batch 5, Han: monsters in 2D) ----
+     A kind may carry sprite: { base: 'assets/monsters/<kind>/',
+     fps: 8, frames: { idle: [...], walk: [...], aggro: [...],
+     attack: [...], hit: [...], stun: [...], death: [...] } }
+     (file names relative to base), or be mapped at runtime via
+     window.__espilMonsterSpriteMap[kindId] (same shape) - the map
+     wins. Wired today (Asset room delivery, MONSTER-ART-SPEC-v1,
+     2026-11-07): the crawler kind walk sets for rat / stray /
+     hound - 6 frames each, already tinted per kind (the material
+     colour stays white; only the hit flash and the wind-up
+     telegraph ever tint the body). Static slots use the first
+     frame. Kinds without a delivered set (wisp, shambler, brute,
+     wraith, titan) keep the canvas placeholder at the new scales
+     until their sets land.
+     PLUSHY SUPERSESSION (Han 2026-11-07, Asset room handover):
+     the sprite source is now the Plushy AI set, and ALL SEVEN
+     covered kinds are wired from their Plushy deliveries under
+     assets/monsters/<kind>-plushy/ (idle/walk-front/aggro/
+     attack/hit/stun/death groups, tints pre-applied, plane
+     aspect matched to each canvas via sprite.w/h): rat = boar,
+     stray = strayer, hound = boar elite, shambler = spitter,
+     wraith = spitter elite, brute = brute, titan = brute elite.
+     The walk left/right/back frames are delivered and copied
+     but not in the billboard cycle (the sprite faces the camera;
+     the front set is the readable cycle). WISP HAS NO PLUSHY
+     COUNTERPART ANYWHERE - it is a documented GAP and keeps the
+     shambler-class canvas placeholder, which does not properly
+     cover it. Plushy canvases run 312-437 px, so at the final
+     sizes the density is ~211 px/m on the rat and ~52 px/m on
+     the titan - a source limit, disclosed, not fixable here.
+     SCALES carry the player-size floor (player ~1.7 m, Asset
+     room): rendered height = base height x scale must reach
+     1.7 m, which raised rat and stray to 1.55 (1.71 m). */
+  var TEXCACHE = {};
+  function frameTexture(url) {
+    if (TEXCACHE[url]) return TEXCACHE[url];
+    var tex = null;
+    try {
+      tex = new THREE.TextureLoader().load(url);
+    } catch (e) { tex = null; }
+    TEXCACHE[url] = tex;
+    return tex;
+  }
+  function spriteCfgFor(kind) {
+    try {
+      var map = window.__espilMonsterSpriteMap;
+      if (map && map[kind.id]) return map[kind.id];
+    } catch (e) {}
+    return kind.sprite || null;
+  }
+  function spriteFrames(cfg, key) {
+    if (!cfg || !cfg.frames) return null;
+    var f = cfg.frames[key];
+    if (f && f.length) return f;
+    if (key === 'aggro') return cfg.frames.walk || cfg.frames.idle || null;
+    if (key === 'attack') return cfg.frames.aggro || cfg.frames.idle || null;
+    if (key === 'hit' || key === 'stun' || key === 'death') return cfg.frames.idle || null;
+    return cfg.frames.idle || null;
+  }
+  /* advance the billboard's frame for the monster's current state.
+     Falls back silently to whatever texture is already on the body
+     (the canvas placeholder) until a frame image has loaded. */
+  function stepSprite(m, dt, key) {
+    if (!m.sprite) return;
+    var frames = spriteFrames(m.sprite, key);
+    if (!frames) return;
+    var fps = m.sprite.fps || 6;
+    if (m.frameKey !== key) { m.frameKey = key; m.frameT = 0; }
+    m.frameT += dt;
+    var idx = Math.floor(m.frameT * fps) % frames.length;
+    if (idx === m.frameIdx && m.frameKey === m.frameApplied) return;
+    var tex = frameTexture((m.sprite.base || '') + frames[idx]);
+    if (tex && tex.image && tex.image.width) {
+      if (m.body.material.map !== tex) m.body.material.map = tex;
+      m.frameIdx = idx; m.frameApplied = m.frameKey;
+    }
+  }
 
   /* ---- Zone entrance gates: 3 rings x 4 compass directions ----
      Colour is the zone BEYOND the gate (grade-ladder-adjacent hues):
@@ -377,6 +511,11 @@
   function addMonster(kind, x, z, scene) {
     var base = BASES[kind.base];
     var w = base.w * kind.scale, h = base.h * kind.scale;
+    /* a wired set may carry its own plane aspect (sprite.w/h in
+       base units) so its canvas is never stretched - the Plushy
+       rat set (393x361) uses w 1.2 against the crawler h 1.1 */
+    var cfg0 = spriteCfgFor(kind);
+    if (cfg0 && cfg0.w && cfg0.h) { w = cfg0.w * kind.scale; h = cfg0.h * kind.scale; }
     var body = new THREE.Sprite(new THREE.SpriteMaterial({
       map: kindTexture(kind), transparent: true, depthWrite: false
     }));
@@ -390,7 +529,7 @@
       map: hp.tex, transparent: true, depthWrite: false
     }));
     hpSprite.scale.set(1.5, 0.19, 1);
-    var shadow = new THREE.Mesh(new THREE.CircleGeometry(0.5 * kind.scale, 18),
+    var shadow = new THREE.Mesh(new THREE.CircleGeometry(Math.max(0.5 * kind.scale, w * 0.3), 18),
       new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28, depthWrite: false }));
     shadow.rotation.x = -Math.PI / 2;
     var m = {
@@ -403,8 +542,17 @@
       shadow: shadow, w: w, h: h, faceY: Math.random() * Math.PI * 2,
       speed: kind.speed, atkT: 0, flashT: 0, dieT: 0, fadeT: 0,
       wanderT: 0, tx: x, tz: z, stuckT: 0, anchorX: x, anchorZ: z,
-      stuckClock: 0, phase: S.seq % 5, bob: Math.random() * Math.PI * 2
+      stuckClock: 0, phase: S.seq % 5, bob: Math.random() * Math.PI * 2,
+      sprite: spriteCfgFor(kind), frameT: 0, frameKey: '', frameApplied: '', frameIdx: -1
     };
+    if (m.sprite && m.sprite.frames) {
+      /* warm the texture cache so the first frames do not pop in */
+      Object.keys(m.sprite.frames).forEach(function (k) {
+        (m.sprite.frames[k] || []).forEach(function (f) {
+          frameTexture((m.sprite.base || '') + f);
+        });
+      });
+    }
     drawHpBar(m);
     body.position.set(x, h / 2, z);
     plate.position.set(x, h + 0.75, z);
@@ -448,6 +596,7 @@
   function stepMonster(m, dt, pp) {
     if (m.state === 'dying') {
       m.dieT -= dt;
+      stepSprite(m, dt, 'death');
       var f = Math.max(0, m.dieT / 0.9);
       m.body.material.opacity = f;
       m.plate.material.opacity = f; m.hpSprite.material.opacity = f;
@@ -581,6 +730,20 @@
        replaces frames; the bob keeps the billboard alive meanwhile) */
     m.bob += dt * 3;
     var bobY = Math.sin(m.bob) * 0.07;
+    /* real frames, when a set is wired: the state key follows the
+       monster's actual state - hit beat while the flash runs, the
+       attack group through the wind-up, walk while it moves, the
+       aggro group while it chases on the spot, idle otherwise.
+       Sets without a group fall back (attack -> aggro -> idle,
+       aggro -> walk -> idle), and single-frame groups simply hold. */
+    if (m.sprite) {
+      var sKey = 'idle';
+      if (m.flashT > 0) sKey = 'hit';
+      else if (m.windupT > 0) sKey = 'attack';
+      else if (md > 0.6) sKey = 'walk';
+      else if (chasing) sKey = 'aggro';
+      stepSprite(m, dt, sKey);
+    }
     m.body.position.set(m.x, m.h / 2 + bobY, m.z);
     m.plate.position.set(m.x, m.h + 0.75 + bobY, m.z);
     m.hpSprite.position.set(m.x, m.h + 0.42 + bobY, m.z);
@@ -593,8 +756,10 @@
         if (a.gone || b.gone || a.state === 'dying' || b.state === 'dying') continue;
         var dx = b.x - a.x, dz = b.z - a.z;
         var d2 = dx * dx + dz * dz;
-        if (d2 > 1.2 || d2 < 0.0001) continue;
-        var d = Math.sqrt(d2), push = (1.1 - d) / 2;
+        /* separation distance follows the (Batch 5) body sizes */
+        var minD = 0.55 * (a.kind.scale + b.kind.scale);
+        if (d2 > minD * minD || d2 < 0.0001) continue;
+        var d = Math.sqrt(d2), push = (minD - d) / 2;
         var ux = dx / d, uz = dz / d;
         if (walkable(a.x - ux * push, a.z - uz * push)) { a.x -= ux * push; a.z -= uz * push; }
         if (walkable(b.x + ux * push, b.z + uz * push)) { b.x += ux * push; b.z += uz * push; }
@@ -822,6 +987,7 @@
       }),
       kinds: KINDS.map(function (k) {
         return { id: k.id, name: k.name, zone: k.zone, grade: k.grade, level: k.level, hp: k.hp, dmg: k.dmg,
+                 scale: k.scale, sprite: !!spriteCfgFor(k),
                  def: k.def, eva: k.eva, element: k.element, weak: k.weak };
       }),
       feel: {
@@ -835,6 +1001,8 @@
           z: Math.round(m.z * 100) / 100, hp: m.hp, maxHp: m.maxHp,
           level: m.level, zone: m.zone, state: m.state,
           flash: m.flashT > 0, winding: m.windupT > 0,
+          sprite: m.sprite ? (m.sprite.base || 'kind') : null,
+          frame: m.sprite ? (m.frameKey + ':' + m.frameIdx) : null,
           windupDmg: Math.round(m.windupDmg * 10) / 10,
           barFrac: Math.round((m.barHp / (m.maxHp || 1)) * 1000) / 1000,
           ghostFrac: Math.round((m.ghostHp / (m.maxHp || 1)) * 1000) / 1000

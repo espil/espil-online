@@ -457,6 +457,133 @@
     if (w && w.getAttribute('data-stage') !== '1') mmSetBig(false);
   }, 500);
 
+  /* ---- Batch 5 (Han 2026-11-07): mobile combat cluster + menu row --
+     Item 3: a left-side shortcut cluster on coarse pointers -
+     PUNCH / KICK / THROW (the desktop move set), DEFENSE (the
+     Defense move / guard) and TELEPORT (the fly toggle, key B -
+     summonVehicle in the monolith). Moves go through the exact
+     desktop path, window.__espilSkills.move === doMove.
+     Item 4: four SAME-SIZE buttons beside the HP/MP flasks -
+     bag (I), profile (P / panels), skill tree (K), stall (Y) -
+     each opening the existing window through its existing route.
+     Inside the store interior the attack trio renders disabled
+     and inert (item 5c: the store keeps the HUD pattern, attacks
+     do not fire indoors). */
+  var b5Style = document.createElement('style');
+  b5Style.id = 'espil-mmo-b5-style';
+  b5Style.textContent =
+    '#espil-mmo-combat{display:none}' +
+    '#espil-mmo-menu4{display:none}' +
+    '@media (pointer:coarse){' +
+      'body.in-map #espil-mmo-combat{display:flex;position:fixed;left:10px;top:50%;' +
+        'transform:translateY(-50%);z-index:34;flex-direction:column;gap:9px}' +
+      '#espil-mmo-combat button{width:56px;height:56px;border-radius:50%;border:2px solid rgba(255,233,168,.55);' +
+        'background:rgba(30,20,8,.62);color:#ffe9ad;display:flex;flex-direction:column;align-items:center;' +
+        'justify-content:center;gap:1px;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;' +
+        'box-shadow:0 0 14px rgba(255,217,122,.18);padding:0}' +
+      '#espil-mmo-combat button .ci{font-size:19px;line-height:1}' +
+      '#espil-mmo-combat button .cl{font:800 8px/1 "Manrope",sans-serif;letter-spacing:.06em}' +
+      '#espil-mmo-combat button:active{background:rgba(90,60,20,.8)}' +
+      '#espil-mmo-combat button.b5-off{opacity:.38;border-color:rgba(200,200,200,.35);color:#cfd4d8;' +
+        'box-shadow:none;pointer-events:none}' +
+      '#espil-mmo-menu4{display:flex;gap:6px;order:6;flex:0 0 auto;align-items:center}' +
+      '#espil-mmo-menu4 button{width:46px;height:46px;min-width:46px;border-radius:50%;' +
+        'border:2px solid #54381f;padding:0;display:flex;align-items:center;justify-content:center;' +
+        'background:radial-gradient(circle at 33% 28%,#fff6dd,#ecd3a0 58%,#cfa96f);' +
+        'box-shadow:0 3px 6px rgba(30,15,0,.35),inset 0 1px 2px rgba(255,255,255,.9);' +
+        'font-size:19px;line-height:1;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}' +
+    '}';
+  document.head.appendChild(b5Style);
+
+  function b5Move(id) {
+    return function (e) {
+      e.preventDefault();
+      if (e.currentTarget.classList.contains('b5-off')) return;
+      try {
+        if (window.__espilSkills && window.__espilSkills.move) window.__espilSkills.move(id);
+        else sendKey(id === 'punch' ? 'q' : id === 'kick' ? 'w' : id === 'throw' ? 'e' : 'r',
+                     id === 'punch' ? 'KeyQ' : id === 'kick' ? 'KeyW' : id === 'throw' ? 'KeyE' : 'KeyR');
+      } catch (err) {}
+    };
+  }
+  var b5Combat = null;
+  function b5BuildCombat() {
+    if (b5Combat || !document.body) return;
+    b5Combat = document.createElement('div');
+    b5Combat.id = 'espil-mmo-combat';
+    b5Combat.setAttribute('aria-label', 'Combat shortcuts');
+    var defs = [
+      { move: 'punch', icon: '👊', label: 'PUNCH' },
+      { move: 'kick', icon: '🦵', label: 'KICK' },
+      { move: 'throw', icon: '「」', label: 'THROW' },
+      { move: 'defense', icon: '🛡️', label: 'DEFENSE' },
+      { fly: true, icon: '✈️', label: 'TELEPORT' }
+    ];
+    defs.forEach(function (d) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      if (d.move) { b.setAttribute('data-move', d.move); b.addEventListener('pointerdown', b5Move(d.move)); }
+      if (d.fly) {
+        b.setAttribute('data-fly', '1');
+        b.addEventListener('pointerdown', function (e) { e.preventDefault(); sendKey('b', 'KeyB'); });
+      }
+      b.setAttribute('aria-label', d.label);
+      b.innerHTML = '<span class="ci">' + d.icon + '</span><span class="cl">' + d.label + '</span>';
+      b5Combat.appendChild(b);
+    });
+    document.body.appendChild(b5Combat);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', b5BuildCombat);
+  else b5BuildCombat();
+
+  var b5Menu4 = null;
+  var b5MenuTimer = setInterval(function () {
+    if (b5Menu4) { clearInterval(b5MenuTimer); return; }
+    var qb = document.getElementById('quickbar');
+    var mp = document.getElementById('mp-flask-wrap');
+    if (!qb || !mp || !mp.parentNode) return;
+    b5Menu4 = document.createElement('div');
+    b5Menu4.id = 'espil-mmo-menu4';
+    b5Menu4.setAttribute('aria-label', 'Menu shortcuts');
+    var defs = [
+      { id: 'bag', icon: '🎒', label: 'Bag', fn: function () { sendKey('i', 'KeyI'); } },
+      { id: 'profile', icon: '👤', label: 'Profile', fn: function () {
+          if (window.__espilOpenSelfProfile) window.__espilOpenSelfProfile();
+          else sendKey('p', 'KeyP');
+        } },
+      { id: 'skill', icon: '⚔️', label: 'Skill tree', fn: function () {
+          if (window.__espilSkills && window.__espilSkills.tree) window.__espilSkills.tree();
+          else sendKey('k', 'KeyK');
+        } },
+      { id: 'stall', icon: '🧺', label: 'Stall', fn: function () { sendKey('y', 'KeyY'); } }
+    ];
+    defs.forEach(function (d) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('data-menu', d.id);
+      b.setAttribute('aria-label', d.label);
+      b.textContent = d.icon;
+      b.addEventListener('pointerdown', function (e) { e.preventDefault(); try { d.fn(); } catch (err) {} });
+      b5Menu4.appendChild(b);
+    });
+    mp.parentNode.insertBefore(b5Menu4, mp.nextSibling);
+    clearInterval(b5MenuTimer);
+  }, 700);
+
+  /* store-interior sync: the attack trio goes disabled + inert
+     while the player is inside (item 5c) or the store page holds
+     the world; DEFENSE / TELEPORT keep their own indoor rules in
+     the monolith (fly summon already refuses indoors). */
+  setInterval(function () {
+    if (!b5Combat) return;
+    var off = false;
+    try { off = !!window.__espilInside || !!window.__espilStorePaused; } catch (e) {}
+    Array.prototype.forEach.call(b5Combat.children, function (b) {
+      var mv = b.getAttribute('data-move');
+      if (mv && mv !== 'defense') b.classList.toggle('b5-off', off);
+    });
+  }, 400);
+
   window.__espilMMOHudState = function () {
     var mw = document.getElementById('minimap-wrap');
     return {
@@ -466,7 +593,13 @@
       name: (document.getElementById('espil-mmo-name') || {}).textContent || '',
       leo: (document.getElementById('espil-mmo-leo') || {}).textContent || '',
       minimapBig: mmBig,
-      minimapStage: mw ? mw.getAttribute('data-stage') : null
+      minimapStage: mw ? mw.getAttribute('data-stage') : null,
+      combatCluster: !!document.getElementById('espil-mmo-combat'),
+      menu4: !!document.getElementById('espil-mmo-menu4'),
+      attacksOff: (function () {
+        var b = document.querySelector('#espil-mmo-combat button[data-move="punch"]');
+        return !!b && b.classList.contains('b5-off');
+      })()
     };
   };
 })();

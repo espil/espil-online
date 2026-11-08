@@ -19,8 +19,9 @@
   #hint { left:50%; bottom:96px; transform:translateX(-50%); padding:10px 18px; font-size:.86rem;
     font-weight:700; color:#fff4cf; opacity:0; transition:opacity .25s; pointer-events:none; white-space:nowrap; }
   #hint.on { opacity:1; }
-  #controls-note { left:50%; bottom:18px; transform:translateX(-50%); padding:8px 14px; font-size:.72rem;
-    opacity:.85; pointer-events:none; white-space:nowrap; }
+  /* Batch 5 (Han 2026-11-07): the movement-guide footer chip that
+     sat here (#controls-note) is REMOVED - mobile players get the
+     stick and the USE button, not a text manual. */
   #close-page { top:14px; right:14px; padding:10px 16px; font:800 .74rem 'Manrope',sans-serif;
     letter-spacing:.08em; color:#eafffd; cursor:pointer; }
   #close-page:hover { border-color:rgba(134,238,228,.8); }
@@ -37,6 +38,28 @@
       touch-action:none; }
     #stick-knob { position:absolute; left:50%; top:50%; width:50px; height:50px; margin:-25px 0 0 -25px;
       border-radius:50%; background:rgba(142,247,232,.5); border:1.5px solid rgba(234,255,253,.85); }
+  }
+  /* Batch 5: USE button + in-game-pattern combat cluster (coarse
+     only). USE is the touch twin of SPACE at the counter - it shows
+     exactly when the counter hint shows. The combat cluster mirrors
+     the in-game mobile cluster's look, but every button is DISABLED
+     inside the store: shopping is peaceful here. */
+  #use-btn, #store-combat { display:none; }
+  @media (pointer:coarse) {
+    #use-btn { position:fixed; right:18px; bottom:144px; width:84px; height:84px; z-index:8;
+      border-radius:50%; border:2px solid rgba(134,238,228,.55); background:rgba(10,34,38,.6);
+      color:#ddfffc; font:800 .72rem 'Manrope',sans-serif; letter-spacing:.08em; cursor:pointer;
+      box-shadow:0 0 18px rgba(80,232,220,.25); touch-action:none; user-select:none; -webkit-user-select:none; }
+    #use-btn.on { display:block; }
+    #use-btn:active { background:rgba(34,90,94,.8); }
+    #store-combat { display:flex; position:fixed; left:10px; top:50%; transform:translateY(-50%);
+      z-index:7; flex-direction:column; gap:9px; }
+    #store-combat button { width:56px; height:56px; border-radius:50%; border:2px solid rgba(200,200,200,.35);
+      background:rgba(30,20,8,.62); color:#cfd4d8; opacity:.38; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; gap:1px; padding:0; box-shadow:none;
+      touch-action:none; user-select:none; -webkit-user-select:none; }
+    #store-combat button .ci { font-size:19px; line-height:1; }
+    #store-combat button .cl { font:800 8px 'Manrope',sans-serif; letter-spacing:.06em; }
   }
   #loading { position:fixed; inset:0; z-index:20; background:#10151a; display:flex; align-items:center;
     justify-content:center; font-weight:800; letter-spacing:.14em; color:#8ef7e8; }
@@ -77,9 +100,16 @@
 </div>
 <button class="chip" id="close-page" type="button">✕ CLOSE &amp; RETURN</button>
 <div class="chip" id="hint">Press SPACE to pay at the counter</div>
-<div class="chip" id="controls-note">arrows - walk &nbsp;·&nbsp; A / D - turn camera &nbsp;·&nbsp; W / S - zoom &nbsp;·&nbsp; drag - look &nbsp;·&nbsp; SPACE at the counter - shop</div>
 <div class="chip" id="toast" role="status"></div>
 <div id="stick"><div id="stick-knob"></div></div>
+<button id="use-btn" type="button" aria-label="Use">USE</button>
+<div id="store-combat" aria-label="Combat shortcuts (disabled in store)">
+  <button type="button" disabled aria-label="Punch (disabled)"><span class="ci">👊</span><span class="cl">PUNCH</span></button>
+  <button type="button" disabled aria-label="Kick (disabled)"><span class="ci">🦵</span><span class="cl">KICK</span></button>
+  <button type="button" disabled aria-label="Throw (disabled)"><span class="ci">「」</span><span class="cl">THROW</span></button>
+  <button type="button" disabled aria-label="Defense (disabled)"><span class="ci">🛡️</span><span class="cl">DEFENSE</span></button>
+  <button type="button" disabled aria-label="Teleport (disabled)"><span class="ci">✈️</span><span class="cl">TELEPORT</span></button>
+</div>
 
 <div id="shop-ui" aria-hidden="true">
   <div class="shop-card">
@@ -595,6 +625,19 @@ function init() {
   });
   document.addEventListener('keyup', function (e) { keys[e.code] = false; });
   document.getElementById('shop-close').addEventListener('click', function () { setShop(false); });
+  /* Batch 5: USE button - the touch twin of the SPACE handler
+     above, same condition, same action. On coarse pointers the
+     hint names the button instead of the key. */
+  var useBtn = document.getElementById('use-btn');
+  if (useBtn) useBtn.addEventListener('click', function () {
+    if (counterNear && !shopIsOpen) setShop(true);
+  });
+  try {
+    if (window.matchMedia && window.matchMedia('(pointer:coarse)').matches) {
+      var hintEl0 = document.getElementById('hint');
+      if (hintEl0) hintEl0.textContent = 'Tap USE to pay at the counter';
+    }
+  } catch (e) {}
   document.getElementById('close-page').addEventListener('click', function () {
     notifyParent('espil-store-close'); window.close();
     setTimeout(function () { toast('You can close this tab - the street page resumes.'); }, 350);
@@ -610,6 +653,8 @@ function init() {
     var d = Math.hypot(player.x - STORE.counter.x, player.z - STORE.counter.z);
     counterNear = d < 3.4;
     hintEl.classList.toggle('on', counterNear && !shopIsOpen);
+    var ub = document.getElementById('use-btn');
+    if (ub) ub.classList.toggle('on', counterNear && !shopIsOpen);
     renderer.render(scene, camera);
   })();
   var waitLoads = setInterval(function () {
@@ -645,6 +690,10 @@ window.__storePage = {
       yaw: +player.yaw.toFixed(3), pitch: +player.pitch.toFixed(3), eye: EYE,
       fov: +camera.fov.toFixed(1), fovTarget: +player.fovTarget.toFixed(1),
       counterNear: counterNear, shopOpen: shopIsOpen,
+      useVisible: (function () { var u = document.getElementById('use-btn'); return !!u && u.classList.contains('on'); })(),
+      guideFooter: !!document.getElementById('controls-note'),
+      combatBtns: document.querySelectorAll('#store-combat button').length,
+      combatDisabled: (function () { var bs = document.querySelectorAll('#store-combat button'); for (var i = 0; i < bs.length; i++) if (!bs[i].disabled) return false; return bs.length > 0; })(),
       clerkLoaded: clerkLoaded, clerkAnim: clerkAnim,
       layoutLoaded: layoutState.loaded, layoutCount: layoutState.count,
       placed: loadState.placed, failed: loadState.failed.slice(),
