@@ -609,5 +609,542 @@
     };
   };
 })();
+
+/* =====================================================================
+   HUD2 (Han 2026-11-08): the mobile HUD rework. Two references, one
+   component set, two orientation arrangements:
+   - LANDSCAPE (reference 1, mobile action-RPG): coin top-left, score
+     bar top-centre, SQUARE minimap top-right with a time/FPS bar
+     directly beneath it, joystick bottom-left, action arc
+     bottom-right.
+   - PORTRAIT (reference 2, Genshin-style): CIRCULAR minimap top-left
+     (time/FPS folded as a tiny readout beneath it), a small icon row
+     across the top (menu functions + the Leo coin as a chip), the
+     score trio folded as a compact line under that row, a vertical
+     nearby-character list on the right, HP/MP bars bottom-centre
+     (level at the HP bar's left end), joystick bottom-left (faint
+     until touched) + a chat button at the far bottom-left corner,
+     action cluster bottom-right.
+   Score semantics (chosen mapping of reference 1's two-scores-plus-
+   centre form, stated): left = player kill count (skull), centre =
+   current zone name, right = active monster count. Kills are counted
+   from the game's own 'espil-guide' monster-kill events (the same
+   events that grant Leo per kill) - session count, no invented
+   numbers. The largest action button (ATK, sword glyph) fires the
+   game's existing touch attack surface (#map-attack, which is
+   doMove('punch')) - the same move the PUNCH button reaches through
+   __espilSkills.move, exactly as the two surfaces behaved before.
+   BUTTON SIZE STANDARD (Han 2026-11-08, overriding the references'
+   large-button grammar): the old cluster's main buttons measured
+   56px; ATK is 28px (half), secondary actions 23px, utility 20px,
+   teleport 18px, menu chips 20px. The JOYSTICK is a drag SURFACE,
+   not a button, and stays a large translucent area as both
+   references show it.
+   The Batch 5/6 mobile cluster (#espil-mmo-combat), the menu4 row
+   and the quickbar tray are hidden on coarse pointers - this layout
+   is the single mobile scheme. Desktop (fine pointer) never sees
+   any of it. Inside the store the attack family renders disabled
+   and inert, same rule as the old cluster (DEFENSE / TELEPORT /
+   USE / JUMP keep their own indoor behaviour in the monolith). */
+(function () {
+  'use strict';
+  if (window.__espilHud2) return;
+  window.__espilHud2 = true;
+
+  var css =
+    '#espil-hud2-coin,#espil-hud2-score,#espil-hud2-timefps,#espil-hud2-menu,' +
+    '#espil-hud2-bars,#espil-hud2-actions,#espil-hud2-chars,#espil-hud2-chat{display:none}' +
+    '@media (pointer:coarse){' +
+      /* the superseded mobile scheme retires on touch screens */
+      '#espil-mmo-combat{display:none!important}' +
+      '#espil-mmo-menu4{display:none!important}' +
+      '#quickbar{display:none!important}' +
+      '#espil-mmo-status{display:none!important}' +
+      '#espil-loc{display:none!important}' +
+      '#map-attack,#map-jump,#map-interact{display:none!important}' +
+      /* joystick: the pair's own stick, moved bottom-left, kept LARGE
+         (a drag surface, not a button) */
+      'body.in-map .joystick{left:12px!important;right:auto!important;bottom:12px!important;' +
+        'width:148px!important;height:148px!important;opacity:.5!important;z-index:34;' +
+        'background:radial-gradient(circle,rgba(8,12,16,.16),rgba(8,12,16,.42));' +
+        'border:2px solid rgba(255,255,255,.28);box-shadow:0 4px 18px rgba(0,0,0,.3)}' +
+      'body.in-map .joystick.joy-live{opacity:.78!important}' +
+      'body.in-map .joy-knob{background:radial-gradient(circle at 38% 32%,rgba(255,255,255,.55),rgba(160,180,200,.30));' +
+        'box-shadow:0 2px 8px rgba(0,0,0,.35)}' +
+      /* coin (Leo) */
+      'body.in-map #espil-hud2-coin{display:flex;position:fixed;z-index:36;align-items:center;gap:5px}' +
+      '#espil-hud2-coin .h2-medal{border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe9a8,#f5b301 55%,#b97a02);' +
+        'border:2px solid #7a5200;color:#5a3a00;display:flex;align-items:center;justify-content:center;font-weight:900;flex:none}' +
+      '#espil-hud2-coin .h2-num{background:rgba(8,10,14,.72);color:#ffd97a;font:800 11px/1.5 "Manrope",sans-serif;' +
+        'padding:1px 7px;border-radius:8px}' +
+      /* score bar */
+      'body.in-map #espil-hud2-score{display:flex;position:fixed;z-index:36;left:50%;transform:translateX(-50%);' +
+        'align-items:center;justify-content:space-between;background:rgba(10,12,16,.84);color:#fff;' +
+        'font:800 12px "Manrope",sans-serif;clip-path:polygon(12px 0,calc(100% - 12px) 0,100% 50%,calc(100% - 12px) 100%,12px 100%,0 50%)}' +
+      '#espil-hud2-score .h2-zone-t{color:#ffe9a8;letter-spacing:.04em}' +
+      /* time / FPS readout */
+      'body.in-map #espil-hud2-timefps{display:flex;position:fixed;z-index:36;justify-content:space-between;' +
+        'background:rgba(8,10,14,.78);color:#e8f2ee;font:700 10px/1.6 "Manrope",sans-serif;' +
+        'padding:2px 7px;border-radius:6px;box-sizing:border-box}' +
+      /* menu chips */
+      'body.in-map #espil-hud2-menu{display:flex;position:fixed;z-index:36;gap:6px}' +
+      '#espil-hud2-menu button{width:20px;height:20px;border-radius:50%;border:1.5px solid rgba(255,233,168,.5);' +
+        'background:rgba(16,20,26,.68);color:#ffe9ad;font-size:11px;line-height:1;display:flex;align-items:center;' +
+        'justify-content:center;padding:0;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}' +
+      /* HP / MP bars */
+      'body.in-map #espil-hud2-bars{display:block;position:fixed;z-index:36}' +
+      '#espil-hud2-bars .h2-hprow{display:flex;align-items:center}' +
+      '#espil-hud2-bars .h2-lv{font:800 9px "Manrope",sans-serif;color:#ffe9a8;background:rgba(8,10,14,.72);' +
+        'border-radius:6px;padding:2px 4px;margin-right:4px;flex:none}' +
+      '#espil-hud2-bars .h2-track{position:relative;flex:1;height:12px;background:rgba(6,8,10,.72);' +
+        'border:1px solid rgba(255,255,255,.35);border-radius:7px;overflow:hidden}' +
+      '#espil-hud2-bars .h2-track i{position:absolute;left:0;top:0;bottom:0;width:100%;' +
+        'background:linear-gradient(90deg,#d92c2c,#ff8a3c)}' +
+      '#espil-hud2-bars .h2-track.mp{height:6px;margin-top:3px}' +
+      '#espil-hud2-bars .h2-track.mp i{background:linear-gradient(90deg,#2277dd,#6fd8ff)}' +
+      '#espil-hud2-bars .h2-hp-num{position:absolute;inset:0;text-align:center;font:800 9px/12px "Manrope",sans-serif;' +
+        'color:#fff;text-shadow:0 1px 2px #000}' +
+      /* action cluster */
+      'body.in-map #espil-hud2-actions{display:block;position:fixed;z-index:36}' +
+      '#espil-hud2-actions button{position:absolute;border-radius:50%;border:2px solid rgba(255,220,150,.55);' +
+        'background:radial-gradient(circle at 35% 30%,rgba(122,72,30,.92),rgba(48,29,11,.94));color:#ffe9ad;' +
+        'display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;cursor:pointer;' +
+        'touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 2px 7px rgba(0,0,0,.4)}' +
+      '#espil-hud2-actions button .ci{line-height:1}' +
+      '#espil-hud2-actions button .al{font:800 5px/1.2 "Manrope",sans-serif;letter-spacing:.02em}' +
+      '#espil-hud2-actions button[data-atk]{width:28px;height:28px}' +
+      '#espil-hud2-actions button[data-atk] .ci{font-size:13px}' +
+      '#espil-hud2-actions button[data-move]{width:23px;height:23px}' +
+      '#espil-hud2-actions button[data-move] .ci{font-size:10px}' +
+      '#espil-hud2-actions button.h2-util{width:20px;height:20px;background:radial-gradient(circle at 35% 30%,rgba(52,66,80,.92),rgba(18,24,32,.94));border-color:rgba(180,220,255,.5)}' +
+      '#espil-hud2-actions button.h2-util .ci{font-size:10px}' +
+      '#espil-hud2-actions button[data-fly]{width:18px;height:18px;background:radial-gradient(circle at 35% 30%,rgba(20,90,96,.92),rgba(8,36,44,.94));border-color:rgba(125,252,230,.55)}' +
+      '#espil-hud2-actions button[data-fly] .ci{font-size:9px}' +
+      '#espil-hud2-actions button:active{filter:brightness(1.35)}' +
+      '#espil-hud2-actions button.h2-off{opacity:.35;border-color:rgba(200,200,200,.3);color:#cfd4d8;pointer-events:none}' +
+      /* nearby-character list + chat button (portrait forms) */
+      '#espil-hud2-chars .h2-char{display:flex;align-items:center;gap:4px}' +
+      '#espil-hud2-chars .h2-chip{width:24px;height:24px;border-radius:50%;border:1.5px solid rgba(255,255,255,.6);flex:none}' +
+      '#espil-hud2-chars .h2-cname{font:700 9px "Manrope",sans-serif;color:#fff;text-shadow:0 1px 3px #000;' +
+        'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:62px}' +
+      '#espil-hud2-chat{border-radius:50%;border:1.5px solid rgba(255,255,255,.5);background:rgba(16,20,26,.68);' +
+        'color:#fff;font-size:11px;line-height:1;align-items:center;justify-content:center;padding:0;cursor:pointer;touch-action:none}' +
+      /* minimap marker layer */
+      '#espil-hud2-mmlayer{position:absolute;inset:0;pointer-events:none;z-index:6;overflow:hidden}' +
+      '#espil-hud2-mmlayer .h2-mk{position:absolute;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;' +
+        'clip-path:polygon(50% 0,100% 100%,0 100%)}' +
+      '#espil-hud2-mmlayer .h2-mk.mon{background:#ff4747}' +
+      '#espil-hud2-mmlayer .h2-mk.blu{background:#57a8ff}' +
+      '#espil-hud2-mmlayer .h2-mkp{position:absolute;width:11px;height:11px;margin:-5.5px 0 0 -5.5px;' +
+        'background:#fff;clip-path:polygon(50% 0,100% 100%,0 100%);filter:drop-shadow(0 0 2px #000)}' +
+    '}' +
+    /* ---- LANDSCAPE arrangement (reference 1) ---- */
+    '@media (pointer:coarse) and (orientation:landscape){' +
+      'body.in-map #espil-hud2-coin{left:10px;top:10px;flex-direction:column;gap:3px}' +
+      '#espil-hud2-coin .h2-medal{width:30px;height:30px;font-size:13px}' +
+      'body.in-map #espil-hud2-score{top:10px;width:320px;height:30px;padding:0 22px}' +
+      'body.in-map #minimap-wrap[data-stage="1"]{top:10px!important;right:10px!important;left:auto!important;' +
+        'width:118px!important;height:118px!important;border-radius:12px!important;transform:none}' +
+      'body.in-map #espil-hud2-timefps{top:132px;right:10px;width:118px}' +
+      'body.in-map #espil-hud2-menu{left:10px;top:88px;flex-direction:column}' +
+      'body.in-map #espil-hud2-bars{left:12px;bottom:170px;width:196px}' +
+      'body.in-map #espil-hud2-actions{right:8px;bottom:8px;width:168px;height:172px}' +
+      'body.in-map #espil-hud2-chars{display:none!important}' +
+      'body.in-map #espil-hud2-chat{display:none!important}' +
+    '}' +
+    /* ---- PORTRAIT arrangement (reference 2) ---- */
+    '@media (pointer:coarse) and (orientation:portrait){' +
+      'body.in-map .joystick{width:118px!important;height:118px!important;left:14px!important;bottom:56px!important;opacity:.22!important}' +
+      'body.in-map .joystick.joy-live{opacity:.55!important}' +
+      'body.in-map #minimap-wrap[data-stage="1"]{top:10px!important;left:10px!important;right:auto!important;' +
+        'width:92px!important;height:92px!important;border-radius:50%!important;transform:none}' +
+      'body.in-map #espil-hud2-timefps{top:106px;left:10px;right:auto;width:92px;font-size:9px;padding:1px 5px}' +
+      'body.in-map #espil-hud2-coin{left:110px;top:10px;flex-direction:row}' +
+      '#espil-hud2-coin .h2-medal{width:20px;height:20px;font-size:9px}' +
+      '#espil-hud2-coin .h2-num{font-size:10px}' +
+      'body.in-map #espil-hud2-menu{top:10px;right:10px;flex-direction:row}' +
+      'body.in-map #espil-hud2-score{top:42px;width:250px;height:22px;padding:0 16px;font-size:10px}' +
+      'body.in-map #espil-hud2-chars{display:flex;position:fixed;z-index:36;right:8px;top:32%;width:94px;flex-direction:column;gap:5px}' +
+      'body.in-map #espil-hud2-bars{left:50%;transform:translateX(-50%);bottom:12px;width:172px}' +
+      'body.in-map #espil-hud2-actions{right:6px;bottom:6px;width:150px;height:158px}' +
+      'body.in-map #espil-hud2-chat{display:flex;position:fixed;z-index:36;left:8px;bottom:8px;width:22px;height:22px}' +
+    '}';
+  var styleEl = document.createElement('style');
+  styleEl.id = 'espil-hud2-style';
+  styleEl.textContent = css;
+  document.head.appendChild(styleEl);
+
+  function sendKey(key, code) {
+    ['keydown', 'keyup'].forEach(function (t) {
+      document.dispatchEvent(new KeyboardEvent(t, { key: key, code: code, bubbles: true, cancelable: true }));
+    });
+  }
+  function coarse() { try { return !!(window.matchMedia && matchMedia('(pointer:coarse)').matches); } catch (e) { return false; } }
+  function portrait() { try { return !!(window.matchMedia && matchMedia('(orientation:portrait)').matches); } catch (e) { return false; } }
+  function el(id) { return document.getElementById(id); }
+  function mk(tag, id, html) { var d = document.createElement(tag); if (id) d.id = id; if (html != null) d.innerHTML = html; return d; }
+
+  /* ---- DOM ---- */
+  var coin = mk('div', 'espil-hud2-coin', '<span class="h2-medal">L</span><span class="h2-num">1,000</span>');
+  coin.setAttribute('aria-label', 'Leo balance');
+  var score = mk('div', 'espil-hud2-score',
+    '<span class="h2-sk">💀 <span class="h2-kills-n">0</span></span>' +
+    '<span class="h2-zone-t">-</span>' +
+    '<span class="h2-act">👾 <span class="h2-act-n">0</span></span>');
+  score.setAttribute('aria-label', 'Score');
+  var timefps = mk('div', 'espil-hud2-timefps', '<span class="h2-clock">--:--</span><span class="h2-fps">FPS -</span>');
+  var bars = mk('div', 'espil-hud2-bars',
+    '<div class="h2-hprow"><span class="h2-lv">Lv 1</span>' +
+    '<div class="h2-track hp"><i></i><span class="h2-hp-num">100/100</span></div></div>' +
+    '<div class="h2-track mp"><i></i></div>');
+  var chars = mk('div', 'espil-hud2-chars');
+  chars.setAttribute('aria-label', 'Nearby characters');
+  var chatBtn = mk('button', 'espil-hud2-chat', '💬');
+  chatBtn.type = 'button';
+  chatBtn.setAttribute('aria-label', 'Chat');
+  chatBtn.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    var w = document.querySelector('.chat-window');
+    if (!w) return;
+    w.classList.toggle('is-expanded');
+    if (w.classList.contains('is-expanded')) {
+      var inp = el('chat-input');
+      if (inp) { try { inp.focus(); } catch (err) {} }
+    }
+  });
+
+  var menu = mk('div', 'espil-hud2-menu');
+  menu.setAttribute('aria-label', 'Menu shortcuts');
+  var MENU = [
+    { id: 'map', icon: '🗺️', label: 'Map', fn: function () { sendKey('m', 'KeyM'); } },
+    { id: 'bag', icon: '🎒', label: 'Bag', fn: function () { sendKey('i', 'KeyI'); } },
+    { id: 'skill', icon: '⚔️', label: 'Skill tree', fn: function () {
+        if (window.__espilSkills && window.__espilSkills.tree) window.__espilSkills.tree();
+        else sendKey('k', 'KeyK'); } },
+    { id: 'profile', icon: '👤', label: 'Profile', fn: function () {
+        if (window.__espilOpenSelfProfile) window.__espilOpenSelfProfile();
+        else sendKey('p', 'KeyP'); } },
+    { id: 'stall', icon: '🧺', label: 'Stall', fn: function () { sendKey('y', 'KeyY'); } }
+  ];
+  MENU.forEach(function (d) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('data-menu', d.id);
+    b.setAttribute('aria-label', d.label);
+    b.textContent = d.icon;
+    b.addEventListener('pointerdown', function (e) { e.preventDefault(); try { d.fn(); } catch (err) {} });
+    menu.appendChild(b);
+  });
+
+  /* action cluster: positions are (right, bottom) px inside the box,
+     per orientation; ATK at the corner, the rest arcing up-left,
+     TELEPORT the small button below the arc */
+  var POS_L = { atk: [2, 2], punch: [38, 4], kick: [66, 20], throw: [86, 46], defense: [92, 76],
+                dash: [80, 106], spin: [56, 128], wave: [26, 142], art: [106, 106], use: [130, 74], jump: [136, 42], fly: [40, 36] };
+  var POS_P = { atk: [2, 2], dash: [4, 38], punch: [36, 4], kick: [64, 12], throw: [88, 28], defense: [104, 50],
+                spin: [34, 44], wave: [62, 56], art: [88, 74], use: [112, 86], jump: [118, 114], fly: [40, 80] };
+  var actions = mk('div', 'espil-hud2-actions');
+  actions.setAttribute('aria-label', 'Actions');
+  var KEYMAP = { punch: ['q', 'KeyQ'], kick: ['w', 'KeyW'], throw: ['e', 'KeyE'], defense: ['r', 'KeyR'],
+                 dash: ['a', 'KeyA'], spin: ['s', 'KeyS'], wave: ['d', 'KeyD'], art: ['f', 'KeyF'] };
+  function fireMove(id) {
+    return function (e) {
+      e.preventDefault();
+      if (e.currentTarget.classList.contains('h2-off')) return;
+      try {
+        if (window.__espilSkills && window.__espilSkills.move) window.__espilSkills.move(id);
+        else if (KEYMAP[id]) sendKey(KEYMAP[id][0], KEYMAP[id][1]);
+      } catch (err) {}
+    };
+  }
+  function fireSurface(targetId) {
+    return function (e) {
+      e.preventDefault();
+      if (e.currentTarget.classList.contains('h2-off')) return;
+      var t = el(targetId);
+      if (t) { try { t.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true })); return; } catch (err) {} }
+      if (targetId === 'map-attack') { try { if (window.__espilSkills) window.__espilSkills.move('punch'); } catch (err) {} }
+    };
+  }
+  var actBtns = {};
+  function addAction(key, attrs, icon, label, handler, cls) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    for (var k in attrs) b.setAttribute(k, attrs[k]);
+    if (cls) b.className = cls;
+    b.setAttribute('aria-label', label);
+    b.innerHTML = '<span class="ci">' + icon + '</span><span class="al">' + label + '</span>';
+    b.addEventListener('pointerdown', handler);
+    actions.appendChild(b);
+    actBtns[key] = b;
+  }
+  addAction('atk', { 'data-atk': '1' }, '⚔️', 'ATK', fireSurface('map-attack'));
+  addAction('punch', { 'data-move': 'punch' }, '👊', 'PUNCH', fireMove('punch'));
+  addAction('kick', { 'data-move': 'kick' }, '🦵', 'KICK', fireMove('kick'));
+  addAction('throw', { 'data-move': 'throw' }, '「」', 'THROW', fireMove('throw'));
+  addAction('defense', { 'data-move': 'defense' }, '🛡️', 'DEF', fireMove('defense'));
+  addAction('dash', { 'data-move': 'dash' }, '💨', 'DASH', fireMove('dash'));
+  addAction('spin', { 'data-move': 'spin' }, '🌀', 'SPIN', fireMove('spin'));
+  addAction('wave', { 'data-move': 'wave' }, '🌊', 'WAVE', fireMove('wave'));
+  addAction('art', { 'data-move': 'art' }, '✨', 'ART', fireMove('art'));
+  addAction('use', {}, '✋', 'USE', fireSurface('map-interact'), 'h2-util');
+  addAction('jump', {}, '⬆️', 'JUMP', fireSurface('map-jump'), 'h2-util');
+  addAction('fly', { 'data-fly': '1' }, '✈️', '', function (e) { e.preventDefault(); sendKey('b', 'KeyB'); });
+  actBtns.fly.setAttribute('aria-label', 'TELEPORT');
+
+  var mounted = false;
+  function mount() {
+    if (!document.body) return;
+    [coin, score, timefps, menu, bars, chars, chatBtn, actions].forEach(function (n) {
+      if (!n.parentNode) document.body.appendChild(n);
+    });
+    var wrap = el('minimap-wrap');
+    if (wrap && !el('espil-hud2-mmlayer')) {
+      var layer = mk('div', 'espil-hud2-mmlayer');
+      wrap.appendChild(layer);
+    }
+    mounted = true;
+    layoutActions();
+  }
+  if (document.body) mount(); else document.addEventListener('DOMContentLoaded', mount);
+
+  var lastPort = null;
+  function layoutActions() {
+    var p = portrait();
+    if (p === lastPort) return;
+    lastPort = p;
+    var T = p ? POS_P : POS_L;
+    for (var k in actBtns) {
+      if (!T[k]) continue;
+      actBtns[k].style.right = T[k][0] + 'px';
+      actBtns[k].style.bottom = T[k][1] + 'px';
+    }
+  }
+  window.addEventListener('resize', layoutActions);
+  window.addEventListener('orientationchange', function () { lastPort = null; layoutActions(); });
+
+  /* ---- live state ---- */
+  var kills = 0;
+  window.addEventListener('espil-guide', function (e) {
+    if (e && e.detail && e.detail.type === 'monster-kill') kills++;
+  });
+  var fpsMeter = { frames: 0, last: 0 };
+  var fpsHist = [], fpsAvg = 0;
+  (function fpsLoop() {
+    requestAnimationFrame(fpsLoop);
+    fpsMeter.frames++;
+  })();
+  setInterval(function () {
+    /* the rAF counter runs on real elapsed seconds; the sampler that
+       reads it ticks on a 1 s wall interval */
+    var now = performance.now();
+    var dt = (now - (fpsMeter.last || now)) / 1000;
+    fpsMeter.last = now;
+    if (dt > 0.2) {
+      var f = Math.round(fpsMeter.frames / dt);
+      fpsMeter.frames = 0;
+      fpsHist.push(f);
+      if (fpsHist.length > 3) fpsHist.shift();
+      fpsAvg = Math.round(fpsHist.reduce(function (a, b) { return a + b; }, 0) / fpsHist.length);
+    }
+  }, 1000);
+
+  var ZONE_NAMES = { tutorial: 'Tutorial', low: 'Low', mid: 'Mid', high: 'High' };
+  var cur = { zone: '-', active: 0, mkM: 0, mkB: 0, charN: 0, off: false };
+  var mkPool = { mon: [], blu: [] };
+  function mkDiv(cls) {
+    var d = document.createElement('div');
+    d.className = 'h2-mk ' + cls;
+    return d;
+  }
+  function paintMarkers() {
+    var layer = el('espil-hud2-mmlayer');
+    var wrap = el('minimap-wrap');
+    cur.mkM = 0; cur.mkB = 0;
+    if (!layer || !wrap) return;
+    var stage = wrap.getAttribute('data-stage');
+    layer.style.display = (stage === '1') ? 'block' : 'none';
+    if (stage !== '1') return;
+    var pose = null;
+    try { pose = window.__espilPlayerPose ? window.__espilPlayerPose() : null; } catch (e) {}
+    if (!pose) return;
+    var W = wrap.clientWidth, H = wrap.clientHeight;
+    if (!W || !H) return;
+    var i, d;
+    /* player: white marker at centre, rotated to facing */
+    var pm = layer.querySelector('.h2-mkp');
+    if (!pm) { pm = document.createElement('div'); pm.className = 'h2-mkp'; layer.appendChild(pm); }
+    var fx = -Math.sin(pose.a || 0), fz = -Math.cos(pose.a || 0);
+    var ang = Math.atan2(fz, fx) * 180 / Math.PI + 90;
+    pm.style.left = (W / 2) + 'px';
+    pm.style.top = (H / 2) + 'px';
+    pm.style.transform = 'rotate(' + ang + 'deg)';
+    function plot(list, cls, pool) {
+      var need = 0;
+      for (i = 0; i < list.length; i++) {
+        var dx = list[i].x - pose.x, dz = list[i].z - pose.z;
+        if (Math.abs(dx) > 55 || Math.abs(dz) > 55) continue;
+        if (!pool[need]) { pool[need] = mkDiv(cls); layer.appendChild(pool[need]); }
+        d = pool[need];
+        d.style.display = 'block';
+        d.style.left = ((0.5 + dx / 100) * W) + 'px';
+        d.style.top = ((0.5 + dz / 100) * H) + 'px';
+        need++;
+      }
+      for (i = need; i < pool.length; i++) pool[i].style.display = 'none';
+      return need;
+    }
+    var mons = [], blues = [];
+    try {
+      var ms = window.__espilMonsterState ? window.__espilMonsterState() : null;
+      if (ms) ms.monsters.forEach(function (m) { if (!m.gone && m.state !== 'leaving') mons.push(m); });
+    } catch (e) {}
+    try {
+      var ns = window.__espilNpcState ? window.__espilNpcState() : null;
+      if (ns) ns.npcs.forEach(function (n) { blues.push(n); });
+    } catch (e) {}
+    try {
+      var cs = window.__espilChatState ? window.__espilChatState() : null;
+      if (cs && cs.users) cs.users.forEach(function (u) {
+        if (u.id !== cs.myId && u.pos) blues.push({ x: u.pos.x, z: u.pos.z });
+      });
+    } catch (e) {}
+    cur.mkM = plot(mons, 'mon', mkPool.mon);
+    cur.mkB = plot(blues, 'blu', mkPool.blu);
+  }
+
+  var charSig = '';
+  function paintChars(pose) {
+    cur.charN = 0;
+    if (!portrait() || !pose) { charSig = ''; if (chars) chars.innerHTML = ''; return; }
+    var entries = [];
+    try {
+      var ns = window.__espilNpcState ? window.__espilNpcState() : null;
+      if (ns) ns.npcs.forEach(function (n) {
+        var d = Math.hypot(n.x - pose.x, n.z - pose.z);
+        if (d <= 60) entries.push({ name: (n.look && n.look.still) || n.lookKey || 'Resident', gender: n.gender, d: d });
+      });
+    } catch (e) {}
+    try {
+      var cs = window.__espilChatState ? window.__espilChatState() : null;
+      if (cs && cs.users) cs.users.forEach(function (u) {
+        if (u.id === cs.myId || !u.pos) return;
+        var d = Math.hypot(u.pos.x - pose.x, u.pos.z - pose.z);
+        if (d <= 60) entries.push({ name: u.name || 'Guest', gender: u.gender, d: d });
+      });
+    } catch (e) {}
+    entries.sort(function (a, b) { return a.d - b.d; });
+    entries = entries.slice(0, 8);
+    cur.charN = entries.length;
+    var sig = entries.map(function (e2) { return e2.name; }).join('|');
+    if (sig === charSig) return;
+    charSig = sig;
+    chars.innerHTML = '';
+    entries.forEach(function (e2) {
+      var row = document.createElement('div');
+      row.className = 'h2-char';
+      var col = (e2.gender === 'female' || e2.gender === 'f') ? '#f0a6c0' : (e2.gender === 'male' || e2.gender === 'm') ? '#7db4e8' : '#ffd97a';
+      row.innerHTML = '<span class="h2-chip" style="background:' + col + '"></span><span class="h2-cname"></span>';
+      row.querySelector('.h2-cname').textContent = e2.name;
+      chars.appendChild(row);
+    });
+  }
+
+  function refresh() {
+    if (!mounted) mount();
+    layoutActions();
+    var inMap = document.body && document.body.classList.contains('in-map');
+    if (!inMap || !coarse()) return;
+    /* Leo coin */
+    var leo = 1000;
+    try { var lv = parseInt(localStorage.getItem('espil_leo_balance') || '1000', 10); if (!isNaN(lv)) leo = lv; } catch (e) {}
+    var numEl = coin.querySelector('.h2-num');
+    var lt = leo.toLocaleString('en-US');
+    if (numEl && numEl.textContent !== lt) numEl.textContent = lt;
+    /* pose + zone + active */
+    var pose = null;
+    try { pose = window.__espilPlayerPose ? window.__espilPlayerPose() : null; } catch (e) {}
+    if (pose) {
+      try {
+        var z = window.__espilZoneAt ? window.__espilZoneAt(pose.x, pose.z) : null;
+        if (z && ZONE_NAMES[z.zone]) cur.zone = ZONE_NAMES[z.zone];
+      } catch (e) {}
+    }
+    try {
+      var ms = window.__espilMonsterState ? window.__espilMonsterState() : null;
+      if (ms) cur.active = ms.active;
+    } catch (e) {}
+    var zn = score.querySelector('.h2-zone-t');
+    if (zn && zn.textContent !== cur.zone) zn.textContent = cur.zone;
+    var an = score.querySelector('.h2-act-n');
+    if (an && an.textContent !== String(cur.active)) an.textContent = String(cur.active);
+    var kn = score.querySelector('.h2-kills-n');
+    if (kn && kn.textContent !== String(kills)) kn.textContent = String(kills);
+    /* clock + fps */
+    var dnow = new Date();
+    var hh = ('0' + dnow.getHours()).slice(-2), mm2 = ('0' + dnow.getMinutes()).slice(-2);
+    var ck = timefps.querySelector('.h2-clock');
+    var ct = hh + ':' + mm2;
+    if (ck && ck.textContent !== ct) ck.textContent = ct;
+    var fe = timefps.querySelector('.h2-fps');
+    var ft = 'FPS ' + (fpsHist.length ? fpsAvg : '-');
+    if (fe && fe.textContent !== ft) fe.textContent = ft;
+    /* HP / MP + level */
+    try {
+      var ss = window.__espilSkills ? window.__espilSkills.state : null;
+      if (ss) {
+        var hpf = Math.max(0, Math.min(100, ss.hp / (ss.maxhp || 100) * 100));
+        var mpf = Math.max(0, Math.min(100, ss.mp / (ss.maxmp || 50) * 100));
+        bars.querySelector('.h2-track.hp i').style.width = hpf + '%';
+        bars.querySelector('.h2-track.mp i').style.width = mpf + '%';
+        var hn = bars.querySelector('.h2-hp-num');
+        var ht = Math.ceil(ss.hp) + '/' + ss.maxhp;
+        if (hn && hn.textContent !== ht) hn.textContent = ht;
+      }
+      var lvl = 1;
+      var lvv = parseInt(localStorage.getItem('espil_level') || '1', 10);
+      if (!isNaN(lvv) && lvv > 0) lvl = lvv;
+      var lve = bars.querySelector('.h2-lv');
+      var lvt = 'Lv ' + lvl;
+      if (lve && lve.textContent !== lvt) lve.textContent = lvt;
+    } catch (e) {}
+    paintMarkers();
+    paintChars(pose);
+  }
+  refresh();
+  setInterval(refresh, 500);
+
+  /* store-interior sync: the attack family goes disabled + inert
+     indoors; DEFENSE / TELEPORT / USE / JUMP keep their own rules */
+  setInterval(function () {
+    var off = false;
+    try { off = !!window.__espilInside || !!window.__espilStorePaused; } catch (e) {}
+    cur.off = off;
+    for (var k in actBtns) {
+      var b = actBtns[k];
+      var mv = b.getAttribute('data-move');
+      var isAtk = b.hasAttribute('data-atk');
+      if (isAtk || (mv && mv !== 'defense')) b.classList.toggle('h2-off', off);
+    }
+  }, 400);
+
+  /* extend the room's state hook */
+  var prevState = window.__espilMMOHudState;
+  window.__espilMMOHudState = function () {
+    var s = {};
+    try { if (prevState) s = prevState(); } catch (e) {}
+    s.hud2 = true;
+    s.mode = !coarse() ? 'desktop' : (portrait() ? 'portrait' : 'landscape');
+    s.kills = kills;
+    s.zone = cur.zone;
+    s.activeMonsters = cur.active;
+    s.mmMarkers = { monsters: cur.mkM, blues: cur.mkB };
+    s.charList = cur.charN;
+    s.fps = fpsAvg;
+    s.attacksOff = !!(actBtns.atk && actBtns.atk.classList.contains('h2-off'));
+    s.leoText = (coin.querySelector('.h2-num') || {}).textContent || '';
+    return s;
+  };
+})();
 /* __espilMMOHud END */
 
