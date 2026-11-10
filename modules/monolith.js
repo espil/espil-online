@@ -6803,11 +6803,13 @@
        like the standalone store page (/vancouver/1238-robson-st):
        the camera sits at the player's own eye (1.6 m), the avatar
        is not drawn, A/D turn the camera (the store page's Batch H
-       rate, 90 deg/s) and attack inputs stay inert. Routed interiors
-       (entered through another building, whose visit is routed into
-       this same room) keep their existing framing - the FPV switch
-       is scoped to the Konbiniya entry, which is exactly the case
-       espilInsideRouted === null (set below only for other doors).
+       rate, 90 deg/s) and attack inputs stay inert. WIDENED by
+       Han's decision (2026-11-10): FPV applies to EVERY interior,
+       including routed interiors entered through another building
+       (whose visit is routed into this same room) - the predicate
+       no longer scopes to the Konbiniya entry alone; it was first
+       restored scoped to espilInsideRouted === null (2026-11-09)
+       and Han then unified all interiors to true first-person.
        The defect this restores: espilEnterInside never changed the
        camera model at all, so the overlay follow camera and the P1
        pitch-52 map framing both kept their outdoor third-person
@@ -6815,7 +6817,7 @@
     var ESPIL_KB_EYE=1.6, ESPIL_KB_TURN=Math.PI/2, ESPIL_KB_P1_ZOOM=22.0, ESPIL_KB_P1_PITCH=85;
     var espilFpvApplied=false;
     function espilKbFpvActive(){
-      return !!(window.__espilInside&&espilInsideRec&&espilInsideRouted===null&&typeof walkPlayer!=='undefined'&&walkPlayer);
+      return !!(window.__espilInside&&espilInsideRec&&typeof walkPlayer!=='undefined'&&walkPlayer);
     }
     window.__espilKbFpvState=function(){
       var cam=(typeof mapCamera!=='undefined'&&mapCamera&&mapCamera.position)?mapCamera.position:null;
