@@ -38,7 +38,20 @@
    __espilMonsterTargets(), __espilMonsterHit(...),
    __espilDropTable, __espilDropRoll(kindId, zone),
    __espilMonsterForceZone(zone|null) (test override, same spirit as
-   __espilNpcForceLevel). */
+   __espilNpcForceLevel).
+   ARENA (2026-11-09): the Art Gallery plaza is the first SAFE ZONE
+   (Han round 4): no field monster is summoned inside it and no
+   field monster may move into it. The instance director
+   (__espilInstanceSpawn / __espilInstanceSetEnrage /
+   __espilInstanceClear / __espilInstanceState) spawns arena-owned
+   monsters that live in the same array but are flagged
+   m.instance: they are exempt from zone population counts, zone
+   fade-out and the safe-zone movement block (the arena space is
+   its own ground), their kills are flagged instance:true on the
+   hit return and the monster-drop event, and field summoning
+   pauses while the player is inside an interior
+   (window.__espilInside - monolith's own no-summoning-indoors
+   rule, Batch G). */
 (function () {
   'use strict';
   if (window.__espilMonsterState) return; /* single instance */
@@ -48,6 +61,17 @@
      record bbox x[-46.9..52.9], z[-57.6..16.8] -> centre (3.0, -20.4);
      the spawn plaza (3, 31) sits 14.2 m south of its south face. */
   var GALLERY = { x: 3, z: -20.4 };
+
+  /* ---- Safe zone (Arena, Han round 4, 2026-11-09) ----
+     Centre = the village / guest spawn point ESPIL_SPAWN (3, 33)
+     in monolith; the arena portal stands inside the zone, 8 m
+     east of the spawn. Radius 40 m is the design DRAFT. Store
+     interiors are safe by the interior rule, not by this circle. */
+  var SAFE_ZONE = { x: 3, z: 33, r: 40 };
+  function inSafeZone(x, z) {
+    var dx = x - SAFE_ZONE.x, dz = z - SAFE_ZONE.z;
+    return (dx * dx + dz * dz) < SAFE_ZONE.r * SAFE_ZONE.r;
+  }
 
   /* ---- Zone radii (measured) ----
      3,095 baked buildings (vancouver_district_sample.json), centroid
@@ -372,6 +396,61 @@
     feel: { hits: 0, crits: 0, cancels: 0, numbers: 0, flashes: 0, evades: 0 }, dmgSeq: 0
   };
 
+  /* ---- entry mode (landing flow, Han 2026-11-09) ----
+     The landing records the chosen mode in sessionStorage
+     ('espil_entry_mode') before it navigates to the game page and
+     mirrors it on window.__espilEntryMode. 'shop' is the
+     non-combat mode: this module must not summon or activate any
+     monsters - the spawn director below never runs, so the active
+     set stays empty - and __espilMonsterState reports
+     mode:'shop'. A direct entry with no stored mode defaults to
+     'play' (the survival build as it stands). */
+  var ENTRY_MODE = 'play';
+  try {
+    var storedMode = sessionStorage.getItem('espil_entry_mode');
+    if (storedMode === 'shop' || storedMode === 'play') ENTRY_MODE = storedMode;
+    else if (window.__espilEntryMode === 'shop') ENTRY_MODE = 'shop';
+  } catch (e) {}
+  window.__espilEntryMode = ENTRY_MODE;
+  var SHOP_MODE = ENTRY_MODE === 'shop';
+  if (SHOP_MODE) {
+    /* HUD-visible disabled state for the combat inputs (the
+       Konbiniya disabled-attack rule, generalised to the whole
+       session): the ATK and move buttons go inert; Use / Jump /
+       Teleport stay live, so movement is normal. The gate is a
+       style rule keyed on the body class below - the HUD toggles
+       its own 'h2-off' class by store state, so a class toggle
+       from here would be fought; a CSS rule cannot be. The slow
+       re-apply underneath adds the disabled attribute as a
+       second layer and covers the HUD rebuilding its cluster.
+       The keyboard and skill paths into monolith's doMove
+       cannot be gated from this module - see
+       espil-online-room/landing/MONOLITH-SEAM.md. */
+    try {
+      var shopCss = document.createElement('style');
+      shopCss.id = 'espil-shopmode-css';
+      shopCss.textContent =
+        'body.espil-shopmode #espil-hud2-actions button[data-atk],' +
+        'body.espil-shopmode #espil-hud2-actions button[data-move],' +
+        'body.espil-shopmode #map-attack' +
+        '{opacity:.35!important;filter:grayscale(.65);pointer-events:none!important}';
+      (document.head || document.documentElement).appendChild(shopCss);
+    } catch (e) {}
+    var shopOffApply = function () {
+      try {
+        if (document.body) document.body.classList.add('espil-shopmode');
+        var btns = document.querySelectorAll(
+          '#espil-hud2-actions button[data-atk], #espil-hud2-actions button[data-move], #map-attack');
+        for (var bi = 0; bi < btns.length; bi++) {
+          if (!btns[bi].classList.contains('h2-off')) btns[bi].classList.add('h2-off');
+          if (!btns[bi].disabled) btns[bi].disabled = true;
+        }
+      } catch (e) {}
+    };
+    shopOffApply();
+    setInterval(shopOffApply, 1000);
+  }
+
   function cityKey() {
     try { return window.__espilCityKey || 'vancouver'; } catch (e) { return 'vancouver'; }
   }
@@ -438,8 +517,21 @@
   }
   function countByZone() {
     var c = { tutorial: 0, low: 0, mid: 0, high: 0 };
-    S.monsters.forEach(function (m) { if (!m.gone && m.state !== 'leaving') c[m.zone]++; });
+    S.monsters.forEach(function (m) {
+      if (m.gone || m.state === 'leaving' || m.instance) return;
+      if (c[m.zone] != null) c[m.zone]++;
+    });
     return c;
+  }
+  function fieldCount() {
+    var n = 0;
+    S.monsters.forEach(function (m) { if (!m.gone && !m.instance) n++; });
+    return n;
+  }
+  function instanceCount() {
+    var n = 0;
+    S.monsters.forEach(function (m) { if (!m.gone && m.instance) n++; });
+    return n;
   }
 
   /* ---------------- placeholder sprite art ----------------
@@ -571,6 +663,7 @@
       var d = 18 + Math.random() * 27;
       var x = px + Math.cos(a) * d, z = pz + Math.sin(a) * d;
       if (!walkable(x, z)) continue;
+      if (inSafeZone(x, z)) continue;   /* safe zone: never summoned inside */
       if (zoneAt(x, z).zone !== zone) continue;
       return { x: x, z: z };
     }
@@ -578,7 +671,7 @@
       var a2 = Math.random() * Math.PI * 2;
       var d2 = 12 + Math.random() * 48;
       var x2 = px + Math.cos(a2) * d2, z2 = pz + Math.sin(a2) * d2;
-      if (walkable(x2, z2) && zoneAt(x2, z2).zone === zone) return { x: x2, z: z2 };
+      if (walkable(x2, z2) && !inSafeZone(x2, z2) && zoneAt(x2, z2).zone === zone) return { x: x2, z: z2 };
     }
     return null;
   }
@@ -652,7 +745,7 @@
     } catch (e) {}
   }
   function spawnMonster(zone, px, pz) {
-    if (S.monsters.length >= CAP) return;
+    if (fieldCount() >= CAP) return;
     var scene = sceneRoot();
     if (!scene) return;
     var pt = spawnPoint(zone, px, pz);
@@ -714,7 +807,9 @@
     if (pp) {
       dx = pp.x - m.x; dz = pp.z - m.z;
       dist = Math.sqrt(dx * dx + dz * dz);
-      chasing = dist < m.kind.aggro;
+      /* instance monsters hunt across their whole arena space;
+         field monsters keep the kind's aggro radius */
+      chasing = dist < (m.instance ? 9999 : m.kind.aggro);
     }
     var tx, tz, spd;
     if (chasing) {
@@ -736,7 +831,7 @@
           if (dist < m.kind.reach * 1.2) {
             try {
               if (typeof window.__espilPlayerDamage === 'function')
-                window.__espilPlayerDamage(m.kind.dmg, m.x, m.z);
+                window.__espilPlayerDamage(m.kind.dmg * (m.dmgMul || 1), m.x, m.z);
             } catch (e) {}
           }
         }
@@ -759,7 +854,9 @@
         for (var t = 0; t < 8; t++) {
           var a = Math.random() * Math.PI * 2, d = 4 + Math.random() * 11;
           var nx = m.spawnX + Math.cos(a) * d, nz = m.spawnZ + Math.sin(a) * d;
-          if (walkable(nx, nz)) { m.tx = nx; m.tz = nz; break; }
+          if (!walkable(nx, nz)) continue;
+          if (!m.instance && inSafeZone(nx, nz)) continue;   /* field monsters never path into the safe zone */
+          m.tx = nx; m.tz = nz; break;
         }
       }
       tx = m.tx; tz = m.tz; spd = m.speed * 0.6;
@@ -776,6 +873,7 @@
         var hx = ux * cs - uz * sn, hz = ux * sn + uz * cs;
         var sx = m.x + hx * stepLen, sz = m.z + hz * stepLen;
         if (!walkable(sx, sz)) continue;
+        if (!m.instance && inSafeZone(sx, sz)) continue;   /* safe zone boundary: slide along it, never cross */
         if (!walkable(m.x + hx * 1.0, m.z + hz * 1.0)) continue;
         m.x = sx; m.z = sz; moved = true;
         var tf = Math.atan2(-hx, -hz);
@@ -785,8 +883,8 @@
         m.faceY += df * Math.min(1, dt * 8);
       }
       if (!moved) {
-        if (walkable(m.x + ux * stepLen, m.z)) { m.x += ux * stepLen; moved = true; }
-        else if (walkable(m.x, m.z + uz * stepLen)) { m.z += uz * stepLen; moved = true; }
+        if (walkable(m.x + ux * stepLen, m.z) && (m.instance || !inSafeZone(m.x + ux * stepLen, m.z))) { m.x += ux * stepLen; moved = true; }
+        else if (walkable(m.x, m.z + uz * stepLen) && (m.instance || !inSafeZone(m.x, m.z + uz * stepLen))) { m.z += uz * stepLen; moved = true; }
       }
       if (moved) m.stuckT = 0; else m.stuckT += dt;
     }
@@ -835,8 +933,8 @@
         if (d2 > minD * minD || d2 < 0.0001) continue;
         var d = Math.sqrt(d2), push = (minD - d) / 2;
         var ux = dx / d, uz = dz / d;
-        if (walkable(a.x - ux * push, a.z - uz * push)) { a.x -= ux * push; a.z -= uz * push; }
-        if (walkable(b.x + ux * push, b.z + uz * push)) { b.x += ux * push; b.z += uz * push; }
+        if (walkable(a.x - ux * push, a.z - uz * push) && (a.instance || !inSafeZone(a.x - ux * push, a.z - uz * push))) { a.x -= ux * push; a.z -= uz * push; }
+        if (walkable(b.x + ux * push, b.z + uz * push) && (b.instance || !inSafeZone(b.x + ux * push, b.z + uz * push))) { b.x += ux * push; b.z += uz * push; }
       }
     }
   }
@@ -1106,8 +1204,11 @@
   window.__espilMonsterState = function () {
     var byZone = countByZone();
     return {
+      mode: ENTRY_MODE,
       active: S.monsters.filter(function (m) { return !m.gone && m.state !== 'leaving'; }).length,
       total: S.monsters.length,
+      safeZone: { x: SAFE_ZONE.x, z: SAFE_ZONE.z, r: SAFE_ZONE.r },
+      instance: instanceCount(),
       byZone: byZone,
       playerZone: S.playerZone,
       forced: S.forcedZone,
@@ -1136,7 +1237,7 @@
         return {
           id: m.id, kind: m.kind.id, x: Math.round(m.x * 100) / 100,
           z: Math.round(m.z * 100) / 100, hp: m.hp, maxHp: m.maxHp,
-          level: m.level, zone: m.zone, state: m.state,
+          level: m.level, zone: m.zone, state: m.state, instance: !!m.instance,
           flash: m.flashT > 0, winding: m.windupT > 0,
           sprite: m.sprite ? (m.sprite.base || 'kind') : null,
           frame: m.sprite ? (m.frameKey + ':' + m.frameIdx) : null,
@@ -1156,6 +1257,7 @@
     return out;
   };
   window.__espilMonsterHit = function (id, dmg, fromX, fromZ, opts) {
+    if (SHOP_MODE) return null; /* SHOP MODE: no combat - a hit can never land */
     for (var i = 0; i < S.monsters.length; i++) {
       var m = S.monsters[i];
       if (m.id !== id || m.gone || m.state === 'dying' || m.state === 'leaving') continue;
@@ -1181,7 +1283,8 @@
         S.feel.evades++;
         spawnDmgNumber(m, 0, crit, true);
         return { id: m.id, hp: m.hp, dead: false, killed: false, applied: 0, evaded: true,
-                 crit: crit, cancelled: false, kind: m.kind.id, zone: m.zone, grade: m.kind.grade };
+                 crit: crit, cancelled: false, kind: m.kind.id, zone: m.zone, grade: m.kind.grade,
+                 instance: !!m.instance };
       }
       m.hp -= applied;
       /* ---- feel: flash, number, sound (on the applied figure) ---- */
@@ -1216,9 +1319,11 @@
       var mass = m.kind.scale * m.kind.scale;
       var kb = Math.max(0.25, Math.min(1.8, 1.6 / mass));
       var kx = dx / d * kb, kz = dz / d * kb;
-      if (walkable(m.x + kx, m.z + kz)) { m.x += kx; m.z += kz; }
-      else if (walkable(m.x + kx * 0.5, m.z + kz * 0.5)) { m.x += kx * 0.5; m.z += kz * 0.5; }
-      if (m.hp > 0) return { id: m.id, hp: m.hp, dead: false, killed: false, applied: applied, evaded: false, crit: crit, cancelled: cancelled, kind: m.kind.id, zone: m.zone, grade: m.kind.grade };
+      var kbFull = walkable(m.x + kx, m.z + kz) && (m.instance || !inSafeZone(m.x + kx, m.z + kz));
+      var kbHalf = walkable(m.x + kx * 0.5, m.z + kz * 0.5) && (m.instance || !inSafeZone(m.x + kx * 0.5, m.z + kz * 0.5));
+      if (kbFull) { m.x += kx; m.z += kz; }
+      else if (kbHalf) { m.x += kx * 0.5; m.z += kz * 0.5; }
+      if (m.hp > 0) return { id: m.id, hp: m.hp, dead: false, killed: false, applied: applied, evaded: false, crit: crit, cancelled: cancelled, kind: m.kind.id, zone: m.zone, grade: m.kind.grade, instance: !!m.instance };
       /* death (Batch 6 Item B): drops OPEN on the three separated
          lines - weapon materials guaranteed, armour and accessory
          materials rolled by zone. The parts array keeps the legacy
@@ -1238,11 +1343,11 @@
       if (S.lastDrops.length > 8) S.lastDrops.splice(0, S.lastDrops.length - 8);
       try {
         window.dispatchEvent(new CustomEvent('espil-guide', {
-          detail: { type: 'monster-drop', id: m.id, kind: m.kind.id, grade: m.kind.grade, parts: parts, items: drops }
+          detail: { type: 'monster-drop', id: m.id, kind: m.kind.id, grade: m.kind.grade, parts: parts, items: drops, instance: !!m.instance }
         }));
       } catch (e) {}
       m.state = 'dying'; m.dieT = 0.9;
-      return { id: m.id, hp: 0, dead: true, killed: true, applied: applied, evaded: false, crit: crit, parts: parts, drops: drops, kind: m.kind.id, zone: m.zone, grade: m.kind.grade };
+      return { id: m.id, hp: 0, dead: true, killed: true, applied: applied, evaded: false, crit: crit, parts: parts, drops: drops, kind: m.kind.id, zone: m.zone, grade: m.kind.grade, instance: !!m.instance };
     }
     return null;
   };
@@ -1251,6 +1356,76 @@
     else if (ZONES.indexOf(v) >= 0) { S.forcedZone = v; }
     else return;
     S.zoneEvalAt = 0; /* re-evaluate on the next tick */
+  };
+
+  /* ---------------- safe zone + instance director (Arena) ---------------- */
+  window.__espilSafeZone = function () { return { x: SAFE_ZONE.x, z: SAFE_ZONE.z, r: SAFE_ZONE.r }; };
+  window.__espilSafeZoneAt = function (x, z) { return inSafeZone(x, z); };
+
+  var INSTANCE_CAP = 48;   /* instance bodies alive at once (own cap;
+                              the field keeps its CAP on field bodies) */
+  function kindById(id) {
+    for (var i = 0; i < KINDS.length; i++) if (KINDS[i].id === id) return KINDS[i];
+    return null;
+  }
+  /* Spawn one arena-owned monster of an existing kind at an exact
+     point. opts: { level (display/combat label, the round number),
+     hpMul (party scaling), dropZone (which zone's drop chances the
+     death roll uses), speedMul, dmgMul }. Returns the monster id
+     or null. Instance bodies neither feed the field population
+     counts nor obey field zone rules; their death path is the
+     shared one (drops via rollDrops on dropZone, monster-drop
+     event flagged instance:true). */
+  window.__espilInstanceSpawn = function (kindId, x, z, opts) {
+    if (SHOP_MODE) return null;
+    opts = opts || {};
+    var kind = kindById(kindId);
+    if (!kind) return null;
+    if (instanceCount() >= INSTANCE_CAP) return null;
+    var scene = sceneRoot();
+    if (!scene) return null;
+    try {
+      var m = addMonster(kind, x, z, scene);
+      m.instance = true;
+      m.zone = opts.dropZone || kind.zone;
+      if (opts.level) m.level = opts.level;
+      var hpMul = opts.hpMul || 1;
+      m.maxHp = Math.max(1, Math.round(kind.hp * hpMul));
+      m.hp = m.maxHp; m.barHp = m.maxHp; m.ghostHp = m.maxHp;
+      m.speedMul = opts.speedMul || 1;
+      m.baseDmgMul = opts.dmgMul || 1;
+      m.dmgMul = m.baseDmgMul;
+      m.baseSpeed = kind.speed * m.speedMul;
+      m.speed = m.baseSpeed;
+      m.enraged = false;
+      m.state = 'arriving'; m.fadeT = 0.9;
+      m.body.material.opacity = 0; m.plate.material.opacity = 0; m.hpSprite.material.opacity = 0;
+      drawHpBar(m);
+      return m.id;
+    } catch (e) { return null; }
+  };
+  /* Round soft-timer enrage (Arena design: past 180 s the remaining
+     monsters gain speed and attack). Applied on top of each body's
+     spawn-time multipliers; reversible between rounds. */
+  window.__espilInstanceSetEnrage = function (on) {
+    S.monsters.forEach(function (m) {
+      if (!m.instance || m.gone) return;
+      m.enraged = !!on;
+      m.speed = (m.baseSpeed || m.kind.speed) * (on ? 1.35 : 1);
+      m.dmgMul = (m.baseDmgMul || 1) * (on ? 1.5 : 1);
+    });
+  };
+  window.__espilInstanceClear = function () {
+    for (var i = S.monsters.length - 1; i >= 0; i--) {
+      if (S.monsters[i].instance) removeMonster(S.monsters[i]);
+    }
+  };
+  window.__espilInstanceState = function () {
+    return S.monsters.filter(function (m) { return m.instance && !m.gone; }).map(function (m) {
+      return { id: m.id, kind: m.kind.id, x: Math.round(m.x * 100) / 100, z: Math.round(m.z * 100) / 100,
+               hp: m.hp, maxHp: m.maxHp, level: m.level, state: m.state,
+               speed: Math.round(m.speed * 100) / 100, dmgMul: m.dmgMul || 1, enraged: !!m.enraged };
+    });
   };
 
   /* ---------------- main loop ---------------- */
@@ -1276,6 +1451,9 @@
       }
       S.outMapSince = 0;
       if (window.__espilStorePaused) return; /* store page holds the world */
+      if (SHOP_MODE) return; /* SHOP MODE (Han 2026-11-09): no zone gates,
+                                no summoning, no activation - the world
+                                stays a shopping street for the session */
       if (!S.gatesBuilt && now > S.gateTryAt) {
         S.gateTryAt = now + 2000;
         if (probe(GALLERY.x, GALLERY.z)) buildGates();
@@ -1290,21 +1468,25 @@
             S.activeZones = activeZoneSet(pz);
             /* zones that fell out of the active set fade out */
             S.monsters.forEach(function (m) {
-              if (!m.gone && m.state !== 'dying' && !S.activeZones[m.zone]) {
+              if (!m.gone && m.state !== 'dying' && !m.instance && !S.activeZones[m.zone]) {
                 m.state = 'leaving'; m.fadeT = 0.9;
               }
             });
           }
         }
       }
-      /* per-zone population: fill active zones at ~0.5/s each */
-      if (S.playerZone && pp) {
+      /* per-zone population: fill active zones at ~0.5/s each.
+         Field summoning pauses while the player is inside an
+         interior (monolith's no-summoning-indoors rule) - this
+         also keeps field bodies out of the arena space once the
+         interior seam lands. */
+      if (S.playerZone && pp && !window.__espilInside) {
         var counts = countByZone();
         ZONES.forEach(function (z) {
           if (!S.activeZones[z]) return;
           if (counts[z] >= ZONE_TARGET[z]) return;
           S.spawnAcc[z] = (S.spawnAcc[z] || 0) + dt * SPAWN_RATE;
-          while (S.spawnAcc[z] >= 1 && counts[z] < ZONE_TARGET[z] && S.monsters.length < CAP) {
+          while (S.spawnAcc[z] >= 1 && counts[z] < ZONE_TARGET[z] && fieldCount() < CAP) {
             S.spawnAcc[z] -= 1;
             spawnMonster(z, pp.x, pp.z);
             counts[z]++;

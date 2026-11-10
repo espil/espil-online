@@ -130,7 +130,7 @@
     { name: 'Ruby Bead', kr: '루비 구슬', slot: null, kind: 'mat', grade: '영웅', matLine: 'accessory', matGrade: 'red', def: 0, mdef: 0, price: 140, app: { shape: 'bead', c1: '#e04b4b', c2: '#4a4238' }, desc: '장신구 제작 재료 (red).' },
     { name: 'Topaz Bead', kr: '토파즈 구슬', slot: null, kind: 'mat', grade: '전설', matLine: 'accessory', matGrade: 'gold', def: 0, mdef: 0, price: 220, app: { shape: 'bead', c1: '#f2b63c', c2: '#4a4238' }, desc: '장신구 제작 재료 (gold).' },
     { name: 'Lunaris Bead', kr: '루나리스 구슬', slot: null, kind: 'mat', grade: '전설', matLine: 'accessory', matGrade: 'pink', def: 0, mdef: 0, price: 350, app: { shape: 'bead', c1: '#f28ad0', c2: '#4a4238' }, desc: '장신구 제작 재료 (pink).' },
-    { name: 'Revival Potion', kr: '부활 포션', slot: null, kind: 'use', grade: '캐시', cash: true, def: 0, mdef: 0, price: 0, app: { shape: 'drink', c1: '#e86a8a', c2: '#ffd23c' }, desc: '캐시 아이템 (10개에 $1). 쓰러졌을 때 그 자리에서 HP/MP 50%로 부활합니다. 캐시상점은 아직 닫혀 있어 구매할 수 없습니다.' }
+    { name: 'Revival Potion', kr: '부활 포션', slot: null, kind: 'use', grade: '캐시', cash: true, def: 0, mdef: 0, price: 0, app: { shape: 'drink', c1: '#e86a8a', c2: '#ffd23c' }, desc: '캐시 아이템 (10개에 $1). 쓰러졌을 때 그 자리에서 HP/MP 50%로 부활합니다. 캐시상점에서 구매할 수 있습니다.' }
   ];
   var DB_LOOKUP = {};
   DB.forEach(function (it) { DB_LOOKUP[it.name.toLowerCase()] = it; });

@@ -55,6 +55,10 @@
    - tiles3d: the same seams as npcs - the Google 3D Tiles layer is
      a world feature; the module itself is the LIGHT decision entry
      (the heavy renderer loads only on a tilesEnabled:true decision).
+   - cashshop: the same seams as npcs - the cash shop (Han decision
+     round 3, 2026-11-09) is reachable from anywhere in the map
+     (its floating button self-gates on body.in-map), so it arms
+     with the arrival bundle like the other world features.
    Every import is fire-and-forget with a console warning on
    failure; a failed lazy load never breaks the page.
    __espilLazyState() reports what has landed (rig probes). */
@@ -104,7 +108,7 @@
   window.addEventListener('espil-dive-start', function () { load('tutorial.js'); });
   window.addEventListener('espil-guide', function (e) {
     var d = e && e.detail; if (!d) return;
-    if (d.type === 'arrival') { socialBundle(); load('npcs.js'); load('monsters.js'); load('tiles3d.js'); }
+    if (d.type === 'arrival') { socialBundle(); load('npcs.js'); load('monsters.js'); load('tiles3d.js'); load('cashshop.js'); load('arena.js'); }
     if (d.type === 'interior') { storePair(); load('panels.js'); }
   });
   window.addEventListener('espil-party-frame', socialBundle);
@@ -146,7 +150,7 @@
      interception must be resident before the Enter click. 600 ms,
      and each arm is a no-op once loaded. */
   setInterval(function () {
-    if (document.body && document.body.classList.contains('in-map')) { socialBundle(); load('npcs.js'); load('monsters.js'); load('tiles3d.js'); }
+    if (document.body && document.body.classList.contains('in-map')) { socialBundle(); load('npcs.js'); load('monsters.js'); load('tiles3d.js'); load('cashshop.js'); load('arena.js'); }
     if (window.__espilInside) storePair();
     var bp = document.getElementById('bldg-panel');
     if (bp && bp.getAttribute('aria-hidden') === 'false') load('store-page-link.js');
