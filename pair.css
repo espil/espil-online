@@ -1740,23 +1740,41 @@
        block with ID selectors (#signin-modal / #char-custom) and
        entry-flow.js paints the auth zone inside the modal. The
        body-prefixed rules below outrank both, colours only. */
-    body #signin-modal .modal {
+    body #signin-div.modal {
       background-image:linear-gradient(180deg,rgba(46,29,15,.97),rgba(28,18,9,.96)),url("assets/tex/logwood.jpg");
       background-size:cover,380px; border:2px solid #54381f; color:#f5e6c8;
       box-shadow:0 24px 60px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,224,170,.18);
     }
-    body #signin-modal .modal h2 { color:#ffe9b0; text-shadow:0 0 14px rgba(255,217,122,.3); }
-    body #signin-modal .modal-sub { color:rgba(232,220,192,.75); }
-    body #signin-modal .modal-close { color:#caa06a; }
-    body #signin-modal .modal-divider { color:#caa06a; }
-    body #signin-modal .provider {
+    body #signin-div.modal h2 { color:#ffe9b0; text-shadow:0 0 14px rgba(255,217,122,.3); }
+    body #signin-div .modal-sub { color:rgba(232,220,192,.75); }
+    body #signin-div .modal-close { color:#caa06a; }
+    body #signin-div .modal-divider { color:#caa06a; }
+    body #signin-div .provider {
       background-image:linear-gradient(180deg,rgba(84,56,31,.9),rgba(52,35,19,.92)),url("assets/tex/logwood.jpg");
       background-size:cover,220px; border:2px solid #6b4a2f; color:#f5e6c8;
       box-shadow:inset 0 1px 0 rgba(255,224,170,.25), inset 0 -3px 0 rgba(0,0,0,.35);
     }
-    body #signin-modal .provider.guest-enter { background:linear-gradient(180deg,#8a5a2b,#6e4520); border-color:#54381f; color:#ffe9b0; text-shadow:0 1px 2px rgba(40,20,0,.5); box-shadow:0 4px 12px rgba(20,10,0,.45); }
-    body #signin-modal .provider-logo { border-color:#6b4a2f; background:linear-gradient(180deg,#e8cf9f,#caa06a); box-shadow:inset 0 -3px 0 rgba(84,56,31,.35); }
-    body #signin-modal .provider-note { color:rgba(232,220,192,.7); }
+    body #signin-div .provider.guest-enter { background:linear-gradient(180deg,#8a5a2b,#6e4520); border-color:#54381f; color:#ffe9b0; text-shadow:0 1px 2px rgba(40,20,0,.5); box-shadow:0 4px 12px rgba(20,10,0,.45); }
+    body #signin-div .provider-logo { border-color:#6b4a2f; background:linear-gradient(180deg,#e8cf9f,#caa06a); box-shadow:inset 0 -3px 0 rgba(84,56,31,.35); }
+    body #signin-div .provider-note { color:rgba(232,220,192,.7); }
+
+    /* Sign-in presentation (Han 2026-11-10): the sign-in form lives
+       INSIDE the landing text div (#city-status) - the div itself
+       switches to its login state (.auth-open) while a gate is
+       presented. #signin-modal is kept only as the presenters'
+       aria-hidden signal element and never renders. */
+    #signin-modal { display:none !important; }
+    #signin-div { display:none; transform:none; margin:0 auto; max-height:calc(100dvh - 110px); }
+    #city-status.auth-open #signin-div { display:flex; }
+    #city-status.gate-hidden.auth-open { display:block !important; }
+    #city-status.auth-open::before, #city-status.auth-open::after { display:none; }
+    #city-status.auth-open .city-clock,
+    #city-status.auth-open .city-list,
+    #city-status.auth-open .city-phase,
+    #city-status.auth-open .site-credit,
+    #city-status.auth-open #city-message,
+    #city-status.auth-open #sprint-indicator,
+    #city-status.auth-open #sprint-toggle { display:none !important; }
     body #char-custom { background:rgba(16,10,4,.82); }
     body #char-custom .char-card-wrap {
       background-image:linear-gradient(180deg,rgba(46,29,15,.96),rgba(28,18,9,.97)),url("assets/tex/logwood.jpg");

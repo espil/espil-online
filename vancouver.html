@@ -162,22 +162,22 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
     }
   </style>
 <style id="espil-logo-off">.mapboxgl-ctrl-logo{display:none!important}
-#signin-modal .modal{background:linear-gradient(180deg,#fffbf0,#fff3dc);border:2px solid #d9b380;color:#5a4020;box-shadow:0 24px 60px rgba(90,60,20,.35)}
-#signin-modal .modal h2{color:#6b4a1f;text-shadow:none}
-#signin-modal .modal-sub{color:#8a6a3b}
-#signin-modal .modal-close{color:#8a6a3b}
-#signin-modal .modal-divider{color:#a8742c}
-#signin-modal .provider{background:linear-gradient(180deg,#fffdf6,#ffeecd);border:2px solid #cfa96f;color:#6b4a1f;box-shadow:inset 0 -3px 0 rgba(207,169,111,.35)}
-#signin-modal .provider:disabled{opacity:.55}
-#signin-modal .provider.guest-enter{background:linear-gradient(180deg,#ffb84d,#f08c1a);border-color:#d97f10;color:#fff;text-shadow:0 1px 2px rgba(120,60,0,.5);box-shadow:0 4px 12px rgba(190,110,10,.4)}
-#signin-modal .provider-social-row{display:flex;justify-content:center;gap:14px;margin:2px 0 6px}
-#signin-modal .provider-logo{appearance:none;width:46px;height:46px;border-radius:50%;border:2px solid #cfa96f;background:linear-gradient(180deg,#fffdf6,#ffeecd);display:flex;align-items:center;justify-content:center;padding:0;box-shadow:inset 0 -3px 0 rgba(207,169,111,.35)}
-#signin-modal .provider-logo svg{width:22px;height:22px;display:block}
-#signin-modal .provider-logo:disabled{opacity:.55;cursor:default;filter:saturate(.35)}
-#signin-modal .provider-note{margin:2px 0 0;font-size:.72rem;color:#8a6a3b;text-align:center}
-#signin-modal .auth-guestonly-note{margin:10px 0 0;font-size:.76rem;line-height:1.5;color:#c2571b}
-#signin-modal #auth-box input:disabled{opacity:.55;cursor:not-allowed}
-#signin-modal .auth-btn:disabled{opacity:.5;cursor:not-allowed}
+#signin-div.modal{background:linear-gradient(180deg,#fffbf0,#fff3dc);border:2px solid #d9b380;color:#5a4020;box-shadow:0 24px 60px rgba(90,60,20,.35)}
+#signin-div.modal h2{color:#6b4a1f;text-shadow:none}
+#signin-div.modal-sub{color:#8a6a3b}
+#signin-div.modal-close{color:#8a6a3b}
+#signin-div.modal-divider{color:#a8742c}
+#signin-div .provider{background:linear-gradient(180deg,#fffdf6,#ffeecd);border:2px solid #cfa96f;color:#6b4a1f;box-shadow:inset 0 -3px 0 rgba(207,169,111,.35)}
+#signin-div .provider:disabled{opacity:.55}
+#signin-div .provider.guest-enter{background:linear-gradient(180deg,#ffb84d,#f08c1a);border-color:#d97f10;color:#fff;text-shadow:0 1px 2px rgba(120,60,0,.5);box-shadow:0 4px 12px rgba(190,110,10,.4)}
+#signin-div .provider-social-row{display:flex;justify-content:center;gap:14px;margin:2px 0 6px}
+#signin-div .provider-logo{appearance:none;width:46px;height:46px;border-radius:50%;border:2px solid #cfa96f;background:linear-gradient(180deg,#fffdf6,#ffeecd);display:flex;align-items:center;justify-content:center;padding:0;box-shadow:inset 0 -3px 0 rgba(207,169,111,.35)}
+#signin-div .provider-logo svg{width:22px;height:22px;display:block}
+#signin-div .provider-logo:disabled{opacity:.55;cursor:default;filter:saturate(.35)}
+#signin-div .provider-note{margin:2px 0 0;font-size:.72rem;color:#8a6a3b;text-align:center}
+#signin-div .auth-guestonly-note{margin:10px 0 0;font-size:.76rem;line-height:1.5;color:#c2571b}
+#signin-div #auth-box input:disabled{opacity:.55;cursor:not-allowed}
+#signin-div .auth-btn:disabled{opacity:.5;cursor:not-allowed}
 #char-custom .char-card-wrap{background:linear-gradient(180deg,#fffbf0,#fff3dc);border:2px solid #d9b380;color:#5a4020;box-shadow:0 24px 60px rgba(90,60,20,.35)}
 #char-custom .char-card-wrap h2{color:#6b4a1f;text-shadow:none}
 #char-custom .char-sub{color:#8a6a3b}
@@ -185,8 +185,8 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
 #char-custom .char-card.is-selected{border-color:#b57708;background:linear-gradient(180deg,#ffe9b8,#ffd98c);box-shadow:0 2px 8px rgba(150,100,20,.35)}
 #char-custom #char-confirm{background:linear-gradient(180deg,#ffb84d,#f08c1a);border:2px solid #d97f10;color:#fff;text-shadow:0 1px 2px rgba(120,60,0,.5);box-shadow:0 4px 12px rgba(190,110,10,.4)}
 #char-custom input[type="text"]{background:#fffdf6;border:1.5px solid #d9b380;color:#5a4020}
-#signin-modal #auth-box{visibility:hidden}
-#signin-modal #auth-box[data-entryflow="1"]{visibility:visible}
+#signin-div #auth-box{visibility:hidden}
+#signin-div #auth-box[data-entryflow="1"]{visibility:visible}
 </style>
 </head>
 <body>
@@ -283,44 +283,7 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
       </div>
       <p class="bgm-card-hint" id="bgm-card-state">Now playing &middot; loops forever</p>
     </div>
-    <div class="modal-backdrop" id="signin-modal" aria-hidden="true">
-      <div class="modal" role="dialog" aria-modal="true" aria-label="Sign in to ESPIL Online">
-        <button class="modal-close" id="signin-close" type="button" aria-label="Close sign in">&times;</button>
-        <h2 data-i18n="signinTitle">ENTER ESPIL ONLINE</h2>
-        <p class="modal-sub" data-i18n="signinSub">Choose how you'd like to arrive.</p>
-        <p class="bypass-note" id="signin-bypass" hidden>TESTING BYPASS &mdash; continuing as guest&hellip;</p>
-        <!-- Batch A (Han 2026-11-02 #1/#2): guest-only entry until the
-             server account system lands. The account form stays in
-             place but is disabled, with the reason written under it;
-             ENTER AS GUEST is the modal's one active control. The
-             social providers move to the BOTTOM of the modal as
-             logo-only round buttons, disabled, marked in preparation.
-             The character choice happens in the next step. -->
-        <div class="modal-divider">Account</div>
-        <div id="auth-box" style="text-align:left;">
-          <label for="auth-id" style="display:block;font:700 .66rem/1.4 'Manrope',sans-serif;letter-spacing:.14em;color:#8fb8b3;margin:2px 0 5px;">EMAIL</label>
-          <input id="auth-id" type="email" maxlength="254" autocomplete="email" placeholder="you@example.com"  style="display:block;width:100%;box-sizing:border-box;background:rgba(6,12,18,.85);border:1px solid rgba(134,238,228,.45);border-radius:9px;padding:10px 11px;font-size:14px;color:#fff;outline:none;" />
-          <label for="auth-pw" style="display:block;font:700 .66rem/1.4 'Manrope',sans-serif;letter-spacing:.14em;color:#8fb8b3;margin:10px 0 5px;">PASSWORD</label>
-          <input id="auth-pw" type="password" maxlength="128" autocomplete="current-password" placeholder="8 characters or more"  style="display:block;width:100%;box-sizing:border-box;background:rgba(6,12,18,.85);border:1px solid rgba(134,238,228,.45);border-radius:9px;padding:10px 11px;font-size:14px;color:#fff;outline:none;" />
-          <div style="display:flex;gap:8px;margin-top:12px;">
-            <button class="auth-btn" id="auth-signin" type="button"  style="flex:1;appearance:none;border:1px solid rgba(134,238,228,.55);border-radius:12px;padding:12px;background:rgba(18,44,50,.8);color:#eafffd;font:800 .78rem/1 'Manrope',sans-serif;letter-spacing:.08em;cursor:pointer;">SIGN IN</button>
-            <button class="auth-btn" id="auth-signup" type="button"  style="flex:1;appearance:none;border:1px solid rgba(169,226,222,.25);border-radius:12px;padding:12px;background:rgba(10,26,31,.6);color:#e8f4f3;font:800 .78rem/1 'Manrope',sans-serif;letter-spacing:.08em;cursor:pointer;">SIGN UP</button>
-          </div>
-          <p id="auth-msg" style="min-height:1.2em;margin:9px 0 0;font-size:.76rem;line-height:1.5;color:#ffd97a;"></p>
-          <p id="auth-session" hidden style="margin:4px 0 0;font-size:.76rem;line-height:1.5;color:#8ef7e8;"></p>
-          <p class="auth-guestonly-note">Sign up with your email and password, or continue with Google. Your character and progress save to your account.</p>
-        </div>
-        <div class="modal-divider">Guest</div>
-        <button class="provider guest-enter" id="guest-enter" type="button" data-i18n="guestEnter">ENTER AS GUEST</button>
-        <div class="modal-divider">Social</div>
-        <div class="provider-social-row">
-          <button class="provider-logo" type="button" data-provider="Google" aria-label="Sign in with Google"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M23.5 12.27c0-.85-.08-1.66-.22-2.45H12v4.64h6.45a5.52 5.52 0 0 1-2.4 3.58v2.97h3.88c2.28-2.1 3.57-5.19 3.57-8.74z"/><path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.94-2.91l-3.88-2.97c-1.08.72-2.45 1.15-4.06 1.15-3.12 0-5.77-2.11-6.71-4.96H1.28v3.07A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.29 14.31A7.2 7.2 0 0 1 4.91 12c0-.8.14-1.58.38-2.31V6.62H1.28a12 12 0 0 0 0 10.76l4.01-3.07z"/><path fill="#EA4335" d="M12 4.73c1.76 0 3.35.61 4.6 1.8l3.44-3.44A11.98 11.98 0 0 0 12 0 12 12 0 0 0 1.28 6.62l4.01 3.07C6.23 6.84 8.88 4.73 12 4.73z"/></svg></button>
-          <button class="provider-logo" type="button" data-provider="Apple" disabled aria-label="Apple sign-in (in preparation)"><svg viewBox="0 0 384 512" aria-hidden="true"><path fill="#55534e" d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg></button>
-          <button class="provider-logo" type="button" data-provider="Facebook" disabled aria-label="Facebook sign-in (in preparation)"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#1877F2" d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.09 10.13 24v-8.44H7.08v-3.49h3.04V9.41c0-3.02 1.8-4.7 4.54-4.7 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.96.93-1.96 1.89v2.26h3.33l-.53 3.49h-2.8V24C19.61 23.09 24 18.1 24 12.07z"/></svg></button>
-        </div>
-        <p class="provider-note">Apple and Facebook sign-in are in preparation.</p>
-      </div>
-    </div>
+    <div class="modal-backdrop" id="signin-modal" aria-hidden="true"></div>
     <!-- Notice panel (Han 2026-10-19): opened from the landing topbar.
          Sections render from ESPIL_NOTICE_CONTENT below - edit the
          arrays to update the notice; the markup never changes. -->
@@ -374,6 +337,42 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
     </div>
     <audio id="bgm" loop preload="auto" src="assets/Green_bgm_landing.mp3"></audio>
     <div class="city-readout" id="city-status">
+      <div class="modal" id="signin-div" role="dialog" aria-label="Sign in to ESPIL Online">
+        <button class="modal-close" id="signin-close" type="button" aria-label="Close sign in">&times;</button>
+        <h2 data-i18n="signinTitle">ENTER ESPIL ONLINE</h2>
+        <p class="modal-sub" data-i18n="signinSub">Choose how you'd like to arrive.</p>
+        <p class="bypass-note" id="signin-bypass" hidden>TESTING BYPASS &mdash; continuing as guest&hellip;</p>
+        <!-- Batch A (Han 2026-11-02 #1/#2): guest-only entry until the
+             server account system lands. The account form stays in
+             place but is disabled, with the reason written under it;
+             ENTER AS GUEST is the modal's one active control. The
+             social providers move to the BOTTOM of the modal as
+             logo-only round buttons, disabled, marked in preparation.
+             The character choice happens in the next step. -->
+        <div class="modal-divider">Account</div>
+        <div id="auth-box" style="text-align:left;">
+          <label for="auth-id" style="display:block;font:700 .66rem/1.4 'Manrope',sans-serif;letter-spacing:.14em;color:#8fb8b3;margin:2px 0 5px;">EMAIL</label>
+          <input id="auth-id" type="email" maxlength="254" autocomplete="email" placeholder="you@example.com"  style="display:block;width:100%;box-sizing:border-box;background:rgba(6,12,18,.85);border:1px solid rgba(134,238,228,.45);border-radius:9px;padding:10px 11px;font-size:14px;color:#fff;outline:none;" />
+          <label for="auth-pw" style="display:block;font:700 .66rem/1.4 'Manrope',sans-serif;letter-spacing:.14em;color:#8fb8b3;margin:10px 0 5px;">PASSWORD</label>
+          <input id="auth-pw" type="password" maxlength="128" autocomplete="current-password" placeholder="8 characters or more"  style="display:block;width:100%;box-sizing:border-box;background:rgba(6,12,18,.85);border:1px solid rgba(134,238,228,.45);border-radius:9px;padding:10px 11px;font-size:14px;color:#fff;outline:none;" />
+          <div style="display:flex;gap:8px;margin-top:12px;">
+            <button class="auth-btn" id="auth-signin" type="button"  style="flex:1;appearance:none;border:1px solid rgba(134,238,228,.55);border-radius:12px;padding:12px;background:rgba(18,44,50,.8);color:#eafffd;font:800 .78rem/1 'Manrope',sans-serif;letter-spacing:.08em;cursor:pointer;">SIGN IN</button>
+            <button class="auth-btn" id="auth-signup" type="button"  style="flex:1;appearance:none;border:1px solid rgba(169,226,222,.25);border-radius:12px;padding:12px;background:rgba(10,26,31,.6);color:#e8f4f3;font:800 .78rem/1 'Manrope',sans-serif;letter-spacing:.08em;cursor:pointer;">SIGN UP</button>
+          </div>
+          <p id="auth-msg" style="min-height:1.2em;margin:9px 0 0;font-size:.76rem;line-height:1.5;color:#ffd97a;"></p>
+          <p id="auth-session" hidden style="margin:4px 0 0;font-size:.76rem;line-height:1.5;color:#8ef7e8;"></p>
+          <p class="auth-guestonly-note">Sign up with your email and password, or continue with Google. Your character and progress save to your account.</p>
+        </div>
+        <div class="modal-divider">Guest</div>
+        <button class="provider guest-enter" id="guest-enter" type="button" data-i18n="guestEnter">ENTER AS GUEST</button>
+        <div class="modal-divider">Social</div>
+        <div class="provider-social-row">
+          <button class="provider-logo" type="button" data-provider="Google" aria-label="Sign in with Google"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M23.5 12.27c0-.85-.08-1.66-.22-2.45H12v4.64h6.45a5.52 5.52 0 0 1-2.4 3.58v2.97h3.88c2.28-2.1 3.57-5.19 3.57-8.74z"/><path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.94-2.91l-3.88-2.97c-1.08.72-2.45 1.15-4.06 1.15-3.12 0-5.77-2.11-6.71-4.96H1.28v3.07A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.29 14.31A7.2 7.2 0 0 1 4.91 12c0-.8.14-1.58.38-2.31V6.62H1.28a12 12 0 0 0 0 10.76l4.01-3.07z"/><path fill="#EA4335" d="M12 4.73c1.76 0 3.35.61 4.6 1.8l3.44-3.44A11.98 11.98 0 0 0 12 0 12 12 0 0 0 1.28 6.62l4.01 3.07C6.23 6.84 8.88 4.73 12 4.73z"/></svg></button>
+          <button class="provider-logo" type="button" data-provider="Apple" disabled aria-label="Apple sign-in (in preparation)"><svg viewBox="0 0 384 512" aria-hidden="true"><path fill="#55534e" d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg></button>
+          <button class="provider-logo" type="button" data-provider="Facebook" disabled aria-label="Facebook sign-in (in preparation)"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#1877F2" d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.09 10.13 24v-8.44H7.08v-3.49h3.04V9.41c0-3.02 1.8-4.7 4.54-4.7 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.96.93-1.96 1.89v2.26h3.33l-.53 3.49h-2.8V24C19.61 23.09 24 18.1 24 12.07z"/></svg></button>
+        </div>
+        <p class="provider-note">Apple and Facebook sign-in are in preparation.</p>
+      </div>
       <time class="city-clock" id="city-clock" aria-label="Local time"></time>
       <div class="city-list" id="city-list" aria-label="City selector. Scroll the reel and choose the centered city."></div>
       <div class="city-phase" id="city-phase" aria-hidden="true">

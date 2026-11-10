@@ -725,6 +725,43 @@
     if (step === 'login' && sessionRecord()) completeLogin();
   }, 500);
 
+  /* Order guard (Han 2026-11-10: mode selection comes BEFORE
+     city selection): until the flow reaches the city step,
+     monolith's native reel keys (Enter / ArrowUp / ArrowDown)
+     must not step or select a city - during the intro slide-up
+     window and at the menu step the reel is hidden, but the
+     keys would otherwise still drive it. Keys that belong to
+     the intro, to a form control, to the sign-in div or to
+     this flow's own panels pass through untouched. */
+  document.addEventListener('keydown', function (e) {
+    if (step === 'city' || step === 'done') return;
+    if (e.key !== 'Enter' && e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    if (window.__espilIntroActive) return;
+    var t = e.target;
+    if (t) {
+      var tag = t.tagName || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (t.closest && (t.closest('#signin-div') || t.closest('#espil-mainmenu') ||
+          t.closest('#espil-zealandia-panel') || t.closest('#espil-about-panel') ||
+          t.closest('#espil-cityprep-panel'))) return;
+    }
+    e.stopPropagation();
+    e.preventDefault();
+  }, true);
+
+  /* Same order guard for the mouse: a click on the globe canvas
+     before the city step can raycast-select a city (monolith
+     flies the camera and the city info panel follows) - swallow
+     canvas clicks until the city step. Orbit dragging is driven
+     by pointer movement, not by the click event, so the start
+     presentation's globe stays orbitable. */
+  document.addEventListener('click', function (e) {
+    if (step === 'city' || step === 'done') return;
+    if (window.__espilIntroActive) return;
+    var t = e.target;
+    if (t && t.tagName === 'CANVAS') e.stopPropagation();
+  }, true);
+
   /* probe/inspection hook */
   window.__espilLandingFlow = {
     step: function () { return step; },
@@ -733,6 +770,15 @@
   };
 
   /* ---------------- boot: the intro plays first, as today ------ */
+  /* Order (Han 2026-11-10): the city-selection reel inside the
+     text div is not presented before the mode menu. The div
+     starts gate-hidden (the intro covers the first moments, as
+     today), shows the login form at the login step (.auth-open
+     overrides gate-hidden for the form alone), stays hidden at
+     the menu step, and returns only at the city step, where
+     chooseMode removes gate-hidden exactly as before. */
+  var csBoot = $('city-status');
+  if (csBoot) csBoot.classList.add('gate-hidden');
   var bootTries = 0;
   var bootTimer = setInterval(function () {
     bootTries++;

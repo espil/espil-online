@@ -234,6 +234,24 @@
     if(closeBtn)closeBtn.addEventListener('click',closeModal);
     if(modal)modal.addEventListener('click',function(e){ if(e.target===modal)closeModal(); });
     document.addEventListener('keydown',function(e){ if(e.key==='Escape')closeModal(); });
+    /* Sign-in presentation (Han 2026-11-10): the sign-in form itself
+       now lives inside the landing text div (#city-status) as
+       #signin-div - the div switches to its login state (.auth-open)
+       while a gate is presented. #signin-modal remains only the
+       presenters' signal: monolith's entry gate, entry-flow's
+       landing step and social.js's completion all flip its
+       aria-hidden exactly as before, and this mirror renders that
+       signal on the div. The backdrop itself never renders
+       (pair.css #signin-modal{display:none}). */
+    var cityStatusEl=document.getElementById('city-status');
+    function paintSigninDiv(){
+      if(!cityStatusEl||!modal)return;
+      cityStatusEl.classList.toggle('auth-open',modal.getAttribute('aria-hidden')==='false');
+    }
+    if(modal&&cityStatusEl){
+      paintSigninDiv();
+      new MutationObserver(paintSigninDiv).observe(modal,{attributes:true,attributeFilter:['aria-hidden']});
+    }
     var providers=document.querySelectorAll('.provider');
     Array.prototype.forEach.call(providers,function(btn){
       btn.addEventListener('click',function(){

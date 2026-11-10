@@ -117,23 +117,31 @@
     if (d.type === 'interior') { storePair(); load('panels.js'); }
   });
   window.addEventListener('espil-party-frame', socialBundle);
-  /* The login gate's seam (GAP-1, 2026-11-10): the game-page
-     login gate and the landing flow's login step both present
-     the sign-in modal before any arrival can fire, and the
-     flipped pair's form handlers live in social.js alone - so
-     the modal becoming visible arms social.js. Only social.js
-     arms here: stall2 / tutorial / panels keep their arrival
-     seams (the tutorial must never arm inside the entry
-     sequence), and the arrival bundle still lands the rest at
-     the join moment. If the modal is already open when this
+  /* The login gate's seam (GAP-1, 2026-11-10; re-connected for the
+     div form the same day): the game-page login gate and the
+     landing flow's login step both present the sign-in form
+     before any arrival can fire, and the flipped pair's form
+     handlers live in social.js alone - so the form becoming
+     visible arms social.js. Only social.js arms here: stall2 /
+     tutorial / panels keep their arrival seams (the tutorial
+     must never arm inside the entry sequence), and the arrival
+     bundle still lands the rest at the join moment.
+     SEAM RE-CONNECTION: the form no longer lives in #signin-modal
+     (kept as the presenters' aria-hidden signal only); it is
+     #signin-div inside the landing text div (#city-status), and
+     landing-auth.js mirrors the gate signal onto the div as the
+     .auth-open class. The presented moment is therefore the div
+     gaining .auth-open, and that class change is what arms
+     social.js now - the direct analogue of the old modal-open
+     trigger. If the div form is already presented when this
      loader boots, arm immediately. */
   (function armSocialAtGate() {
-    var m = document.getElementById('signin-modal');
-    if (!m) { setTimeout(armSocialAtGate, 800); return; }
-    if (m.getAttribute('aria-hidden') === 'false') load('social.js');
+    var cs = document.getElementById('city-status');
+    if (!cs) { setTimeout(armSocialAtGate, 800); return; }
+    if (cs.classList.contains('auth-open')) load('social.js');
     new MutationObserver(function () {
-      if (m.getAttribute('aria-hidden') === 'false') load('social.js');
-    }).observe(m, { attributes: true, attributeFilter: ['aria-hidden'] });
+      if (cs.classList.contains('auth-open')) load('social.js');
+    }).observe(cs, { attributes: true, attributeFilter: ['class'] });
   })();
   document.addEventListener('keydown', function (e) {
     var ae = document.activeElement, tag = (ae && ae.tagName) || '';
