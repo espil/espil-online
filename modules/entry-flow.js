@@ -503,22 +503,25 @@
   /* ---------------- styling (own style element) ---------------- */
   var css = document.createElement('style');
   css.id = 'espil-landing-flow-css';
+  /* Unified city-list form (Han 2026-11-10: "every choice is
+     handled through the city-list" + "use the city-list text
+     style"): the flow's views are plain list blocks INSIDE the
+     readout - #espil-flow-ui, built below inside #city-status,
+     and pair.css owns the .flow-open switch that yields the
+     readout's city children to them. No card, no overlay, at any
+     step: choice entries are buttons carrying pair.css's own
+     .city-name class, so their text style IS the city-list text
+     style by construction. */
   css.textContent =
-    '#espil-mainmenu,#espil-zealandia-panel,#espil-about-panel,#espil-cityprep-panel{position:fixed;inset:0;z-index:60;display:none;' +
-      'align-items:center;justify-content:center;background:rgba(4,6,9,.55);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}' +
-    '#espil-mainmenu[aria-hidden="false"],#espil-zealandia-panel[aria-hidden="false"],' +
-    '#espil-about-panel[aria-hidden="false"],#espil-cityprep-panel[aria-hidden="false"]{display:flex}' +
-    '.espil-flow-card{width:min(92vw,380px);background:rgba(9,11,15,.92);border:1px solid rgba(255,217,122,.35);border-radius:16px;' +
-      'padding:26px 24px 22px;text-align:center;box-shadow:0 18px 50px rgba(0,0,0,.55);font-family:"Manrope",sans-serif;color:#f3ead2}' +
-    '.espil-flow-card h2{margin:0 0 4px;font-size:21px;font-weight:800;letter-spacing:.02em;color:#ffe9a8}' +
-    '.espil-flow-card .espil-flow-sub{margin:0 0 18px;font-size:12px;line-height:1.55;color:rgba(243,234,210,.72)}' +
-    '.espil-flow-card p.espil-flow-copy{margin:0 0 18px;font-size:13px;line-height:1.65;color:rgba(243,234,210,.88);text-align:left}' +
-    '.espil-flow-btn{display:block;width:100%;margin:8px 0;padding:12px 14px;border-radius:11px;border:1px solid rgba(255,217,122,.4);' +
-      'background:rgba(255,217,122,.08);color:#ffe9a8;font:800 14px "Manrope",sans-serif;letter-spacing:.03em;cursor:pointer}' +
-    '.espil-flow-btn:hover{background:rgba(255,217,122,.18)}' +
-    '.espil-flow-btn.espil-flow-primary{background:linear-gradient(180deg,#ffd97a,#e8ae3c);color:#241a04;border-color:#ffd97a}' +
-    '.espil-flow-btn.espil-flow-ghost{background:transparent;border-color:rgba(243,234,210,.25);color:rgba(243,234,210,.8);font-weight:700}' +
-    '#espil-cityprep-name{color:#ffe9a8}';
+    '.espil-flow-view{display:none}' +
+    '.espil-flow-view[aria-hidden="false"]{display:block}' +
+    '.espil-flow-title{padding:10px 16px 2px;color:#fff8e1;font:800 1rem/1.3 "Manrope",sans-serif;letter-spacing:.16em;' +
+      'text-shadow:0 0 8px rgba(255,217,77,.95),0 0 26px rgba(255,180,40,.55)}' +
+    '.espil-flow-sub{margin:0 0 6px;padding:0 16px;color:rgba(232,220,192,.55);font:600 .72rem/1.5 "Manrope",sans-serif;letter-spacing:.08em}' +
+    '.espil-flow-copy{margin:0;padding:8px 14px 12px;color:rgba(232,220,192,.78);font:600 .76rem/1.65 "Manrope",sans-serif;letter-spacing:.04em}' +
+    '#espil-city-back{display:none}' +
+    '#city-status.city-step:not(.flow-open) #espil-city-back{display:flex}' +
+    '#city-status.is-city #espil-city-back{display:none !important}';
   document.head.appendChild(css);
 
   /* ---------------- DOM: menu + panels ---------------- */
@@ -529,64 +532,140 @@
     n.setAttribute('aria-hidden', 'true');
     return n;
   }
+  function flowItem(id, label, primary) {
+    return '<button type="button" class="city-name espil-flow-item' + (primary ? ' is-centered' : '') +
+      '" id="' + id + '">' + label + '</button>';
+  }
   function buildUI() {
+    buildCityBack();
     if ($('espil-mainmenu')) return;
-    var menu = el('div', 'espil-mainmenu');
+    var cs = $('city-status');
+    if (!cs) return;
+    var ui = document.createElement('div');
+    ui.id = 'espil-flow-ui';
+
+    var menu = el('div', 'espil-mainmenu', 'espil-flow-view');
     menu.setAttribute('role', 'dialog');
     menu.setAttribute('aria-label', 'Espil Online menu');
     menu.innerHTML =
-      '<div class="espil-flow-card"><h2>Espil Online</h2>' +
+      '<div class="espil-flow-title">Espil Online</div>' +
       '<p class="espil-flow-sub">A digital replica of this world, in real time.</p>' +
-      '<button type="button" class="espil-flow-btn espil-flow-primary" id="espil-menu-play">Play</button>' +
-      '<button type="button" class="espil-flow-btn" id="espil-menu-shop">Shop</button>' +
-      '<button type="button" class="espil-flow-btn" id="espil-menu-zealandia">Zealandia</button>' +
-      '<button type="button" class="espil-flow-btn espil-flow-ghost" id="espil-menu-about">About</button></div>';
-    document.body.appendChild(menu);
+      flowItem('espil-menu-play', 'Play', true) +
+      flowItem('espil-menu-shop', 'Shop', false) +
+      flowItem('espil-menu-zealandia', 'Zealandia', false) +
+      flowItem('espil-menu-about', 'About', false) +
+      flowItem('espil-menu-back', 'Back', false);
+    ui.appendChild(menu);
 
-    var zea = el('div', 'espil-zealandia-panel');
+    var zea = el('div', 'espil-zealandia-panel', 'espil-flow-view');
     zea.setAttribute('role', 'dialog');
     zea.setAttribute('aria-label', 'Zealandia');
     zea.innerHTML =
-      '<div class="espil-flow-card"><h2>Zealandia</h2>' +
+      '<div class="espil-flow-title">Zealandia</div>' +
       '<p class="espil-flow-copy">Zealandia is where the real game continues - in the Espil app for mobile and PC. ' +
       'There is no entry into Zealandia on the web: here the journey ends at the Auckland Time Stone, and the app takes over from there.</p>' +
-      '<button type="button" class="espil-flow-btn espil-flow-ghost" id="espil-zealandia-back">Back</button></div>';
-    document.body.appendChild(zea);
+      flowItem('espil-zealandia-back', 'Back', false);
+    ui.appendChild(zea);
 
-    var about = el('div', 'espil-about-panel');
+    var about = el('div', 'espil-about-panel', 'espil-flow-view');
     about.setAttribute('role', 'dialog');
     about.setAttribute('aria-label', 'About Espil Online');
     about.innerHTML =
-      '<div class="espil-flow-card"><h2>About Espil Online</h2>' +
+      '<div class="espil-flow-title">About Espil Online</div>' +
       '<p class="espil-flow-copy">Espil Online is a digital replica of this world, based on the real world in real time - ' +
       'the sky, the weather and the alignment of the stars move with the real world. Vancouver is the first city; ' +
       'the destination is a map of the whole world, with the city chosen by where you are.</p>' +
-      '<button type="button" class="espil-flow-btn espil-flow-ghost" id="espil-about-back">Back</button></div>';
-    document.body.appendChild(about);
+      flowItem('espil-about-back', 'Back', false);
+    ui.appendChild(about);
 
-    var prep = el('div', 'espil-cityprep-panel');
+    var prep = el('div', 'espil-cityprep-panel', 'espil-flow-view');
     prep.setAttribute('role', 'dialog');
     prep.setAttribute('aria-label', 'City in preparation');
     prep.innerHTML =
-      '<div class="espil-flow-card"><h2 id="espil-cityprep-name">City</h2>' +
+      '<div class="espil-flow-title" id="espil-cityprep-name">City</div>' +
       '<p class="espil-flow-copy">This city\'s data pack is in preparation. When it is ready, the city opens here exactly as it stands in the real world.</p>' +
-      '<button type="button" class="espil-flow-btn espil-flow-ghost" id="espil-cityprep-back">Back to city selection</button></div>';
-    document.body.appendChild(prep);
+      flowItem('espil-cityprep-back', 'Back to city selection', false);
+    ui.appendChild(prep);
+
+    cs.appendChild(ui);
 
     $('espil-menu-play').addEventListener('click', function () { chooseMode('play'); });
     $('espil-menu-shop').addEventListener('click', function () { chooseMode('shop'); });
-    $('espil-menu-zealandia').addEventListener('click', function () { show(zea); });
-    $('espil-menu-about').addEventListener('click', function () { show(about); });
-    $('espil-zealandia-back').addEventListener('click', function () { hide(zea); });
-    $('espil-about-back').addEventListener('click', function () { hide(about); });
-    $('espil-cityprep-back').addEventListener('click', function () { hide(prep); });
+    $('espil-menu-zealandia').addEventListener('click', function () { presentFlowView($('espil-zealandia-panel')); });
+    $('espil-menu-about').addEventListener('click', function () { presentFlowView($('espil-about-panel')); });
+    $('espil-menu-back').addEventListener('click', function () { backToLogin(); });
+    $('espil-zealandia-back').addEventListener('click', function () { presentFlowView($('espil-mainmenu')); });
+    $('espil-about-back').addEventListener('click', function () { presentFlowView($('espil-mainmenu')); });
+    $('espil-cityprep-back').addEventListener('click', function () { closePrep(); });
   }
   function show(n) { if (n) n.setAttribute('aria-hidden', 'false'); }
   function hide(n) { if (n) n.setAttribute('aria-hidden', 'true'); }
 
-  /* ---------------- the steps ---------------- */
-  function openLoginStep() {
-    if (step !== 'boot' && step !== 'login') return;
+  /* One presented view at a time inside the readout; presenting
+     one sets .flow-open on #city-status (pair.css yields the
+     readout's city children to the flow list and shows
+     #espil-flow-ui). Presenting none returns the readout to its
+     city face. */
+  var FLOW_VIEW_IDS = ['espil-mainmenu', 'espil-zealandia-panel', 'espil-about-panel', 'espil-cityprep-panel'];
+  function presentFlowView(view) {
+    buildUI();
+    FLOW_VIEW_IDS.forEach(function (id) { var n = $(id); if (n && n !== view) hide(n); });
+    if (view) show(view);
+    var cs = $('city-status');
+    if (cs) {
+      cs.classList.toggle('flow-open', !!view);
+      if (view) cs.classList.remove('gate-hidden');
+    }
+  }
+  function closePrep() {
+    hide($('espil-cityprep-panel'));
+    var cs = $('city-status');
+    if (cs) cs.classList.remove('flow-open');
+  }
+
+  /* Back entries (Han 2026-11-10: a way back at every step of
+     the city-list flow). The city step's Back lives in the
+     readout under the reel; the menu's Back is a list entry in
+     the menu view itself (built above). Back never logs out and
+     never wipes, parks or moves the session record. */
+  function buildCityBack() {
+    if ($('espil-city-back')) return;
+    var list = $('city-list');
+    if (!list || !list.parentNode) return;
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.id = 'espil-city-back';
+    b.className = 'city-name';
+    b.textContent = 'Back';
+    b.setAttribute('aria-label', 'Back to the mode menu');
+    list.parentNode.insertBefore(b, list.nextSibling);
+    b.addEventListener('click', function () { backToMenu(); });
+  }
+  function backToMenu() {
+    if (step !== 'city') return;
+    step = 'menu';
+    var cs = $('city-status'); if (cs) cs.classList.remove('city-step');
+    presentFlowView($('espil-mainmenu'));
+  }
+  /* loginHold: the flow stays at the login/guest step until that
+     step's own controls complete the gate. It is set by the
+     menu's Back (backToLogin) and by social.js through
+     window.__espilFlowHoldLogin when a name claim is abandoned
+     (the claim's session record is already written then, and the
+     player is returned to the login/guest selection to choose
+     how to proceed - the advance poll below must not sweep them
+     into the menu). Released when a gate completion hides the
+     modal signal on a live record, or by the guest entry's own
+     completion path. */
+  var loginHold = false;
+  window.__espilFlowHoldLogin = function () { loginHold = true; };
+  function backToLogin() {
+    if (step !== 'menu') return;
+    presentFlowView(null);
+    loginHold = true;
+    showLoginStep();
+  }
+  function showLoginStep() {
     step = 'login';
     if (typeof window.__espilOpenAuth === 'function') { window.__espilOpenAuth(); return; }
     var m = $('signin-modal');
@@ -595,6 +674,12 @@
       var cs = $('city-status'); if (cs) cs.classList.add('gate-hidden');
     }
   }
+
+  /* ---------------- the steps ---------------- */
+  function openLoginStep() {
+    if (step !== 'boot' && step !== 'login') return;
+    showLoginStep();
+  }
   function sessionRecord() {
     try { var s = JSON.parse(localStorage.getItem('espil_session_v1') || 'null'); return s && s.id ? s : null; }
     catch (e) { return null; }
@@ -602,10 +687,12 @@
   function completeLogin() {
     if (step !== 'login') return;
     step = 'menu';
+    loginHold = false;
     var m = $('signin-modal'); if (m) m.setAttribute('aria-hidden', 'true');
-    var cs = $('city-status'); if (cs) cs.classList.add('gate-hidden'); /* the menu owns the screen until Play/Shop */
-    buildUI();
-    show($('espil-mainmenu'));
+    var cs = $('city-status');
+    if (cs) { cs.classList.remove('gate-hidden'); cs.classList.remove('city-step'); }
+    buildUI(); /* the views must exist before the menu is resolved */
+    presentFlowView($('espil-mainmenu')); /* the menu is list content inside the text div */
   }
   function setEntryMode(mode) {
     chosenMode = mode;
@@ -614,9 +701,10 @@
   }
   function chooseMode(mode) {
     setEntryMode(mode);
-    hide($('espil-mainmenu'));
+    presentFlowView(null); /* the flow list yields to the readout's city face */
     step = 'city';
-    var cs = $('city-status'); if (cs) cs.classList.remove('gate-hidden'); /* city selection is live: the text div returns */
+    var cs = $('city-status');
+    if (cs) { cs.classList.remove('gate-hidden'); cs.classList.add('city-step'); /* city selection is live, with its Back entry */ }
     activateCityLayer();
   }
 
@@ -640,8 +728,9 @@
     return out;
   }
   function openPrep(name) {
+    buildUI();
     var n = $('espil-cityprep-name'); if (n) n.textContent = name;
-    show($('espil-cityprep-panel'));
+    presentFlowView($('espil-cityprep-panel'));
   }
   function activateCityLayer() {
     if (cityLayerActive) return;
@@ -720,9 +809,34 @@
   /* Sign-in completion (post-S0): a session record appearing
      while the flow sits at the login step advances it to the
      menu - this is how a Google return or an email sign-in
-     (startSession -> completeGate hides the modal) flows on. */
+     (startSession -> completeGate hides the modal) flows on.
+     Two holds apply (Han 2026-11-10):
+     - a sign-up NAME CLAIM pending or failed: social.js has
+       already written the (held) session record, but the gate
+       completes only when the claim resolves. The state is read
+       through __espilAuthState().nameClaim, never guessed here.
+     - loginHold (set by the menu's Back and by social.js's
+       claim-abandon hook __espilFlowHoldLogin): the flow stays
+       at the login/guest selection until the gate itself
+       completes - the modal signal hides - on a live record. */
+  function claimInFlight() {
+    try {
+      var st = window.__espilAuthState && window.__espilAuthState();
+      return !!(st && (st.nameClaim === 'pending' || st.nameClaim === 'failed'));
+    } catch (e) { return false; }
+  }
   setInterval(function () {
-    if (step === 'login' && sessionRecord()) completeLogin();
+    if (step !== 'login') return;
+    if (claimInFlight()) return;
+    if (loginHold) {
+      var m = $('signin-modal');
+      if (m && m.getAttribute('aria-hidden') === 'true' && sessionRecord()) {
+        loginHold = false;
+        completeLogin();
+      }
+      return;
+    }
+    if (sessionRecord()) completeLogin();
   }, 500);
 
   /* Order guard (Han 2026-11-10: mode selection comes BEFORE
@@ -762,6 +876,60 @@
     if (t && t.tagName === 'CANVAS') e.stopPropagation();
   }, true);
 
+  /* All cities OPEN from first presentation (Han 2026-11-10:
+     every city is open - the selection must not LOOK locked
+     either). Monolith builds its globe pins once and marks every
+     city outside its selectable set disabled + is-inactive
+     (pair.css greys them to 45% opacity). The city layer above
+     used to strip that only when the city step began, so the
+     login form and the mode menu sat in front of a globe whose
+     cities all read as closed. Strip the locked state from BOOT
+     instead, and keep it stripped: the poll runs until the pins
+     exist, and the observer re-strips if the locked state is
+     ever re-applied (monolith applies it once, at pin build;
+     nothing re-applies it per frame - the observer is the belt
+     on those braces). stripPinLocks mutates only when a lock is
+     actually present, so the observer cannot loop on its own
+     corrections. */
+  function stripPinLocks() {
+    var pins = document.querySelectorAll('#city-pins .city-pin');
+    for (var i = 0; i < pins.length; i++) {
+      if (pins[i].disabled) pins[i].disabled = false;
+      if (pins[i].classList.contains('is-inactive')) pins[i].classList.remove('is-inactive');
+    }
+    return pins.length;
+  }
+  var pinWatchTries = 0;
+  var pinWatchTimer = setInterval(function () {
+    pinWatchTries++;
+    if (stripPinLocks() > 0 || pinWatchTries > 400) clearInterval(pinWatchTimer);
+  }, 300);
+  var pinLayerEl = $('city-pins');
+  if (pinLayerEl && window.MutationObserver) {
+    new MutationObserver(function () { stripPinLocks(); }).observe(pinLayerEl, {
+      childList: true, subtree: true, attributes: true,
+      attributeFilter: ['class', 'disabled']
+    });
+  }
+
+  /* The acting half of the same order: the pins now LOOK open
+     from boot, but a pick must not ACT before the city step
+     (login/guest -> mode menu -> city selection). Swallow every
+     pin click until then, capture-phase like the canvas guard
+     above, so monolith's own pin handler (centre the reel,
+     select the city, start the approach) never runs early. At
+     the city step this guard steps aside and the city layer's
+     own capture handler routes the pick exactly as before
+     (Vancouver native, every other city the prep panel). */
+  document.addEventListener('click', function (e) {
+    if (step === 'city' || step === 'done') return;
+    var t = e.target;
+    if (t && t.closest && t.closest('.city-pin')) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  }, true);
+
   /* probe/inspection hook */
   window.__espilLandingFlow = {
     step: function () { return step; },
@@ -774,9 +942,10 @@
      text div is not presented before the mode menu. The div
      starts gate-hidden (the intro covers the first moments, as
      today), shows the login form at the login step (.auth-open
-     overrides gate-hidden for the form alone), stays hidden at
-     the menu step, and returns only at the city step, where
-     chooseMode removes gate-hidden exactly as before. */
+     overrides gate-hidden for the form alone), presents the
+     flow's list at the menu step (.flow-open, the same readout
+     carrying the menu instead of its city face), and returns to
+     the city face only at the city step. */
   var csBoot = $('city-status');
   if (csBoot) csBoot.classList.add('gate-hidden');
   var bootTries = 0;

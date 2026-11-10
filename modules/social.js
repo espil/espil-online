@@ -574,6 +574,74 @@
     authMsg(msg, true); paintAuth();
     setTimeout(completeGate, 350);
   }
+  /* Sign-up name claim (Han 2026-11-10 - an approved account-design
+     addition, presentation-frozen otherwise): when the form's name
+     field carries a value, registration still happens first (the
+     account is created with the server-derived name and the
+     session is issued at once, exactly as before); the entered
+     name is then claimed via the Worker's POST /auth/name. While a
+     claim is unresolved the gate is NOT completed, and the landing
+     flow's advance reads nameClaim through __espilAuthState() and
+     holds. A rejected claim leaves the user in the form with the
+     session live: SIGN UP then retries the claim with the field's
+     current value (never a re-register), an emptied field or the
+     form's Back entry abandons the claim and keeps the derived
+     name. Errors surface mapped and human - never raw payloads. */
+  var nameClaimState = 'idle'; /* idle | pending | failed */
+  var claimDerivedName = null;
+  function readName() { var el = $('auth-name'); return el ? el.value.trim() : ''; }
+  function setClaimBackVisible(v) { var b = $('auth-back'); if (b) b.hidden = !v; }
+  function holdSession(rec) {
+    try { localStorage.setItem(LS_SESSION, JSON.stringify({ id: rec.name, at: Date.now(), server: true })); } catch (_) {}
+    try { localStorage.setItem('espil_username', rec.name); } catch (_) {}
+    paintAuth();
+  }
+  function finishClaim(name) {
+    nameClaimState = 'idle';
+    setClaimBackVisible(false);
+    try { localStorage.setItem(LS_SESSION, JSON.stringify({ id: name, at: Date.now(), server: true })); } catch (_) {}
+    try { localStorage.setItem('espil_username', name); } catch (_) {}
+    authMsg('Account created. Welcome, ' + name + '.', true);
+    paintAuth();
+    setTimeout(completeGate, 350);
+  }
+  function failClaim(err) {
+    nameClaimState = 'failed';
+    setClaimBackVisible(true);
+    if (err === 'name_reserved') authMsg('That name is reserved. Enter a different name and press SIGN UP again.');
+    else if (err === 'name_taken') authMsg('That name is already taken. Enter a different name and press SIGN UP again.');
+    else if (err === 'invalid_name') authMsg('Names use 3 to 16 letters, numbers or underscores. Enter a different name and press SIGN UP again.');
+    else authMsg('That name could not be claimed. Press SIGN UP to try again.');
+  }
+  function claimName(name) {
+    nameClaimState = 'pending';
+    authMsg('Account created. Claiming your name...', true);
+    fetch(API_BASE + '/auth/name', {
+      method: 'POST', credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: name })
+    }).then(function (r) {
+      return r.json().then(function (b) { return { status: r.status, body: b }; });
+    }).then(function (res) {
+      if (res.status === 200 && res.body && res.body.user) finishClaim(res.body.user.name);
+      else failClaim(res.body && res.body.error);
+    }).catch(function () { failClaim(null); });
+  }
+  function abandonClaim() {
+    if (nameClaimState !== 'failed' && nameClaimState !== 'pending') return;
+    nameClaimState = 'idle';
+    setClaimBackVisible(false);
+    authMsg(claimDerivedName ? ('Account created. Welcome, ' + claimDerivedName + '.') : '', true);
+    /* Landing: return to the login/guest selection and stay there
+       (the flow is asked to hold its advance). The game-page gate
+       has no earlier step, so there the gate completes with the
+       derived name instead. */
+    if (window.__espilLandingFlow) {
+      try { if (window.__espilFlowHoldLogin) window.__espilFlowHoldLogin(); } catch (_) {}
+    } else {
+      setTimeout(completeGate, 350);
+    }
+  }
   function readCreds() {
     var idEl = $('auth-id'), pwEl = $('auth-pw');
     return { id: idEl ? idEl.value.trim() : '', pw: pwEl ? pwEl.value : '' };
@@ -586,6 +654,15 @@
   var GUEST_ONLY = false; /* S0 activation (flip step 2): server accounts are live. */
   function doSignup() {
     if (GUEST_ONLY) { authMsg('Account sign-in is paused - entry is guest-only until the server account system lands.'); return; }
+    /* Name-claim retry (Han 2026-11-10): with a failed claim and a
+       live session, SIGN UP is the claim's retry - never a second
+       registration. An emptied name field abandons the claim. */
+    if (nameClaimState === 'failed' && session()) {
+      var retryName = readName();
+      if (!retryName) { abandonClaim(); return; }
+      claimName(retryName);
+      return;
+    }
     /* S0 activation: email + password simple sign-up against the
        Worker (D3 as amended, Han 2026-11-08). The server creates
        the account and issues the session at once - no email
@@ -614,7 +691,16 @@
         return r.json().then(function (b) { return { status: r.status, body: b }; });
       }).then(function (res) {
         if (res.status === 200 && res.body && res.body.user) {
-          startSession({ name: res.body.user.name }, 'Account created. Welcome, ' + res.body.user.name + '.');
+          claimDerivedName = res.body.user.name;
+          var wantName = readName();
+          if (wantName) {
+            /* Session first (derived name), then the name claim;
+               the gate completes only when the claim resolves. */
+            holdSession({ name: res.body.user.name });
+            claimName(wantName);
+          } else {
+            startSession({ name: res.body.user.name }, 'Account created. Welcome, ' + res.body.user.name + '.');
+          }
         } else if (res.body && res.body.error === 'email_taken') {
           authMsg('That email is already registered. Sign in instead.');
         } else if (res.status === 429) {
@@ -627,6 +713,8 @@
   }
   function doSignin() {
     if (GUEST_ONLY) { authMsg('Account sign-in is paused - entry is guest-only until the server account system lands.'); return; }
+    /* A fresh sign-in supersedes any failed name claim. */
+    if (nameClaimState !== 'idle') { nameClaimState = 'idle'; setClaimBackVisible(false); }
     /* S0 activation: email + password sign-in against the Worker.
        The server answers one generic error for unknown email and
        wrong password alike. Structure (a) (AUTH-REVIEW-2): fetch
@@ -677,6 +765,17 @@
       idEl.addEventListener('keydown', function (e) { e.stopPropagation(); });
       idEl.addEventListener('keyup', function (e) { e.stopPropagation(); });
     }
+    var nmEl = $('auth-name');
+    if (nmEl && !nmEl.__espilWired) {
+      nmEl.__espilWired = true;
+      nmEl.addEventListener('keydown', function (e) { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); doSignup(); } });
+      nmEl.addEventListener('keyup', function (e) { e.stopPropagation(); });
+    }
+    var abEl = $('auth-back');
+    if (abEl && !abEl.__espilWired) {
+      abEl.__espilWired = true;
+      abEl.addEventListener('click', abandonClaim);
+    }
     var lo = $('set-logout');
     if (lo && !lo.__espilWired) {
       lo.__espilWired = true;
@@ -687,6 +786,7 @@
            (the Worker sets sessions.revoked_at), not just locally. */
         try { fetch(API_BASE + '/auth/logout', { method: 'POST', credentials: 'include' }).catch(function () {}); } catch (_) {}
         try { localStorage.removeItem(LS_SESSION); } catch (_) {}
+        nameClaimState = 'idle'; setClaimBackVisible(false);
         paintAuth(); toast('Signed out, ' + s.id + '.');
       });
     }
@@ -697,7 +797,7 @@
     /* S0 activation: signedIn reflects the server-written session
        record; the device-local account count is no longer an
        authority and is no longer reported. */
-    return { signedIn: !!(s && s.server), id: s && s.server ? s.id : null, accounts: s && s.server ? 1 : 0 };
+    return { signedIn: !!(s && s.server), id: s && s.server ? s.id : null, accounts: s && s.server ? 1 : 0, nameClaim: nameClaimState };
   };
 
   /* ---------------- state for rigs ------------------------------ */

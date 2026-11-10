@@ -351,6 +351,8 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
              The character choice happens in the next step. -->
         <div class="modal-divider">Account</div>
         <div id="auth-box" style="text-align:left;">
+          <label for="auth-name" style="display:block;font:700 .66rem/1.4 'Manrope',sans-serif;letter-spacing:.14em;color:#8fb8b3;margin:2px 0 5px;">NAME (OPTIONAL)</label>
+          <input id="auth-name" type="text" maxlength="16" autocomplete="nickname" placeholder="Display name (optional)" style="display:block;width:100%;box-sizing:border-box;background:rgba(6,12,18,.85);border:1px solid rgba(134,238,228,.45);border-radius:9px;padding:10px 11px;font-size:14px;color:#fff;outline:none;" />
           <label for="auth-id" style="display:block;font:700 .66rem/1.4 'Manrope',sans-serif;letter-spacing:.14em;color:#8fb8b3;margin:2px 0 5px;">EMAIL</label>
           <input id="auth-id" type="email" maxlength="254" autocomplete="email" placeholder="you@example.com"  style="display:block;width:100%;box-sizing:border-box;background:rgba(6,12,18,.85);border:1px solid rgba(134,238,228,.45);border-radius:9px;padding:10px 11px;font-size:14px;color:#fff;outline:none;" />
           <label for="auth-pw" style="display:block;font:700 .66rem/1.4 'Manrope',sans-serif;letter-spacing:.14em;color:#8fb8b3;margin:10px 0 5px;">PASSWORD</label>
@@ -361,6 +363,7 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
           </div>
           <p id="auth-msg" style="min-height:1.2em;margin:9px 0 0;font-size:.76rem;line-height:1.5;color:#ffd97a;"></p>
           <p id="auth-session" hidden style="margin:4px 0 0;font-size:.76rem;line-height:1.5;color:#8ef7e8;"></p>
+          <button class="auth-back" id="auth-back" type="button" hidden>Back</button>
           <p class="auth-guestonly-note">Sign up with your email and password, or continue with Google. Your character and progress save to your account.</p>
         </div>
         <div class="modal-divider">Guest</div>
