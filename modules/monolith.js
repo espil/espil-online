@@ -897,7 +897,7 @@
     }
     var walkPlayer=null,walkColliders=[];
     var walkKeys={};
-    var walkCamYaw=0,walkCamPitch=.84,walkCamDist=5.5; /* Cauldron style: 48° pitch; default follow distance 5.5 m (Han 2026-11-09 proportion correction: MapleStory-like proportion, character ~0.30 of viewport height and never screen-filling; the 2.95 m close framing of 2026-11-08 is superseded, 14 before that) */
+    var walkCamYaw=0,walkCamPitch=.84,walkCamDist=6.2; /* Cauldron style: 48° pitch; default follow distance 6.2 m (Han 2026-11-09, second same-day correction: a SMALL step farther from the 5.5 m / ~0.31 framing landed hours earlier - target ~0.28 of viewport height; the 5.5 m proportion default, the 2.95 m close framing of 2026-11-08 and 14 m before that are all superseded) */
     /* QA #15 (2026-10-06): sprint is a Ctrl toggle, not hold-Shift. */
     var sprintOn=false;
     function updateSprintUI(){
@@ -1544,7 +1544,7 @@
     /* --- entry arrival (Han 2026-10-19): the character no longer
        falls from the sky. The player is placed on the ground at the
        entry target and only the CAMERA dives in: walkCamDist sweeps
-       the old descent envelope (60 -> 5.5) on a timer, which also
+       the old descent envelope (60 -> the standing default) on a timer, which also
        leads the map zoom in P1 mode. The entry target itself (city
        spawn or the resolved boundary point) is unchanged, so the
        per-city spawn accuracy is exactly what the descent had. --- */
@@ -1591,7 +1591,7 @@
       p.pos.y=base;
       p.velY=0; p.onGround=true; p.jumps=0;
       p._espilArrive={surf:base,probeAt:0,startedAt:performance.now(),dur:1900};
-      walkCamDist=60; /* wide sky framing; the step eases it to 5.5 */
+      walkCamDist=60; /* wide sky framing; the step eases it to 6.2 */
       if(typeof espilP1!=='undefined'&&espilP1)espilP1.zoomDrive=false; /* the arrival envelope leads the map zoom for this entry */
       espilShowGeoPrompt();
     }
@@ -1605,18 +1605,18 @@
             if(typeof walkAvatar!=='undefined'&&walkAvatar&&walkAvatar.playLand)walkAvatar.playLand(); }
         }
         var td=Math.max(0,Math.min(1,(nowD-a.startedAt)/a.dur));
-        var fd=1-td; walkCamDist=5.5+54.5*fd*fd;
-        if(td>=1){ p._espilArrive=null; walkCamDist=5.5; espilHideGeoPrompt(); }
+        var fd=1-td; walkCamDist=6.2+53.8*fd*fd;
+        if(td>=1){ p._espilArrive=null; walkCamDist=6.2; espilHideGeoPrompt(); }
         return;
       }
       var now=performance.now();
       if(now-a.probeAt>150){ a.probeAt=now; var y=espilTileBase(p.pos.x,p.pos.z); if(y===null)y=espilOwnSurfaceY(p.pos.x,p.pos.z); if(y!==null&&y!==undefined)a.surf=y; }
       if(a.surf!==null&&a.surf!==undefined){ p.pos.y=a.surf; p.onGround=true; }
       var t=Math.max(0,Math.min(1,(now-a.startedAt)/a.dur));
-      var f=1-t; walkCamDist=5.5+54.5*f*f;
+      var f=1-t; walkCamDist=6.2+53.8*f*f;
       if(t>=1){
         p._espilArrive=null;
-        walkCamDist=5.5;
+        walkCamDist=6.2;
         espilHideGeoPrompt();
         espilUiRise();
         /* GUIDE HOOKS (joint guide project, 2026-10-21): the guide
@@ -2468,7 +2468,11 @@
        Retied 2026-11-09 (Han proportion correction): intercept kept; the
        P1 default zoom is now 20.39, which the same bridge maps to the
        new 5.5 m overlay default (DistFromZoom(20.39) = 5.5), again
-       unsaturated at both clamp ends. */
+       unsaturated at both clamp ends.
+       Retied again 2026-11-09 (Han: zoom out a little, same evening):
+       the P1 default zoom is now 20.17 = ZoomFromDist(6.2) on the same
+       curve, and DistFromZoom(20.17) = 6.2 - the identity holds at the
+       new 6.2 m overlay default, again unsaturated at both ends. */
     function espilP1ZoomFromDist(d){ return Math.max(14.5,Math.min(23,23.44-1.242*Math.log2(Math.max(2,d)))); }
     function espilP1DistFromZoom(z){ return Math.max(2,Math.min(60,Math.pow(2,(23.44-z)/1.242))); }
     function espilP1LngLat(x,z){
@@ -2578,7 +2582,7 @@
       var px=espilPaintAnchor.x, pz=espilPaintAnchor.y;
       var py=(typeof walkPlayer!=='undefined'&&walkPlayer)?walkPlayer.pos.y:0;
       var scanned=0, changed=0, lodFlat=0;
-      var zm=(typeof espilP1!=='undefined'&&espilP1&&typeof espilP1.zoom==='number')?espilP1.zoom:20.39;
+      var zm=(typeof espilP1!=='undefined'&&espilP1&&typeof espilP1.zoom==='number')?espilP1.zoom:20.17;
       for(var i=0;i<feats.length;i++){
         var m=meta[i];
         var bx=px<m.mnx?m.mnx-px:(px>m.mxx?px-m.mxx:0), bz=pz<m.mnz?m.mnz-pz:(pz>m.mxz?pz-m.mxz:0);
@@ -2616,7 +2620,7 @@
     function espilP1PaintUpdate(){
       if(!espilP1.buildingsAdded||!espilP1BldCache||!espilP1.map)return;
       var now=performance.now();
-      var zm=(typeof espilP1.zoom==='number')?espilP1.zoom:20.39;
+      var zm=(typeof espilP1.zoom==='number')?espilP1.zoom:20.17;
       if(espilP1PaintLast){
         var dx=espilPaintAnchor.x-espilP1PaintLast.x, dz=espilPaintAnchor.y-espilP1PaintLast.z;
         if(dx*dx+dz*dz<9&&Math.abs(zm-espilP1PaintLast.zm)<0.05)return; /* anchor still (3 m gate) and zoom steady */
@@ -2786,7 +2790,7 @@
       else document.body.appendChild(el);
       espilP1.mapEl=el;
       try{
-        espilP1.map=new mapboxgl.Map({container:el,style:'mapbox://styles/quadclipse/cmvdcpdor000901sq8xq57eab',center:espilP1LngLat((espilCityCfg().spawn||{x:3,z:31}).x,(espilCityCfg().spawn||{x:3,z:31}).z),zoom:17.3,pitch:52,bearing:0,attributionControl:false,interactive:false,projection:'mercator',maxZoom:23}); /* projection forced (Han 2026-10-17): the designated style declares lambertConformalConic, under which Mapbox skips ALL 3D drawing ("Drawing 3D models for lambertConformalConic projection is not yet implemented") - the custom layer and our extrusions vanished on Han's PC while the mercator stub could not reproduce it. The game's math is Mercator throughout. maxZoom was the Mapbox default 22 (custom cap removed on Han's order); raised to 23 on 2026-11-08 so the close default zoom 21.5 kept wheel headroom above it; the 2026-11-09 default is 20.39 and 23 stays as the cap. */
+        espilP1.map=new mapboxgl.Map({container:el,style:'mapbox://styles/quadclipse/cmvdcpdor000901sq8xq57eab',center:espilP1LngLat((espilCityCfg().spawn||{x:3,z:31}).x,(espilCityCfg().spawn||{x:3,z:31}).z),zoom:17.3,pitch:52,bearing:0,attributionControl:false,interactive:false,projection:'mercator',maxZoom:23}); /* projection forced (Han 2026-10-17): the designated style declares lambertConformalConic, under which Mapbox skips ALL 3D drawing ("Drawing 3D models for lambertConformalConic projection is not yet implemented") - the custom layer and our extrusions vanished on Han's PC while the mercator stub could not reproduce it. The game's math is Mercator throughout. maxZoom was the Mapbox default 22 (custom cap removed on Han's order); raised to 23 on 2026-11-08 so the close default zoom 21.5 kept wheel headroom above it; the 2026-11-09 default is 20.17 (6.2 m via the bridge; 20.39 = 5.5 m earlier the same day) and 23 stays as the cap. */
       }catch(e){ espilP1.failed='init'; window.__espilMapProgress01=1; espilP1Banner('Could not start the Mapbox map. Please check the token.'); return; }
       espilP1.map.on('load',function(){
         /* the loaded style re-imposes its declared projection - force
@@ -2887,11 +2891,24 @@
            both surfaces stay scale-locked. During descent the descent
            envelope leads the zoom (and the target tracks it), unless
            the player has taken the zoom over with the wheel. */
-        if(espilP1.zoom===null){ espilP1.zoom=20.39; espilP1.zoomT=20.39; } /* default framing: 19.3 until 2026-11-08 (Han PC QA 2026-10-18), 21.5 during the 2026-11-08 close framing; Han 2026-11-09 corrected the proportion (MapleStory-like: character ~0.30 of viewport height, never screen-filling) - 20.39 via the bridge = the same 5.5 m physical distance as the overlay default */
-        if(walkPlayer._espilArrive&&!espilP1.zoomDrive){
+        if(espilP1.zoom===null){ espilP1.zoom=20.17; espilP1.zoomT=20.17; } /* default framing: 19.3 until 2026-11-08 (Han PC QA 2026-10-18), 21.5 during the 2026-11-08 close framing; Han 2026-11-09 corrected the proportion (MapleStory-like: character ~0.30 of viewport height, never screen-filling) at 20.39 = 5.5 m, then asked for a small step farther the same evening - 20.17 via the bridge = the same 6.2 m physical distance as the overlay default */
+        var kbFpv=(typeof espilKbFpvActive==='function')&&espilKbFpvActive();
+        if(kbFpv){
+          /* KONBINIYA FPV (P1 path): while the Konbiniya FPV is
+             active the map camera leaves the pitch-52 follow framing
+             and drops to street level at the player's own spot -
+             pitch at the Mapbox maximum, zoom at the FPV level;
+             the avatar is hidden by the FPV application in
+             updateWalkMap, so no character stands in frame. The
+             user's outdoor zoom state is left untouched and the
+             entry-saved zoom is restored on leave as before. */
+          espilP1.zoomT=ESPIL_KB_P1_ZOOM;
+          espilP1.zoom+=(espilP1.zoomT-espilP1.zoom)*0.35;
+          if(Math.abs(espilP1.zoomT-espilP1.zoom)<0.001)espilP1.zoom=espilP1.zoomT;
+        }else if(walkPlayer._espilArrive&&!espilP1.zoomDrive){
           espilP1.zoom=espilP1.zoomT=espilP1ZoomFromDist(walkCamDist);
         }else{
-          if(!espilP1.zoomDrive)espilP1.zoomT=20.39; /* until the player takes the wheel, the target is the default framing */
+          if(!espilP1.zoomDrive)espilP1.zoomT=20.17; /* until the player takes the wheel, the target is the default framing */
           espilP1.zoom+=(espilP1.zoomT-espilP1.zoom)*0.2;
           if(Math.abs(espilP1.zoomT-espilP1.zoom)<0.001)espilP1.zoom=espilP1.zoomT;
           walkCamDist=espilP1DistFromZoom(espilP1.zoom);
@@ -2903,7 +2920,7 @@
            (espilP1.zoom / zoomT) is never rewritten. */
         if(typeof espilCamDEff==='number'&&espilCamDEff<espilP1DistFromZoom(zoom)-0.05)
           zoom=espilP1ZoomFromDist(Math.max(2.2,espilCamDEff));
-        try{ espilP1.map.jumpTo({center:ll,bearing:brg,pitch:52,zoom:zoom}); }catch(e){}
+        try{ espilP1.map.jumpTo({center:ll,bearing:brg,pitch:kbFpv?ESPIL_KB_P1_PITCH:52,zoom:zoom}); }catch(e){}
         if(espilP1.layerLive){ try{ espilP1.map.triggerRepaint(); }catch(e){} } /* the map's render pass draws the game scene via the custom layer */
         /* AVATAR SCALE (Han 2026-10-17; SIZE HELD 2026-11-05): in
            layer mode the avatar draws at true map scale - about 11 px
@@ -4779,7 +4796,7 @@
       }
       walkPlayer.velY=0;walkPlayer.onGround=true;
       walkPlayer.jumps=0;walkPlayer.faceY=.5;walkPlayer.bobT=0;
-      walkCamPitch=.84;walkCamDist=5.5; /* Cauldron 48°; distance = the 2026-11-09 proportion default */
+      walkCamPitch=.84;walkCamDist=6.2; /* Cauldron 48°; distance = the 2026-11-09 zoom-out default */
       walkPlayer.av.group.position.copy(walkPlayer.pos);
       walkPlayer.av.group.rotation.y=.5;
       /* Snap the follow camera behind the player on entry. */
@@ -5586,6 +5603,8 @@
       }
     }
     function doMove(id){
+      if(typeof espilKbFpvActive==='function'&&espilKbFpvActive())return; /* KONBINIYA FPV: attack inputs are inert inside (Han 2026-11-08) - every attack entry point funnels through here */
+      if(window.__espilEntryMode==='shop')return; /* SHOP MODE (landing flow, Han 2026-11-09): combat inputs are disabled for the whole session - the last input path of MONOLITH-SEAM item 1 (monsters.js already gates spawns/targets/hits; the DOM buttons are inert there) */
       if(!cityPhaseActive||!walkPlayer||skillTreeOpen)return;
       if(espilDead)return; /* SURVIVAL S1: the death choice owns the body */
       var m=MOVES[id];
@@ -6779,6 +6798,37 @@
        public name - the Konbiniya's - regardless of which building
        was entered; null when the Konbiniya itself was entered. */
     var espilInsideRouted=null;
+    /* KONBINIYA FPV (Han fixed rule 2026-11-07, restored 2026-11-09):
+       entering the Konbiniya itself is TRUE FIRST-PERSON, exactly
+       like the standalone store page (/vancouver/1238-robson-st):
+       the camera sits at the player's own eye (1.6 m), the avatar
+       is not drawn, A/D turn the camera (the store page's Batch H
+       rate, 90 deg/s) and attack inputs stay inert. Routed interiors
+       (entered through another building, whose visit is routed into
+       this same room) keep their existing framing - the FPV switch
+       is scoped to the Konbiniya entry, which is exactly the case
+       espilInsideRouted === null (set below only for other doors).
+       The defect this restores: espilEnterInside never changed the
+       camera model at all, so the overlay follow camera and the P1
+       pitch-52 map framing both kept their outdoor third-person
+       framing inside the store, avatar in frame. */
+    var ESPIL_KB_EYE=1.6, ESPIL_KB_TURN=Math.PI/2, ESPIL_KB_P1_ZOOM=22.0, ESPIL_KB_P1_PITCH=85;
+    var espilFpvApplied=false;
+    function espilKbFpvActive(){
+      return !!(window.__espilInside&&espilInsideRec&&espilInsideRouted===null&&typeof walkPlayer!=='undefined'&&walkPlayer);
+    }
+    window.__espilKbFpvState=function(){
+      var cam=(typeof mapCamera!=='undefined'&&mapCamera&&mapCamera.position)?mapCamera.position:null;
+      var p=(typeof walkPlayer!=='undefined'&&walkPlayer)?walkPlayer:null;
+      return { active:espilKbFpvActive(), applied:espilFpvApplied, eye:ESPIL_KB_EYE,
+        camPos:cam?{x:Math.round(cam.x*100)/100,y:Math.round(cam.y*100)/100,z:Math.round(cam.z*100)/100}:null,
+        playerPos:(p&&p.pos)?{x:Math.round(p.pos.x*100)/100,y:Math.round(p.pos.y*100)/100,z:Math.round(p.pos.z*100)/100}:null,
+        avatarVisible:(p&&p.av&&p.av.group)?!!p.av.group.visible:null,
+        shadowVisible:(p&&p.av&&p.av.shadow)?!!p.av.shadow.visible:null,
+        yaw:(typeof walkCamYaw==='number')?Math.round(walkCamYaw*1000)/1000:null,
+        pitch:(typeof walkCamPitch==='number')?Math.round(walkCamPitch*1000)/1000:null,
+        routedFrom:window.__espilInside?window.__espilInside.routedFrom:undefined };
+    };
     function espilEnterInside(rec){
       var p=walkPlayer; if(!p||!rec)return;
       /* Batch 5 (Han 2026-11-07): no refusal - every rendered
@@ -6804,8 +6854,11 @@
       if(espilIntGroup)espilIntGroup.scale.set(sx,1,sz);
       if(window.__espilFitoutGroup)window.__espilFitoutGroup.scale.set(sx,1,sz);
       /* Interior framing (v3): pull the map zoom out so the whole
-         store map reads at once, Pokemon-store style; restored on leave. */
-      if(typeof espilP1!=='undefined'&&espilP1&&espilP1.map){ espilIntPrevZoom=(typeof espilP1.zoomT==='number')?espilP1.zoomT:null; espilP1.zoomT=18.3; }
+         store map reads at once, Pokemon-store style; restored on leave.
+         The Konbiniya itself is the exception (FPV fixed rule): its
+         entry zoom target is the street-level FPV zoom, and the P1
+         tick drives pitch/zoom from the FPV branch while inside. */
+      if(typeof espilP1!=='undefined'&&espilP1&&espilP1.map){ espilIntPrevZoom=(typeof espilP1.zoomT==='number')?espilP1.zoomT:null; espilP1.zoomT=isKb?ESPIL_KB_P1_ZOOM:18.3; }
       espilInsideRec=rec;
       espilInsideDoor={x:ESPIL_INT.x,z:ESPIL_INT.z+7.3*sz};
       espilInsideOutside={x:p.pos.x,y:p.pos.y,z:p.pos.z};
@@ -9035,18 +9088,19 @@
       /* ZOOM OPERATION (Han 2026-10-17): in Mapbox mode the wheel and
          pinch move the MAP ZOOM target directly, in zoom units (range
          16 to 23 (Mapbox default max was 22, Han 2026-10-17; top raised
-         2026-11-08; the 20.39 default since 2026-11-09 sits mid-range,
+         2026-11-08; the 20.17 default since the 2026-11-09 zoom-out
+         (20.39 earlier that day) sits mid-range,
          clear of both clamp edges), 0.28
          per wheel notch) - not a camera distance
          translated through a curve. Outside Mapbox mode the legacy
          distance behaviour is unchanged. */
       if(ESPIL_P1&&typeof espilP1!=='undefined'&&espilP1&&espilP1.map&&espilP1.ready&&!espilP1.failed){
-        if(espilP1.zoomT===null)espilP1.zoomT=20.39;
+        if(espilP1.zoomT===null)espilP1.zoomT=20.17;
         espilP1.zoomT=Math.max(16,Math.min(23,espilP1.zoomT-d*0.28));
         espilP1.zoomDrive=true; /* a wheel during descent takes the zoom over from the envelope */
         return;
       }
-      walkCamDist=Math.max(window.__espilInside?0.4:1.8,Math.min(16,walkCamDist+d)); /* floor 1.8 (was 3) since 2026-11-08 so the default (5.5 since 2026-11-09) sits inside the wheel range; the inside-store 0.4 floor is unchanged */
+      walkCamDist=Math.max(window.__espilInside?0.4:1.8,Math.min(16,walkCamDist+d)); /* floor 1.8 (was 3) since 2026-11-08 so the default (6.2 since the 2026-11-09 zoom-out) sits inside the wheel range; the inside-store 0.4 floor is unchanged */
     }
     /* Keyboard: tracked only while the map is open (globe keeps its own bindings). */
     document.addEventListener('keydown',function(e){
@@ -9092,6 +9146,7 @@
       var ae=document.activeElement,atag=(ae&&ae.tagName)||'';
       if(!/INPUT|TEXTAREA|SELECT/.test(atag)){
         var lk=k.toLowerCase(),sl=skillSlotForKey(lk);
+        if(sl&&espilKbFpvActive())sl=null; /* KONBINIYA FPV: the skill row never fires inside - A/D are camera turns here (Han 2026-11-08) */
         if(sl){
           if(!e.repeat){
             if(sl.move)doMove(sl.move);
@@ -9379,6 +9434,15 @@
       if(p._fall&&(p._espilArrive||p._espilLanding))p._fall=null;
       updateDnaImprint(dt);
       /* --- input: keys + touch stick, relative to camera yaw --- */
+      if(espilKbFpvActive()){
+        /* KONBINIYA FPV: A/D turn the CAMERA (Han 2026-11-08 - inside
+           the Konbiniya A/D is camera movement, not attack), at the
+           standalone store page's Batch H turn rate. The keydown
+           skill dispatch and doMove are gated off while FPV is
+           active, so these keys can never fire Dash/Wave here. */
+        if(walkKeys['a'])walkCamYaw+=ESPIL_KB_TURN*dt;
+        if(walkKeys['d'])walkCamYaw-=ESPIL_KB_TURN*dt;
+      }
       var ix=0,iz=0;
       if(walkKeys['arrowup'])iz-=1;
       if(walkKeys['arrowdown'])iz+=1;
@@ -9540,16 +9604,37 @@
       p.av.shadow.position.set(p.pos.x,.03,p.pos.z);
       p.av.shadow.material.opacity=Math.max(.08,.26-Math.max(0,p.pos.y-.05)*.05);
       /* --- follow camera --- */
-      var cp=Math.cos(walkCamPitch),sp=Math.sin(walkCamPitch);
-      var want=new THREE.Vector3(
-        p.pos.x+Math.sin(walkCamYaw)*cp*espilCamDEff,
-        p.pos.y+sp*espilCamDEff+1.2,
-        p.pos.z+Math.cos(walkCamYaw)*cp*espilCamDEff
-      );
-      if(want.y<1.4)want.y=1.4;
-      var k=Math.min(1,dt*7);
-      mapCamera.position.lerp(want,k);
-      mapCamera.lookAt(p.pos.x,p.pos.y+1.7,p.pos.z);
+      if(espilKbFpvActive()){
+        /* KONBINIYA FPV (overlay path): the camera sits at the
+           player's own eye (1.6 m - the standalone store page's EYE)
+           and looks along the view yaw; the avatar group and its
+           contact shadow are not drawn while FPV is applied. The
+           look pitch reuses the drag-look pitch, re-centred so the
+           outdoor default (.84) looks level. On the first frame FPV
+           is no longer active the outdoor follow camera resumes and
+           the avatar is restored - nothing else keeps FPV state. */
+        if(!espilFpvApplied){ espilFpvApplied=true;
+          if(p.av&&p.av.group)p.av.group.visible=false;
+          if(p.av&&p.av.shadow)p.av.shadow.visible=false; }
+        var fEye=new THREE.Vector3(p.pos.x,p.pos.y+ESPIL_KB_EYE,p.pos.z);
+        var fLp=Math.max(-1.2,Math.min(1.2,.84-walkCamPitch)), fCp=Math.cos(fLp);
+        mapCamera.position.copy(fEye);
+        mapCamera.lookAt(fEye.x-Math.sin(walkCamYaw)*fCp, fEye.y+Math.sin(fLp), fEye.z-Math.cos(walkCamYaw)*fCp);
+      }else{
+        if(espilFpvApplied){ espilFpvApplied=false;
+          if(p.av&&p.av.group)p.av.group.visible=true;
+          if(p.av&&p.av.shadow)p.av.shadow.visible=true; }
+        var cp=Math.cos(walkCamPitch),sp=Math.sin(walkCamPitch);
+        var want=new THREE.Vector3(
+          p.pos.x+Math.sin(walkCamYaw)*cp*espilCamDEff,
+          p.pos.y+sp*espilCamDEff+1.2,
+          p.pos.z+Math.cos(walkCamYaw)*cp*espilCamDEff
+        );
+        if(want.y<1.4)want.y=1.4;
+        var k=Math.min(1,dt*7);
+        mapCamera.position.lerp(want,k);
+        mapCamera.lookAt(p.pos.x,p.pos.y+1.7,p.pos.z);
+      }
       if(typeof espilOwnerChipTick==='function')espilOwnerChipTick(false);
       /* Building proximity: store-name labels + interact prompt. */
       updateBuildingProximity(p.pos.x,p.pos.z,performance.now());
