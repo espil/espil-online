@@ -244,6 +244,24 @@
         showToast(name+' sign-in arrives with the game server.');
       });
     });
+    /* S0 activation (flip step 3): the Google logo button is the
+       live social entry. It hands off to the Worker's server-led
+       OAuth start; Google returns to this page with the session
+       cookie set, and the S0 session sync (social.js /
+       entry-flow.js) turns it into the local session record.
+       Apple and Facebook stay in preparation. */
+    var logos=document.querySelectorAll('.provider-logo');
+    Array.prototype.forEach.call(logos,function(btn){
+      btn.addEventListener('click',function(){
+        if(window.EspilAudio&&window.EspilAudio.pop)window.EspilAudio.pop();
+        var name=btn.getAttribute('data-provider')||'';
+        if(name==='Google'){
+          window.location.href='https://api.espil.online/auth/google/start?return='+encodeURIComponent(window.location.href);
+          return;
+        }
+        showToast(name+' sign-in is in preparation.');
+      });
+    });
     /* Guest entry (Han 2026-10-18, production config): the modal's
        one active control - same pass-through the provider buttons
        used, now explicit. */

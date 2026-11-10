@@ -471,6 +471,75 @@
 
   /* ---------------- accounts: signup / sign in ------------------ */
   var LS_ACCOUNTS = 'espil_accounts_v1', LS_SESSION = 'espil_session_v1';
+  /* S0 activation (flip step 1, READINESS 3.6): the account
+     authority is the espil-api Worker. espil_accounts_v1 is
+     retired as an authority - records are left in place, never
+     deleted, and no longer read for auth (device-local records do
+     not migrate, PLAN.md D3). espil_session_v1 keeps its shape
+     ({id, at}) and is written only from a server response; the
+     server:true mark is what entry-flow's isLoggedIn() now reads. */
+  var API_BASE = 'https://api.espil.online';
+  function serverSessionSync() {
+    if (!window.fetch) return;
+    fetch(API_BASE + '/auth/session', { credentials: 'include' }).then(function (r) {
+      return r.status === 200 ? r.json() : null;
+    }).then(function (body) {
+      if (body && body.signedIn && body.user && body.user.name) {
+        try { localStorage.setItem(LS_SESSION, JSON.stringify({ id: body.user.name, at: Date.now(), server: true })); } catch (_) {}
+        try { localStorage.setItem('espil_username', body.user.name); } catch (_) {}
+      } else {
+        var s = session();
+        if (s && s.server) { try { localStorage.removeItem(LS_SESSION); } catch (_) {} }
+      }
+      paintAuth();
+    }).catch(function () {});
+  }
+  /* ESPIL-AUTH-CLIENT-BEGIN */
+  /* Credential helpers, structure (a) (Cybersecurity ruling
+     AUTH-REVIEW-2): the password NEVER leaves this device. Only
+     K = PBKDF2-HMAC-SHA256(password, salt, iterations) crosses
+     the wire; the server stores an HMAC of K under a server-side
+     pepper and never sees the password. The breached-password
+     check is a k-anonymity range lookup: only the first 5 hex
+     characters of the password's SHA-1 are sent to the range
+     service - the full hash and the password itself never
+     leave. This marked block is extracted and exercised by the
+     espil-api test suite; keep it free of module internals. */
+  var ESPIL_PBKDF2_ITERATIONS = 600000;
+  function espilB64urlEncode(bytes) {
+    var s = '';
+    for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function espilB64urlDecode(str) {
+    var s = String(str).replace(/-/g, '+').replace(/_/g, '/');
+    var padded = s + '='.repeat((4 - (s.length % 4)) % 4);
+    var bin = atob(padded);
+    var out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  function espilPasswordPolicyError(password) {
+    if (!password || password.length < 8) return 'Password: 8 characters or more.';
+    if (password.length > 128) return 'Password: 128 characters or fewer.';
+    return null;
+  }
+  function espilDeriveKey(password, saltB64, iterations) {
+    var salt = espilB64urlDecode(saltB64);
+    return crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']).then(function (key) {
+      return crypto.subtle.deriveBits({ name: 'PBKDF2', salt: salt, iterations: iterations, hash: 'SHA-256' }, key, 256);
+    }).then(function (bits) { return espilB64urlEncode(new Uint8Array(bits)); });
+  }
+  function espilPasswordBreached(password) {
+    return crypto.subtle.digest('SHA-1', new TextEncoder().encode(password)).then(function (buf) {
+      var hex = Array.prototype.map.call(new Uint8Array(buf), function (b) { return ('0' + b.toString(16)).slice(-2); }).join('').toUpperCase();
+      var prefix = hex.slice(0, 5), suffix = hex.slice(5);
+      return fetch('https://api.pwnedpasswords.com/range/' + prefix).then(function (r) { return r.text(); }).then(function (text) {
+        return text.split(/\r?\n/).some(function (line) { return line.split(':')[0] === suffix; });
+      });
+    }).catch(function () { return false; });
+  }
+  /* ESPIL-AUTH-CLIENT-END */
   function accounts() { try { var o = JSON.parse(localStorage.getItem(LS_ACCOUNTS) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (_) { return {}; } }
   function saveAccounts(o) { try { localStorage.setItem(LS_ACCOUNTS, JSON.stringify(o)); } catch (_) {} }
   function session() { try { var s = JSON.parse(localStorage.getItem(LS_SESSION) || 'null'); return s && s.id ? s : null; } catch (_) { return null; } }
@@ -500,7 +569,7 @@
     var m = $('signin-modal'); if (m) m.setAttribute('aria-hidden', 'true');
   }
   function startSession(rec, msg) {
-    try { localStorage.setItem(LS_SESSION, JSON.stringify({ id: rec.name, at: Date.now() })); } catch (_) {}
+    try { localStorage.setItem(LS_SESSION, JSON.stringify({ id: rec.name, at: Date.now(), server: true })); } catch (_) {}
     try { localStorage.setItem('espil_username', rec.name); } catch (_) {}
     authMsg(msg, true); paintAuth();
     setTimeout(completeGate, 350);
@@ -514,31 +583,84 @@
      these guards keep the handlers inert even if a control is
      re-enabled by another module. Account code and stored accounts
      stay intact for the backend step. */
-  var GUEST_ONLY = true;
+  var GUEST_ONLY = false; /* S0 activation (flip step 2): server accounts are live. */
   function doSignup() {
     if (GUEST_ONLY) { authMsg('Account sign-in is paused - entry is guest-only until the server account system lands.'); return; }
+    /* S0 activation: email + password simple sign-up against the
+       Worker (D3 as amended, Han 2026-11-08). The server creates
+       the account and issues the session at once - no email
+       verification gate. The account name is derived server-side
+       from the email; claiming a specific name is POST /auth/name.
+       Structure (a) (AUTH-REVIEW-2): the password is screened for
+       known breaches and turned into K HERE, under a fresh random
+       salt - only K, the salt and the iteration count are sent;
+       the password itself never leaves this device. */
     var c = readCreds();
-    if (!/^[A-Za-z0-9_]{3,16}$/.test(c.id)) { authMsg('ID: 3-16 letters, numbers or underscore.'); return; }
-    if (!c.pw || c.pw.length < 6) { authMsg('Password: 6 characters or more.'); return; }
-    var all = accounts(), key = c.id.toLowerCase();
-    if (all[key]) { authMsg('That ID is already taken. Sign in instead.'); return; }
-    var salt = ('00000000' + Math.floor(Math.random() * 0xffffffff).toString(16)).slice(-8) +
-               ('00000000' + Math.floor(Math.random() * 0xffffffff).toString(16)).slice(-8);
-    sha256hex(salt + '::' + c.pw).then(function (hash) {
-      all[key] = { name: c.id, salt: salt, hash: hash, at: Date.now() };
-      saveAccounts(all);
-      startSession(all[key], 'Account created. Welcome, ' + c.id + '.');
-    });
+    var email = (c.id || '').trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { authMsg('Enter your email address.'); return; }
+    var policyError = espilPasswordPolicyError(c.pw);
+    if (policyError) { authMsg(policyError); return; }
+    authMsg('Creating your account...');
+    espilPasswordBreached(c.pw).then(function (breached) {
+      if (breached) { authMsg('That password appears in known data breaches. Please choose a different one.'); return; }
+      var salt = espilB64urlEncode(crypto.getRandomValues(new Uint8Array(16)));
+      return espilDeriveKey(c.pw, salt, ESPIL_PBKDF2_ITERATIONS).then(function (key) {
+        return fetch(API_BASE + '/auth/email/register', {
+          method: 'POST', credentials: 'include',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ email: email, key: key, salt: salt, iterations: ESPIL_PBKDF2_ITERATIONS, channel: 'web' })
+        });
+      }).then(function (r) {
+        return r.json().then(function (b) { return { status: r.status, body: b }; });
+      }).then(function (res) {
+        if (res.status === 200 && res.body && res.body.user) {
+          startSession({ name: res.body.user.name }, 'Account created. Welcome, ' + res.body.user.name + '.');
+        } else if (res.body && res.body.error === 'email_taken') {
+          authMsg('That email is already registered. Sign in instead.');
+        } else if (res.status === 429) {
+          authMsg('Too many attempts. Please wait a little and try again.');
+        } else {
+          authMsg('Sign-up failed. Please try again.');
+        }
+      });
+    }).catch(function () { authMsg('Sign-up failed. Please try again.'); });
   }
   function doSignin() {
     if (GUEST_ONLY) { authMsg('Account sign-in is paused - entry is guest-only until the server account system lands.'); return; }
+    /* S0 activation: email + password sign-in against the Worker.
+       The server answers one generic error for unknown email and
+       wrong password alike. Structure (a) (AUTH-REVIEW-2): fetch
+       the account's salt first (an unknown email gets an
+       indistinguishable fake salt), derive K locally with the
+       returned salt + iterations, and send only K. */
     var c = readCreds();
-    var all = accounts(), rec = all[c.id.toLowerCase()];
-    if (!rec) { authMsg('No account with that ID yet. Sign up first.'); return; }
-    sha256hex(rec.salt + '::' + c.pw).then(function (hash) {
-      if (hash !== rec.hash) { authMsg('Wrong password.'); return; }
-      startSession(rec, 'Welcome back, ' + rec.name + '.');
-    });
+    var email = (c.id || '').trim().toLowerCase();
+    if (!email || !c.pw) { authMsg('Enter your email and password.'); return; }
+    authMsg('Signing in...');
+    fetch(API_BASE + '/auth/email/salt?email=' + encodeURIComponent(email), { credentials: 'include' }).then(function (r) {
+      return r.json();
+    }).then(function (s) {
+      if (!s || !s.salt) throw new Error('salt');
+      return espilDeriveKey(c.pw, s.salt, s.iterations || ESPIL_PBKDF2_ITERATIONS);
+    }).then(function (key) {
+      return fetch(API_BASE + '/auth/email/login', {
+        method: 'POST', credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: email, key: key, channel: 'web' })
+      });
+    }).then(function (r) {
+      return r.json().then(function (b) { return { status: r.status, body: b }; });
+    }).then(function (res) {
+      if (res.status === 200 && res.body && res.body.user) {
+        startSession({ name: res.body.user.name }, 'Welcome back, ' + res.body.user.name + '.');
+      } else if (res.status === 401) {
+        authMsg('Email or password is incorrect.');
+      } else if (res.status === 429) {
+        authMsg('Too many attempts. Please wait a little and try again.');
+      } else {
+        authMsg('Sign-in failed. Please try again.');
+      }
+    }).catch(function () { authMsg('Sign-in failed. Please try again.'); });
   }
   function wireAuth() {
     var su = $('auth-signup'), si = $('auth-signin'), pw = $('auth-pw');
@@ -561,6 +683,9 @@
       lo.addEventListener('click', function () {
         var s = session();
         if (!s) { toast('Sign in first - the sign-in window is on the landing page.'); return; }
+        /* S0 activation: logout revokes the session SERVER-side
+           (the Worker sets sessions.revoked_at), not just locally. */
+        try { fetch(API_BASE + '/auth/logout', { method: 'POST', credentials: 'include' }).catch(function () {}); } catch (_) {}
         try { localStorage.removeItem(LS_SESSION); } catch (_) {}
         paintAuth(); toast('Signed out, ' + s.id + '.');
       });
@@ -569,7 +694,10 @@
   }
   window.__espilAuthState = function () {
     var s = session();
-    return { signedIn: !!s, id: s ? s.id : null, accounts: Object.keys(accounts()).length };
+    /* S0 activation: signedIn reflects the server-written session
+       record; the device-local account count is no longer an
+       authority and is no longer reported. */
+    return { signedIn: !!(s && s.server), id: s && s.server ? s.id : null, accounts: s && s.server ? 1 : 0 };
   };
 
   /* ---------------- state for rigs ------------------------------ */
@@ -586,7 +714,7 @@
   window.__espilSocialTogglePanel = togglePanel;
   window.__espilSocialPick = pickCharacter;
 
-  function init() { ensureDom(); wireAuth(); }
+  function init() { ensureDom(); wireAuth(); serverSessionSync(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
   setInterval(wireAuth, 2000);

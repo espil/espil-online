@@ -52,7 +52,7 @@
     locating: { en: 'Finding your location...', ko: '위치를 확인하는 중입니다...', fr: 'Localisation en cours...', zh: '正在定位...' },
     outside: { en: 'That is outside the playable area - arriving at the Art Gallery instead.', ko: '플레이 가능 지역 밖이라 아트갤러리 앞에 도착합니다.', fr: "Hors de la zone jouable - arrivée devant la galerie d'art.", zh: '超出可游玩区域，将在美术馆前抵达。' },
     noGeo: { en: 'Location is unavailable - pick a place instead.', ko: '위치를 확인할 수 없습니다. 장소를 골라 주세요.', fr: 'Position indisponible - choisissez un lieu.', zh: '无法定位，请选择一个地点。' },
-    guestOnly: { en: 'Account sign-in is paused. Accounts are moving to our server, with character data saved server-side and email verification. Until that system lands, entry is guest-only.', ko: '계정 로그인은 잠시 중단되었습니다. 계정은 저희 서버로 이전되며, 캐릭터 데이터는 서버에 저장되고 이메일 인증이 도입됩니다. 그 시스템이 열릴 때까지는 게스트로만 입장하실 수 있습니다.', fr: 'La connexion par compte est en pause. Les comptes migrent vers notre serveur, avec les personnages enregistrés côté serveur et une vérification par e-mail. En attendant, l\'entrée est réservée aux invités.', zh: '账户登录已暂停。账户正在迁移到我们的服务器，角色数据将保存在服务器端并引入邮箱验证。在此之前，仅限访客进入。' }
+    guestOnly: { en: 'Accounts live on our server now. Sign in with Google, or register with your email and password - your character and progress save to your account.', ko: '계정은 이제 서버에서 운영됩니다. Google로 로그인하거나 이메일과 비밀번호로 가입해 주십시오. 캐릭터와 진행 상황은 계정에 저장됩니다.', fr: 'La connexion par compte est en pause. Les comptes migrent vers notre serveur, avec les personnages enregistrés côté serveur et une vérification par e-mail. En attendant, l\'entrée est réservée aux invités.', zh: '账户登录已暂停。账户正在迁移到我们的服务器，角色数据将保存在服务器端并引入邮箱验证。在此之前，仅限访客进入。' }
   };
   function lang() { try { return window.__espilLang() || 'en'; } catch (e) { return 'en'; } }
   function t(k, vars) {
@@ -86,10 +86,64 @@
   document.head.appendChild(css);
 
   /* ---------------- accounts (same store as the social module) --- */
-  var LS_ACCOUNTS = 'espil_accounts_v1', LS_SESSION = 'espil_session_v1';
+  var LS_ACCOUNTS = 'espil_accounts_v1', LS_SESSION = 'espil_session_v1', LS_SESSION_PARK = 'espil_session_park_v1';
   function accounts() { try { var o = JSON.parse(localStorage.getItem(LS_ACCOUNTS) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (_) { return {}; } }
   function saveAccounts(o) { try { localStorage.setItem(LS_ACCOUNTS, JSON.stringify(o)); } catch (_) {} }
   function session() { try { var s = JSON.parse(localStorage.getItem(LS_SESSION) || 'null'); return s && s.id ? s : null; } catch (_) { return null; } }
+  /* S0 activation (flip step 1): refresh the local session record
+     from the Worker's server session at boot, so a Google return
+     (the session arrives as a cookie) becomes the espil_session_v1
+     record this module's gate reads. social.js runs the same sync
+     for its surfaces. NOTE for rig verification: the sync fires at
+     init, ahead of any entry interaction; the gate reads the
+     record when it fires. */
+  var API_BASE = 'https://api.espil.online';
+  function serverSessionSync() {
+    if (!window.fetch) return;
+    fetch(API_BASE + '/auth/session', { credentials: 'include' }).then(function (r) {
+      return r.status === 200 ? r.json() : null;
+    }).then(function (body) {
+      if (body && body.signedIn && body.user && body.user.name) {
+        try { localStorage.setItem(LS_SESSION, JSON.stringify({ id: body.user.name, at: Date.now(), server: true })); } catch (_) {}
+        try { localStorage.setItem('espil_username', body.user.name); } catch (_) {}
+        try { localStorage.removeItem(LS_SESSION_PARK); } catch (_) {}
+      } else {
+        var s = session();
+        if (s && s.server) { try { localStorage.removeItem(LS_SESSION); } catch (_) {} }
+        /* A parked record is the same server session held out of a
+           guest entry's way (see the guest-enter handler); the
+           server saying signed-out retires it too, so a logout or
+           an expired session can never be resurrected from it. */
+        try { localStorage.removeItem(LS_SESSION_PARK); } catch (_) {}
+      }
+    }).catch(function () {});
+  }
+  /* S0 GAP-1 fix (2026-11-10): hand a parked session record back
+     on a fresh visit. A dive handoff (espil_pending_city in
+     sessionStorage, the espil-handoff class on <html>) is the
+     SAME entry still travelling - the guest choice governs it
+     end to end, so the record stays parked through the handoff
+     and the game page it lands on enters as the guest the
+     player chose. Any other load is a new visit: the record
+     returns to its live key, and serverSessionSync (called next
+     in init) revalidates it against the Worker, pruning it if
+     the server session is gone. If a live record already
+     exists it wins and the park is stale. */
+  function restoreParkedSession() {
+    try {
+      if (localStorage.getItem(LS_SESSION)) { localStorage.removeItem(LS_SESSION_PARK); return; }
+      var parked = localStorage.getItem(LS_SESSION_PARK);
+      if (!parked) return;
+      var handoff = false;
+      try {
+        handoff = document.documentElement.classList.contains('espil-handoff') ||
+                  !!sessionStorage.getItem('espil_pending_city');
+      } catch (_) {}
+      if (handoff) return;
+      localStorage.setItem(LS_SESSION, parked);
+      localStorage.removeItem(LS_SESSION_PARK);
+    } catch (_) {}
+  }
   function sha256hex(str) {
     if (window.crypto && crypto.subtle && crypto.subtle.digest) {
       return crypto.subtle.digest('SHA-256', new TextEncoder().encode(str)).then(function (buf) {
@@ -119,7 +173,7 @@
      verification). The account code below stays intact for that
      backend step; the guard makes it unreachable, and buildAuthZone
      renders the zone disabled. Stored accounts are never deleted. */
-  var GUEST_ONLY = true;
+  var GUEST_ONLY = false; /* S0 activation (flip step 2): server accounts are live. */
   function doSignup() {
     if (GUEST_ONLY) { authMsg(t('guestOnly')); return; }
     var id = ($('eauth-su-id') || {}).value || '', nm = ($('eauth-su-name') || {}).value || '',
@@ -160,14 +214,19 @@
        under the form. (This replaces the tabbed rebuild this module
        used to inject: while GUEST_ONLY stands, no account control
        may be live anywhere in the modal.) */
-    zone.querySelectorAll('input, button').forEach(function (el) { el.disabled = true; });
+    /* S0 activation (flip step 2): the zone is disabled only while
+       GUEST_ONLY stands. With server accounts live, the form stays
+       enabled and social.js owns its wiring. */
+    if (GUEST_ONLY) {
+      zone.querySelectorAll('input, button').forEach(function (el) { el.disabled = true; });
+    }
     var note = zone.querySelector('.auth-guestonly-note');
     if (!note) {
       note = document.createElement('p');
       note.className = 'auth-guestonly-note';
       zone.appendChild(note);
     }
-    note.textContent = t('guestOnly');
+    note.textContent = GUEST_ONLY ? t('guestOnly') : '';
   }
 
   /* ---------------- guests: adopt the server's Guest N ----------- */
@@ -178,11 +237,24 @@
       /* Batch A guest-only: a guest entry must not silently carry a
          stored account session (the custmerge gate would otherwise
          adopt the account's registered character, and presence would
-         join under the account name). Drop ONLY the session record;
-         espil_accounts_v1 itself is left untouched for the server
-         backend step. Capture phase: this runs before the gate
-         completes and the character gate reads the session. */
-      try { localStorage.removeItem(LS_SESSION); } catch (_) {}
+         join under the account name). Capture phase: this runs before
+         the gate completes and the character gate reads the session.
+         S0 GAP-1 fix (2026-11-10): the record is PARKED, not dropped.
+         The live key still leaves before the gate completes - every
+         consumer of this entry (the spawn gate above, custmerge,
+         monolith's espilGuestNow, presence) keys off the record's
+         absence, so the entry stays a true guest entry, pinned to
+         the Art Gallery with no restore. But the record is the local
+         face of a server session the player never signed out of:
+         parking it verbatim under LS_SESSION_PARK lets the next
+         fresh visit restore it (restoreParkedSession in init), so
+         entering as a guest no longer signs the player out.
+         espil_accounts_v1 itself stays untouched, as before. */
+      try {
+        var raw = localStorage.getItem(LS_SESSION);
+        if (raw) localStorage.setItem(LS_SESSION_PARK, raw);
+        localStorage.removeItem(LS_SESSION);
+      } catch (_) {}
     }
   }, true);
   setInterval(function () {
@@ -326,16 +398,23 @@
        entry is a guest entry, and the gallery pick below is set
        deterministically - the guest branch never consults the
        cache for spawning. (The guest-enter handler above also
-       drops any stored session when the guest button is used, so
-       a session can only ever reach this gate via a real sign-in
-       through startSession.) The account stage only has to enable
+       parks any stored session record out of the live key when
+       the guest button is used - restored on a later fresh
+       visit, never during the guest entry itself - so a session
+       can only ever reach this gate via a real sign-in through
+       startSession.) The account stage only has to enable
        sign-in and the restore branch goes live with no further
        spawn changes. */
     function isLoggedIn() {
       var ses = session();
-      if (!ses) return false;
-      var accs = accounts();
-      return !!(accs[ses.id] || accs[String(ses.id).toLowerCase()]);
+      /* S0 activation (flip step 1): the basis is the SERVER
+         session - espil_session_v1 as written from the Worker's
+         /auth/session response (server:true). espil_accounts_v1
+         is retired as an authority: records stay in place, never
+         deleted, never read for auth. This is the swap PLAN.md S0
+         names - the restore branch above goes live on it with no
+         further spawn changes. */
+      return !!(ses && ses.server === true && ses.id);
     }
     var loggedIn = isLoggedIn();
     var directGamePage = false;
@@ -355,6 +434,8 @@
   /* claim the auth zone now, and re-claim it whenever the modal opens */
   function init() {
     buildAuthZone();
+    restoreParkedSession();
+    serverSessionSync();
     var m = $('signin-modal');
     if (m && !m.__espilEntryObs) {
       m.__espilEntryObs = true;
@@ -364,5 +445,303 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
+})();
+
+/* =====================================================================
+   LANDING FLOW (Han direct order, 2026-11-09): the landing no longer
+   starts at city selection. The staged order is: the text div as
+   before (title presentation unchanged) -> FIRST Login / Guest (the
+   existing sign-in modal is this step) -> THEN the menu (Play / Shop /
+   Zealandia / About) -> Play and Shop share CITY SELECTION (all
+   cities selectable; a city without a data bundle shows the
+   preparation panel - city name + data-pack-in-preparation notice +
+   back to the selection; no fake map, no silent Vancouver fallback)
+   -> the chosen city is entered in the recorded mode.
+
+   MODE CONTRACT: Play/Shop record the mode in sessionStorage
+   'espil_entry_mode' ('play' | 'shop') and on window.__espilEntryMode
+   BEFORE any navigation; monsters.js reads it at boot on the game
+   page (shop = zero spawns, zero activation). A direct game-page
+   entry with no stored mode defaults to 'play' on that side.
+
+   This section is a separate IIFE appended after the module above:
+   it edits no existing function, so the staged S0 pair patches
+   (whose hunks live in the module above and in the modal markup)
+   keep their context lines byte-for-byte.
+   ===================================================================== */
+(function () {
+  'use strict';
+  if (window.__espilLandingFlow) return; /* single instance */
+
+  /* ---- scope guards: this flow owns a PLAIN landing load only.
+     The game page, a dive handoff, a direct city entry and a
+     pending city switch all keep the existing machinery. ---- */
+  var plainLanding = false;
+  try {
+    plainLanding =
+      window.__ESPIL_GAME_PAGE !== true &&
+      window.__espilDirectCityEntry !== true &&
+      !document.documentElement.classList.contains('espil-handoff') &&
+      !sessionStorage.getItem('espil_pending_city');
+  } catch (e) { plainLanding = false; }
+  if (!plainLanding) return;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var step = 'boot'; /* boot -> login -> menu -> city -> done */
+  var chosenMode = null;
+
+  /* Cities with a data bundle in the shipped config (monolith's
+     ESPIL_CITIES keys). Every other city on the globe is
+     bundle-less and gets the preparation panel. Of the bundle
+     cities only Vancouver's entry gate is open in the current
+     monolith build (espilPlayableCity / ESPIL_SELECTABLE_CITIES
+     live in monolith.js) - see landing/MONOLITH-SEAM.md; until
+     that seam lands, a bundle city other than Vancouver also
+     lands on the preparation panel. */
+  var BUNDLE_CITIES = { 'Vancouver': 1, 'Auckland': 1, 'Tokyo': 1, 'New York': 1, 'Paris': 1, 'London': 1 };
+
+  /* ---------------- styling (own style element) ---------------- */
+  var css = document.createElement('style');
+  css.id = 'espil-landing-flow-css';
+  css.textContent =
+    '#espil-mainmenu,#espil-zealandia-panel,#espil-about-panel,#espil-cityprep-panel{position:fixed;inset:0;z-index:60;display:none;' +
+      'align-items:center;justify-content:center;background:rgba(4,6,9,.55);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}' +
+    '#espil-mainmenu[aria-hidden="false"],#espil-zealandia-panel[aria-hidden="false"],' +
+    '#espil-about-panel[aria-hidden="false"],#espil-cityprep-panel[aria-hidden="false"]{display:flex}' +
+    '.espil-flow-card{width:min(92vw,380px);background:rgba(9,11,15,.92);border:1px solid rgba(255,217,122,.35);border-radius:16px;' +
+      'padding:26px 24px 22px;text-align:center;box-shadow:0 18px 50px rgba(0,0,0,.55);font-family:"Manrope",sans-serif;color:#f3ead2}' +
+    '.espil-flow-card h2{margin:0 0 4px;font-size:21px;font-weight:800;letter-spacing:.02em;color:#ffe9a8}' +
+    '.espil-flow-card .espil-flow-sub{margin:0 0 18px;font-size:12px;line-height:1.55;color:rgba(243,234,210,.72)}' +
+    '.espil-flow-card p.espil-flow-copy{margin:0 0 18px;font-size:13px;line-height:1.65;color:rgba(243,234,210,.88);text-align:left}' +
+    '.espil-flow-btn{display:block;width:100%;margin:8px 0;padding:12px 14px;border-radius:11px;border:1px solid rgba(255,217,122,.4);' +
+      'background:rgba(255,217,122,.08);color:#ffe9a8;font:800 14px "Manrope",sans-serif;letter-spacing:.03em;cursor:pointer}' +
+    '.espil-flow-btn:hover{background:rgba(255,217,122,.18)}' +
+    '.espil-flow-btn.espil-flow-primary{background:linear-gradient(180deg,#ffd97a,#e8ae3c);color:#241a04;border-color:#ffd97a}' +
+    '.espil-flow-btn.espil-flow-ghost{background:transparent;border-color:rgba(243,234,210,.25);color:rgba(243,234,210,.8);font-weight:700}' +
+    '#espil-cityprep-name{color:#ffe9a8}';
+  document.head.appendChild(css);
+
+  /* ---------------- DOM: menu + panels ---------------- */
+  function el(tag, id, cls) {
+    var n = document.createElement(tag);
+    if (id) n.id = id;
+    if (cls) n.className = cls;
+    n.setAttribute('aria-hidden', 'true');
+    return n;
+  }
+  function buildUI() {
+    if ($('espil-mainmenu')) return;
+    var menu = el('div', 'espil-mainmenu');
+    menu.setAttribute('role', 'dialog');
+    menu.setAttribute('aria-label', 'Espil Online menu');
+    menu.innerHTML =
+      '<div class="espil-flow-card"><h2>Espil Online</h2>' +
+      '<p class="espil-flow-sub">A digital replica of this world, in real time.</p>' +
+      '<button type="button" class="espil-flow-btn espil-flow-primary" id="espil-menu-play">Play</button>' +
+      '<button type="button" class="espil-flow-btn" id="espil-menu-shop">Shop</button>' +
+      '<button type="button" class="espil-flow-btn" id="espil-menu-zealandia">Zealandia</button>' +
+      '<button type="button" class="espil-flow-btn espil-flow-ghost" id="espil-menu-about">About</button></div>';
+    document.body.appendChild(menu);
+
+    var zea = el('div', 'espil-zealandia-panel');
+    zea.setAttribute('role', 'dialog');
+    zea.setAttribute('aria-label', 'Zealandia');
+    zea.innerHTML =
+      '<div class="espil-flow-card"><h2>Zealandia</h2>' +
+      '<p class="espil-flow-copy">Zealandia is where the real game continues - in the Espil app for mobile and PC. ' +
+      'There is no entry into Zealandia on the web: here the journey ends at the Auckland Time Stone, and the app takes over from there.</p>' +
+      '<button type="button" class="espil-flow-btn espil-flow-ghost" id="espil-zealandia-back">Back</button></div>';
+    document.body.appendChild(zea);
+
+    var about = el('div', 'espil-about-panel');
+    about.setAttribute('role', 'dialog');
+    about.setAttribute('aria-label', 'About Espil Online');
+    about.innerHTML =
+      '<div class="espil-flow-card"><h2>About Espil Online</h2>' +
+      '<p class="espil-flow-copy">Espil Online is a digital replica of this world, based on the real world in real time - ' +
+      'the sky, the weather and the alignment of the stars move with the real world. Vancouver is the first city; ' +
+      'the destination is a map of the whole world, with the city chosen by where you are.</p>' +
+      '<button type="button" class="espil-flow-btn espil-flow-ghost" id="espil-about-back">Back</button></div>';
+    document.body.appendChild(about);
+
+    var prep = el('div', 'espil-cityprep-panel');
+    prep.setAttribute('role', 'dialog');
+    prep.setAttribute('aria-label', 'City in preparation');
+    prep.innerHTML =
+      '<div class="espil-flow-card"><h2 id="espil-cityprep-name">City</h2>' +
+      '<p class="espil-flow-copy">This city\'s data pack is in preparation. When it is ready, the city opens here exactly as it stands in the real world.</p>' +
+      '<button type="button" class="espil-flow-btn espil-flow-ghost" id="espil-cityprep-back">Back to city selection</button></div>';
+    document.body.appendChild(prep);
+
+    $('espil-menu-play').addEventListener('click', function () { chooseMode('play'); });
+    $('espil-menu-shop').addEventListener('click', function () { chooseMode('shop'); });
+    $('espil-menu-zealandia').addEventListener('click', function () { show(zea); });
+    $('espil-menu-about').addEventListener('click', function () { show(about); });
+    $('espil-zealandia-back').addEventListener('click', function () { hide(zea); });
+    $('espil-about-back').addEventListener('click', function () { hide(about); });
+    $('espil-cityprep-back').addEventListener('click', function () { hide(prep); });
+  }
+  function show(n) { if (n) n.setAttribute('aria-hidden', 'false'); }
+  function hide(n) { if (n) n.setAttribute('aria-hidden', 'true'); }
+
+  /* ---------------- the steps ---------------- */
+  function openLoginStep() {
+    if (step !== 'boot' && step !== 'login') return;
+    step = 'login';
+    if (typeof window.__espilOpenAuth === 'function') { window.__espilOpenAuth(); return; }
+    var m = $('signin-modal');
+    if (m) {
+      m.setAttribute('aria-hidden', 'false');
+      var cs = $('city-status'); if (cs) cs.classList.add('gate-hidden');
+    }
+  }
+  function sessionRecord() {
+    try { var s = JSON.parse(localStorage.getItem('espil_session_v1') || 'null'); return s && s.id ? s : null; }
+    catch (e) { return null; }
+  }
+  function completeLogin() {
+    if (step !== 'login') return;
+    step = 'menu';
+    var m = $('signin-modal'); if (m) m.setAttribute('aria-hidden', 'true');
+    var cs = $('city-status'); if (cs) cs.classList.add('gate-hidden'); /* the menu owns the screen until Play/Shop */
+    buildUI();
+    show($('espil-mainmenu'));
+  }
+  function setEntryMode(mode) {
+    chosenMode = mode;
+    try { sessionStorage.setItem('espil_entry_mode', mode); } catch (e) {}
+    window.__espilEntryMode = mode;
+  }
+  function chooseMode(mode) {
+    setEntryMode(mode);
+    hide($('espil-mainmenu'));
+    step = 'city';
+    var cs = $('city-status'); if (cs) cs.classList.remove('gate-hidden'); /* city selection is live: the text div returns */
+    activateCityLayer();
+  }
+
+  /* ---------------- city selection layer ----------------
+     Monolith's reel lists only the cities its selectable set
+     opens, and its pins sit disabled for the rest. Han's order
+     makes ALL cities selectable: while the flow is at the city
+     step this layer lists every city, re-enables every pin, and
+     routes each pick - Vancouver to monolith's own button (its
+     info panel and DIVE run untouched), every other city to the
+     preparation panel. */
+  var cityLayerActive = false;
+  function harvestCities() {
+    var out = [];
+    var pins = document.querySelectorAll('#city-pins .city-pin');
+    for (var i = 0; i < pins.length; i++) {
+      var label = pins[i].getAttribute('aria-label') || '';
+      var name = label.split(',')[0].trim();
+      if (name) out.push({ name: name, pin: pins[i] });
+    }
+    return out;
+  }
+  function openPrep(name) {
+    var n = $('espil-cityprep-name'); if (n) n.textContent = name;
+    show($('espil-cityprep-panel'));
+  }
+  function activateCityLayer() {
+    if (cityLayerActive) return;
+    cityLayerActive = true;
+    var tries = 0;
+    var timer = setInterval(function () {
+      tries++;
+      var cities = harvestCities();
+      var list = $('city-list');
+      if ((!cities.length || !list) && tries < 200) return;
+      clearInterval(timer);
+      if (!list) return;
+      /* pins: every city selectable */
+      cities.forEach(function (c) {
+        c.pin.disabled = false;
+        c.pin.classList.remove('is-inactive');
+      });
+      /* the reel: hide monolith's own entries, list all cities */
+      var orig = [];
+      for (var i = 0; i < list.children.length; i++) {
+        orig.push(list.children[i]);
+        list.children[i].style.display = 'none';
+      }
+      cities.forEach(function (c) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'city-name espil-city-btn';
+        b.textContent = c.name;
+        b.setAttribute('data-city', c.name);
+        b.setAttribute('aria-label', c.pin.getAttribute('aria-label') || c.name);
+        b.addEventListener('click', function () {
+          var btns = list.querySelectorAll('.espil-city-btn');
+          for (var j = 0; j < btns.length; j++) btns[j].classList.toggle('is-centered', btns[j] === b);
+          if (c.name === 'Vancouver') {
+            for (var k = 0; k < orig.length; k++) {
+              if ((orig[k].textContent || '').trim() === 'Vancouver') { orig[k].click(); return; }
+            }
+          }
+          openPrep(c.name);
+        });
+        list.appendChild(b);
+      });
+    }, 300);
+    /* pin picks for non-Vancouver cities: capture-phase, so
+       monolith's own pin handler (which would refuse them) never
+       runs; Vancouver's pin falls through to the native flow. */
+    document.addEventListener('click', function (e) {
+      if (step !== 'city') return;
+      var t = e.target;
+      var pin = t && t.closest ? t.closest('.city-pin') : null;
+      if (!pin) return;
+      var name = (pin.getAttribute('aria-label') || '').split(',')[0].trim();
+      if (!name || name === 'Vancouver') return;
+      e.stopPropagation();
+      e.preventDefault();
+      openPrep(name);
+    }, true);
+  }
+
+  /* Guest completion of the login step: capture-phase at the
+     document, registered after entry-flow's own guest listener
+     above (which drops any stored session first, as before). The
+     propagation stop keeps landing-auth's landing-page toast
+     ('Guest entry is available at a city gate') from firing -
+     under this flow the guest button IS the gate. On the game
+     page this whole section never runs, so the in-entry guest
+     path is untouched. */
+  document.addEventListener('click', function (e) {
+    if (step !== 'login') return;
+    if (e.target && e.target.id === 'guest-enter') {
+      e.stopPropagation();
+      completeLogin();
+    }
+  }, true);
+
+  /* Sign-in completion (post-S0): a session record appearing
+     while the flow sits at the login step advances it to the
+     menu - this is how a Google return or an email sign-in
+     (startSession -> completeGate hides the modal) flows on. */
+  setInterval(function () {
+    if (step === 'login' && sessionRecord()) completeLogin();
+  }, 500);
+
+  /* probe/inspection hook */
+  window.__espilLandingFlow = {
+    step: function () { return step; },
+    mode: function () { return chosenMode; },
+    bundleCities: Object.keys(BUNDLE_CITIES)
+  };
+
+  /* ---------------- boot: the intro plays first, as today ------ */
+  var bootTries = 0;
+  var bootTimer = setInterval(function () {
+    bootTries++;
+    var introEl = document.getElementById('intro');
+    var introActive = window.__espilIntroActive === true;
+    if ((!introEl && !introActive) || bootTries > 400) {
+      clearInterval(bootTimer);
+      openLoginStep();
+    }
+  }, 300);
 })();
 

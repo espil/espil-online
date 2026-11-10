@@ -23,6 +23,11 @@
      found by probe_stall2 on the freeze candidate and fixed
      here; the bundle still lands after entry, so panels stays
      out of the entry-critical set.
+   - social (auth half): the sign-in modal opening - the login
+     gate (game page) and the landing flow's login step present
+     social.js's sign-in form BEFORE any arrival can fire, so
+     the modal becoming visible is its first-need seam for the
+     auth wiring; only social.js arms there (GAP-1, 2026-11-10).
    - store: the building panel being clicked, the interior event,
      or __espilInside appearing (poll). The store's own tick then
      applies the fitout for the building already entered.
@@ -112,6 +117,24 @@
     if (d.type === 'interior') { storePair(); load('panels.js'); }
   });
   window.addEventListener('espil-party-frame', socialBundle);
+  /* The login gate's seam (GAP-1, 2026-11-10): the game-page
+     login gate and the landing flow's login step both present
+     the sign-in modal before any arrival can fire, and the
+     flipped pair's form handlers live in social.js alone - so
+     the modal becoming visible arms social.js. Only social.js
+     arms here: stall2 / tutorial / panels keep their arrival
+     seams (the tutorial must never arm inside the entry
+     sequence), and the arrival bundle still lands the rest at
+     the join moment. If the modal is already open when this
+     loader boots, arm immediately. */
+  (function armSocialAtGate() {
+    var m = document.getElementById('signin-modal');
+    if (!m) { setTimeout(armSocialAtGate, 800); return; }
+    if (m.getAttribute('aria-hidden') === 'false') load('social.js');
+    new MutationObserver(function () {
+      if (m.getAttribute('aria-hidden') === 'false') load('social.js');
+    }).observe(m, { attributes: true, attributeFilter: ['aria-hidden'] });
+  })();
   document.addEventListener('keydown', function (e) {
     var ae = document.activeElement, tag = (ae && ae.tagName) || '';
     if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
