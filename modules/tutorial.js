@@ -180,16 +180,28 @@
       '#espil-tut .kb{min-width:16px;height:16px;padding:0 2px;margin-right:2px;border-radius:4px;font-size:.60rem;border-bottom-width:2px}' +
       '#espil-tut.tut-min{gap:5px;padding:4px 10px;font-size:.68rem}' +
       '#espil-tut .mini-ic{color:#ffd97a;font-size:.66rem;line-height:1}' +
-      /* Mobile placement (Han 2026-11-06): in the map the chip
-         leaves the top-centre and sits in the right column directly
-         under the (shrunk) mobile minimap, right-aligned with it -
-         top = the minimap's 120px top + its coarse height
-         max(52px,10vh) (pair.css) + an 8px gap. Scoped to
-         body.in-map so the landing-page hints keep their
-         top-centre spot. The minimized pill inherits this anchor,
-         and the chip's z-60 keeps it above - and tappable over -
-         the tap-expanded minimap (z-30). */
-      'body.in-map #espil-tut{left:auto;right:14px;transform:none;top:calc(128px + max(52px,10vh) + env(safe-area-inset-top,0px))}' +
+      /* Mobile placement: in the map the chip leaves the top-centre
+         for the minimap column of the HUD3 composition (Han
+         2026-11-09, wholesale mobile recomposition; the 2026-11-06
+         right-column-under-a-120px-minimap anchor is superseded -
+         HUD2's minimap rests at top:10 in both orientations).
+         LANDSCAPE: the right column under the square minimap and
+         its time/FPS bar (10..128 + 132..~154), chip from top:160,
+         right-aligned, at most 40vw wide. PORTRAIT: the left
+         column under the circular minimap and its time/FPS chip
+         (10..102 + 106..~126), chip from top:132, left-aligned, at
+         most 54vw wide - the Genshin quest-tracker spot, stacked
+         over the chat zone (top:200). Scoped to body.in-map so the
+         landing-page hints keep their top-centre spot. The
+         minimized pill inherits the anchor. mmo-hud.js pins the
+         same geometry with !important, so the two sheets agree in
+         either load order. */
+      '@media (pointer:coarse) and (orientation:landscape){' +
+      'body.in-map #espil-tut{left:auto;right:14px;transform:none;top:160px;max-width:40vw}' +
+      '}' +
+      '@media (pointer:coarse) and (orientation:portrait){' +
+      'body.in-map #espil-tut{left:10px;right:auto;transform:none;top:132px;max-width:54vw;text-align:left}' +
+      '}' +
       '}';
       /* Mobile revert (Han 2026-11-04): the Batch E2 coarse-pointer
          top:52px tutorial offset is REMOVED - top:86px everywhere. */

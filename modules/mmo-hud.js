@@ -654,6 +654,33 @@
    rings, flat translucent dark glass and white glyphs throughout,
    per the Genshin-style reference. Landscape is untouched: it
    keeps the reference-1 skin exactly as landed.
+   HUD3 COMPOSITION (Han 2026-11-09, after checking production on
+   his phone: the minimap, chat, buttons and quest UI overlapped):
+   the mobile layout is recomposed WHOLESALE on the two references,
+   chat window included - every standing surface owns a fixed zone
+   and no two zones intersect, in both orientations:
+   - LANDSCAPE: coin TL column; score TC; menu chips as a row
+     centred under the score (was: a column down the left edge);
+     square minimap TR with the time/FPS bar under it; the quest
+     chip in the right column under that bar; the chat window in
+     the left column under the coin (top:86, its bottom edge 170px
+     off the bottom, clear of the joystick); joystick BL; HP/MP
+     bars bottom-centre (was: bottom-left, where the chat zone now
+     sits); action arc BR.
+   - PORTRAIT: circular minimap TL with the time/FPS chip under
+     it; coin chip beside it; menu row TR; the folded score line
+     under the top row; the quest chip in the LEFT column under
+     the time/FPS chip (was: the right column, across the screen
+     from the minimap stack it belongs to); the chat window in the
+     left column under the chip (top:200 - it used to rest as a
+     full-width band across the very top, over the minimap, coin,
+     score and menu); nearby list R; joystick BL (faint); chat
+     button far BL corner; HP/MP bars bottom-centre; the action
+     cluster RAISED to bottom:64 (was bottom:6, where its left
+     buttons sat on the centred HP/MP bars' right end).
+   The presence transients take zones in pair.css (DM chip,
+   interact prompt). Button sizes and every behaviour are exactly
+   as landed - this pass moves placement only.
    The Batch 5/6 mobile cluster (#espil-mmo-combat), the menu4 row
    and the quickbar tray are hidden on coarse pointers - this layout
    is the single mobile scheme. Desktop (fine pointer) never sees
@@ -760,8 +787,8 @@
       'body.in-map #minimap-wrap[data-stage="1"]{top:10px!important;right:10px!important;left:auto!important;' +
         'width:118px!important;height:118px!important;border-radius:12px!important;transform:none}' +
       'body.in-map #espil-hud2-timefps{top:132px;right:10px;width:118px}' +
-      'body.in-map #espil-hud2-menu{left:10px;top:88px;flex-direction:column}' +
-      'body.in-map #espil-hud2-bars{left:12px;bottom:170px;width:196px}' +
+      'body.in-map #espil-hud2-menu{left:50%;transform:translateX(-50%);top:46px;flex-direction:row}' +
+      'body.in-map #espil-hud2-bars{left:50%;transform:translateX(-50%);bottom:14px;width:min(210px,32vw)}' +
       'body.in-map #espil-hud2-actions{right:8px;bottom:8px;width:168px;height:172px}' +
       'body.in-map #espil-hud2-chars{display:none!important}' +
       'body.in-map #espil-hud2-chat{display:none!important}' +
@@ -777,10 +804,10 @@
       '#espil-hud2-coin .h2-medal{width:20px;height:20px;font-size:9px}' +
       '#espil-hud2-coin .h2-num{font-size:10px}' +
       'body.in-map #espil-hud2-menu{top:10px;right:10px;flex-direction:row}' +
-      'body.in-map #espil-hud2-score{top:42px;width:250px;height:22px;padding:0 16px;font-size:10px}' +
+      'body.in-map #espil-hud2-score{top:42px;left:110px;transform:none;width:250px;height:22px;padding:0 16px;font-size:10px}' +
       'body.in-map #espil-hud2-chars{display:flex;position:fixed;z-index:36;right:8px;top:32%;width:94px;flex-direction:column;gap:5px}' +
       'body.in-map #espil-hud2-bars{left:50%;transform:translateX(-50%);bottom:12px;width:172px}' +
-      'body.in-map #espil-hud2-actions{right:6px;bottom:6px;width:150px;height:158px}' +
+      'body.in-map #espil-hud2-actions{right:6px;bottom:64px;width:150px;height:158px}' +
       'body.in-map #espil-hud2-chat{display:flex;position:fixed;z-index:36;left:8px;bottom:8px;width:22px;height:22px}' +
       /* Genshin separation (Han 2026-11-09): portrait drops every
          inherited piece of the PC log skin - thin light rings, flat
@@ -815,6 +842,46 @@
       '#espil-tut{background:rgba(18,22,28,.55)!important;color:#fff!important;border:1px solid rgba(255,255,255,.35)!important;' +
         'box-shadow:0 4px 12px rgba(0,0,0,.3)!important;text-shadow:none!important}' +
       '#espil-tut .kb{background:rgba(255,255,255,.16)!important;border:1px solid rgba(255,255,255,.4)!important;color:#fff!important;box-shadow:none!important}' +
+    '}' +
+    /* ---- HUD3 composition: chat window + quest chip zones ---------
+       The chat window and the tutorial chip are not HUD2 elements,
+       but the composition owns their placement on coarse pointers:
+       pair.css carries their structure, tutorial.js carries the
+       chip's own anchor (the same values, in its sheet), and the
+       pins below hold the zones regardless of sheet order. */
+    '@media (pointer:coarse){' +
+      '.chat-window{display:flex;flex-direction:column;pointer-events:auto}' +
+      '.chat-window .chat-log{flex:1 1 auto;min-height:0;max-height:none}' +
+      '.chat-window .chat-input{display:block}' +
+      '.chat-window.is-expanded{z-index:70}' +
+    '}' +
+    '@media (pointer:coarse) and (orientation:landscape){' +
+      /* chat zone: the left column under the coin; its bottom edge
+         rests 170px off the bottom, above the joystick's top edge
+         (160px). Expanding changes nothing geometrically here -
+         the zone is already the full resting size. */
+      '.chat-window{left:12px;right:auto;top:108px;bottom:calc(170px + env(safe-area-inset-bottom,0px));width:min(320px,40vw);max-height:none}' +
+      '.chat-window.is-expanded{width:min(320px,40vw);height:auto}' +
+      /* quest chip: the right column under the time/FPS bar
+         (minimap 10..128, bar 132..~154, chip from 160) */
+      'body.in-map #espil-tut{top:160px!important;right:14px!important;left:auto!important;transform:none!important;max-width:40vw}' +
+    '}' +
+    '@media (pointer:coarse) and (orientation:portrait){' +
+      /* chat zone: the left column under the quest chip (chip
+         132..~191 worst case, chat from 200). Resting, the log
+         shows up to ~6 lines and the window hugs its content;
+         expanded, it stretches inside the zone down to a bottom
+         edge 190px off the bottom - clear of the joystick's top
+         edge (174px) and of the raised action cluster (the chat's
+         right edge is at 52vw+10, the cluster starts further
+         right on every phone width). */
+      '.chat-window{left:10px;right:auto;top:200px;bottom:auto;width:min(300px,52vw);max-height:none}' +
+      '.chat-window .chat-log{flex:0 1 auto;max-height:96px}' +
+      '.chat-window.is-expanded{width:min(300px,52vw);height:calc(100dvh - 390px)}' +
+      '.chat-window.is-expanded .chat-log{flex:1 1 auto;max-height:none}' +
+      /* quest chip: the left column under the time/FPS chip
+         (minimap 10..102, chip 106..~126, quest from 132) */
+      'body.in-map #espil-tut{top:132px!important;left:10px!important;right:auto!important;transform:none!important;max-width:54vw;text-align:left}' +
     '}';
   var styleEl = document.createElement('style');
   styleEl.id = 'espil-hud2-style';

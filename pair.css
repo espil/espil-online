@@ -470,7 +470,12 @@
       color:#fff4cf; font:950 13px/1 "Manrope",sans-serif; display:grid; place-items:center;
     }
     @media (pointer:coarse) and (orientation:landscape) {
-      .chat-window { left:12px; bottom:calc(170px + env(safe-area-inset-bottom)); width:min(320px,calc(100vw - 24px)); }
+      /* HUD3 composition (Han 2026-11-09): the landscape chat zone
+         is the left column under the coin - top:86 down to a bottom
+         edge 170px above the screen bottom, clear of the 148px
+         joystick (top edge 160px off the bottom). mmo-hud.js pins
+         the same rect; the two sheets agree. */
+      .chat-window { left:12px; top:86px; bottom:calc(170px + env(safe-area-inset-bottom)); width:min(320px,40vw); }
     }
     /* Han 2026-10-16 #10: chat window copies the cauldron-test design -
        gold frame, cream text, message bubbles (placement unchanged). */
@@ -1818,7 +1823,17 @@
        stay. Chat: the resting window moves to the TOP of the screen
        with the latest message readable (the log already auto-scrolls
        to the newest line in addChatMsg); tapping it expands it to
-       half the screen (monolith initChat toggles .is-expanded). */
+       half the screen (monolith initChat toggles .is-expanded).
+       HUD3 AMENDMENT (Han 2026-11-09, wholesale mobile recomposition):
+       the chat-at-the-top band is RETIRED - on Han's phone it covered
+       the minimap, the coin, the score line and the menu row that
+       HUD2 (mmo-hud.js) puts in the top strip. The chat window now
+       rests in a bounded left-column zone in BOTH orientations; the
+       zone geometry lives in mmo-hud.js (the mobile composition
+       owner) and the chat rules below carry the structure only. The
+       top-stack rules further down (loc pill / EXP readout / minimap
+       top) served the band and are inert on coarse - HUD2's own
+       !important geometry outranks them wherever they disagree. */
     @media (pointer:coarse) {
       /* Button purge - skill slots (QWER), item slots, the menu
          cluster, the minimap zoom buttons, and the in-map settings /
@@ -1832,25 +1847,19 @@
          DOM, so it would win ties at their edges). */
       body.in-map #map-interact, body.in-map .map-jump { z-index:34; }
       .joystick { z-index:34; }
-      /* Chat at the top: full-width band under the safe area. The
-         log rests at ~2 lines - the newest message sits at its
-         bottom, fully readable; the input appears only expanded. */
+      /* Chat (HUD3 composition): a flex column that fills whatever
+         rect its zone gives it - mmo-hud.js owns the zone geometry
+         per orientation. The log flexes inside the rect, the input
+         is always shown (the desktop grammar), and expanding only
+         raises the window above the mid-screen overlays (z-index)
+         and, in portrait, stretches it inside the same zone: the
+         zone itself never grows over a neighbouring region. */
       .chat-window {
-        top:calc(10px + env(safe-area-inset-top,0px)); bottom:auto;
-        left:10px; right:10px; width:auto; max-height:none;
+        display:flex; flex-direction:column;
         padding:8px 10px; pointer-events:auto;
       }
-      .chat-log { min-height:0; max-height:46px; overflow-y:auto; }
-      .chat-input { display:none; }
-      .chat-window.is-expanded {
-        height:50dvh; width:auto; display:flex; flex-direction:column;
-        /* Above the mid-screen overlays (map guidance banner z-30,
-           compass chip z-45, tutorial chip z-60): an open half-screen
-           chat takes the taps inside its own rect. */
-        z-index:70;
-      }
-      .chat-window.is-expanded .chat-log { flex:1 1 auto; max-height:none; }
-      .chat-window.is-expanded .chat-input { display:block; }
+      .chat-log { flex:1 1 auto; min-height:0; max-height:none; overflow-y:auto; }
+      .chat-window.is-expanded { z-index:70; }
       /* The quickbar's remaining contents (HP/MP flasks + zone
          strip - displays, not buttons) lift clear above USE/JUMP:
          the late global #quickbar rule otherwise leaves the tray's
@@ -1866,12 +1875,47 @@
       body #espil-loc { top:calc(86px + env(safe-area-inset-top,0px)); }
       .map-status { top:calc(94px + env(safe-area-inset-top,0px)); }
       #minimap-wrap { top:calc(120px + env(safe-area-inset-top,0px)); }
-      /* Presence transients: the DM chip drops under the chat band
-         and the player-interact prompt lifts clear of the joystick
-         (their styles are injected later by presence.js - the
-         !important here is what lets this earlier sheet win). */
-      #espil-dm-chip { top:calc(96px + env(safe-area-inset-top,0px)) !important; }
-      #espil-interact-prompt { bottom:calc(172px + env(safe-area-inset-bottom,0px)) !important; }
+      /* Presence transients (their styles are injected later by
+         presence.js - the !important here is what lets this earlier
+         sheet win). HUD3 composition zones: portrait - the DM chip
+         centres under the score line (top:74) and the interact
+         prompt centres at bottom:238, above the raised action
+         cluster (its top edge sits 222px off the bottom); landscape
+         - the DM chip centres at bottom:56 above the bottom-centre
+         HP/MP bars, the prompt centres above it at bottom:100,
+         both clear of the left chat zone (which ends 170px off the
+         bottom) and of the joystick / action corners. */
+      @media (orientation:portrait) {
+        #espil-dm-chip { top:calc(74px + env(safe-area-inset-top,0px)) !important; left:50% !important; right:auto !important; transform:translateX(-50%); }
+        #espil-interact-prompt { bottom:calc(238px + env(safe-area-inset-bottom,0px)) !important; }
+      }
+      @media (orientation:landscape) {
+        #espil-dm-chip { top:auto !important; bottom:calc(56px + env(safe-area-inset-bottom,0px)) !important; left:50% !important; right:auto !important; transform:translateX(-50%); }
+        #espil-interact-prompt { bottom:calc(100px + env(safe-area-inset-bottom,0px)) !important; }
+      }
+      /* Top-bar utility pills (Notice / language - the pair .topbar)
+         and the cash shop entry button (cashshop.js #espil-cash-btn,
+         whose own sheet anchors it right:14 top:118 in every
+         viewport): in-map on coarse screens their stock positions
+         sit on the minimap (landscape) and the menu row (portrait).
+         HUD3 zones: landscape - the pills join the left utility
+         column under the Leo coin (top:70; the chat zone starts at
+         top:108 to clear them) and the cash button joins the
+         top-centre stack under the menu row (top:72, centred);
+         portrait - the cash button keeps its stock right-column
+         spot (top:118, right:14 - clear of the menu row and the
+         nearby list) and the pills stack under it (top:164,
+         right:12). Landing screens keep the stock top bar: these
+         rules are in-map only. */
+      body.in-map .topbar { pointer-events:none; }
+      body.in-map .topbar-actions { position:fixed; z-index:9600; }
+      @media (orientation:landscape) {
+        body.in-map .topbar-actions { left:12px; top:calc(70px + env(safe-area-inset-top,0px)); right:auto; }
+        body.in-map #espil-cash-btn { left:50% !important; right:auto !important; transform:translateX(-50%); top:calc(72px + env(safe-area-inset-top,0px)) !important; }
+      }
+      @media (orientation:portrait) {
+        body.in-map .topbar-actions { right:12px; top:calc(164px + env(safe-area-inset-top,0px)); left:auto; }
+      }
     }
     /* The Mapbox guidance banner (#espil-map-guidance, monolith
        espilP1Banner) is a pure text notice - it has no control and
