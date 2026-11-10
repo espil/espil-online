@@ -145,9 +145,6 @@
         stun: ['stun_1.webp','stun_2.webp','stun_3.webp','stun_4.webp'],
         death: ['death_1.webp','death_2.webp','death_3.webp','death_4.webp'] } },
       def: 0, eva: 0, element: 'neutral', weak: null },
-    { id: 'wisp', name: 'Square Wisp', base: 'shambler', tint: '#9fc4e8', scale: 2.2,
-      grade: 'white', level: 2, hp: 25, dmg: 4, aggro: 9, speed: 1.30, reach: 1.8, atkCd: 1.20, zone: 'tutorial', elite: false,
-      def: 0, eva: 0, element: 'neutral', weak: null },
     { id: 'stray', name: 'Alley Stray', base: 'crawler', tint: '#5d4632', scale: 3.1,
       grade: 'yellow', level: 4, hp: 45, dmg: 6, aggro: 11, speed: 2.08, reach: 1.6, atkCd: 0.98, zone: 'low', elite: false,
       sprite: { base: 'assets/monsters/stray-plushy/', fps: 8, w: 1.05, h: 1.1, frames: {
