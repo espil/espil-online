@@ -5100,11 +5100,19 @@
          (Re-applied 2026-10-14 after the working-copy overwrite.) */
       var _sm=document.getElementById('store-modal');
       if(_sm&&!_sm.classList.contains('hidden'))return;
+      /* ARENA SEAM: the arena portal at the Art Gallery plaza
+         (11, 33) - inside the safe zone, 8 m east of ESPIL_SPAWN.
+         Space / INTERACT within 10 m opens the arena panel. */
+      if(window.__espilArena&&walkPlayer&&walkPlayer.pos){
+        var _adx=walkPlayer.pos.x-11,_adz=walkPlayer.pos.z-33;
+        if(_adx*_adx+_adz*_adz<=100){ window.__espilArena.portalUse(); return; }
+      }
       /* BUILDING INTERIOR (Han batch 6 #6): while inside, Space at
          the door leaves; Space anywhere else toggles the shop UI. */
       if(window.__espilInside&&espilInsideDoor){
         var _dd=Math.sqrt((walkPlayer.pos.x-espilInsideDoor.x)*(walkPlayer.pos.x-espilInsideDoor.x)+(walkPlayer.pos.z-espilInsideDoor.z)*(walkPlayer.pos.z-espilInsideDoor.z));
-        if(_dd<1.8){ espilLeaveBuilding(); return; }
+        if(_dd<1.8){ if(window.__espilInside.arena){ if(window.__espilArena)window.__espilArena.exitRun(); return; } espilLeaveBuilding(); return; }
+        if(window.__espilInside.arena)return; /* ARENA SEAM: no kiosk/shop surface inside the arena space */
         /* v3 (Han 2026-10-26): inside, Space works the kiosk - near it,
            the kiosk hook fires; anywhere else only closes an open card. */
         var _ks=(typeof window.__espilKioskState==='function')?window.__espilKioskState():null;
@@ -6727,6 +6735,10 @@
     }
     window.__espilInterior=null; window.__espilInteriorReturn=null;
     var ESPIL_INT={x:0,z:8000};
+    /* ARENA SEAM (arena build, 2026-11-10): the arena instance
+       space anchor - clear of the shop interior at ESPIL_INT
+       (z 8000) by far more than the fitout depth. */
+    var ESPIL_ARENA_INT={x:0,z:8400};
     function espilNearestRecord(px,pz){
       var pb=espilPolyBucketAt(px,pz); if(!pb)return null;
       var best=null,bestD=1e9;
@@ -6883,6 +6895,71 @@
       espilCloseShop();
       if(out){ p.pos.set(out.x,out.y,out.z); p.velY=0; }
     }
+    /* ============ ARENA SPACE (arena build seam item 4) =====
+       The run's ground: a personal instance on the interior
+       pattern - own far-offset anchor (ESPIL_ARENA_INT), entry /
+       exit teleports, saved outside point - but an outdoor-style
+       combat ground, NOT a store interior: no building record is
+       attached (espilInsideRec stays null, so the Konbiniya FPV
+       predicate - which keys on the interior record - never
+       engages here and the normal third-person follow camera
+       applies), no shop fitout, no kiosk. While
+       window.__espilInside.arena is set the indoors rules apply
+       (monsters.js's field director pauses, no field summoning
+       around the space, no NPC summoning, no flying).
+       modules/arena.js picks these hooks up through its
+       enterSpace()/exitSpace() adapters. */
+    var espilArenaGroup=null;
+    function espilBuildArenaSpace(){
+      if(espilArenaGroup)return;
+      var g=new THREE.Group(); g.position.set(ESPIL_ARENA_INT.x,0,ESPIL_ARENA_INT.z);
+      espilArenaGroup=g;
+      function M(geo,mat,x,y,z,ry){
+        var m=new THREE.Mesh(geo,mat); m.position.set(x,y,z); if(ry)m.rotation.y=ry;
+        m.frustumCulled=false; g.add(m); return m;
+      }
+      var floorMat=new THREE.MeshLambertMaterial({color:0x3f4652});
+      var fl=M(new THREE.CircleGeometry(26,56),floorMat,0,0.01,0); fl.rotation.x=-Math.PI/2;
+      var innerMat=new THREE.MeshLambertMaterial({color:0x4a4238});
+      var inn=M(new THREE.CircleGeometry(9,40),innerMat,0,0.03,0); inn.rotation.x=-Math.PI/2;
+      /* rim ring in the zone-glow gold grammar (0xf2b63c) */
+      var rimMat=new THREE.MeshBasicMaterial({color:0xf2b63c});
+      var rim=M(new THREE.RingGeometry(25.1,26,72),rimMat,0,0.04,0); rim.rotation.x=-Math.PI/2;
+      /* exit door marker at centre + (0, +9): frame posts + the
+         EXIT sign, in the interior door convention */
+      var postMat=new THREE.MeshLambertMaterial({color:0x6d5a41});
+      M(new THREE.BoxGeometry(0.5,3.2,0.5),postMat,-1.4,1.6,9);
+      M(new THREE.BoxGeometry(0.5,3.2,0.5),postMat,1.4,1.6,9);
+      M(new THREE.BoxGeometry(3.3,0.5,0.5),postMat,0,3.2,9);
+      var exitCvs=document.createElement('canvas'); exitCvs.width=256; exitCvs.height=96;
+      var ectx=exitCvs.getContext('2d');
+      ectx.fillStyle='#20242c'; ectx.fillRect(0,0,256,96);
+      ectx.fillStyle='#f2b63c'; ectx.font='700 56px "Avenir Next","Segoe UI",sans-serif';
+      ectx.textAlign='center'; ectx.textBaseline='middle'; ectx.fillText('EXIT',128,50);
+      var exitMat=new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(exitCvs)});
+      var ex=M(new THREE.PlaneGeometry(1.5,0.56),exitMat,0,2.5,9); ex.rotation.y=Math.PI;
+      mapScene.add(g);
+    }
+    window.__espilArenaCentre=function(){ return {x:ESPIL_ARENA_INT.x,z:ESPIL_ARENA_INT.z}; };
+    window.__espilArenaEnterSpace=function(){
+      var p=walkPlayer; if(!p)return null;
+      if(p.flying||p._fall)espilFlyClear(); /* fly state clears on space entry, as on interior entry */
+      espilBuildArenaSpace();
+      espilInsideDoor={x:ESPIL_ARENA_INT.x,z:ESPIL_ARENA_INT.z+9};
+      espilInsideOutside={x:p.pos.x,y:p.pos.y,z:p.pos.z};
+      espilFadeThrough(function(){
+        p.pos.set(ESPIL_ARENA_INT.x,0.05,ESPIL_ARENA_INT.z); p.velY=0; p.onGround=true;
+        window.__espilInside={name:'Arena',interior:true,arena:true,routedFrom:null,door:{x:ESPIL_ARENA_INT.x,z:ESPIL_ARENA_INT.z+9},x:11,z:33};
+      });
+      return {x:ESPIL_ARENA_INT.x,z:ESPIL_ARENA_INT.z};
+    };
+    window.__espilArenaExitSpace=function(){
+      var p=walkPlayer; if(!p)return;
+      var out=espilInsideOutside;
+      espilInsideDoor=null; espilInsideOutside=null; espilInsideHint=false;
+      window.__espilInside=null;
+      if(out){ p.pos.set(out.x,out.y,out.z); p.velY=0; }
+    };
     function openBuildingOpts(){
       var o=document.getElementById('bldg-opts'); if(!o)return;
       var n=document.getElementById('bldg-opts-name'); if(n)n.textContent=espilInsideRouted?'Konbiniya':espilBldgName;
@@ -7117,6 +7194,18 @@
     function espilInsideTick(p){
       if(!window.__espilInside)return;
       if(!document.body.classList.contains('in-map')){ espilInsideRec=null; espilInsideDoor=null; espilInsideOutside=null; window.__espilInside=null; espilCloseShop(); closeBuildingOpts(); return; }
+      /* ARENA SEAM: inside the arena space the shop-room box clamp
+         does not apply - the player is held on the arena disc
+         (radius 26 around ESPIL_ARENA_INT) instead, and the door
+         hint names the arena exit. */
+      if(window.__espilInside.arena){
+        var _acx=p.pos.x-ESPIL_ARENA_INT.x, _acz=p.pos.z-ESPIL_ARENA_INT.z, _acr=Math.sqrt(_acx*_acx+_acz*_acz);
+        if(_acr>25.4){ p.pos.x=ESPIL_ARENA_INT.x+_acx/_acr*25.4; p.pos.z=ESPIL_ARENA_INT.z+_acz/_acr*25.4; }
+        var _add=espilInsideDoor?Math.sqrt((p.pos.x-espilInsideDoor.x)*(p.pos.x-espilInsideDoor.x)+(p.pos.z-espilInsideDoor.z)*(p.pos.z-espilInsideDoor.z)):99;
+        if(_add<1.8&&!espilInsideHint){ espilInsideHint=true; if(window.__espilToast)window.__espilToast('Press Space to leave the arena'); }
+        if(_add>=1.8)espilInsideHint=false;
+        return;
+      }
       if(p.pos.x<ESPIL_INT.x-11.5*espilIntScale.x)p.pos.x=ESPIL_INT.x-11.5*espilIntScale.x;
       if(p.pos.x>ESPIL_INT.x+11.5*espilIntScale.x)p.pos.x=ESPIL_INT.x+11.5*espilIntScale.x;
       if(p.pos.z<ESPIL_INT.z-6.1*espilIntScale.z)p.pos.z=ESPIL_INT.z-6.1*espilIntScale.z;
@@ -8020,6 +8109,7 @@
       return isNaN(v)?1000:v;
     }
     function espilGrantKillLeo(res){
+      if(res&&res.instance)return; /* ARENA SEAM: instance kills are paid by the arena's per-round guarantee, never per kill */
       var amt=(ESPIL_LEO_ZONE[res.zone]||0)+(ESPIL_LEO_GRADE[res.grade]||0);
       if(amt<=0)return;
       try{ localStorage.setItem('espil_leo_balance',String(espilLeoBalance()+amt)); }catch(e){}
@@ -8287,7 +8377,7 @@
     function espilEnterDeath(){
       espilDead=true;
       try{ if(walkPlayer&&walkPlayer.av&&walkPlayer.av.__espilSetState)walkPlayer.av.__espilSetState('dead'); }catch(e){} /* Batch 6 Item D: sprite death set */
-      espilShowDeathUI();
+      if(!window.__espilDeathUiHold)espilShowDeathUI(); /* ARENA SEAM: held during an arena run - modules/arena.js presents the death surface */
       try{ window.dispatchEvent(new CustomEvent('espil-guide',{detail:{type:'player-died'}})); }catch(e){}
     }
     function espilReviveCommon(frac){
@@ -8313,6 +8403,32 @@
       if(!espilConsumePotion()){ espilShowDeathUI(); return; }
       espilReviveCommon(.50);
     }
+    /* ARENA SEAM (arena build, 2026-11-09): programmatic revives.
+       __espilPlayerRevivePotion consumes one Revival Potion from
+       the shared stock and revives in place at 50% - exactly the
+       death UI potion button's path, callable by modules/arena.js
+       which counts the use against the run's 3-stock cap.
+       __espilPlayerRevive(frac) revives in place WITHOUT consuming
+       stock (the cash revive: arena settles the entitlement
+       through the cash shop before calling). __espilPlayerReviveVillage
+       is espilReviveVillage exposed for the arena exit path, used
+       when the death UI is held (item 2) and its button is absent. */
+    window.__espilPlayerRevivePotion=function(){
+      if(!espilDead)return false;
+      if(!espilConsumePotion())return false;
+      espilReviveCommon(.50);
+      return true;
+    };
+    window.__espilPlayerRevive=function(frac){
+      if(!espilDead)return false;
+      espilReviveCommon((typeof frac==='number'&&frac>0&&frac<=1)?frac:.50);
+      return true;
+    };
+    window.__espilPlayerReviveVillage=function(){
+      if(!espilDead)return false;
+      espilReviveVillage();
+      return true;
+    };
     /* ---- evade indicator ---- */
     var espilEvadeEl=null, espilEvadeTimer=0;
     function espilShowEvade(){
