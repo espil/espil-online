@@ -640,6 +640,20 @@
    teleport 18px, menu chips 20px. The JOYSTICK is a drag SURFACE,
    not a button, and stays a large translucent area as both
    references show it.
+   PORTRAIT SEPARATION (Han correction 2026-11-09): the portrait
+   arrangement is a fully separate mobile presentation - it must
+   NOT import the PC version's log-style (통나무) UI. A portrait-
+   only skin block at the end of the portrait media query drops
+   every inherited piece of the desktop log skin from portrait:
+   the minimap's 4px dark-wood border + gold inset ring, the
+   action buttons' brown radial wood/leather gradient + gold rim,
+   the HP flask-liquid red-orange gradient (now a flat green
+   fill), the gold Leo medallion treatment, the gold-rimmed menu
+   chips, the chevron score bar, and the logwood-textured chat
+   window / chat lines / tutorial chip. Portrait uses thin light
+   rings, flat translucent dark glass and white glyphs throughout,
+   per the Genshin-style reference. Landscape is untouched: it
+   keeps the reference-1 skin exactly as landed.
    The Batch 5/6 mobile cluster (#espil-mmo-combat), the menu4 row
    and the quickbar tray are hidden on coarse pointers - this layout
    is the single mobile scheme. Desktop (fine pointer) never sees
@@ -768,6 +782,39 @@
       'body.in-map #espil-hud2-bars{left:50%;transform:translateX(-50%);bottom:12px;width:172px}' +
       'body.in-map #espil-hud2-actions{right:6px;bottom:6px;width:150px;height:158px}' +
       'body.in-map #espil-hud2-chat{display:flex;position:fixed;z-index:36;left:8px;bottom:8px;width:22px;height:22px}' +
+      /* Genshin separation (Han 2026-11-09): portrait drops every
+         inherited piece of the PC log skin - thin light rings, flat
+         translucent glass, white glyphs, a flat green HP fill, plain
+         white level text. Every rule below lives inside the portrait
+         media block only; landscape keeps the reference-1 skin. */
+      'body.in-map #minimap-wrap[data-stage="1"]{border:1.5px solid rgba(255,255,255,.55)!important;' +
+        'box-shadow:0 2px 10px rgba(0,0,0,.35)!important}' +
+      'body.in-map #espil-hud2-timefps{background:rgba(18,22,28,.45);border:1px solid rgba(255,255,255,.22);color:#fff}' +
+      '#espil-hud2-coin .h2-medal{background:#f5b301;border:1px solid rgba(255,255,255,.65);color:#4a3200;box-shadow:none}' +
+      '#espil-hud2-coin .h2-num{background:rgba(18,22,28,.45);color:#fff}' +
+      '#espil-hud2-menu button{border:1px solid rgba(255,255,255,.4);background:rgba(18,22,28,.45);color:#fff}' +
+      'body.in-map #espil-hud2-score{clip-path:none;border-radius:11px;background:rgba(18,22,28,.45)}' +
+      'body.in-map #espil-hud2-score .h2-zone-t{color:#fff}' +
+      '#espil-hud2-bars .h2-lv{background:none;color:#fff;text-shadow:0 1px 2px #000;padding:2px 2px}' +
+      '#espil-hud2-bars .h2-track{background:rgba(10,12,14,.5);border:1px solid rgba(255,255,255,.4)}' +
+      '#espil-hud2-bars .h2-track.hp i{background:#79d93b}' +
+      '#espil-hud2-bars .h2-track.mp i{background:#57b6f0}' +
+      '#espil-hud2-actions button{background:rgba(18,22,28,.5);border:1.5px solid rgba(255,255,255,.55);' +
+        'color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.3)}' +
+      '#espil-hud2-actions button.h2-util{background:rgba(18,22,28,.5);border-color:rgba(255,255,255,.55)}' +
+      '#espil-hud2-actions button[data-fly]{background:rgba(18,22,28,.5);border-color:rgba(255,255,255,.55)}' +
+      '#espil-hud2-chat{background:rgba(18,22,28,.45);border:1px solid rgba(255,255,255,.4)}' +
+      '.chat-window{background:rgba(14,17,22,.8);border:1px solid rgba(255,255,255,.3);color:#fff;' +
+        'box-shadow:0 8px 18px rgba(0,0,0,.35)}' +
+      '.chat-window .chat-log{color:#fff;text-shadow:none}' +
+      '.chat-channel{color:rgba(255,255,255,.85)}' +
+      '.chat-channel.is-active{background:rgba(255,255,255,.2);color:#fff}' +
+      '#chat-input{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.35);color:#fff}' +
+      '#chat-bubble{background:rgba(18,22,28,.6);border:1px solid rgba(255,255,255,.4);color:#fff}' +
+      '.espil-chat-line{background:rgba(18,22,28,.45);border:1px solid rgba(255,255,255,.22);color:#fff}' +
+      '#espil-tut{background:rgba(18,22,28,.55)!important;color:#fff!important;border:1px solid rgba(255,255,255,.35)!important;' +
+        'box-shadow:0 4px 12px rgba(0,0,0,.3)!important;text-shadow:none!important}' +
+      '#espil-tut .kb{background:rgba(255,255,255,.16)!important;border:1px solid rgba(255,255,255,.4)!important;color:#fff!important;box-shadow:none!important}' +
     '}';
   var styleEl = document.createElement('style');
   styleEl.id = 'espil-hud2-style';

@@ -897,7 +897,7 @@
     }
     var walkPlayer=null,walkColliders=[];
     var walkKeys={};
-    var walkCamYaw=0,walkCamPitch=.84,walkCamDist=2.95; /* Cauldron style: 48° pitch; default follow distance 2.95 m (Han 2026-11-08 close framing: character ~0.55 of portrait viewport height, was 14) */
+    var walkCamYaw=0,walkCamPitch=.84,walkCamDist=5.5; /* Cauldron style: 48° pitch; default follow distance 5.5 m (Han 2026-11-09 proportion correction: MapleStory-like proportion, character ~0.30 of viewport height and never screen-filling; the 2.95 m close framing of 2026-11-08 is superseded, 14 before that) */
     /* QA #15 (2026-10-06): sprint is a Ctrl toggle, not hold-Shift. */
     var sprintOn=false;
     function updateSprintUI(){
@@ -1544,7 +1544,7 @@
     /* --- entry arrival (Han 2026-10-19): the character no longer
        falls from the sky. The player is placed on the ground at the
        entry target and only the CAMERA dives in: walkCamDist sweeps
-       the old descent envelope (60 -> 2.95) on a timer, which also
+       the old descent envelope (60 -> 5.5) on a timer, which also
        leads the map zoom in P1 mode. The entry target itself (city
        spawn or the resolved boundary point) is unchanged, so the
        per-city spawn accuracy is exactly what the descent had. --- */
@@ -1591,7 +1591,7 @@
       p.pos.y=base;
       p.velY=0; p.onGround=true; p.jumps=0;
       p._espilArrive={surf:base,probeAt:0,startedAt:performance.now(),dur:1900};
-      walkCamDist=60; /* wide sky framing; the step eases it to 2.95 */
+      walkCamDist=60; /* wide sky framing; the step eases it to 5.5 */
       if(typeof espilP1!=='undefined'&&espilP1)espilP1.zoomDrive=false; /* the arrival envelope leads the map zoom for this entry */
       espilShowGeoPrompt();
     }
@@ -1605,18 +1605,18 @@
             if(typeof walkAvatar!=='undefined'&&walkAvatar&&walkAvatar.playLand)walkAvatar.playLand(); }
         }
         var td=Math.max(0,Math.min(1,(nowD-a.startedAt)/a.dur));
-        var fd=1-td; walkCamDist=2.95+57.05*fd*fd;
-        if(td>=1){ p._espilArrive=null; walkCamDist=2.95; espilHideGeoPrompt(); }
+        var fd=1-td; walkCamDist=5.5+54.5*fd*fd;
+        if(td>=1){ p._espilArrive=null; walkCamDist=5.5; espilHideGeoPrompt(); }
         return;
       }
       var now=performance.now();
       if(now-a.probeAt>150){ a.probeAt=now; var y=espilTileBase(p.pos.x,p.pos.z); if(y===null)y=espilOwnSurfaceY(p.pos.x,p.pos.z); if(y!==null&&y!==undefined)a.surf=y; }
       if(a.surf!==null&&a.surf!==undefined){ p.pos.y=a.surf; p.onGround=true; }
       var t=Math.max(0,Math.min(1,(now-a.startedAt)/a.dur));
-      var f=1-t; walkCamDist=2.95+57.05*f*f;
+      var f=1-t; walkCamDist=5.5+54.5*f*f;
       if(t>=1){
         p._espilArrive=null;
-        walkCamDist=2.95;
+        walkCamDist=5.5;
         espilHideGeoPrompt();
         espilUiRise();
         /* GUIDE HOOKS (joint guide project, 2026-10-21): the guide
@@ -2464,7 +2464,11 @@
        23.44 so the P1 default zoom 21.5 maps to the same 2.95 m physical
        follow distance as the overlay default, and the distance floor
        3 -> 2 keeps the bridge unsaturated at that default (the occlusion
-       cap reads its distance through here). Slope unchanged. */
+       cap reads its distance through here). Slope unchanged.
+       Retied 2026-11-09 (Han proportion correction): intercept kept; the
+       P1 default zoom is now 20.39, which the same bridge maps to the
+       new 5.5 m overlay default (DistFromZoom(20.39) = 5.5), again
+       unsaturated at both clamp ends. */
     function espilP1ZoomFromDist(d){ return Math.max(14.5,Math.min(23,23.44-1.242*Math.log2(Math.max(2,d)))); }
     function espilP1DistFromZoom(z){ return Math.max(2,Math.min(60,Math.pow(2,(23.44-z)/1.242))); }
     function espilP1LngLat(x,z){
@@ -2574,7 +2578,7 @@
       var px=espilPaintAnchor.x, pz=espilPaintAnchor.y;
       var py=(typeof walkPlayer!=='undefined'&&walkPlayer)?walkPlayer.pos.y:0;
       var scanned=0, changed=0, lodFlat=0;
-      var zm=(typeof espilP1!=='undefined'&&espilP1&&typeof espilP1.zoom==='number')?espilP1.zoom:21.5;
+      var zm=(typeof espilP1!=='undefined'&&espilP1&&typeof espilP1.zoom==='number')?espilP1.zoom:20.39;
       for(var i=0;i<feats.length;i++){
         var m=meta[i];
         var bx=px<m.mnx?m.mnx-px:(px>m.mxx?px-m.mxx:0), bz=pz<m.mnz?m.mnz-pz:(pz>m.mxz?pz-m.mxz:0);
@@ -2612,7 +2616,7 @@
     function espilP1PaintUpdate(){
       if(!espilP1.buildingsAdded||!espilP1BldCache||!espilP1.map)return;
       var now=performance.now();
-      var zm=(typeof espilP1.zoom==='number')?espilP1.zoom:21.5;
+      var zm=(typeof espilP1.zoom==='number')?espilP1.zoom:20.39;
       if(espilP1PaintLast){
         var dx=espilPaintAnchor.x-espilP1PaintLast.x, dz=espilPaintAnchor.y-espilP1PaintLast.z;
         if(dx*dx+dz*dz<9&&Math.abs(zm-espilP1PaintLast.zm)<0.05)return; /* anchor still (3 m gate) and zoom steady */
@@ -2782,7 +2786,7 @@
       else document.body.appendChild(el);
       espilP1.mapEl=el;
       try{
-        espilP1.map=new mapboxgl.Map({container:el,style:'mapbox://styles/quadclipse/cmvdcpdor000901sq8xq57eab',center:espilP1LngLat((espilCityCfg().spawn||{x:3,z:31}).x,(espilCityCfg().spawn||{x:3,z:31}).z),zoom:17.3,pitch:52,bearing:0,attributionControl:false,interactive:false,projection:'mercator',maxZoom:23}); /* projection forced (Han 2026-10-17): the designated style declares lambertConformalConic, under which Mapbox skips ALL 3D drawing ("Drawing 3D models for lambertConformalConic projection is not yet implemented") - the custom layer and our extrusions vanished on Han's PC while the mercator stub could not reproduce it. The game's math is Mercator throughout. maxZoom was the Mapbox default 22 (custom cap removed on Han's order); raised to 23 on 2026-11-08 so the close default zoom 21.5 keeps wheel headroom above it. */
+        espilP1.map=new mapboxgl.Map({container:el,style:'mapbox://styles/quadclipse/cmvdcpdor000901sq8xq57eab',center:espilP1LngLat((espilCityCfg().spawn||{x:3,z:31}).x,(espilCityCfg().spawn||{x:3,z:31}).z),zoom:17.3,pitch:52,bearing:0,attributionControl:false,interactive:false,projection:'mercator',maxZoom:23}); /* projection forced (Han 2026-10-17): the designated style declares lambertConformalConic, under which Mapbox skips ALL 3D drawing ("Drawing 3D models for lambertConformalConic projection is not yet implemented") - the custom layer and our extrusions vanished on Han's PC while the mercator stub could not reproduce it. The game's math is Mercator throughout. maxZoom was the Mapbox default 22 (custom cap removed on Han's order); raised to 23 on 2026-11-08 so the close default zoom 21.5 kept wheel headroom above it; the 2026-11-09 default is 20.39 and 23 stays as the cap. */
       }catch(e){ espilP1.failed='init'; window.__espilMapProgress01=1; espilP1Banner('Could not start the Mapbox map. Please check the token.'); return; }
       espilP1.map.on('load',function(){
         /* the loaded style re-imposes its declared projection - force
@@ -2883,11 +2887,11 @@
            both surfaces stay scale-locked. During descent the descent
            envelope leads the zoom (and the target tracks it), unless
            the player has taken the zoom over with the wheel. */
-        if(espilP1.zoom===null){ espilP1.zoom=21.5; espilP1.zoomT=21.5; } /* default framing: 19.3 until 2026-11-08 (Han PC QA 2026-10-18); Han 2026-11-08 ordered the follow camera MUCH closer (portrait reference, character ~half the viewport height) - 21.5 via the re-anchored bridge = the same 2.95 m physical distance as the overlay default */
+        if(espilP1.zoom===null){ espilP1.zoom=20.39; espilP1.zoomT=20.39; } /* default framing: 19.3 until 2026-11-08 (Han PC QA 2026-10-18), 21.5 during the 2026-11-08 close framing; Han 2026-11-09 corrected the proportion (MapleStory-like: character ~0.30 of viewport height, never screen-filling) - 20.39 via the bridge = the same 5.5 m physical distance as the overlay default */
         if(walkPlayer._espilArrive&&!espilP1.zoomDrive){
           espilP1.zoom=espilP1.zoomT=espilP1ZoomFromDist(walkCamDist);
         }else{
-          if(!espilP1.zoomDrive)espilP1.zoomT=21.5; /* until the player takes the wheel, the target is the default framing */
+          if(!espilP1.zoomDrive)espilP1.zoomT=20.39; /* until the player takes the wheel, the target is the default framing */
           espilP1.zoom+=(espilP1.zoomT-espilP1.zoom)*0.2;
           if(Math.abs(espilP1.zoomT-espilP1.zoom)<0.001)espilP1.zoom=espilP1.zoomT;
           walkCamDist=espilP1DistFromZoom(espilP1.zoom);
@@ -4775,7 +4779,7 @@
       }
       walkPlayer.velY=0;walkPlayer.onGround=true;
       walkPlayer.jumps=0;walkPlayer.faceY=.5;walkPlayer.bobT=0;
-      walkCamPitch=.84;walkCamDist=2.95; /* Cauldron 48°; distance = the 2026-11-08 close default */
+      walkCamPitch=.84;walkCamDist=5.5; /* Cauldron 48°; distance = the 2026-11-09 proportion default */
       walkPlayer.av.group.position.copy(walkPlayer.pos);
       walkPlayer.av.group.rotation.y=.5;
       /* Snap the follow camera behind the player on entry. */
@@ -9031,17 +9035,18 @@
       /* ZOOM OPERATION (Han 2026-10-17): in Mapbox mode the wheel and
          pinch move the MAP ZOOM target directly, in zoom units (range
          16 to 23 (Mapbox default max was 22, Han 2026-10-17; top raised
-         2026-11-08 so the 21.5 default is not at the clamp edge), 0.28
+         2026-11-08; the 20.39 default since 2026-11-09 sits mid-range,
+         clear of both clamp edges), 0.28
          per wheel notch) - not a camera distance
          translated through a curve. Outside Mapbox mode the legacy
          distance behaviour is unchanged. */
       if(ESPIL_P1&&typeof espilP1!=='undefined'&&espilP1&&espilP1.map&&espilP1.ready&&!espilP1.failed){
-        if(espilP1.zoomT===null)espilP1.zoomT=21.5;
+        if(espilP1.zoomT===null)espilP1.zoomT=20.39;
         espilP1.zoomT=Math.max(16,Math.min(23,espilP1.zoomT-d*0.28));
         espilP1.zoomDrive=true; /* a wheel during descent takes the zoom over from the envelope */
         return;
       }
-      walkCamDist=Math.max(window.__espilInside?0.4:1.8,Math.min(16,walkCamDist+d)); /* floor 1.8 (was 3) since 2026-11-08 so the 2.95 default sits inside the wheel range; the inside-store 0.4 floor is unchanged */
+      walkCamDist=Math.max(window.__espilInside?0.4:1.8,Math.min(16,walkCamDist+d)); /* floor 1.8 (was 3) since 2026-11-08 so the default (5.5 since 2026-11-09) sits inside the wheel range; the inside-store 0.4 floor is unchanged */
     }
     /* Keyboard: tracked only while the map is open (globe keeps its own bindings). */
     document.addEventListener('keydown',function(e){
