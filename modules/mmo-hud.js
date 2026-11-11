@@ -640,6 +640,17 @@
    teleport 18px, menu chips 20px. The JOYSTICK is a drag SURFACE,
    not a button, and stays a large translucent area as both
    references show it.
+   SIZE + FORM REVISION (Han 2026-11-11, superseding the size
+   standard above - "the buttons are too small to see"): every
+   control is now in the 44px+ class (ATK 56, quick slots 52,
+   USE/JUMP 48, menu icon 48, chat 44, TELEPORT 44). The eight
+   fixed move buttons are replaced by a 4-slot QUICK BAR: any of
+   the eight moves registers into a slot (tap fires, long-press
+   opens the assign sheet, cooldowns paint from the game's own
+   cooldown map; assignments persist with the skill state). The
+   five menu chips collapse into ONE menu icon whose sheet holds
+   the fixed shortcuts (skill tree, items, bag, map, stall). The
+   portrait score bar drops to top:66 to clear the 48px icon.
    PORTRAIT SEPARATION (Han correction 2026-11-09): the portrait
    arrangement is a fully separate mobile presentation - it must
    NOT import the PC version's log-style (통나무) UI. A portrait-
@@ -729,8 +740,10 @@
         'padding:2px 7px;border-radius:6px;box-sizing:border-box}' +
       /* menu chips */
       'body.in-map #espil-hud2-menu{display:flex;position:fixed;z-index:36;gap:6px}' +
-      '#espil-hud2-menu button{width:20px;height:20px;border-radius:50%;border:1.5px solid rgba(255,233,168,.5);' +
-        'background:rgba(16,20,26,.68);color:#ffe9ad;font-size:11px;line-height:1;display:flex;align-items:center;' +
+      /* menu: ONE menu icon button (Han 2026-11-11: the fixed
+         shortcuts gather behind this single icon, in the sheet) */
+      '#espil-hud2-menu button{width:48px;height:48px;border-radius:50%;border:2px solid rgba(255,233,168,.55);' +
+        'background:rgba(16,20,26,.72);color:#ffe9ad;font-size:23px;line-height:1;display:flex;align-items:center;' +
         'justify-content:center;padding:0;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}' +
       /* HP / MP bars */
       'body.in-map #espil-hud2-bars{display:block;position:fixed;z-index:36}' +
@@ -752,15 +765,18 @@
         'display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;cursor:pointer;' +
         'touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 2px 7px rgba(0,0,0,.4)}' +
       '#espil-hud2-actions button .ci{line-height:1}' +
-      '#espil-hud2-actions button .al{font:800 5px/1.2 "Manrope",sans-serif;letter-spacing:.02em}' +
-      '#espil-hud2-actions button[data-atk]{width:28px;height:28px}' +
-      '#espil-hud2-actions button[data-atk] .ci{font-size:13px}' +
-      '#espil-hud2-actions button[data-move]{width:23px;height:23px}' +
-      '#espil-hud2-actions button[data-move] .ci{font-size:10px}' +
-      '#espil-hud2-actions button.h2-util{width:20px;height:20px;background:radial-gradient(circle at 35% 30%,rgba(52,66,80,.92),rgba(18,24,32,.94));border-color:rgba(180,220,255,.5)}' +
-      '#espil-hud2-actions button.h2-util .ci{font-size:10px}' +
-      '#espil-hud2-actions button[data-fly]{width:18px;height:18px;background:radial-gradient(circle at 35% 30%,rgba(20,90,96,.92),rgba(8,36,44,.94));border-color:rgba(125,252,230,.55)}' +
-      '#espil-hud2-actions button[data-fly] .ci{font-size:9px}' +
+      '#espil-hud2-actions button .al{font:800 8px/1.2 "Manrope",sans-serif;letter-spacing:.02em}' +
+      /* BUTTON SIZE REVISION (Han 2026-11-11, superseding the
+         2026-11-08 small-button standard: "the buttons are too
+         small to see"): every mobile control lands in the 44px+
+         tap-target class - ATK 56, quick slots 52, USE/JUMP 48,
+         TELEPORT 44, menu icon 48, chat button 44. */
+      '#espil-hud2-actions button[data-atk]{width:56px;height:56px}' +
+      '#espil-hud2-actions button[data-atk] .ci{font-size:26px}' +
+      '#espil-hud2-actions button.h2-util{width:48px;height:48px;background:radial-gradient(circle at 35% 30%,rgba(52,66,80,.92),rgba(18,24,32,.94));border-color:rgba(180,220,255,.5)}' +
+      '#espil-hud2-actions button.h2-util .ci{font-size:20px}' +
+      '#espil-hud2-actions button[data-fly]{width:44px;height:44px;background:radial-gradient(circle at 35% 30%,rgba(20,90,96,.92),rgba(8,36,44,.94));border-color:rgba(125,252,230,.55)}' +
+      '#espil-hud2-actions button[data-fly] .ci{font-size:18px}' +
       '#espil-hud2-actions button:active{filter:brightness(1.35)}' +
       '#espil-hud2-actions button.h2-off{opacity:.35;border-color:rgba(200,200,200,.3);color:#cfd4d8;pointer-events:none}' +
       /* nearby-character list + chat button (portrait forms) */
@@ -789,7 +805,7 @@
       'body.in-map #espil-hud2-timefps{top:132px;right:10px;width:118px}' +
       'body.in-map #espil-hud2-menu{left:50%;transform:translateX(-50%);top:46px;flex-direction:row}' +
       'body.in-map #espil-hud2-bars{left:50%;transform:translateX(-50%);bottom:14px;width:min(210px,32vw)}' +
-      'body.in-map #espil-hud2-actions{right:8px;bottom:8px;width:168px;height:172px}' +
+      'body.in-map #espil-hud2-actions{right:8px;bottom:8px;width:236px;height:132px}' +
       'body.in-map #espil-hud2-chars{display:none!important}' +
       'body.in-map #espil-hud2-chat{display:none!important}' +
     '}' +
@@ -804,11 +820,11 @@
       '#espil-hud2-coin .h2-medal{width:20px;height:20px;font-size:9px}' +
       '#espil-hud2-coin .h2-num{font-size:10px}' +
       'body.in-map #espil-hud2-menu{top:10px;right:10px;flex-direction:row}' +
-      'body.in-map #espil-hud2-score{top:42px;left:110px;transform:none;width:250px;height:22px;padding:0 16px;font-size:10px}' +
+      'body.in-map #espil-hud2-score{top:66px;left:110px;transform:none;width:250px;height:22px;padding:0 16px;font-size:10px}' +
       'body.in-map #espil-hud2-chars{display:flex;position:fixed;z-index:36;right:8px;top:32%;width:94px;flex-direction:column;gap:5px}' +
       'body.in-map #espil-hud2-bars{left:50%;transform:translateX(-50%);bottom:12px;width:172px}' +
-      'body.in-map #espil-hud2-actions{right:6px;bottom:64px;width:150px;height:158px}' +
-      'body.in-map #espil-hud2-chat{display:flex;position:fixed;z-index:36;left:8px;bottom:8px;width:22px;height:22px}' +
+      'body.in-map #espil-hud2-actions{right:6px;bottom:64px;width:238px;height:132px}' +
+      'body.in-map #espil-hud2-chat{display:flex;position:fixed;z-index:36;left:8px;bottom:6px;width:44px;height:44px;font-size:19px}' +
       /* Genshin separation (Han 2026-11-09): portrait drops every
          inherited piece of the PC log skin - thin light rings, flat
          translucent glass, white glyphs, a flat green HP fill, plain
@@ -842,6 +858,60 @@
       '#espil-tut{background:rgba(18,22,28,.55)!important;color:#fff!important;border:1px solid rgba(255,255,255,.35)!important;' +
         'box-shadow:0 4px 12px rgba(0,0,0,.3)!important;text-shadow:none!important}' +
       '#espil-tut .kb{background:rgba(255,255,255,.16)!important;border:1px solid rgba(255,255,255,.4)!important;color:#fff!important;box-shadow:none!important}' +
+    '}' +
+    /* ---- QUICK SLOTS + MENU SHEET (Han 2026-11-11) ----------------
+       The 4-slot quick bar lives inside the action box as a flex
+       row; the menu sheet and the slot-assign sheet are HUD2-owned
+       overlays (coarse only in practice - the fine block below
+       hard-hides them on desktop). Slot buttons opt out of the
+       action box's absolute positioning. */
+    '#espil-hud2-quick{position:absolute;right:2px;bottom:68px;display:flex;gap:6px}' +
+    '#espil-hud2-quick button{position:relative!important;width:52px;height:52px;flex:none}' +
+    '#espil-hud2-quick button .ci{font-size:22px}' +
+    '#espil-hud2-quick button .h2-slotn{position:absolute;top:-4px;left:-4px;z-index:2;min-width:16px;height:16px;' +
+      'padding:0 4px;border-radius:8px;background:#3a2817;color:#ffe9a8;font-size:10px;font-weight:800;' +
+      'display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,233,168,.5)}' +
+    '#espil-hud2-quick button .h2-cd{position:absolute;inset:0;border-radius:50%;display:none;' +
+      'align-items:center;justify-content:center;font:800 13px "Manrope",sans-serif;color:#fff;' +
+      'text-shadow:0 1px 2px #000;pointer-events:none;z-index:1}' +
+    '#espil-hud2-quick button.h2-empty{opacity:.55;border-style:dashed}' +
+    '#espil-hud2-sheet,#espil-hud2-assign{position:fixed;inset:0;z-index:88;display:none;' +
+      'align-items:center;justify-content:center;background:rgba(5,7,10,.55)}' +
+    '#espil-hud2-sheet.open,#espil-hud2-assign.open{display:flex}' +
+    '.h2-sheet-card{width:min(330px,88vw);max-height:82dvh;overflow-y:auto;background:rgba(14,17,22,.95);' +
+      'border:1.5px solid rgba(255,233,168,.45);border-radius:16px;padding:14px;color:#fff;' +
+      'font-family:"Manrope",sans-serif;box-shadow:0 14px 40px rgba(0,0,0,.5)}' +
+    '.h2-sheet-title{display:flex;align-items:center;justify-content:space-between;gap:10px;' +
+      'font:800 15px "Manrope",sans-serif;margin-bottom:10px}' +
+    '.h2-sheet-close{width:48px;height:48px;flex:none;border-radius:50%;border:1px solid rgba(255,255,255,.4);' +
+      'background:rgba(255,255,255,.08);color:#fff;font-size:19px;line-height:1;display:flex;align-items:center;' +
+      'justify-content:center;padding:0;cursor:pointer;touch-action:manipulation}' +
+    '.h2-sheet-row{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;margin:0 0 8px;' +
+      'padding:10px 14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.28);' +
+      'border-radius:12px;color:#fff;font:800 15px "Manrope",sans-serif;cursor:pointer;text-align:left;' +
+      'touch-action:manipulation;user-select:none;-webkit-user-select:none}' +
+    '.h2-sheet-row .si{font-size:24px;line-height:1;flex:none}' +
+    '.h2-sheet-row .sk{margin-left:auto;font:800 10px "Manrope",sans-serif;color:#ffe9a8;' +
+      'background:rgba(0,0,0,.4);border-radius:6px;padding:2px 6px;flex:none}' +
+    '.h2-sheet-row.h2-locked{opacity:.55}' +
+    '.h2-sheet-row.h2-cur{border-color:#ffd97a;background:rgba(255,217,122,.14)}' +
+    '@media (pointer:fine){' +
+      '#espil-hud2-sheet,#espil-hud2-assign{display:none!important}' +
+    '}' +
+    /* compact phones: the wider control grid tightens so no zone
+       is touched - portrait <=430px (bars stay bottom-centre, the
+       joystick keeps its left column), landscape <=700px (the
+       bars slide into the gap between joystick and action box) */
+    '@media (pointer:coarse) and (orientation:portrait) and (max-width:430px){' +
+      'body.in-map #espil-hud2-actions{width:216px;height:120px}' +
+      '#espil-hud2-quick{bottom:62px}' +
+      '#espil-hud2-quick button{width:48px;height:48px}' +
+    '}' +
+    '@media (pointer:coarse) and (orientation:landscape) and (max-width:700px){' +
+      'body.in-map #espil-hud2-actions{width:222px;height:124px}' +
+      'body.in-map #espil-hud2-bars{left:186px;transform:none;width:144px}' +
+      '#espil-hud2-quick{bottom:64px}' +
+      '#espil-hud2-quick button{width:48px;height:48px}' +
     '}' +
     /* ---- HUD3 composition: chat window + quest chip zones ---------
        The chat window and the tutorial chip are not HUD2 elements,
@@ -927,36 +997,89 @@
     }
   });
 
+  /* ---- menu: ONE icon + a sheet (Han 2026-11-11) -----------------
+     The fixed shortcuts (skill tree, items, bag - plus the map and
+     stall the old chip row also carried) gather behind a single
+     menu icon: the sheet is the one place they live now. Firing an
+     entry closes the sheet first, then opens the real panel through
+     its existing route, so nothing can sit trapped under the sheet
+     and panel z-order never matters. */
   var menu = mk('div', 'espil-hud2-menu');
-  menu.setAttribute('aria-label', 'Menu shortcuts');
-  var MENU = [
-    { id: 'map', icon: '🗺️', label: 'Map', fn: function () { sendKey('m', 'KeyM'); } },
-    { id: 'bag', icon: '🎒', label: 'Bag', fn: function () { sendKey('i', 'KeyI'); } },
-    { id: 'skill', icon: '⚔️', label: 'Skill tree', fn: function () {
+  menu.setAttribute('aria-label', 'Menu');
+  var sheet = mk('div', 'espil-hud2-sheet');
+  sheet.setAttribute('aria-hidden', 'true');
+  var SHEET = [
+    { id: 'skill', icon: '⚔️', label: 'Skill tree', key: 'K', fn: function () {
         if (window.__espilSkills && window.__espilSkills.tree) window.__espilSkills.tree();
         else sendKey('k', 'KeyK'); } },
-    { id: 'profile', icon: '👤', label: 'Profile', fn: function () {
+    { id: 'items', icon: '🧰', label: 'Items', key: 'P', fn: function () {
         if (window.__espilOpenSelfProfile) window.__espilOpenSelfProfile();
         else sendKey('p', 'KeyP'); } },
-    { id: 'stall', icon: '🧺', label: 'Stall', fn: function () { sendKey('y', 'KeyY'); } }
+    { id: 'bag', icon: '🎒', label: 'Bag', key: 'I', fn: function () {
+        if (window.__espilGearWindow && window.__espilGearWindow.openBag) window.__espilGearWindow.openBag();
+        else sendKey('i', 'KeyI'); } },
+    { id: 'map', icon: '🗺️', label: 'Map', key: 'M', fn: function () { sendKey('m', 'KeyM'); } },
+    { id: 'stall', icon: '🧺', label: 'Stall', key: 'Y', fn: function () { sendKey('y', 'KeyY'); } }
   ];
-  MENU.forEach(function (d) {
-    var b = document.createElement('button');
-    b.type = 'button';
-    b.setAttribute('data-menu', d.id);
-    b.setAttribute('aria-label', d.label);
-    b.textContent = d.icon;
-    b.addEventListener('pointerdown', function (e) { e.preventDefault(); try { d.fn(); } catch (err) {} });
-    menu.appendChild(b);
+  function sheetOpen() { return sheet.classList.contains('open'); }
+  function openSheet() {
+    sheet.classList.add('open');
+    sheet.setAttribute('aria-hidden', 'false');
+  }
+  function closeSheet() {
+    sheet.classList.remove('open');
+    sheet.setAttribute('aria-hidden', 'true');
+  }
+  (function buildSheet() {
+    var card = mk('div', null);
+    card.className = 'h2-sheet-card';
+    var title = mk('div', null, '<span>Menu</span>');
+    title.className = 'h2-sheet-title';
+    var x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'h2-sheet-close';
+    x.setAttribute('aria-label', 'Close menu');
+    x.textContent = '✕';
+    x.addEventListener('pointerdown', function (e) { e.preventDefault(); closeSheet(); });
+    title.appendChild(x);
+    card.appendChild(title);
+    SHEET.forEach(function (d) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'h2-sheet-row';
+      b.setAttribute('data-sheet', d.id);
+      b.setAttribute('aria-label', d.label);
+      b.innerHTML = '<span class="si">' + d.icon + '</span><span>' + d.label + '</span>' +
+        '<span class="sk">' + d.key + '</span>';
+      b.addEventListener('pointerdown', function (e) {
+        e.preventDefault();
+        closeSheet();
+        try { d.fn(); } catch (err) {}
+      });
+      card.appendChild(b);
+    });
+    sheet.appendChild(card);
+    sheet.addEventListener('pointerdown', function (e) { if (e.target === sheet) closeSheet(); });
+  })();
+  var menuBtn = document.createElement('button');
+  menuBtn.type = 'button';
+  menuBtn.setAttribute('data-menu', 'menu');
+  menuBtn.setAttribute('aria-label', 'Menu');
+  menuBtn.textContent = '☰';
+  menuBtn.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    if (sheetOpen()) closeSheet(); else openSheet();
   });
+  menu.appendChild(menuBtn);
 
-  /* action cluster: positions are (right, bottom) px inside the box,
-     per orientation; ATK at the corner, the rest arcing up-left,
-     TELEPORT the small button below the arc */
-  var POS_L = { atk: [2, 2], punch: [38, 4], kick: [66, 20], throw: [86, 46], defense: [92, 76],
-                dash: [80, 106], spin: [56, 128], wave: [26, 142], art: [106, 106], use: [130, 74], jump: [136, 42], fly: [40, 36] };
-  var POS_P = { atk: [2, 2], dash: [4, 38], punch: [36, 4], kick: [64, 12], throw: [88, 28], defense: [104, 50],
-                spin: [34, 44], wave: [62, 56], art: [88, 74], use: [112, 86], jump: [118, 114], fly: [40, 80] };
+  /* action cluster (Han 2026-11-11 form): a two-row grid inside
+     the box - the quick bar (4 assignable skill slots) on the top
+     row, ATK / JUMP / USE / TELEPORT on the bottom row. Positions
+     are (right, bottom) px inside the box; the compact set serves
+     narrow screens (the layout key includes the width class). */
+  var POS_L = { atk: [2, 2], jump: [66, 4], use: [122, 4], fly: [178, 8] };
+  var POS_P = { atk: [2, 2], jump: [66, 4], use: [122, 4], fly: [178, 8] };
+  var POS_C = { atk: [2, 2], jump: [60, 3], use: [110, 3], fly: [160, 5] };
   var actions = mk('div', 'espil-hud2-actions');
   actions.setAttribute('aria-label', 'Actions');
   var KEYMAP = { punch: ['q', 'KeyQ'], kick: ['w', 'KeyW'], throw: ['e', 'KeyE'], defense: ['r', 'KeyR'],
@@ -993,23 +1116,222 @@
     actBtns[key] = b;
   }
   addAction('atk', { 'data-atk': '1' }, '⚔️', 'ATK', fireSurface('map-attack'));
-  addAction('punch', { 'data-move': 'punch' }, '👊', 'PUNCH', fireMove('punch'));
-  addAction('kick', { 'data-move': 'kick' }, '🦵', 'KICK', fireMove('kick'));
-  addAction('throw', { 'data-move': 'throw' }, '「」', 'THROW', fireMove('throw'));
-  addAction('defense', { 'data-move': 'defense' }, '🛡️', 'DEF', fireMove('defense'));
-  addAction('dash', { 'data-move': 'dash' }, '💨', 'DASH', fireMove('dash'));
-  addAction('spin', { 'data-move': 'spin' }, '🌀', 'SPIN', fireMove('spin'));
-  addAction('wave', { 'data-move': 'wave' }, '🌊', 'WAVE', fireMove('wave'));
-  addAction('art', { 'data-move': 'art' }, '✨', 'ART', fireMove('art'));
   addAction('use', {}, '✋', 'USE', fireSurface('map-interact'), 'h2-util');
   addAction('jump', {}, '⬆️', 'JUMP', fireSurface('map-jump'), 'h2-util');
   addAction('fly', { 'data-fly': '1' }, '✈️', '', function (e) { e.preventDefault(); sendKey('b', 'KeyB'); });
   actBtns.fly.setAttribute('aria-label', 'TELEPORT');
 
+  /* ---- quick slots (Han 2026-11-11) ------------------------------
+     Four slots, each holding one of the game's eight moves. Tap
+     fires through the exact desktop path (__espilSkills.move ===
+     doMove, which itself refuses unlearned tree skills with its
+     own toast); a long press (>=480ms, near-stationary) opens the
+     assign sheet instead, and tapping an EMPTY slot opens it too.
+     Assignment persists with the skill state: the companion record
+     espil_quickslots_v1, mirrored into __espilSkills.state.qs so
+     it also rides the espil_skills_v1 record whenever the
+     monolith saves skills after the HUD has set it (the loader
+     there picks named fields only, so the HUD reads the raw
+     record back as its fallback). Cooldowns paint from the game's
+     own cooldown map (__espilCombatState().cd, seconds left); the
+     sweep fraction divides by the MOVES base cooldown - swift-rank
+     reductions make that an approximation for display only. */
+  var QS_KEY = 'espil_quickslots_v1';
+  var QS_MOVES = {
+    punch:   { name: 'Punch',           icon: '👊', cd: 0.45, key: 'Q' },
+    kick:    { name: 'Kick',            icon: '🦵', cd: 0.65, key: 'W' },
+    throw:   { name: 'Quote Tool',      icon: '「」', cd: 0.9,  key: 'E' },
+    defense: { name: 'Defense',         icon: '🛡️', cd: 2.5,  key: 'R' },
+    dash:    { name: 'Dash Strike',     icon: '💨', cd: 0.8,  key: 'A', tree: true },
+    spin:    { name: 'Spinning Strike', icon: '🌀', cd: 1.4,  key: 'S', tree: true },
+    wave:    { name: 'Ranged Wave',     icon: '🌊', cd: 1.1,  key: 'D', tree: true },
+    art:     { name: 'Weapon Art',      icon: '⚔️', cd: 2.2,  key: 'F', tree: true }
+  };
+  var QS_ORDER = ['punch', 'kick', 'throw', 'defense', 'dash', 'spin', 'wave', 'art'];
+  function qsSanitize(a) {
+    if (!Array.isArray(a) || a.length !== 4) return null;
+    return a.map(function (v) { return QS_MOVES[v] ? v : null; });
+  }
+  function qsLoad() {
+    try {
+      var a = qsSanitize(JSON.parse(localStorage.getItem(QS_KEY) || 'null'));
+      if (a) return a;
+    } catch (e) {}
+    try {
+      var s = JSON.parse(localStorage.getItem('espil_skills_v1') || 'null');
+      var b = s && qsSanitize(s.qs);
+      if (b) return b;
+    } catch (e) {}
+    return ['punch', 'kick', 'throw', 'defense'];
+  }
+  var qsSlots = qsLoad();
+  function qsSave() {
+    try { localStorage.setItem(QS_KEY, JSON.stringify(qsSlots)); } catch (e) {}
+    try {
+      if (window.__espilSkills && window.__espilSkills.state)
+        window.__espilSkills.state.qs = qsSlots.slice();
+    } catch (e) {}
+    qsPaint();
+  }
+  var quick = mk('div', 'espil-hud2-quick');
+  quick.setAttribute('aria-label', 'Quick slots');
+  var slotBtns = [];
+  function qsPaint() {
+    slotBtns.forEach(function (b, i) {
+      var id = qsSlots[i];
+      var m = id ? QS_MOVES[id] : null;
+      b.classList.toggle('h2-empty', !m);
+      b.setAttribute('data-move', id || '');
+      b.setAttribute('aria-label', m ? ('Quick slot ' + (i + 1) + ': ' + m.name) : ('Quick slot ' + (i + 1) + ': empty'));
+      b.querySelector('.ci').textContent = m ? m.icon : '＋';
+      b.querySelector('.al').textContent = m ? m.name.split(' ')[0].toUpperCase() : 'EMPTY';
+    });
+  }
+  var assignSheet = mk('div', 'espil-hud2-assign');
+  assignSheet.setAttribute('aria-hidden', 'true');
+  var assignSlot = -1;
+  function assignOpen() { return assignSheet.classList.contains('open'); }
+  function closeAssign() {
+    assignSheet.classList.remove('open');
+    assignSheet.setAttribute('aria-hidden', 'true');
+    assignSlot = -1;
+  }
+  function openAssign(i) {
+    assignSlot = i;
+    var title = assignSheet.querySelector('.h2-sheet-title span');
+    if (title) title.textContent = 'Quick slot ' + (i + 1);
+    Array.prototype.forEach.call(assignSheet.querySelectorAll('[data-assign]'), function (r) {
+      r.classList.toggle('h2-cur', r.getAttribute('data-assign') === (qsSlots[i] || ''));
+    });
+    var clr = assignSheet.querySelector('[data-clear]');
+    if (clr) clr.style.display = qsSlots[i] ? '' : 'none';
+    assignSheet.classList.add('open');
+    assignSheet.setAttribute('aria-hidden', 'false');
+  }
+  (function buildAssign() {
+    var card = mk('div', null);
+    card.className = 'h2-sheet-card';
+    var title = mk('div', null, '<span>Quick slot</span>');
+    title.className = 'h2-sheet-title';
+    var x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'h2-sheet-close';
+    x.setAttribute('aria-label', 'Close');
+    x.textContent = '✕';
+    x.addEventListener('pointerdown', function (e) { e.preventDefault(); closeAssign(); });
+    title.appendChild(x);
+    card.appendChild(title);
+    QS_ORDER.forEach(function (id) {
+      var m = QS_MOVES[id];
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'h2-sheet-row' + (m.tree ? ' h2-locked' : '');
+      b.setAttribute('data-assign', id);
+      b.setAttribute('aria-label', m.name);
+      b.innerHTML = '<span class="si">' + m.icon + '</span><span>' + m.name +
+        (m.tree ? ' · skill tree' : '') + '</span><span class="sk">' + m.key + '</span>';
+      b.addEventListener('pointerdown', function (e) {
+        e.preventDefault();
+        if (assignSlot >= 0) { qsSlots[assignSlot] = id; qsSave(); }
+        closeAssign();
+      });
+      card.appendChild(b);
+    });
+    var clr = document.createElement('button');
+    clr.type = 'button';
+    clr.className = 'h2-sheet-row';
+    clr.setAttribute('data-clear', '1');
+    clr.setAttribute('aria-label', 'Clear slot');
+    clr.innerHTML = '<span class="si">🧹</span><span>Clear slot</span>';
+    clr.addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      if (assignSlot >= 0) { qsSlots[assignSlot] = null; qsSave(); }
+      closeAssign();
+    });
+    card.appendChild(clr);
+    assignSheet.appendChild(card);
+    assignSheet.addEventListener('pointerdown', function (e) { if (e.target === assignSheet) closeAssign(); });
+  })();
+  for (var qi = 0; qi < 4; qi++) {
+    (function (i) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'h2-slot';
+      b.setAttribute('data-slot', String(i));
+      b.innerHTML = '<span class="ci">＋</span><span class="al">EMPTY</span>' +
+        '<span class="h2-slotn">' + (i + 1) + '</span><span class="h2-cd"></span>';
+      var lpTimer = null, lpFired = false, downAt = null;
+      b.addEventListener('pointerdown', function (e) {
+        e.preventDefault();
+        if (b.classList.contains('h2-off')) return;
+        lpFired = false;
+        downAt = { x: e.clientX, y: e.clientY };
+        lpTimer = setTimeout(function () { lpFired = true; openAssign(i); }, 480);
+      });
+      function cancelLp() { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } }
+      b.addEventListener('pointermove', function (e) {
+        if (!downAt || !lpTimer) return;
+        var dx = e.clientX - downAt.x, dy = e.clientY - downAt.y;
+        if (dx * dx + dy * dy > 100) cancelLp();
+      });
+      b.addEventListener('pointercancel', function () { cancelLp(); downAt = null; });
+      b.addEventListener('pointerleave', cancelLp);
+      b.addEventListener('pointerup', function (e) {
+        cancelLp();
+        var wasLp = lpFired;
+        lpFired = false;
+        downAt = null;
+        if (wasLp) return;
+        e.preventDefault();
+        if (b.classList.contains('h2-off')) return;
+        var id = qsSlots[i];
+        if (!id) { openAssign(i); return; }
+        try {
+          if (window.__espilSkills && window.__espilSkills.move) window.__espilSkills.move(id);
+          else if (KEYMAP[id]) sendKey(KEYMAP[id][0], KEYMAP[id][1]);
+        } catch (err) {}
+      });
+      b.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+      quick.appendChild(b);
+      slotBtns.push(b);
+    })(qi);
+  }
+  actions.appendChild(quick);
+  qsPaint();
+  /* cooldown painter: the game's own per-move seconds-left map */
+  setInterval(function () {
+    if (!coarse()) return;
+    var cds = null;
+    try {
+      var cs = window.__espilCombatState ? window.__espilCombatState() : null;
+      if (cs && cs.cd) cds = cs.cd;
+    } catch (e) {}
+    if (!cds) {
+      try {
+        if (window.__espilSkills && window.__espilSkills.state && window.__espilSkills.state.cd)
+          cds = window.__espilSkills.state.cd;
+      } catch (e) {}
+    }
+    if (!cds) return;
+    slotBtns.forEach(function (b, i) {
+      var id = qsSlots[i];
+      var ov = b.querySelector('.h2-cd');
+      if (!ov) return;
+      var rem = id ? (cds[id] || 0) : 0;
+      if (!id || !(rem > 0.03)) { ov.style.display = 'none'; return; }
+      var base = QS_MOVES[id].cd || 1;
+      var frac = Math.max(0, Math.min(1, rem / base));
+      ov.style.display = 'flex';
+      ov.style.background = 'conic-gradient(rgba(4,6,8,.62) 0 ' + (frac * 100).toFixed(1) +
+        '%, transparent ' + (frac * 100).toFixed(1) + '% 100%)';
+      ov.textContent = rem >= 0.1 ? rem.toFixed(1) : '';
+    });
+  }, 100);
+
   var mounted = false;
   function mount() {
     if (!document.body) return;
-    [coin, score, timefps, menu, bars, chars, chatBtn, actions].forEach(function (n) {
+    [coin, score, timefps, menu, bars, chars, chatBtn, actions, sheet, assignSheet].forEach(function (n) {
       if (!n.parentNode) document.body.appendChild(n);
     });
     var wrap = el('minimap-wrap');
@@ -1022,12 +1344,14 @@
   }
   if (document.body) mount(); else document.addEventListener('DOMContentLoaded', mount);
 
-  var lastPort = null;
+  var lastKey = null;
   function layoutActions() {
     var p = portrait();
-    if (p === lastPort) return;
-    lastPort = p;
-    var T = p ? POS_P : POS_L;
+    var compact = window.innerWidth <= (p ? 430 : 700);
+    var key = (p ? 'P' : 'L') + (compact ? 'c' : '');
+    if (key === lastKey) return;
+    lastKey = key;
+    var T = compact ? POS_C : (p ? POS_P : POS_L);
     for (var k in actBtns) {
       if (!T[k]) continue;
       actBtns[k].style.right = T[k][0] + 'px';
@@ -1035,7 +1359,7 @@
     }
   }
   window.addEventListener('resize', layoutActions);
-  window.addEventListener('orientationchange', function () { lastPort = null; layoutActions(); });
+  window.addEventListener('orientationchange', function () { lastKey = null; layoutActions(); });
 
   /* ---- live state ---- */
   var kills = 0;
@@ -1236,10 +1560,14 @@
     cur.off = off;
     for (var k in actBtns) {
       var b = actBtns[k];
-      var mv = b.getAttribute('data-move');
       var isAtk = b.hasAttribute('data-atk');
-      if (isAtk || (mv && mv !== 'defense')) b.classList.toggle('h2-off', off);
+      if (isAtk) b.classList.toggle('h2-off', off);
     }
+    /* quick slots follow the same indoor rule: every move but
+       Defense goes inert inside the store */
+    slotBtns.forEach(function (b, i) {
+      b.classList.toggle('h2-off', off && qsSlots[i] !== 'defense');
+    });
   }, 400);
 
   /* extend the room's state hook */
@@ -1257,6 +1585,12 @@
     s.fps = fpsAvg;
     s.attacksOff = !!(actBtns.atk && actBtns.atk.classList.contains('h2-off'));
     s.leoText = (coin.querySelector('.h2-num') || {}).textContent || '';
+    /* 2026-11-11 directive surface: quick slots + the menu sheet */
+    s.quickslots = qsSlots.slice();
+    s.quickKey = QS_KEY;
+    s.menuButtons = menu.querySelectorAll('button').length;
+    s.sheetOpen = sheetOpen();
+    s.assignOpen = assignOpen();
     return s;
   };
 })();
