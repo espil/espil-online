@@ -6799,11 +6799,12 @@
        rule for the Konbiniya itself matches modules/store.js and
        store-page-link.js: name or 1238 Robson address match, or
        the record anchor within 40 m of the fixed Konbiniya anchor;
-       its own path is untouched (panel Enter click and keyboard
-       entry alike load its in-world interior under its own name;
-       since Han 2026-11-11 store-page-link no longer intercepts
-       the Konbiniya Enter click - the standalone store page stays
-       reachable via that module's open API). */
+       The Konbiniya itself is the one exception (Han 2026-11-11
+       directive item 4, Phase 2): its in-world entry is retired -
+       panel Enter click and keyboard entry alike open the
+       standalone store page in a popup via the store-page-link
+       module, and espilEnterInside refuses the record outright.
+       Every other building keeps the routed interior below. */
     function espilIsKonbiniyaRec(rec){
       if(!rec)return false;
       var nm=rec.name||rec.title||'';
@@ -6881,9 +6882,44 @@
       f.style.opacity='1';
       setTimeout(function(){ mid(); f.style.opacity='0'; },210);
     }
+    /* The Konbiniya popup opener (Han 2026-11-11 directive item 4,
+       Phase 2 seam): reuses the store-page-link module's own
+       contract - tryIntercept with the record first, openKonbiniya
+       as the fallback - and invents no second opener. The module
+       lazy-loads (its arming seams live in lazyload.js), so an
+       Enter pressed before it lands is deferred until it arrives
+       (150 ms poll, up to ~3 s) instead of falling through to the
+       retired in-world entry; if it never arrives, the press ends
+       at a toast, never at an interior. */
+    var espilKbPopupWait=null;
+    function espilOpenKonbiniyaPopup(rec){
+      var link=window.__espilStorePageLink;
+      if(link){
+        if(espilKbPopupWait){clearInterval(espilKbPopupWait);espilKbPopupWait=null;}
+        if(!link.tryIntercept(rec))link.openKonbiniya();
+        return;
+      }
+      if(espilKbPopupWait)return;
+      var tries=0;
+      espilKbPopupWait=setInterval(function(){
+        tries++;
+        var l2=window.__espilStorePageLink;
+        if(l2){ clearInterval(espilKbPopupWait); espilKbPopupWait=null; if(!l2.tryIntercept(rec))l2.openKonbiniya(); }
+        else if(tries>=20){ clearInterval(espilKbPopupWait); espilKbPopupWait=null; if(window.__espilToast)window.__espilToast('The store page is still loading - try Enter again in a moment.'); }
+      },150);
+    }
     function espilEnterBuilding(){
       var p=walkPlayer; if(!p||!espilBldgPanelRec)return;
       var rec=espilBldgPanelRec;
+      /* KONBINIYA POPUP (Han 2026-11-11 directive item 4, Phase 2):
+         the Konbiniya itself never enters the in-world interior -
+         the panel Enter button and the keyboard Enter alike route
+         to the standalone store page popup, exactly like the
+         store-page-link click interception does for the button.
+         The panel is left as it stands (the interception path
+         never closes it either); the world pauses while the popup
+         is open and resumes when it closes. */
+      if(espilIsKonbiniyaRec(rec)){ espilOpenKonbiniyaPopup(rec); return; }
       closeBuildingPanel();
       espilEnterInside(rec);
     }
@@ -6942,6 +6978,13 @@
       /* Batch 5 (Han 2026-11-07): no refusal - every rendered
          building enters, routed into the Konbiniya interior. */
       var isKb=espilIsKonbiniyaRec(rec);
+      /* KONBINIYA POPUP hard stop (Phase 2): the Konbiniya's
+         in-world entry is retired - no caller (the retired
+         espilEnterInterior shim included) can put the player in
+         the Konbiniya interior; the record routes to the popup
+         instead. Routed buildings (isKb false) run byte-identical
+         below this line. */
+      if(isKb){ espilOpenKonbiniyaPopup(rec); return; }
       espilInsideRouted=isKb?null:(espilBldgName||'Building');
       var intName=isKb?espilBldgName:'Konbiniya';
       if(p.flying||p._fall)espilFlyClear(); /* Batch G: fly state clears on interior entry */
