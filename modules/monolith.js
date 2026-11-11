@@ -4189,8 +4189,10 @@
          huge collider boxes (which caused far-side teleport when moving inward). */
       /* (Boundary walls removed; clamping applied in updateWalkMap after collision.) */
       } /* end if(!USE_OSM_REBUILD) — procedural grid skipped */
-      /* The walker. Batch 6 Item D: guests build the 2D sprite
-         avatar; the GLB builder stays for signed-in sessions. */
+      /* The walker. Batch 6 Item D: guests build the guest avatar
+         (KayKit GLB placeholder since Han order 5, 2026-11-10; the
+         2D sprite builder before that); the in-tree GLB builder
+         stays for signed-in sessions. */
       var av=buildPlayerAvatar(espilSavedGender());
       mapScene.add(av.group);mapScene.add(av.shadow);
       walkPlayer={av:av,pos:new THREE.Vector3(3,.05,31),velY:0,onGround:true,jumps:0,faceY:.5,bobT:0,moving:false,flying:false,vehicle:null};
@@ -7919,8 +7921,10 @@
     var __espilPhaseSeq=0;
     function __espilBuildRemoteAvatar(gender){
       /* Batch 6 Item D: peers are guests too (accounts disabled),
-         so remotes take the same 2D sprite renderer. */
-      if(espilGuestNow())return __espilBuildSpriteRemote(gender);
+         so remotes take the same guest renderer as the local player.
+         Han order 5 (2026-11-10): that renderer is the KayKit GLB
+         placeholder while ESPIL_KAYKIT_PLACEHOLDER is on. */
+      if(espilGuestNow())return espilKaykitPlaceholderOn()?__espilBuildKaykitRemote(gender):__espilBuildSpriteRemote(gender);
       var g=new THREE.Group();
       var shadow=new THREE.Mesh(new THREE.CircleGeometry(.55,20),
         new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.26,depthWrite:false}));
@@ -8600,7 +8604,11 @@
       try{ return !window.localStorage.getItem('espil_session_v1'); }catch(e){ return true; }
     }
     function buildPlayerAvatar(gender){
-      return espilGuestNow()?buildSpriteAvatar(gender):buildWalkerAvatar(gender);
+      /* Han order 5 (2026-11-10): while ESPIL_KAYKIT_PLACEHOLDER is
+         on, guests ride the KayKit GLB placeholder instead of the 2D
+         sprite builder; signed-in sessions keep the in-tree masters. */
+      if(espilGuestNow())return espilKaykitPlaceholderOn()?buildKaykitAvatar(gender):buildSpriteAvatar(gender);
+      return buildWalkerAvatar(gender);
     }
 
     /* ---------------- Item C: the three gear trees ----------------
@@ -9077,6 +9085,226 @@
         R.curAnim=name;
       };
       ESPIL_SPRITES.push({spr:spr,local:false,R:R});
+      return R;
+    }
+    /* ================================================================
+       Han order 5 (2026-11-10) - KayKit GLB PLACEHOLDER for the
+       guest (sprite-path) player avatars.
+       The 2D guest sprites read too crude on Han's screen, so the
+       guest's own avatar and remote guest avatars render a KayKit
+       Adventurers character (Rogue, CC0 - licence file ships beside
+       the model in assets/kaykit-placeholder/) as a stopgap while
+       the 2D line is finished properly. This is NOT the final GLB
+       source decision (glb-return plan, Track 1) and NOT the 2D
+       handover: the sprite builders above stay in the tree dormant.
+       REVERT: set ESPIL_KAYKIT_PLACEHOLDER to false (or set
+       window.__ESPIL_KAYKIT_PLACEHOLDER__ = false before this file
+       loads) and every guest goes back to buildSpriteAvatar /
+       __espilBuildSpriteRemote with no other change.
+       Signed-in sessions are untouched: buildWalkerAvatar and the
+       in-tree masters keep their exact branch above.
+       One placeholder character serves both guest genders - the
+       set has no distinctly female character (Phase 0 note); the
+       guest's stored gender/name and the landing flow are unchanged.
+       The character's baked hand props (knives, crossbows) are
+       hidden at setup so the punch reads as the game's own punch,
+       at parity with the in-tree masters (which show no hand
+       weapon either).
+       ================================================================ */
+    var ESPIL_KAYKIT_PLACEHOLDER=true;
+    var ESPIL_KK_FILE='assets/kaykit-placeholder/rogue.glb';
+    var ESPIL_KK_TARGET_H=1.7; /* the game's player height; the masters stand 1.8 */
+    function espilKaykitPlaceholderOn(){
+      if(window.__ESPIL_KAYKIT_PLACEHOLDER__===false)return false;
+      if(window.__ESPIL_KAYKIT_PLACEHOLDER__===true)return true;
+      return ESPIL_KAYKIT_PLACEHOLDER;
+    }
+    var ESPIL_KK_LOCAL=null,ESPIL_KK_REMOTES_BUILT=0;
+    window.__espilKaykitPlaceholderState=function(){
+      var L=ESPIL_KK_LOCAL;
+      return {on:espilKaykitPlaceholderOn(),file:ESPIL_KK_FILE,targetH:ESPIL_KK_TARGET_H,
+        local:L?{ready:!!L.ready,anim:L.curAnim||null,acts:Object.keys(L.actions||{}),dead:!!L.__kkDead}:null,
+        remotesBuilt:ESPIL_KK_REMOTES_BUILT};
+    };
+    /* Game action name -> KayKit embedded clip name. The essentials
+       Han's acceptance names (idle, walk, run, punch, hit, death)
+       plus the jump pair and the store-interaction one-shot. No
+       swim/climb clips exist in the set: those actions stay
+       unregistered and the existing fallbacks (locomotion selector
+       swim fallback, climb guard) cover them, exactly as the
+       sprite path mapped them onto its own sets. */
+    var ESPIL_KK_CLIPS={idle:'Idle',walk:'Walking_A',run:'Running_A',
+      attack:'Unarmed_Melee_Attack_Punch_A',hit:'Hit_A',dead:'Death_A',
+      jump:'Jump_Full_Short',doubleJump:'Jump_Full_Long',
+      chat:'Interact',checkout:'Interact'};
+    var ESPIL_KK_ONESHOT={attack:1,hit:1,dead:1,jump:1,doubleJump:1,chat:1,checkout:1};
+    /* The clips are in-place; only the ground root bone's position
+       track is stripped (the same root-motion discipline as
+       buildWalkerAvatar's stripRootMotion), so game physics alone
+       drives placement. Bone-local translations stay - the Blender
+       rig's pose lives in them. */
+    function espilKkStripRoot(clip){
+      clip.tracks=clip.tracks.filter(function(t){
+        return !/^root\.position$/i.test(t.name||'');
+      });
+      return clip;
+    }
+    /* Hide the baked hand props: every mesh hanging under the two
+       handslot bones. The body meshes live under the character's
+       own part nodes, never under the handslots. */
+    function espilKkHideProps(model){
+      model.traverse(function(o){
+        if(/^handslot\.?[lr]$/i.test(o.name||'')){ /* the GLTF loader strips the dot: 'handslotl' / 'handslotr' in-page */
+          o.traverse(function(c){ if(c!==o&&c.isMesh)c.visible=false; });
+        }
+      });
+    }
+    function espilKkSetup(av,model,clips){
+      espilKkHideProps(model);
+      model.traverse(function(o){ if(o.isMesh)o.castShadow=true; });
+      /* Measure in the bind pose, scale to the player height, then
+         ground the feet exactly (Box3 discipline copied from
+         buildWalkerAvatar). */
+      var bbox=new THREE.Box3().setFromObject(model);
+      var h=Math.max(.01,bbox.max.y-bbox.min.y);
+      var s=ESPIL_KK_TARGET_H/h;
+      model.scale.setScalar(s);
+      bbox=new THREE.Box3().setFromObject(model);
+      model.position.y-=bbox.min.y;
+      av.__visualRoot=model;
+      model.userData.__avBaseScale=s;
+      model.userData.__avBaseY=model.position.y;
+      av.group.add(model);
+      var mixer=new THREE.AnimationMixer(model);
+      av.mixer=mixer;
+      function findClip(name){ for(var i=0;i<clips.length;i++){ if(clips[i].name===name)return clips[i]; } return null; }
+      for(var key in ESPIL_KK_CLIPS){
+        var clip=findClip(ESPIL_KK_CLIPS[key]);
+        if(!clip)continue;
+        var act=mixer.clipAction(espilKkStripRoot(clip));
+        if(ESPIL_KK_ONESHOT[key]){ act.setLoop(THREE.LoopOnce); act.clampWhenFinished=true; }
+        av.actions[key]=act;
+      }
+      av.ready=true;
+      av.playAnim('idle');
+    }
+    /* Crossfade locomotion player, mirroring buildWalkerAvatar's
+       playAnim. Two placeholder guards: while dead, locomotion
+       calls are ignored (the death pose holds until revive); while
+       a hit one-shot is on stage, locomotion calls are ignored -
+       'hit' is not in the walk tick selector's protected list, so
+       without the hold the selector would stomp the hit clip the
+       same frame it starts. */
+    function espilKkPlayAnim(av,name){
+      if(av.__kkDead)return;
+      if(av.__kkHold&&name!==av.__kkHold)return;
+      if(!av.mixer||!av.actions[name]||av.curAnim===name)return;
+      var prev=av.actions[av.curAnim],next=av.actions[name];
+      av.curAnim=name;
+      next.reset().fadeIn(.18).play();
+      next.__espilGen=(next.__espilGen||0)+1;
+      if(prev&&prev!==next){ prev.fadeOut(.18); (function(pp,gg){ setTimeout(function(){ if(pp.__espilGen===gg)pp.stop(); },220); })(prev,prev.__espilGen||0); }
+    }
+    /* One-shot player, mirroring buildWalkerAvatar's playOneShot
+       (generation guard included). Death routes to __espilSetState:
+       its pose must hold past the clip instead of timing out back
+       to locomotion. */
+    function espilKkPlayOneShot(av,name,durMs){
+      if(name==='dead'){ av.__espilSetState('dead'); return true; }
+      if(av.__kkDead)return false;
+      if(!av.mixer||!av.actions[name])return false;
+      var act=av.actions[name];
+      var cur=av.actions[av.curAnim];
+      av.curAnim=name;
+      act.__espilGen=(act.__espilGen||0)+1;
+      var actGen=act.__espilGen;
+      act.reset().fadeIn(.12).play();
+      if(cur&&cur!==act){ cur.fadeOut(.12); (function(pp,gg){ setTimeout(function(){ if(pp.__espilGen===gg)pp.stop(); },180); })(cur,cur.__espilGen||0); }
+      if(name==='hit')av.__kkHold='hit';
+      var dur=durMs||((act.getClip().duration||1)*1000);
+      setTimeout(function(){
+        if(av.__kkHold===name)av.__kkHold=null;
+        if(av.curAnim!==name)return;
+        act.fadeOut(.15);
+        setTimeout(function(){ if(act.__espilGen===actGen)act.stop(); },180);
+        av.curAnim=null;
+      },dur);
+      return true;
+    }
+    function espilKkSetState(av,s){
+      if(s==='dead'){
+        av.__kkDead=true; av.__kkHold=null;
+        var act=av.actions.dead;
+        if(act&&av.mixer){
+          var cur=av.actions[av.curAnim];
+          av.curAnim='dead';
+          act.__espilGen=(act.__espilGen||0)+1;
+          act.reset().fadeIn(.12).play();
+          if(cur&&cur!==act)cur.fadeOut(.12);
+        }
+      }else{
+        av.__kkDead=false;
+        if(av.curAnim==='dead'){
+          var d=av.actions.dead;
+          if(d)d.fadeOut(.15);
+          av.curAnim=null;
+        }
+        espilKkPlayAnim(av,'idle');
+      }
+    }
+    function espilKkPlayJump(av,isDouble){
+      var name=isDouble?'doubleJump':'jump';
+      var act=av.actions[name];
+      if(!act)return espilKkPlayOneShot(av,name);
+      var dur=act.getClip().duration||1;
+      var air=isDouble?1.15:(2*9/26); /* same airtime model as buildWalkerAvatar's playJump */
+      act.timeScale=Math.min(6,Math.max(1,dur/air));
+      return espilKkPlayOneShot(av,name,Math.round(dur/act.timeScale*1000));
+    }
+    function espilKkLoad(av,onfail){
+      try{
+        if(typeof THREE.GLTFLoader==='undefined')throw new Error('no GLTFLoader');
+        new THREE.GLTFLoader().load(ESPIL_KK_FILE,function(gltf){
+          if(av.__kkGone)return;
+          try{ espilKkSetup(av,gltf.scene,gltf.animations||[]); }
+          catch(e){ if(onfail)onfail(); }
+        },undefined,function(){ if(onfail)onfail(); });
+      }catch(e){ if(onfail)onfail(); }
+    }
+    function buildKaykitAvatar(gender){
+      gender=(gender==='female')?'female':'male';
+      var g=new THREE.Group();
+      var shadow=new THREE.Mesh(new THREE.CircleGeometry(.55,20),
+        new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.26,depthWrite:false}));
+      shadow.rotation.x=-Math.PI/2;
+      var av={group:g,shadow:shadow,ready:false,mixer:null,actions:{},curAnim:null,__gender:gender,__kaykit:true};
+      av.playAnim=function(name){ espilKkPlayAnim(av,name); };
+      av.playOneShot=function(name,durMs){ return espilKkPlayOneShot(av,name,durMs); };
+      av.playJump=function(isDouble){ return espilKkPlayJump(av,isDouble); };
+      av.__espilSetState=function(s){ espilKkSetState(av,s); };
+      ESPIL_KK_LOCAL=av;
+      espilKkLoad(av,function(){ if(window.__espilToast)window.__espilToast('Character failed to load'); });
+      return av;
+    }
+    function __espilBuildKaykitRemote(gender){
+      gender=(gender==='female')?'female':'male';
+      var g=new THREE.Group();
+      var shadow=new THREE.Mesh(new THREE.CircleGeometry(.55,20),
+        new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.26,depthWrite:false}));
+      shadow.rotation.x=-Math.PI/2;
+      /* Same field contract as the GLB remote: the remote tick
+         drives playAnim + mixer.update with its tiered stride.
+         visual stays null on purpose - the tick would force the
+         masters' 1.5 scale onto R.visual; the placeholder model
+         carries its own measured scale from espilKkSetup. */
+      var R={group:g,shadow:shadow,mixer:null,actions:{},curAnim:null,ready:false,visual:null,baseY:0,
+             cur:{x:0,y:0,z:0},tgt:{x:0,y:0,z:0,a:0},faceY:0,speed:0,fixSpeed:0,fixAt:0,lastAt:0,plate:null,
+             phase:(__espilPhaseSeq++)%7,acc:0,gone:false,bubble:null,bubbleCv:null,bubbleTex:null,bubbleUntil:0,
+             __kaykit:true,__gender:gender};
+      Object.defineProperty(R,'__kkGone',{get:function(){ return R.gone; }});
+      R.playAnim=function(name){ espilKkPlayAnim(R,name); };
+      ESPIL_KK_REMOTES_BUILT++;
+      espilKkLoad(R,null);
       return R;
     }
     /* Item B appearance half: the equipped weapon rides on the
