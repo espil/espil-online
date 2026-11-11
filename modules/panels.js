@@ -677,9 +677,18 @@
        and the bag are open together they sit side by side (each
        overlay takes one half) instead of stacking full-screen;
        under 1020px they split top/bottom so neither is hidden. */
-    '.skill-tree#character-panel .st-card{width:min(408px,calc(100% - 20px));padding:13px 15px}',
+    /* Han 2026-11-11: both windows smaller (profile 408 -> 356,
+       bag 440 -> 384) and draggable with saved positions - the
+       drag wiring lives further below. */
+    '.skill-tree#character-panel .st-card{width:min(356px,calc(100% - 20px));padding:13px 15px}',
     '.skill-tree#character-panel .st-head{margin-bottom:7px;padding-bottom:7px}',
-    '.skill-tree#inventory-panel .st-card{width:min(440px,calc(100% - 20px))}',
+    '.skill-tree#inventory-panel .st-card{width:min(384px,calc(100% - 20px))}',
+    /* Drag affordance for ONLY these two windows: the header is
+       the drag handle (grab cursor, no touch scrolling hijack).
+       The other .skill-tree windows (skill trees, stall, friends)
+       keep the shared fixed-centre behaviour. */
+    '#character-panel .st-head,#inventory-panel .st-head{cursor:grab;touch-action:none}',
+    'body.espil-panel-dragging,body.espil-panel-dragging *{cursor:grabbing!important;user-select:none!important;-webkit-user-select:none!important}',
     'body.espil-panels-both #character-panel{left:0;right:auto;width:50%}',
     'body.espil-panels-both #inventory-panel{left:auto;right:0;width:50%}',
     'body.espil-panels-both #character-panel .st-card,body.espil-panels-both #inventory-panel .st-card{max-width:calc(100% - 14px)}',
@@ -939,6 +948,132 @@
   }
   watch('inventory-panel', renderBag);
   watch('character-panel', renderProfile);
+
+  /* ---------------- draggable windows (Han 2026-11-11) ----------------
+     The profile and the bag no longer sit fixed at screen centre:
+     each can be dragged by its header (mouse or touch) and the
+     position it was left in is saved across sessions (localStorage
+     espil_panel_pos_v1 = { profile: {x,y}, bag: {x,y} }, offsets
+     in px from the centred spawn). The shell centres the card with
+     flexbox, so a translate() offset composes cleanly on top of
+     the centred spawn - but the pair's own .st-card carries a 3D
+     tilt (pair.css: perspective(1000px) rotateX(2deg)), so the
+     offset is applied as translate() IN FRONT OF the card's base
+     transform (captured live from getComputedStyle): the tilt -
+     the production look - is preserved exactly, the projected
+     size never changes, and the visible box shifts by precisely
+     the offset. A first-ever open has no saved offset and spawns
+     centred exactly as before; saved offsets are clamped so the
+     card always lands fully inside the viewport (a position saved
+     on a desktop monitor replays clamped on a phone). ONLY these
+     two windows: the stall, friends and skill-tree windows keep
+     the shared fixed-centre behaviour. These observers are
+     registered after the watch() pair above, so on open the
+     render lands first and the saved position is applied to the
+     final card box. */
+  var LS_POS = 'espil_panel_pos_v1';
+  function panelPosAll() { var o = getJSON(LS_POS, {}); return o && typeof o === 'object' ? o : {}; }
+  function panelPosGet(key) {
+    var p = panelPosAll()[key];
+    return p && isFinite(+p.x) && isFinite(+p.y) ? { x: +p.x, y: +p.y } : { x: 0, y: 0 };
+  }
+  function panelPosSave(key, pos) {
+    var m = panelPosAll(); m[key] = { x: Math.round(pos.x), y: Math.round(pos.y) }; setJSON(LS_POS, m);
+  }
+  function panelCard(panel) { return panel ? panel.querySelector('.st-card') : null; }
+  /* The card's own base transform (the pair's 3D tilt), captured
+     once with no inline transform set; the drag offset is layered
+     in front of it so the shell's look is never replaced. */
+  function panelBaseTf(card) {
+    if (card._egBaseTf !== undefined) return card._egBaseTf;
+    var prev = card.style.transform, tf = '';
+    card.style.transform = '';
+    try { tf = window.getComputedStyle(card).transform || ''; } catch (e) {}
+    card.style.transform = prev;
+    if (!tf || tf === 'none') tf = 'perspective(1000px) rotateX(2deg)';  /* pair.css .st-card tilt */
+    card._egBaseTf = tf;
+    return tf;
+  }
+  function panelSetTf(card, pos) {
+    card.style.transform = (pos.x || pos.y) ? 'translate(' + pos.x + 'px,' + pos.y + 'px) ' + panelBaseTf(card) : '';
+  }
+  /* Clamp an offset so the card's box stays inside the viewport
+     (6px margin). The box is measured with ONLY the base tilt
+     applied - exactly the box the player sees at offset zero - so
+     the clamp is right in single-window and both-windows mode
+     alike. */
+  function panelClamp(panel, card, pos) {
+    var prev = card.style.transform;
+    card.style.transform = panelBaseTf(card);
+    var r = card.getBoundingClientRect();
+    card.style.transform = prev;
+    var M = 6;
+    var minX = M - r.left, maxX = window.innerWidth - M - r.right;
+    var minY = M - r.top, maxY = window.innerHeight - M - r.bottom;
+    var x = minX > maxX ? minX : Math.min(maxX, Math.max(minX, pos.x));
+    var y = minY > maxY ? minY : Math.min(maxY, Math.max(minY, pos.y));
+    return { x: x, y: y };
+  }
+  function panelApplyPos(panel, key) {
+    var card = panelCard(panel); if (!card) return;
+    if (panel.getAttribute('aria-hidden') !== 'false') return;
+    var pos = panelClamp(panel, card, panelPosGet(key));
+    card._egPos = pos;
+    panelSetTf(card, pos);
+  }
+  function panelDragWire(panel, key) {
+    var card = panelCard(panel), head = panel.querySelector('.st-head');
+    if (!card || !head || head._egDragWired) return;
+    head._egDragWired = true;
+    head.addEventListener('pointerdown', function (e) {
+      if (e.button > 0) return;                        /* primary button / touch contact only */
+      if (e.target.closest('button, a, input, select, textarea, label')) return;  /* header controls stay clickable */
+      var start = card._egPos || panelPosGet(key);
+      var sx = e.clientX, sy = e.clientY, moved = false;
+      try { head.setPointerCapture(e.pointerId); } catch (err) {}
+      document.body.classList.add('espil-panel-dragging');
+      function mv(ev) {
+        var pos = panelClamp(panel, card, { x: start.x + ev.clientX - sx, y: start.y + ev.clientY - sy });
+        card._egPos = pos; moved = true;
+        panelSetTf(card, pos);
+      }
+      function up() {
+        head.removeEventListener('pointermove', mv);
+        head.removeEventListener('pointerup', up);
+        head.removeEventListener('pointercancel', up);
+        document.body.classList.remove('espil-panel-dragging');
+        if (moved && card._egPos) panelPosSave(key, card._egPos);
+      }
+      head.addEventListener('pointermove', mv);
+      head.addEventListener('pointerup', up);
+      head.addEventListener('pointercancel', up);
+      e.preventDefault();
+    });
+    /* Content re-renders (tab switches, item selects) can change
+       the card's height while it sits at a saved offset - re-clamp
+       after clicks inside the panel so it never slips off-screen. */
+    panel.addEventListener('click', function () {
+      requestAnimationFrame(function () { panelApplyPos(panel, key); });
+    }, true);
+    new MutationObserver(function () {
+      if (panel.getAttribute('aria-hidden') === 'false') panelApplyPos(panel, key);
+    }).observe(panel, { attributes: true, attributeFilter: ['aria-hidden'] });
+  }
+  var PANEL_DRAG = [['character-panel', 'profile'], ['inventory-panel', 'bag']];
+  PANEL_DRAG.forEach(function (cfg) {
+    var p = document.getElementById(cfg[0]); if (p) panelDragWire(p, cfg[1]);
+  });
+  /* Both-windows mode re-halves the overlays - re-clamp both cards
+     when it toggles, and on viewport resize, so a saved position
+     never strands a window off-screen. */
+  function panelReclampAll() {
+    PANEL_DRAG.forEach(function (cfg) {
+      var p = document.getElementById(cfg[0]); if (p) panelApplyPos(p, cfg[1]);
+    });
+  }
+  if (document.body) new MutationObserver(panelReclampAll).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  window.addEventListener('resize', panelReclampAll);
+
   function toggleProfile(force) {
     var p = charPanel(); if (!p) return;
     var open = typeof force === 'boolean' ? force : p.getAttribute('aria-hidden') !== 'false';
