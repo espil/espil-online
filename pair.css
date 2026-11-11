@@ -2074,3 +2074,130 @@
       #minimap-wrap[data-stage="1"] { width:max(52px,10vh); height:max(52px,10vh); }
       #minimap-wrap[data-stage="1"].mm-big { width:min(78vw,78dvh,calc(100dvh - 136px)); height:min(78vw,78dvh,calc(100dvh - 136px)); }
     }
+
+    /* ==== Landing restructure (Han 2026-11-11) ====
+       The first landing step is a three-entry list (Login / Sign-up /
+       Guest) inside #signin-div, driven by entry-flow.js through
+       [data-authstep]. The entries reuse the .city-name reel-entry
+       style verbatim; these rules only carry layout and state. */
+    #auth-choice[hidden], #auth-gueststep[hidden], #auth-toback[hidden] { display:none !important; }
+    body #city-status #signin-div #auth-choice .city-name,
+    body #city-status #signin-div #auth-gueststep .city-name {
+      margin:0 auto; max-width:340px; text-align:center;
+    }
+    body #city-status #signin-div .auth-guest-char { color:rgba(232,220,192,.38); }
+    body #city-status #signin-div .auth-guest-char.is-on {
+      color:#fff8e1; font-weight:800;
+      text-shadow:0 0 8px rgba(255,217,77,.95),0 0 26px rgba(255,180,40,.55);
+    }
+    body #city-status #signin-div .auth-guest-go {
+      margin-top:10px; color:#fff8e1; font-weight:800; letter-spacing:.16em;
+      text-shadow:0 0 8px rgba(255,217,77,.95),0 0 26px rgba(255,180,40,.55);
+    }
+    body #city-status #signin-div #guest-name {
+      background:rgba(6,12,18,.45) !important;
+      border:0 !important; border-bottom:1px solid rgba(169,226,222,.35) !important;
+      border-radius:0 !important; color:#fff8e1 !important;
+      font:600 .86rem/1.3 "Manrope",sans-serif !important;
+      letter-spacing:.06em !important; padding:10px 4px !important;
+    }
+    /* Per-step action: the flattened-form rule gives .auth-btn
+       display:flex !important, which outranks the step machine's
+       inline toggles - the mode hide for the two submit actions is
+       carried here, keyed on the step attribute. */
+    body #city-status #signin-div[data-authmode="login"] #auth-signup { display:none !important; }
+    body #city-status #signin-div[data-authmode="signup"] #auth-signin { display:none !important; }
+    body #city-status #signin-div #auth-gueststep label {
+      font:600 .76rem/1.4 "Manrope",sans-serif !important;
+      letter-spacing:.12em !important; color:rgba(232,220,192,.55) !important;
+    }
+
+    /* Mobile swipe scroll (Han 2026-11-11 item 1): every landing
+       surface that can overflow is its own vertical touch scroller.
+       The city reel already carries touch-action:pan-y; the sign-in
+       step and the flow steps (menu / guidance / preparation lists)
+       previously had a max-height but NO overflow, so overflowing
+       content was clipped and a swipe on them hit the page-level
+       touch handlers instead of scrolling. */
+    #city-status.auth-open #signin-div {
+      overflow-y:auto; touch-action:pan-y; overscroll-behavior:contain;
+      scrollbar-width:none; -webkit-overflow-scrolling:touch;
+    }
+    /* The div is a flex column with a max-height: #auth-box was the
+       one shrinkable child (flex-shrink 1), so on a short viewport
+       the form COMPRESSED - its lower fields and the submit action
+       were clipped by the readout's overflow:hidden and nothing
+       could scroll (scrollHeight never exceeded the cap). Children
+       keep their natural height; the div itself scrolls. */
+    #city-status.auth-open #signin-div > * { flex-shrink:0; }
+    #city-status.auth-open #signin-div::-webkit-scrollbar { display:none; }
+    #city-status.flow-open #espil-flow-ui {
+      max-height:calc(100dvh - 110px); overflow-y:auto;
+      touch-action:pan-y; overscroll-behavior:contain;
+      scrollbar-width:none; -webkit-overflow-scrolling:touch;
+    }
+    #city-status.flow-open #espil-flow-ui::-webkit-scrollbar { display:none; }
+    #city-list .espil-city-btn { touch-action:pan-y; }
+
+    /* ==== Dive guide (Han 2026-11-11 item 3) ====
+       New component (entry-flow.js, __espilDiveGuide v1): a first-
+       visit movement modal at dive time plus a slim returning popup.
+       Styled to the pair's dark glass + warm gold readout language. */
+    #espil-diveguide {
+      position:fixed; inset:0; z-index:96; display:flex;
+      align-items:center; justify-content:center; padding:18px;
+      background:rgba(4,8,12,.55);
+    }
+    #espil-diveguide[hidden] { display:none !important; }
+    #espil-diveguide .dg-card {
+      width:min(430px,94vw); max-height:calc(100dvh - 60px); overflow-y:auto;
+      background:linear-gradient(180deg,rgba(10,20,28,.97),rgba(6,12,18,.98));
+      border:1px solid rgba(255,217,122,.4); border-radius:16px;
+      box-shadow:0 24px 60px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,224,170,.15);
+      color:#e8f4f3; padding:22px 22px 18px;
+      font-family:"Manrope",sans-serif; text-align:left;
+    }
+    #espil-diveguide .dg-title {
+      margin:0 0 4px; font:800 1.05rem/1.3 "Manrope",sans-serif;
+      letter-spacing:.14em; color:#fff8e1;
+      text-shadow:0 0 8px rgba(255,217,77,.8),0 0 22px rgba(255,180,40,.45);
+    }
+    #espil-diveguide .dg-sub { margin:0 0 14px; font-size:.8rem; line-height:1.55; color:rgba(232,220,192,.72); }
+    #espil-diveguide .dg-rows { margin:0 0 16px; padding:0; list-style:none; }
+    #espil-diveguide .dg-rows li {
+      display:flex; gap:12px; align-items:baseline;
+      padding:7px 0; border-bottom:1px solid rgba(169,226,222,.12);
+      font-size:.84rem; line-height:1.5; color:#e8f4f3;
+    }
+    #espil-diveguide .dg-key {
+      flex:0 0 118px; font:800 .72rem/1.4 "Manrope",sans-serif;
+      letter-spacing:.08em; color:#ffd97a; text-transform:uppercase;
+    }
+    #espil-diveguide .dg-skip {
+      display:flex; gap:10px; align-items:center; cursor:pointer;
+      font-size:.82rem; color:rgba(232,220,192,.85); margin:0 0 16px;
+    }
+    #espil-diveguide .dg-skip input { width:18px; height:18px; accent-color:#c9973f; cursor:pointer; }
+    #espil-diveguide .dg-start {
+      appearance:none; width:100%; height:44px; cursor:pointer;
+      border:1px solid rgba(255,217,122,.55); border-radius:12px;
+      background:linear-gradient(180deg,#8a5a2b,#6e4520); color:#ffe9b0;
+      font:800 .85rem/1 "Manrope",sans-serif; letter-spacing:.14em;
+      text-shadow:0 1px 2px rgba(40,20,0,.5);
+    }
+    #espil-diveguide-mini {
+      position:fixed; left:50%; bottom:18px; transform:translateX(-50%);
+      z-index:96; display:flex; gap:12px; align-items:center;
+      max-width:min(430px,94vw); padding:10px 14px;
+      background:linear-gradient(180deg,rgba(10,20,28,.95),rgba(6,12,18,.96));
+      border:1px solid rgba(255,217,122,.35); border-radius:12px;
+      box-shadow:0 12px 32px rgba(0,0,0,.5);
+      color:#e8f4f3; font:600 .8rem/1.4 "Manrope",sans-serif;
+    }
+    #espil-diveguide-mini[hidden] { display:none !important; }
+    #espil-diveguide-mini button {
+      appearance:none; cursor:pointer; border:1px solid rgba(169,226,222,.4);
+      background:none; border-radius:8px; color:#fff8e1;
+      font:800 .72rem/1 "Manrope",sans-serif; letter-spacing:.1em; padding:8px 10px;
+    }
+    #espil-diveguide-mini .dg-mini-close { border:0; padding:8px 4px; color:rgba(232,220,192,.6); }

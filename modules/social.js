@@ -723,7 +723,14 @@
        returned salt + iterations, and send only K. */
     var c = readCreds();
     var email = (c.id || '').trim().toLowerCase();
-    if (!email || !c.pw) { authMsg('Enter your email and password.'); return; }
+    if (!email || !c.pw) { authMsg('Enter your ID and password.'); return; }
+    /* Restructure (Han 2026-11-11): the Login step's ID field also
+       accepts the account NAME. Name resolution lives behind the
+       Worker's /auth/name/salt + /auth/name/login pair - prepared
+       in espil-api but NOT yet deployed; until that deploy lands
+       the salt call answers 404 and the form says so honestly
+       instead of faking a flow. */
+    if (email.indexOf('@') < 0) { doSigninByName(email, c.pw); return; }
     authMsg('Signing in...');
     fetch(API_BASE + '/auth/email/salt?email=' + encodeURIComponent(email), { credentials: 'include' }).then(function (r) {
       return r.json();
@@ -749,6 +756,45 @@
         authMsg('Sign-in failed. Please try again.');
       }
     }).catch(function () { authMsg('Sign-in failed. Please try again.'); });
+  }
+  function doSigninByName(name, pw) {
+    authMsg('Signing in...');
+    var saltStatus = 0;
+    fetch(API_BASE + '/auth/name/salt?name=' + encodeURIComponent(name), { credentials: 'include' }).then(function (r) {
+      saltStatus = r.status;
+      return r.json();
+    }).then(function (s) {
+      if (saltStatus === 404) {
+        authMsg('Name sign-in arrives with the next server update - please sign in with your email for now.');
+        throw new Error('name-login-not-deployed');
+      }
+      if (!s || !s.salt) throw new Error('salt');
+      return espilDeriveKey(pw, s.salt, s.iterations || ESPIL_PBKDF2_ITERATIONS);
+    }).then(function (key) {
+      if (!key) return null;
+      return fetch(API_BASE + '/auth/name/login', {
+        method: 'POST', credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: name, key: key, channel: 'web' })
+      });
+    }).then(function (r) {
+      if (!r) return;
+      return r.json().then(function (b) { return { status: r.status, body: b }; });
+    }).then(function (res) {
+      if (!res) return;
+      if (res.status === 200 && res.body && res.body.user) {
+        startSession({ name: res.body.user.name }, 'Welcome back, ' + res.body.user.name + '.');
+      } else if (res.status === 401) {
+        authMsg('Name or password is incorrect.');
+      } else if (res.status === 429) {
+        authMsg('Too many attempts. Please wait a little and try again.');
+      } else {
+        authMsg('Sign-in failed. Please try again.');
+      }
+    }).catch(function (e) {
+      if (e && e.message === 'name-login-not-deployed') return;
+      authMsg('Sign-in failed. Please try again.');
+    });
   }
   function wireAuth() {
     var su = $('auth-signup'), si = $('auth-signin'), pw = $('auth-pw');

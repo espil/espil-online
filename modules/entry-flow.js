@@ -667,6 +667,9 @@
   }
   function showLoginStep() {
     step = 'login';
+    /* Restructure (Han 2026-11-11): the step opens on the
+       three-entry list; a live session keeps the combined form. */
+    presentAuthStep(sessionRecord() ? null : 'choice');
     if (typeof window.__espilOpenAuth === 'function') { window.__espilOpenAuth(); return; }
     var m = $('signin-modal');
     if (m) {
@@ -825,6 +828,166 @@
       return !!(st && (st.nameClaim === 'pending' || st.nameClaim === 'failed'));
     } catch (e) { return false; }
   }
+
+  /* ---- First-step restructure (Han 2026-11-11) ----
+     The login step presents THREE entries inside #signin-div -
+     Login / Sign-up / Guest - and each choice swaps the same div's
+     content in place (no card, no separate window):
+       choice : the three entries only.
+       login  : ID + password fields of the shared #auth-box (the
+                name field and the SIGN UP action hidden) + the
+                provider row (Google live; Apple/Facebook present
+                with an honest in-list not-yet notice).
+       signup : name (the shipped claim field) + email + password
+                + the provider row; the claim hold / reserved /
+                retry behaviour in social.js is untouched - only
+                field visibility and labels are re-cut per step.
+       guest  : a session-local name input + the Male/Female
+                character choice, then the EXISTING #guest-enter
+                path (session parking + step completion) is driven
+                programmatically, so guest semantics stay identical.
+       null   : a session already exists - the combined form shows
+                exactly as before (the session block state).
+     Back from login/signup/guest returns to the choice list. This
+     state machine exists ONLY on the landing: the game page has
+     no landing flow and presents the combined form as today. */
+  var authDiv = document.getElementById('signin-div');
+  function setLabelText(label, text) {
+    if (!label) return;
+    for (var i = 0; i < label.childNodes.length; i++) {
+      var n = label.childNodes[i];
+      if (n.nodeType === 3 && n.nodeValue && n.nodeValue.trim()) { n.nodeValue = text; return; }
+    }
+    label.insertBefore(document.createTextNode(text), label.firstChild);
+  }
+  function presentAuthStep(name) {
+    if (!authDiv) return;
+    var choiceBox = document.getElementById('auth-choice');
+    var guestBox = document.getElementById('auth-gueststep');
+    var authBox = document.getElementById('auth-box');
+    var toBack = document.getElementById('auth-toback');
+    var guestEnter = document.getElementById('guest-enter');
+    var formMode = (name === 'login' || name === 'signup');
+    var formShown = formMode || name === null;
+    if (choiceBox) choiceBox.hidden = name !== 'choice';
+    if (guestBox) guestBox.hidden = name !== 'guest';
+    if (toBack) toBack.hidden = !formMode;
+    if (authBox) authBox.style.display = formShown ? '' : 'none';
+    if (guestEnter) guestEnter.style.display = name === null ? '' : 'none';
+    var dividers = authDiv.querySelectorAll('.modal-divider');
+    for (var d = 0; d < dividers.length; d++) {
+      var isGuestDiv = dividers[d].classList.contains('div-guest');
+      dividers[d].style.display = (formShown && !(formMode && isGuestDiv)) ? '' : 'none';
+    }
+    var provRow = authDiv.querySelector('.provider-social-row');
+    if (provRow) provRow.style.display = formShown ? '' : 'none';
+    var provNote = authDiv.querySelector('.provider-note');
+    if (provNote) provNote.style.display = formShown ? '' : 'none';
+    authDiv.setAttribute('data-authstep', name || '');
+    authDiv.setAttribute('data-authmode', formMode ? name : '');
+    if (formMode) {
+      var nameLabel = document.getElementById('auth-name-label');
+      var nameInput = document.getElementById('auth-name');
+      var idLabel = document.getElementById('auth-id-label');
+      var idInput = document.getElementById('auth-id');
+      var signinBtn = document.getElementById('auth-signin');
+      var signupBtn = document.getElementById('auth-signup');
+      var guestNote = authBox ? authBox.querySelector('.auth-guestonly-note') : null;
+      var isLogin = name === 'login';
+      if (nameLabel) nameLabel.style.display = isLogin ? 'none' : '';
+      if (nameInput) nameInput.style.display = isLogin ? 'none' : '';
+      setLabelText(idLabel, isLogin ? 'ID' : 'EMAIL');
+      if (idInput) {
+        idInput.placeholder = isLogin ? 'Email or account name' : 'you@example.com';
+        idInput.setAttribute('autocomplete', isLogin ? 'username' : 'email');
+      }
+      if (signinBtn) signinBtn.style.display = isLogin ? '' : 'none';
+      if (signupBtn) signupBtn.style.display = isLogin ? 'none' : '';
+      if (guestNote) guestNote.style.display = isLogin ? 'none' : '';
+      var provBtns = authDiv.querySelectorAll('.provider-logo');
+      for (var p = 0; p < provBtns.length; p++) {
+        var pn = (provBtns[p].getAttribute('data-provider') || '').toLowerCase();
+        if (pn === 'apple' || pn === 'facebook') provBtns[p].disabled = false;
+      }
+      var focusEl = isLogin ? idInput : nameInput;
+      if (focusEl) { try { focusEl.focus({ preventScroll: true }); } catch (e) {} }
+    }
+    if (name === 'guest') {
+      var gName = document.getElementById('guest-name');
+      if (gName) { try { gName.focus({ preventScroll: true }); } catch (e) {} }
+    }
+  }
+  (function wireAuthSteps() {
+    if (!authDiv) return;
+    var goLogin = document.getElementById('auth-go-login');
+    var goSignup = document.getElementById('auth-go-signup');
+    var goGuest = document.getElementById('auth-go-guest');
+    if (goLogin) goLogin.addEventListener('click', function () { presentAuthStep('login'); });
+    if (goSignup) goSignup.addEventListener('click', function () { presentAuthStep('signup'); });
+    if (goGuest) goGuest.addEventListener('click', function () { presentAuthStep('guest'); });
+    var toBack = document.getElementById('auth-toback');
+    if (toBack) toBack.addEventListener('click', function () { presentAuthStep('choice'); });
+    var guestBack = document.getElementById('guest-back');
+    if (guestBack) guestBack.addEventListener('click', function () { presentAuthStep('choice'); });
+    /* The name-claim Back (#auth-back, social.js's abandon control)
+       also returns the presentation to the three-entry list; its
+       claim semantics stay with social.js's own listener. */
+    var claimBack = document.getElementById('auth-back');
+    if (claimBack) claimBack.addEventListener('click', function () { presentAuthStep('choice'); });
+    /* Apple / Facebook have no backend yet: on the landing the
+       items are selectable and answer with an honest notice in the
+       form's message line (the Google 503 pattern) instead of a
+       fake flow; Google's real flow stays with landing-auth.js. */
+    authDiv.addEventListener('click', function (ev) {
+      var b = (ev.target && ev.target.closest) ? ev.target.closest('.provider-logo') : null;
+      if (!b) return;
+      var pn = (b.getAttribute('data-provider') || '').toLowerCase();
+      if (pn === 'apple' || pn === 'facebook') {
+        ev.preventDefault();
+        ev.stopPropagation();
+        var msg = document.getElementById('auth-msg');
+        if (msg) msg.textContent = (pn === 'apple' ? 'Apple' : 'Facebook') + ' sign-in is not available yet.';
+      }
+    }, true);
+    /* Guest step: name (session-local only) + character choice.
+       The reserved list mirrors the Worker's account-name rule as
+       a display sanity; nothing here writes to any account store. */
+    var guestGender = 'male';
+    var gMale = document.getElementById('guest-char-male');
+    var gFemale = document.getElementById('guest-char-female');
+    function setGuestGender(g) {
+      guestGender = g;
+      if (gMale) { gMale.classList.toggle('is-on', g === 'male'); gMale.setAttribute('aria-pressed', g === 'male' ? 'true' : 'false'); }
+      if (gFemale) { gFemale.classList.toggle('is-on', g === 'female'); gFemale.setAttribute('aria-pressed', g === 'female' ? 'true' : 'false'); }
+    }
+    if (gMale) gMale.addEventListener('click', function () { setGuestGender('male'); });
+    if (gFemale) gFemale.addEventListener('click', function () { setGuestGender('female'); });
+    var GUEST_RESERVED = ['espil', '에스필', 'lunaris', '루나리스', 'leo', '레오', 'admin', '어드민', 'official', 'system', 'guest'];
+    var guestNameEl = document.getElementById('guest-name');
+    var guestMsg = document.getElementById('guest-msg');
+    function guestGo() {
+      var v = guestNameEl ? (guestNameEl.value || '').trim() : '';
+      if (!v) { if (guestMsg) guestMsg.textContent = 'Please enter a name.'; return; }
+      if (GUEST_RESERVED.indexOf(v.toLowerCase()) >= 0) {
+        if (guestMsg) guestMsg.textContent = 'That name is reserved - please choose another.';
+        return;
+      }
+      try { localStorage.setItem('espil_username', v); } catch (e) {}
+      try {
+        var rec = { gender: guestGender, ts: Date.now() };
+        if (window.__espilPendingLook && typeof window.__espilPendingLook === 'object') rec.look = window.__espilPendingLook;
+        localStorage.setItem('espil_character', JSON.stringify(rec));
+      } catch (e) {}
+      if (guestMsg) guestMsg.textContent = '';
+      var ge = document.getElementById('guest-enter');
+      if (ge) ge.click();
+    }
+    var guestGoBtn = document.getElementById('guest-go');
+    if (guestGoBtn) guestGoBtn.addEventListener('click', guestGo);
+    if (guestNameEl) guestNameEl.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); guestGo(); }
+    });
+  })();
   setInterval(function () {
     if (step !== 'login') return;
     if (claimInFlight()) return;
@@ -958,5 +1121,206 @@
       openLoginStep();
     }
   }, 300);
+})();
+
+/* __espilAuthOnce v1 - AUTH ONCE (Han 2026-11-11).
+   Diagnosis of the second sign-in appearance: the game page's own
+   entry sequence (monolith maybeShowEntrySub -> openLoginGate)
+   presents the login gate UNCONDITIONALLY once the intro typing
+   completes - it never checks whether the visitor already finished
+   Login / Sign-up / Guest at the landing. The landing hands off
+   through sessionStorage espil_pending_city, and the pair's head
+   script marks that arrival with the espil-handoff class on <html>
+   before any module loads. So: on the game page ONLY, and ONLY for
+   a handoff arrival, the moment the gate presents while a gate is
+   pending we complete it through the gate's own completion hook
+   (the same call the form's success path makes). The completion
+   runs in the MutationObserver microtask - before the presented
+   frame can paint. A DIRECT arrival at the game page (no handoff
+   mark) keeps the presented gate exactly as today, and the guest
+   parking / session restore / logout semantics are untouched. */
+(function () {
+  'use strict';
+  try {
+    if (window.__ESPIL_GAME_PAGE !== true) return;
+    if (!document.documentElement.classList.contains('espil-handoff')) return;
+    var done = false;
+    function passGate() {
+      if (done) return true;
+      try {
+        if (typeof window.__espilLoginGatePending === 'function' && window.__espilLoginGatePending()
+            && typeof window.__espilLoginGateDone === 'function') {
+          window.__espilLoginGateDone();
+          done = true;
+          return true;
+        }
+      } catch (e) {}
+      return false;
+    }
+    function watch() {
+      var modal = document.getElementById('signin-modal');
+      if (!modal) return;
+      if (modal.getAttribute('aria-hidden') === 'false') passGate();
+      try {
+        new MutationObserver(function () {
+          if (modal.getAttribute('aria-hidden') === 'false') passGate();
+        }).observe(modal, { attributes: true, attributeFilter: ['aria-hidden'] });
+      } catch (e) {}
+      /* Belt and braces: the gate hooks are defined by the game
+         module, which can land after this observer; a bounded poll
+         covers a presentation that predates their definition. */
+      var ticks = 0;
+      var iv = setInterval(function () {
+        ticks++;
+        if (done || ticks > 240) { clearInterval(iv); return; }
+        if (modal.getAttribute('aria-hidden') === 'false') passGate();
+      }, 500);
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watch);
+    else watch();
+  } catch (e) {}
+})();
+
+/* __espilDiveGuide v1 - DIVE GUIDE (Han 2026-11-11 item 3).
+   A NEW component (not the retired guide system): at dive time a
+   popup shows on the game page. A first-time visitor gets the
+   movement modal; a returning visitor gets the slim popup with a
+   way back into the modal. The modal carries the skip-tutorial
+   toggle: once ON (persisted), neither surface ever appears
+   again. First-visit and skip state live in localStorage under
+   this component's own keys. The guide arms on the arrival guide
+   event and presents once the player is in the map and landed, so
+   it never interrupts the fall or the entry gates. */
+(function () {
+  'use strict';
+  if (window.__ESPIL_GAME_PAGE !== true) return;
+  var SKIP_KEY = 'espil_diveguide_skip_v1';
+  var SEEN_KEY = 'espil_diveguide_seen_v1';
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
+  function curLang() {
+    try { if (typeof window.__espilLang === 'function') return window.__espilLang(); } catch (e) {}
+    return 'en';
+  }
+  var COPY = {
+    en: {
+      title: 'HOW TO MOVE',
+      sub: 'Welcome to Espil Online. These are the controls your traveler uses.',
+      rows: [
+        ['Move', 'Arrow keys - you walk toward where the camera faces. On touch screens, use the stick.'],
+        ['Look', 'Drag to look around.'],
+        ['Jump', 'Shift'],
+        ['Interact', 'Space - talk, enter, and use what stands in front of you.'],
+        ['Sprint', 'Ctrl toggles sprint.'],
+        ['Indoors', 'Inside a store the view is first-person: A and D turn the camera.']
+      ],
+      skip: 'Skip this guide from now on',
+      start: 'START EXPLORING',
+      back: 'Welcome back.',
+      how: 'HOW TO MOVE'
+    },
+    ko: {
+      title: '이동 방법',
+      sub: '에스필 온라인에 오신 것을 환영합니다. 여행자가 사용하는 조작법입니다.',
+      rows: [
+        ['이동', '방향키 - 카메라가 향한 쪽으로 걷습니다. 터치 화면에서는 스틱을 사용합니다.'],
+        ['둘러보기', '드래그하면 주변을 둘러봅니다.'],
+        ['점프', 'Shift'],
+        ['상호작용', 'Space - 앞에 있는 것과 대화하고, 들어가고, 사용합니다.'],
+        ['달리기', 'Ctrl로 달리기를 켜고 끕니다.'],
+        ['실내', '가게 안에서는 1인칭 시점입니다: A와 D로 카메라를 돌립니다.']
+      ],
+      skip: '다음부터 이 가이드를 건너뜁니다',
+      start: '탐험 시작',
+      back: '다시 오신 것을 환영합니다.',
+      how: '이동 방법'
+    }
+  };
+  function copy() { return COPY[curLang()] || COPY.en; }
+  var modal = null, mini = null, skipBox = null, built = false;
+  function build() {
+    if (built) return;
+    built = true;
+    var c = copy();
+    modal = document.createElement('div');
+    modal.id = 'espil-diveguide';
+    modal.hidden = true;
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-label', c.title);
+    var rowsHtml = '';
+    for (var i = 0; i < c.rows.length; i++) {
+      rowsHtml += '<li><span class="dg-key"></span><span class="dg-val"></span></li>';
+    }
+    modal.innerHTML = '<div class="dg-card"><h3 class="dg-title"></h3><p class="dg-sub"></p>'
+      + '<ul class="dg-rows">' + rowsHtml + '</ul>'
+      + '<label class="dg-skip"><input type="checkbox" id="espil-diveguide-skip"> <span class="dg-skip-text"></span></label>'
+      + '<button type="button" class="dg-start"></button></div>';
+    modal.querySelector('.dg-title').textContent = c.title;
+    modal.querySelector('.dg-sub').textContent = c.sub;
+    var lis = modal.querySelectorAll('.dg-rows li');
+    for (var j = 0; j < lis.length && j < c.rows.length; j++) {
+      lis[j].querySelector('.dg-key').textContent = c.rows[j][0];
+      lis[j].querySelector('.dg-val').textContent = c.rows[j][1];
+    }
+    modal.querySelector('.dg-skip-text').textContent = c.skip;
+    modal.querySelector('.dg-start').textContent = c.start;
+    skipBox = modal.querySelector('#espil-diveguide-skip');
+    skipBox.checked = lsGet(SKIP_KEY) === '1';
+    skipBox.addEventListener('change', function () {
+      if (skipBox.checked) lsSet(SKIP_KEY, '1'); else lsDel(SKIP_KEY);
+    });
+    modal.querySelector('.dg-start').addEventListener('click', hideModal);
+    document.body.appendChild(modal);
+    mini = document.createElement('div');
+    mini.id = 'espil-diveguide-mini';
+    mini.hidden = true;
+    mini.innerHTML = '<span class="dg-mini-text"></span>'
+      + '<button type="button" class="dg-mini-how"></button>'
+      + '<button type="button" class="dg-mini-close" aria-label="Close">&times;</button>';
+    mini.querySelector('.dg-mini-text').textContent = c.back;
+    mini.querySelector('.dg-mini-how').textContent = c.how;
+    mini.querySelector('.dg-mini-how').addEventListener('click', function () { hideMini(); showModal(); });
+    mini.querySelector('.dg-mini-close').addEventListener('click', hideMini);
+    document.body.appendChild(mini);
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && modal && !modal.hidden) hideModal();
+    });
+  }
+  function showModal() { build(); if (skipBox) skipBox.checked = lsGet(SKIP_KEY) === '1'; modal.hidden = false; }
+  function hideModal() { if (modal) modal.hidden = true; }
+  var miniTimer = 0;
+  function showMini() {
+    build();
+    mini.hidden = false;
+    if (miniTimer) clearTimeout(miniTimer);
+    miniTimer = setTimeout(hideMini, 9000);
+  }
+  function hideMini() { if (mini) mini.hidden = true; if (miniTimer) { clearTimeout(miniTimer); miniTimer = 0; } }
+  var armed = false, shown = false, poll = 0;
+  function present() {
+    if (shown) return;
+    if (!document.body.classList.contains('in-map')) return;
+    var pose = null;
+    try { pose = (typeof window.__espilPlayerPose === 'function') ? window.__espilPlayerPose() : null; } catch (e) {}
+    if (!pose || !(pose.y < 1.5)) return;
+    shown = true;
+    if (poll) { clearInterval(poll); poll = 0; }
+    if (lsGet(SKIP_KEY) === '1') return;
+    if (lsGet(SEEN_KEY) === '1') { showMini(); return; }
+    lsSet(SEEN_KEY, '1');
+    showModal();
+  }
+  function arm() {
+    if (armed) return;
+    armed = true;
+    poll = setInterval(present, 400);
+    setTimeout(function () { if (poll) { clearInterval(poll); poll = 0; } }, 600000);
+    present();
+  }
+  window.addEventListener('espil-guide', function (ev) {
+    if (ev && ev.detail && ev.detail.type === 'arrival') arm();
+  });
+  window.addEventListener('espil-arrival', arm);
 })();
 
