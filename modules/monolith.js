@@ -897,7 +897,7 @@
     }
     var walkPlayer=null,walkColliders=[];
     var walkKeys={};
-    var walkCamYaw=0,walkCamPitch=.84,walkCamDist=6.2; /* Cauldron style: 48° pitch; default follow distance 6.2 m (Han 2026-11-09, second same-day correction: a SMALL step farther from the 5.5 m / ~0.31 framing landed hours earlier - target ~0.28 of viewport height; the 5.5 m proportion default, the 2.95 m close framing of 2026-11-08 and 14 m before that are all superseded) */
+    var walkCamYaw=0,walkCamPitch=.84,walkCamDist=7.0; /* Cauldron style: 48° pitch; default follow distance 7.0 m (Han 2026-11-10: zoom out a little from the 6.2 m default landed 2026-11-09 - same working step he took then, landing at 7.0 m; the 6.2 m, 5.5 m, 2.95 m and 14 m defaults before it are all superseded) */
     /* QA #15 (2026-10-06): sprint is a Ctrl toggle, not hold-Shift. */
     var sprintOn=false;
     function updateSprintUI(){
@@ -1591,7 +1591,7 @@
       p.pos.y=base;
       p.velY=0; p.onGround=true; p.jumps=0;
       p._espilArrive={surf:base,probeAt:0,startedAt:performance.now(),dur:1900};
-      walkCamDist=60; /* wide sky framing; the step eases it to 6.2 */
+      walkCamDist=60; /* wide sky framing; the step eases it to 7.0 */
       if(typeof espilP1!=='undefined'&&espilP1)espilP1.zoomDrive=false; /* the arrival envelope leads the map zoom for this entry */
       espilShowGeoPrompt();
     }
@@ -1605,18 +1605,18 @@
             if(typeof walkAvatar!=='undefined'&&walkAvatar&&walkAvatar.playLand)walkAvatar.playLand(); }
         }
         var td=Math.max(0,Math.min(1,(nowD-a.startedAt)/a.dur));
-        var fd=1-td; walkCamDist=6.2+53.8*fd*fd;
-        if(td>=1){ p._espilArrive=null; walkCamDist=6.2; espilHideGeoPrompt(); }
+        var fd=1-td; walkCamDist=7.0+53.0*fd*fd;
+        if(td>=1){ p._espilArrive=null; walkCamDist=7.0; espilHideGeoPrompt(); }
         return;
       }
       var now=performance.now();
       if(now-a.probeAt>150){ a.probeAt=now; var y=espilTileBase(p.pos.x,p.pos.z); if(y===null)y=espilOwnSurfaceY(p.pos.x,p.pos.z); if(y!==null&&y!==undefined)a.surf=y; }
       if(a.surf!==null&&a.surf!==undefined){ p.pos.y=a.surf; p.onGround=true; }
       var t=Math.max(0,Math.min(1,(now-a.startedAt)/a.dur));
-      var f=1-t; walkCamDist=6.2+53.8*f*f;
+      var f=1-t; walkCamDist=7.0+53.0*f*f;
       if(t>=1){
         p._espilArrive=null;
-        walkCamDist=6.2;
+        walkCamDist=7.0;
         espilHideGeoPrompt();
         espilUiRise();
         /* GUIDE HOOKS (joint guide project, 2026-10-21): the guide
@@ -1744,6 +1744,20 @@
         var cx=Math.floor(x/CHUNK_SIZE),cz=Math.floor(z/CHUNK_SIZE);
         for(var i=-1;i<=1;i++)for(var j=-1;j<=1;j++)scan(chunkColliders[(cx+i)+','+(cz+j)]);
       }
+      /* INSTANCE GROUND (entry/camera batch, 2026-11-10): the two
+         instance discs are authored in local space with their
+         floors at y = 0 (interior room floor; arena ground disc,
+         r 26), and entry places the player at y = 0.05 - but the
+         anchor regions hold NO baked records, so the scans above
+         answer 0 there only by coincidence of the empty base, and
+         any collider top the 8 km-south map area contributes would
+         lift the instance surface off its own floor. Declare the
+         instance ground explicitly: inside either disc the surface
+         is exactly 0, ahead of every baked contribution. (The arena
+         seam's in-space tick already clamps the player to the disc;
+         this gives the surface/camera law the same ground.) */
+      var idx=x-0, idz1=z-8000, idz2=z-8400;
+      if(idx*idx+idz1*idz1<=30*30||idx*idx+idz2*idz2<=26*26)return 0;
       return best;
     }
     /* ============ ESPIL DISTRICT BUILD (sample district, 2026-10-16) ============
@@ -2122,6 +2136,62 @@
         return true;
       }catch(e){ return true; }
     }
+    /* RESUME EDGE RULE (Han 2026-11-11): a saved resume point that
+       lies inside a baked building footprint used to dive onto the
+       ROOF (the surface law answers the record's h there - the
+       "resume stall" the marketing captures showed was a normal
+       rooftop landing read as a hang). Han's ruling: resume at the
+       footprint's EDGE on the ground instead. Rule, exactly:
+       - The lookup is the surface law's own store: the baked
+         district records in espilPolyHash, probed with
+         espilPolyProbe (signed distance, negative inside). A point
+         needs relocation only when espilOwnSurfaceY(x, z) > 0,
+         i.e. the dive base would be a roof.
+       - Push out iteratively: probe the bucket at the current
+         point; among records with h > 0 whose signed distance is
+         <= PLAYER_R (the same reach the surface law's COLOR-KEY
+         branch uses to claim the roof), take the one with the
+         LARGEST d (nearest edge); move to that record's closest
+         ring point (probe cx, cz) pushed outward along the probe's
+         outward unit normal by PLAYER_R + 0.45 = 1.0 m - just past
+         the roof-claim reach, so the surface law at the new point
+         answers ground. Re-probe from the new point (a neighbour
+         footprint can bind next); at most 8 pushes.
+       - Accept only a point whose espilOwnSurfaceY is exactly 0
+         and that stays inside cfg.bounds; otherwise return null
+         and the resume proceeds exactly as before (roof included).
+       Out-of-footprint points return null on the first surface
+       check, so ordinary resumes and the guest pinned spawn are
+       untouched. The witness window.__espilLastResumeRelocate is
+       set only when a relocation actually happens. */
+    function espilResumeEdgePoint(x,z){
+      try{
+        if(espilOwnSurfaceY(x,z)<=0)return null;
+        var cfg=espilCityCfg(), b=cfg&&cfg.bounds;
+        var px=x, pz=z;
+        for(var step=0; step<8; step++){
+          if(espilOwnSurfaceY(px,pz)<=0){
+            if(b&&(px<b.x0||px>b.x1||pz<b.z0||pz>b.z1))return null;
+            return {x:px, z:pz};
+          }
+          var pb=espilPolyBucketAt(px,pz); if(!pb)return null;
+          var bind=null, bindD=-1e18;
+          for(var i=0;i<pb.length;i++){
+            var rec=pb[i]; if(!(rec.h>0))continue;
+            var pr=espilPolyProbe(rec,px,pz);
+            if(pr.d<=PLAYER_R&&pr.d>bindD){ bindD=pr.d; bind={rec:rec, pr:pr}; }
+          }
+          if(!bind)return null;
+          px=bind.pr.cx+bind.pr.nx*(PLAYER_R+0.45);
+          pz=bind.pr.cz+bind.pr.nz*(PLAYER_R+0.45);
+        }
+        if(espilOwnSurfaceY(px,pz)<=0){
+          if(b&&(px<b.x0||px>b.x1||pz<b.z0||pz>b.z1))return null;
+          return {x:px, z:pz};
+        }
+        return null;
+      }catch(e){ return null; }
+    }
     function espilEntryStart(){
       var p=walkPlayer; if(!p)return;
       var cfg=espilCityCfg();
@@ -2141,10 +2211,27 @@
           espilEntrySpawn={x:last.x,z:last.z};
           espilShowMapLoader();
           var rtries=0;
+          var resumeDive=function(){
+            /* Resume edge rule (Han 2026-11-11, espilResumeEdgePoint
+               above): a saved point inside a building footprint
+               dives to that footprint's edge at ground level, not
+               onto its roof. Computed here, at dive time, when the
+               district data the lookup needs is loaded; a null
+               answer (out-of-footprint, or no ground point found)
+               resumes at the saved spot exactly as before. */
+            var rp=espilResumeEdgePoint(last.x,last.z);
+            var dx=rp?rp.x:last.x, dz=rp?rp.z:last.z;
+            if(rp){
+              window.__espilLastResumeRelocate={from:{x:last.x,z:last.z},to:{x:dx,z:dz},at:Date.now()};
+              espilEntrySpawn={x:dx,z:dz};
+            }
+            espilHideMapLoader();
+            espilBeginDiveArrival(dx,dz);
+          };
           (function resumeDiveWhenReady(){
             if(!walkPlayer)return;
-            if(espilEntryFullyLoaded()){ espilHideMapLoader(); espilBeginDiveArrival(last.x,last.z); return; }
-            if(++rtries>125){ espilHideMapLoader(); espilBeginDiveArrival(last.x,last.z); return; }
+            if(espilEntryFullyLoaded()){ resumeDive(); return; }
+            if(++rtries>125){ resumeDive(); return; }
             setTimeout(resumeDiveWhenReady,200);
           })();
           return;
@@ -2469,10 +2556,15 @@
        P1 default zoom is now 20.39, which the same bridge maps to the
        new 5.5 m overlay default (DistFromZoom(20.39) = 5.5), again
        unsaturated at both clamp ends.
-       Retied again 2026-11-09 (Han: zoom out a little, same evening):
-       the P1 default zoom is now 20.17 = ZoomFromDist(6.2) on the same
-       curve, and DistFromZoom(20.17) = 6.2 - the identity holds at the
-       new 6.2 m overlay default, again unsaturated at both ends. */
+       Retied again 2026-11-09 (Han: zoom out a little, same
+       evening): the P1 default zoom is now 20.17 = ZoomFromDist(6.2)
+       on the same curve, and DistFromZoom(20.17) = 6.2 - the identity
+       holds at the new 6.2 m overlay default, again unsaturated at
+       both ends.
+       Retied again 2026-11-10 (Han: 줌레벨 좀 줌아웃해): the P1
+       default zoom is now 19.95 = ZoomFromDist(7.0), and
+       DistFromZoom(19.95) = 7.01 - the identity holds at the new
+       7.0 m overlay default, again unsaturated at both ends. */
     function espilP1ZoomFromDist(d){ return Math.max(14.5,Math.min(23,23.44-1.242*Math.log2(Math.max(2,d)))); }
     function espilP1DistFromZoom(z){ return Math.max(2,Math.min(60,Math.pow(2,(23.44-z)/1.242))); }
     function espilP1LngLat(x,z){
@@ -2582,7 +2674,7 @@
       var px=espilPaintAnchor.x, pz=espilPaintAnchor.y;
       var py=(typeof walkPlayer!=='undefined'&&walkPlayer)?walkPlayer.pos.y:0;
       var scanned=0, changed=0, lodFlat=0;
-      var zm=(typeof espilP1!=='undefined'&&espilP1&&typeof espilP1.zoom==='number')?espilP1.zoom:20.17;
+      var zm=(typeof espilP1!=='undefined'&&espilP1&&typeof espilP1.zoom==='number')?espilP1.zoom:19.95;
       for(var i=0;i<feats.length;i++){
         var m=meta[i];
         var bx=px<m.mnx?m.mnx-px:(px>m.mxx?px-m.mxx:0), bz=pz<m.mnz?m.mnz-pz:(pz>m.mxz?pz-m.mxz:0);
@@ -2620,7 +2712,7 @@
     function espilP1PaintUpdate(){
       if(!espilP1.buildingsAdded||!espilP1BldCache||!espilP1.map)return;
       var now=performance.now();
-      var zm=(typeof espilP1.zoom==='number')?espilP1.zoom:20.17;
+      var zm=(typeof espilP1.zoom==='number')?espilP1.zoom:19.95;
       if(espilP1PaintLast){
         var dx=espilPaintAnchor.x-espilP1PaintLast.x, dz=espilPaintAnchor.y-espilP1PaintLast.z;
         if(dx*dx+dz*dz<9&&Math.abs(zm-espilP1PaintLast.zm)<0.05)return; /* anchor still (3 m gate) and zoom steady */
@@ -2790,7 +2882,7 @@
       else document.body.appendChild(el);
       espilP1.mapEl=el;
       try{
-        espilP1.map=new mapboxgl.Map({container:el,style:'mapbox://styles/quadclipse/cmvdcpdor000901sq8xq57eab',center:espilP1LngLat((espilCityCfg().spawn||{x:3,z:31}).x,(espilCityCfg().spawn||{x:3,z:31}).z),zoom:17.3,pitch:52,bearing:0,attributionControl:false,interactive:false,projection:'mercator',maxZoom:23}); /* projection forced (Han 2026-10-17): the designated style declares lambertConformalConic, under which Mapbox skips ALL 3D drawing ("Drawing 3D models for lambertConformalConic projection is not yet implemented") - the custom layer and our extrusions vanished on Han's PC while the mercator stub could not reproduce it. The game's math is Mercator throughout. maxZoom was the Mapbox default 22 (custom cap removed on Han's order); raised to 23 on 2026-11-08 so the close default zoom 21.5 kept wheel headroom above it; the 2026-11-09 default is 20.17 (6.2 m via the bridge; 20.39 = 5.5 m earlier the same day) and 23 stays as the cap. */
+        espilP1.map=new mapboxgl.Map({container:el,style:'mapbox://styles/quadclipse/cmvdcpdor000901sq8xq57eab',center:espilP1LngLat((espilCityCfg().spawn||{x:3,z:31}).x,(espilCityCfg().spawn||{x:3,z:31}).z),zoom:17.3,pitch:52,bearing:0,attributionControl:false,interactive:false,projection:'mercator',maxZoom:23}); /* projection forced (Han 2026-10-17): the designated style declares lambertConformalConic, under which Mapbox skips ALL 3D drawing ("Drawing 3D models for lambertConformalConic projection is not yet implemented") - the custom layer and our extrusions vanished on Han's PC while the mercator stub could not reproduce it. The game's math is Mercator throughout. maxZoom was the Mapbox default 22 (custom cap removed on Han's order); raised to 23 on 2026-11-08 so the close default zoom 21.5 kept wheel headroom above it; the 2026-11-09 default was 20.17 (6.2 m via the bridge; 20.39 = 5.5 m earlier the same day) and the 2026-11-10 default is 19.95 (7.0 m); 23 stays as the cap. */
       }catch(e){ espilP1.failed='init'; window.__espilMapProgress01=1; espilP1Banner('Could not start the Mapbox map. Please check the token.'); return; }
       espilP1.map.on('load',function(){
         /* the loaded style re-imposes its declared projection - force
@@ -2891,7 +2983,7 @@
            both surfaces stay scale-locked. During descent the descent
            envelope leads the zoom (and the target tracks it), unless
            the player has taken the zoom over with the wheel. */
-        if(espilP1.zoom===null){ espilP1.zoom=20.17; espilP1.zoomT=20.17; } /* default framing: 19.3 until 2026-11-08 (Han PC QA 2026-10-18), 21.5 during the 2026-11-08 close framing; Han 2026-11-09 corrected the proportion (MapleStory-like: character ~0.30 of viewport height, never screen-filling) at 20.39 = 5.5 m, then asked for a small step farther the same evening - 20.17 via the bridge = the same 6.2 m physical distance as the overlay default */
+        if(espilP1.zoom===null){ espilP1.zoom=19.95; espilP1.zoomT=19.95; } /* default framing: 19.3 until 2026-11-08 (Han PC QA 2026-10-18), 21.5 during the 2026-11-08 close framing; Han 2026-11-09 corrected the proportion (MapleStory-like: character ~0.30 of viewport height, never screen-filling) at 20.39 = 5.5 m, then asked for a small step farther the same evening - 20.17 via the bridge = 6.2 m; Han 2026-11-10 asked to zoom out a little again - 19.95 via the bridge = the same 7.0 m physical distance as the overlay default */
         var kbFpv=(typeof espilKbFpvActive==='function')&&espilKbFpvActive();
         if(kbFpv){
           /* KONBINIYA FPV (P1 path): while the Konbiniya FPV is
@@ -2908,7 +3000,7 @@
         }else if(walkPlayer._espilArrive&&!espilP1.zoomDrive){
           espilP1.zoom=espilP1.zoomT=espilP1ZoomFromDist(walkCamDist);
         }else{
-          if(!espilP1.zoomDrive)espilP1.zoomT=20.17; /* until the player takes the wheel, the target is the default framing */
+          if(!espilP1.zoomDrive)espilP1.zoomT=19.95; /* until the player takes the wheel, the target is the default framing */
           espilP1.zoom+=(espilP1.zoomT-espilP1.zoom)*0.2;
           if(Math.abs(espilP1.zoomT-espilP1.zoom)<0.001)espilP1.zoom=espilP1.zoomT;
           walkCamDist=espilP1DistFromZoom(espilP1.zoom);
@@ -4796,7 +4888,7 @@
       }
       walkPlayer.velY=0;walkPlayer.onGround=true;
       walkPlayer.jumps=0;walkPlayer.faceY=.5;walkPlayer.bobT=0;
-      walkCamPitch=.84;walkCamDist=6.2; /* Cauldron 48°; distance = the 2026-11-09 zoom-out default */
+      walkCamPitch=.84;walkCamDist=7.0; /* Cauldron 48°; distance = the 2026-11-10 zoom-out default (7.0 m; 6.2 m before) */
       walkPlayer.av.group.position.copy(walkPlayer.pos);
       walkPlayer.av.group.rotation.y=.5;
       /* Snap the follow camera behind the player on entry. */
@@ -6707,9 +6799,11 @@
        rule for the Konbiniya itself matches modules/store.js and
        store-page-link.js: name or 1238 Robson address match, or
        the record anchor within 40 m of the fixed Konbiniya anchor;
-       its own path is untouched (panel Enter click still routes
-       to the store page via store-page-link, keyboard entry still
-       loads its in-world interior under its own name). */
+       its own path is untouched (panel Enter click and keyboard
+       entry alike load its in-world interior under its own name;
+       since Han 2026-11-11 store-page-link no longer intercepts
+       the Konbiniya Enter click - the standalone store page stays
+       reachable via that module's open API). */
     function espilIsKonbiniyaRec(rec){
       if(!rec)return false;
       var nm=rec.name||rec.title||'';
@@ -6872,7 +6966,7 @@
          The Konbiniya itself is the exception (FPV fixed rule): its
          entry zoom target is the street-level FPV zoom, and the P1
          tick drives pitch/zoom from the FPV branch while inside. */
-      if(typeof espilP1!=='undefined'&&espilP1&&espilP1.map){ espilIntPrevZoom=(typeof espilP1.zoomT==='number')?espilP1.zoomT:null; espilP1.zoomT=isKb?ESPIL_KB_P1_ZOOM:18.3; }
+      if(typeof espilP1!=='undefined'&&espilP1&&espilP1.map){ espilIntPrevZoom=(typeof espilP1.zoomT==='number')?espilP1.zoomT:null; espilP1.zoomT=ESPIL_KB_P1_ZOOM; } /* ROUTED-INTERIOR VIEWPOINT UNIFICATION (entry/camera batch, 2026-11-10; Han: 일반 상점건물 들어가면 뷰포인트 이상해, 그냥 똑같이해): the routed entry used to assign 18.3 here while the Konbiniya assigned the FPV street zoom - the one pre-tick framing difference between the two entries. In layer mode the FPV branch of espilP1Tick drives zoomT to ESPIL_KB_P1_ZOOM on the first interior frame either way, but the entry assignment is what the first presented frames ease from, and on any path where the tick's FPV branch has not engaged yet the routed view sat at the wide 18.3 framing the Konbiniya never shows. Both entries now assign the identical FPV zoom, so a routed interior presents the Konbiniya's viewpoint from the first frame. */
       espilInsideRec=rec;
       espilInsideDoor={x:ESPIL_INT.x,z:ESPIL_INT.z+7.3*sz};
       espilInsideOutside={x:p.pos.x,y:p.pos.y,z:p.pos.z};
@@ -9206,19 +9300,19 @@
       /* ZOOM OPERATION (Han 2026-10-17): in Mapbox mode the wheel and
          pinch move the MAP ZOOM target directly, in zoom units (range
          16 to 23 (Mapbox default max was 22, Han 2026-10-17; top raised
-         2026-11-08; the 20.17 default since the 2026-11-09 zoom-out
-         (20.39 earlier that day) sits mid-range,
+         2026-11-08; the 19.95 default since the 2026-11-10 zoom-out
+         (20.17 at 6.2 m before it, 20.39 earlier on 2026-11-09) sits mid-range,
          clear of both clamp edges), 0.28
          per wheel notch) - not a camera distance
          translated through a curve. Outside Mapbox mode the legacy
          distance behaviour is unchanged. */
       if(ESPIL_P1&&typeof espilP1!=='undefined'&&espilP1&&espilP1.map&&espilP1.ready&&!espilP1.failed){
-        if(espilP1.zoomT===null)espilP1.zoomT=20.17;
+        if(espilP1.zoomT===null)espilP1.zoomT=19.95;
         espilP1.zoomT=Math.max(16,Math.min(23,espilP1.zoomT-d*0.28));
         espilP1.zoomDrive=true; /* a wheel during descent takes the zoom over from the envelope */
         return;
       }
-      walkCamDist=Math.max(window.__espilInside?0.4:1.8,Math.min(16,walkCamDist+d)); /* floor 1.8 (was 3) since 2026-11-08 so the default (6.2 since the 2026-11-09 zoom-out) sits inside the wheel range; the inside-store 0.4 floor is unchanged */
+      walkCamDist=Math.max(window.__espilInside?0.4:1.8,Math.min(16,walkCamDist+d)); /* floor 1.8 (was 3) since 2026-11-08 so the default (7.0 since the 2026-11-10 zoom-out) sits inside the wheel range; the inside-store 0.4 floor is unchanged */
     }
     /* Keyboard: tracked only while the map is open (globe keeps its own bindings). */
     document.addEventListener('keydown',function(e){
