@@ -96,7 +96,7 @@
 <div class="chip" id="store-chip">
   <div class="nm" id="chip-name">KONBINIYA JAPAN CENTRE</div>
   <div class="ad" id="chip-addr">1238 Robson St, Vancouver</div>
-  <div class="fp">FIRST PERSON · THE /vancouver PAGE IS PAUSED WHILE YOU ARE HERE</div>
+  <div class="fp">THIRD PERSON · THE /vancouver PAGE IS PAUSED WHILE YOU ARE HERE</div>
 </div>
 <button class="chip" id="close-page" type="button">✕ CLOSE &amp; RETURN</button>
 <div class="chip" id="hint">Press SPACE to pay at the counter</div>
@@ -169,13 +169,86 @@ var PAGE_DIR = (function () {
 /* ---- shared state: the SAME localStorage keys as the pair ---- */
 var STOCK_KEY = 'espil_shop_stock_v1';
 var ONIGIRI = { name: 'Onigiri', price: 2, glyph: '\uD83C\uDF59', initial: 20 };
+/* Banana Milk (2026-11-11, popup restoration): the story Q2 errand
+   item joins this page's counter catalogue so the quest stays
+   completable through the popup. Price Leo 110 = the in-world
+   counter catalogue price (modules/store.js CATALOG, corroborated
+   by modules/panels.js FOOD_PRICE; the monolith panel-stock table
+   ESPIL_SHOP_STOCK.convenience lists 95 - a pre-existing in-world
+   divergence; the quest-verified counter purchase charges 110).
+   Initial stock 10 matches the in-world catalogue. */
+var BANANA = { name: 'Banana Milk', price: 110, glyph: '\uD83C\uDF4C', initial: 10 };
+var GOODS = [ONIGIRI, BANANA];
 function leoBalance() { var v = parseInt(localStorage.getItem('espil_leo_balance'), 10); return isNaN(v) ? 1000 : v; }
 function leoSet(v) { try { localStorage.setItem('espil_leo_balance', String(v)); } catch (e) {} }
+/* The stock key is shared with the pair's in-world store, whose
+   value is a per-item map. This page reads/writes the SAME map:
+   unknown items pass through untouched, and the two goods this
+   page sells default to their catalogue initials when absent. */
 function stock() {
-  try { var s = JSON.parse(localStorage.getItem(STOCK_KEY) || 'null'); if (s && typeof s.Onigiri === 'number') return s; } catch (e) {}
-  return { Onigiri: ONIGIRI.initial };
+  var s = null;
+  try { s = JSON.parse(localStorage.getItem(STOCK_KEY) || 'null'); } catch (e) {}
+  var m = (s && typeof s === 'object' && !Array.isArray(s)) ? s : {};
+  if (typeof m[ONIGIRI.name] !== 'number') m[ONIGIRI.name] = ONIGIRI.initial;
+  if (typeof m[BANANA.name] !== 'number') m[BANANA.name] = BANANA.initial;
+  return m;
 }
 function stockSet(s) { try { localStorage.setItem(STOCK_KEY, JSON.stringify(s)); } catch (e) {} }
+
+/* ---- the buyer's bag: espil_owned_items (2026-11-11 Q2 fix) ----
+   A completed purchase must stock the player's bag, exactly as the
+   in-world shop did. The mirrored shape is the pair's canonical
+   one: espil_owned_items is a flat JSON array of item-NAME strings,
+   one entry per unit owned, so quantity is the occurrence count
+   (modules/panels.js ownedList()/ownedCounts(); modules/monolith.js
+   espilOwnedList()/espilPotionCount()). The in-world grant was one
+   push of the name string per purchase (the shop's espil-guide
+   'bought' event, handled in modules/panels.js); this page grants
+   the same push per unit at the same transaction point as the Leo
+   charge and the stock decrement, so a sold-out or unaffordable
+   attempt - both early returns in buyItem - grants nothing. The
+   parent page reads this shared key live (its bag renders from it),
+   so the item is in the bag the moment the purchase completes. */
+var OWNED_KEY = 'espil_owned_items';
+function grantOwned(item, qty) {
+  try {
+    var a = JSON.parse(localStorage.getItem(OWNED_KEY) || '[]');
+    if (!Array.isArray(a)) a = [];
+    for (var i = 0; i < qty; i++) a.push(String(item.name));
+    localStorage.setItem(OWNED_KEY, JSON.stringify(a));
+  } catch (e) {}
+}
+
+/* ---- purchase bridge to the parent page (2026-11-11) ----
+   A completed purchase must reach the street page's story module
+   (quest Q2's 'buy' step) even though this page is a separate
+   window. Two channels, one contract:
+   (1) postMessage to window.opener with targetOrigin pinned to
+       this page's own origin - message shape:
+       { type: 'espil-store-purchase', store: <slug>, item: <name>,
+         qty: <n>, price: <Leo each> }.
+       The parent validates event.origin === its own origin.
+   (2) an append-only record under PURCHASE_KEY in the shared
+       localStorage; the parent drains it (storage event / focus /
+       poll), so the quest advances even if the opener never hears
+       the message. Records: {item, qty, price, store, at}. */
+var PURCHASE_KEY = 'espil_store_purchase_v1';
+function recordPurchase(item, qty) {
+  try {
+    var a = JSON.parse(localStorage.getItem(PURCHASE_KEY) || '[]');
+    if (!Array.isArray(a)) a = [];
+    a.push({ item: item.name, qty: qty, price: item.price, store: STORE.slug, at: Date.now() });
+    if (a.length > 20) a = a.slice(a.length - 20);
+    localStorage.setItem(PURCHASE_KEY, JSON.stringify(a));
+  } catch (e) {}
+}
+function notifyPurchase(item, qty) {
+  try {
+    if (window.opener && !window.opener.closed) {
+      window.opener.postMessage({ type: 'espil-store-purchase', store: STORE.slug, item: item.name, qty: qty, price: item.price }, location.origin);
+    }
+  } catch (e) {}
+}
 
 /* ---- room design (chosen for this page) ----
    Floor 44 m (x) by 30 m (z), walls 6 m, ceiling 6 m. Every Kenney
@@ -185,7 +258,8 @@ function stockSet(s) { try { localStorage.setItem(STOCK_KEY, JSON.stringify(s));
    laid out on a 3.2 m pitch with 4.4 m walkways between rows. */
 var SCALE = 3;
 var ROOM = { hx: 22, hz: 15, h: 6 };       /* half extents + wall height */
-var EYE = 1.6;                              /* first-person eye height */
+var EYE = 1.6;                              /* camera target height: the former first-person eye height, kept as the third-person look-at anchor (Han 2026-11-11: third person, POV kept the same) */
+var CAM_DIST = 3.4;                         /* third-person follow distance behind the shopper */
 var RADIUS = 0.35;                          /* player collision radius */
 
 var scene, camera, renderer, clock;
@@ -353,6 +427,75 @@ function buildClerk() {
   });
 }
 
+/* ---------- the shopper (2026-11-11: third-person restoration) ----------
+   Han's popup restoration puts a VISIBLE shopper in this window:
+   the camera follows behind the figure instead of sitting in its
+   head. The figure is the Kenney character-employee from this
+   page's own fitout set (in-tree asset, /assets/kenney-mini-market/,
+   with idle/walk clips), loaded FRESH like the clerk - a cloned
+   SkinnedMesh keeps the original scene's skeleton and draws
+   nothing. Displayed at the page's fitout SCALE like every other
+   Kenney model here. It carries no collider: collision stays on
+   the player point, exactly as the first-person build had it. */
+var shopper = null, shopperMixer = null, shopperLoaded = false;
+var shopperActions = {}, shopperAnim = null;
+var camDistUsed = CAM_DIST, camClearNow = true;
+/* follow-camera obstruction test: is a point inside any fitout
+   collider (expanded by a margin)? The player point collides, but
+   the follow camera swings CAM_DIST behind the shopper and could
+   otherwise sit inside a shelf (single-sided meshes render as
+   void from inside). The loop shortens the distance until the
+   camera point is clear. */
+function camInside(x, z) {
+  for (var i = 0; i < colliders.length; i++) {
+    var c = colliders[i];
+    if (x > c.minX - 0.3 && x < c.maxX + 0.3 && z > c.minZ - 0.3 && z < c.maxZ + 0.3) return true;
+  }
+  return false;
+}
+var faceYaw = 0, faceTarget = 0;   /* shopper facing (this model's forward is +z at yaw 0, so facing a travel/camera yaw psi means rotation.y = psi + PI) */
+function buildShopper() {
+  if (!loader) loader = new THREE.GLTFLoader();
+  loadState.pending++;
+  loader.load('/assets/kenney-mini-market/character-employee.glb', function (gltf) {
+    loadState.pending--;
+    var obj = gltf.scene;
+    obj.scale.set(SCALE, SCALE, SCALE);
+    obj.position.set(player.x, 0, player.z);
+    obj.traverse(function (n) { n.frustumCulled = false; });
+    scene.add(obj); loadState.placed++;
+    shopper = obj; shopperLoaded = true; faceYaw = faceTarget = player.yaw + Math.PI;
+    if (gltf.animations && gltf.animations.length) {
+      shopperMixer = new THREE.AnimationMixer(obj);
+      gltf.animations.forEach(function (a) { shopperActions[a.name] = shopperMixer.clipAction(a); });
+      var first = shopperActions['idle'] || gltf.animations[0] && shopperActions[gltf.animations[0].name];
+      if (first) { first.play(); shopperAnim = first.getClip().name; }
+    }
+  }, undefined, function () {
+    loadState.pending--; loadState.failed.push('shopper');
+    try { console.warn('[espil-store-page] shopper model failed to load'); } catch (e) {}
+  });
+}
+function setShopperAnim(name) {
+  if (!shopperMixer || shopperAnim === name) return;
+  var next = shopperActions[name]; if (!next) return;
+  var prev = shopperAnim ? shopperActions[shopperAnim] : null;
+  if (prev) prev.fadeOut(0.15);
+  next.reset().fadeIn(0.15).play();
+  shopperAnim = name;
+}
+function updateShopper(dt) {
+  if (!shopper) return;
+  shopper.position.set(player.x, 0, player.z);
+  var diff = faceTarget - faceYaw;
+  while (diff > Math.PI) diff -= Math.PI * 2;
+  while (diff < -Math.PI) diff += Math.PI * 2;
+  faceYaw += diff * Math.min(1, dt * 12);
+  shopper.rotation.y = faceYaw;
+  setShopperAnim(player.moved ? 'walk' : 'idle');
+  if (shopperMixer) shopperMixer.update(dt);
+}
+
 /* ---------- fitout placements: data-driven (Batch F) ----------
    Every placed object comes from layout.json beside this page
    (format: LAYOUT-SPEC.md). The grid anchors each object at its cell
@@ -407,26 +550,34 @@ function toast(msg) {
 function renderShop() {
   document.getElementById('shop-purse').textContent = 'Leo ' + leoBalance().toLocaleString('en-US');
   var grid = document.getElementById('shop-grid'); grid.innerHTML = '';
-  var n = stock().Onigiri;
-  var card = document.createElement('div'); card.className = 'goods'; card.setAttribute('data-store-onigiri', '1');
-  card.innerHTML = '<div class="tile">' + ONIGIRI.glyph + '</div>' +
-    '<div class="gname">' + ONIGIRI.name + '</div>' +
-    '<div class="gmeta">Leo ' + ONIGIRI.price + ' · Stock ' + n + '</div>';
-  var buy = document.createElement('button'); buy.type = 'button';
-  buy.textContent = n > 0 ? 'Buy at counter' : 'Sold out'; buy.disabled = n <= 0;
-  buy.addEventListener('click', function () {
-    var s = stock();
-    if (s.Onigiri <= 0) { toast('Onigiri is sold out'); return; }
-    var bal = leoBalance();
-    if (bal < ONIGIRI.price) { toast('Not enough Leo for Onigiri'); return; }
-    leoSet(bal - ONIGIRI.price); s.Onigiri -= 1; stockSet(s);
-    var bag = document.getElementById('shop-bag');
-    bag.textContent = (bag.textContent.indexOf('Your bag:') === 0 && bag.textContent !== 'Your bag: ')
-      ? bag.textContent + ', Onigiri' : 'Your bag: Onigiri';
-    toast('Bought Onigiri for Leo ' + ONIGIRI.price + ' (' + s.Onigiri + ' left)');
-    renderShop();
+  GOODS.forEach(function (item) {
+    var n = stock()[item.name];
+    var card = document.createElement('div'); card.className = 'goods';
+    if (item === ONIGIRI) card.setAttribute('data-store-onigiri', '1');
+    if (item === BANANA) card.setAttribute('data-store-banana', '1');
+    card.innerHTML = '<div class="tile">' + item.glyph + '</div>' +
+      '<div class="gname">' + item.name + '</div>' +
+      '<div class="gmeta">Leo ' + item.price + ' · Stock ' + n + '</div>';
+    var buy = document.createElement('button'); buy.type = 'button';
+    buy.textContent = n > 0 ? 'Buy at counter' : 'Sold out'; buy.disabled = n <= 0;
+    buy.addEventListener('click', function () { buyItem(item); });
+    card.appendChild(buy); grid.appendChild(card);
   });
-  card.appendChild(buy); grid.appendChild(card);
+}
+function buyItem(item) {
+  var s = stock();
+  if (s[item.name] <= 0) { toast(item.name + ' is sold out'); return; }
+  var bal = leoBalance();
+  if (bal < item.price) { toast('Not enough Leo for ' + item.name); return; }
+  leoSet(bal - item.price); s[item.name] -= 1; stockSet(s);
+  grantOwned(item, 1);          /* the purchase stocks the buyer's bag (espil_owned_items), as the in-world shop did */
+  var bag = document.getElementById('shop-bag');
+  bag.textContent = (bag.textContent.indexOf('Your bag:') === 0 && bag.textContent !== 'Your bag: ')
+    ? bag.textContent + ', ' + item.name : 'Your bag: ' + item.name;
+  toast('Bought ' + item.name + ' for Leo ' + item.price + ' (' + s[item.name] + ' left)');
+  recordPurchase(item, 1);      /* bridge channel 2: shared record */
+  notifyPurchase(item, 1);      /* bridge channel 1: opener message */
+  renderShop();
 }
 function setShop(open) {
   shopIsOpen = open;
@@ -450,11 +601,14 @@ function stepMove(dt) {
   if (keys['ArrowDown']) f -= 1;
   if (keys['ArrowRight']) r += 1;
   if (keys['ArrowLeft']) r -= 1;
+  player.moved = false;
   if (!f && !r) return;
   var len = Math.hypot(f, r); f /= len; r /= len;
   var s = Math.sin(player.yaw), c = Math.cos(player.yaw);
   var dx = (-s * f + c * r) * run * dt;
   var dz = (-c * f - s * r) * run * dt;
+  player.moved = true;
+  faceTarget = Math.atan2(dx, dz);   /* the shopper faces its travel direction (model forward +z) */
   var nx = Math.max(-ROOM.hx + 0.6, Math.min(ROOM.hx - 0.6, player.x + dx));
   if (!collide(nx, player.z)) player.x = nx;
   var nz = Math.max(-ROOM.hz + 0.6, Math.min(ROOM.hz - 0.6, player.z + dz));
@@ -464,10 +618,11 @@ function stepMove(dt) {
 /* ---------- camera keys (Batch H, Han 2026-11-03) ----------
    Inside the store the ARROW keys walk; A / D move the CAMERA
    (yaw left / right at TURN_RATE); W / S adjust the zoom level
-   (first-person FOV toward fovTarget, clamped to [FOV_MIN,
-   FOV_MAX]). WASD no longer moves the character here. The FOV
-   eases toward fovTarget every frame, which is also what makes
-   touch pinch zoom (bindLook below) smooth. */
+   (FOV toward fovTarget, clamped to [FOV_MIN, FOV_MAX] - the
+   same zoom the first-person build used, kept for the third-
+   person follow camera). WASD no longer moves the character
+   here. The FOV eases toward fovTarget every frame, which is
+   also what makes touch pinch zoom (bindLook below) smooth. */
 function stepCamera(dt) {
   if (keys['KeyA']) player.yaw += TURN_RATE * dt;
   if (keys['KeyD']) player.yaw -= TURN_RATE * dt;
@@ -607,7 +762,7 @@ function init() {
   if ('outputEncoding' in renderer) renderer.outputEncoding = THREE.sRGBEncoding;
   if ('toneMapping' in renderer) { renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0; }
   document.getElementById('view').appendChild(renderer.domElement);
-  buildLights(); buildRoom(); buildCounter(); loadLayout();
+  buildLights(); buildRoom(); buildCounter(); buildShopper(); loadLayout();
   clock = new THREE.Clock();
   bindLook(renderer.domElement);
   bindStick();
@@ -648,8 +803,34 @@ function init() {
     var dt = Math.min(clock.getDelta(), 0.05);
     if (clerkMixer) clerkMixer.update(dt);
     if (!shopIsOpen) { stepMove(dt); stepCamera(dt); }
-    camera.position.set(player.x, EYE, player.z);
-    camera.rotation.y = player.yaw; camera.rotation.x = player.pitch;
+    updateShopper(dt);
+    /* third-person follow camera (2026-11-11): the camera rides
+       CAM_DIST behind the shopper along the look yaw, lifted by
+       the drag pitch, and looks at the shopper's chest height.
+       POV values kept from the first-person build where they
+       translate: FOV 72 default with the same W/S + pinch zoom
+       range [30, 95], A/D turn rate pi/2, EYE 1.6 as the height
+       anchor. The follow distance shortens when fitout geometry
+       blocks the full CAM_DIST (camInside), and the position is
+       clamped inside the room, so neither shelves nor walls
+       swallow the camera. */
+    var cp = Math.cos(player.pitch), sp = Math.sin(player.pitch);
+    var backX = Math.sin(player.yaw), backZ = Math.cos(player.yaw);
+    var dUse = CAM_DIST;
+    while (dUse > 0.5) {
+      if (!camInside(player.x + backX * dUse * cp, player.z + backZ * dUse * cp)) break;
+      dUse -= 0.25;
+    }
+    camDistUsed = dUse;
+    var camX = player.x + backX * dUse * cp;
+    var camZ = player.z + backZ * dUse * cp;
+    var camY = EYE + 0.55 + CAM_DIST * sp;
+    camX = Math.max(-ROOM.hx + 0.5, Math.min(ROOM.hx - 0.5, camX));
+    camZ = Math.max(-ROOM.hz + 0.5, Math.min(ROOM.hz - 0.5, camZ));
+    camY = Math.max(0.35, Math.min(ROOM.h - 0.25, camY));
+    camera.position.set(camX, camY, camZ);
+    camClearNow = !camInside(camX, camZ);
+    camera.lookAt(player.x, EYE * 0.85, player.z);
     var d = Math.hypot(player.x - STORE.counter.x, player.z - STORE.counter.z);
     counterNear = d < 3.4;
     hintEl.classList.toggle('on', counterNear && !shopIsOpen);
@@ -668,8 +849,9 @@ init();
 
 /* probe/diagnostic surface */
 window.__storePage = {
-  debugSetPose: function (x, z, yaw) {   /* probes only: jump the FP camera */
+  debugSetPose: function (x, z, yaw) {   /* probes only: jump the shopper (camera follows) */
     player.x = x; player.z = z; if (typeof yaw === 'number') player.yaw = yaw;
+    faceTarget = faceYaw = player.yaw + Math.PI;
   },
   debugOnly: function (idx) {              /* probes only: show just scene child idx (-1 = all) */
     scene.children.forEach(function (o, i) { o.visible = (idx < 0 || i === idx); });
@@ -688,6 +870,10 @@ window.__storePage = {
     return {
       store: STORE.slug, x: +player.x.toFixed(2), z: +player.z.toFixed(2),
       yaw: +player.yaw.toFixed(3), pitch: +player.pitch.toFixed(3), eye: EYE,
+      camMode: 'third', camDist: CAM_DIST, camDistUsed: +camDistUsed.toFixed(2), camClear: camClearNow,
+      camPos: [+camera.position.x.toFixed(2), +camera.position.y.toFixed(2), +camera.position.z.toFixed(2)],
+      shopperLoaded: shopperLoaded, shopperAnim: shopperAnim,
+      bananaMilk: stock()[BANANA.name], purchaseKey: PURCHASE_KEY,
       fov: +camera.fov.toFixed(1), fovTarget: +player.fovTarget.toFixed(1),
       counterNear: counterNear, shopOpen: shopIsOpen,
       useVisible: (function () { var u = document.getElementById('use-btn'); return !!u && u.classList.contains('on'); })(),
