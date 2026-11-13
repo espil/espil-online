@@ -604,7 +604,7 @@
     '#espil-arena-hud{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:9960;background:rgba(12,8,4,.82);border:1px solid rgba(242,182,60,.5);border-radius:999px;color:#ffe9b0;font-size:13px;padding:6px 14px;display:none;font-family:inherit}',
     '#espil-arena-hud.open{display:block}',
     '#espil-arena-hud button{background:none;border:1px solid rgba(242,182,60,.5);color:#ffe9b0;border-radius:999px;padding:2px 9px;margin-left:8px;cursor:pointer;font-size:12px;font-family:inherit}',
-    '#espil-arena-prompt{position:fixed;bottom:118px;left:50%;transform:translateX(-50%);z-index:9960;background:rgba(12,8,4,.85);border:1px solid rgba(242,182,60,.55);border-radius:10px;color:#ffe9b0;font-size:13.5px;padding:8px 14px;display:none;cursor:pointer;font-family:inherit}',
+    '#espil-arena-prompt{position:fixed;bottom:188px;left:50%;transform:translateX(-50%);z-index:9960;background:rgba(12,8,4,.85);border:1px solid rgba(242,182,60,.55);border-radius:10px;color:#ffe9b0;font-size:13.5px;padding:8px 14px;display:none;cursor:pointer;font-family:inherit}',
     '#espil-arena-prompt.open{display:block}',
     '#espil-arena-banner{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:9965;color:#ffd977;font-size:20px;font-weight:700;text-shadow:0 2px 12px rgba(0,0,0,.8);display:none;font-family:inherit;pointer-events:none}',
     '#espil-arena-banner.open{display:block}',
