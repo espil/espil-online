@@ -68,6 +68,11 @@
      chain (Han decisions rounds 3-4, 2026-11-09/10) is a world
      feature whose NPCs stand in the city from arrival on, so it
      arms with the arrival bundle like the other world features.
+   - vehicles: the same seams as npcs - the car system (Han
+     decisions 2026-11-09 + the B-key ruling 2026-11-10) is a
+     world feature whose dealership marker stands in the city
+     from arrival on, so it arms with the arrival bundle like
+     the other world features.
    Every import is fire-and-forget with a console warning on
    failure; a failed lazy load never breaks the page.
    __espilLazyState() reports what has landed (rig probes). */
@@ -117,7 +122,7 @@
   window.addEventListener('espil-dive-start', function () { load('tutorial.js'); });
   window.addEventListener('espil-guide', function (e) {
     var d = e && e.detail; if (!d) return;
-    if (d.type === 'arrival') { socialBundle(); load('npcs.js'); load('monsters.js'); load('tiles3d.js'); load('cashshop.js'); load('arena.js'); load('story.js'); }
+    if (d.type === 'arrival') { socialBundle(); load('npcs.js'); load('monsters.js'); load('tiles3d.js'); load('cashshop.js'); load('arena.js'); load('story.js'); load('vehicles.js'); }
     if (d.type === 'interior') { storePair(); load('panels.js'); }
   });
   window.addEventListener('espil-party-frame', socialBundle);
@@ -185,7 +190,7 @@
      interception must be resident before the Enter click. 600 ms,
      and each arm is a no-op once loaded. */
   setInterval(function () {
-    if (document.body && document.body.classList.contains('in-map')) { socialBundle(); load('npcs.js'); load('monsters.js'); load('tiles3d.js'); load('cashshop.js'); load('arena.js'); load('story.js'); }
+    if (document.body && document.body.classList.contains('in-map')) { socialBundle(); load('npcs.js'); load('monsters.js'); load('tiles3d.js'); load('cashshop.js'); load('arena.js'); load('story.js'); load('vehicles.js'); }
     if (window.__espilInside) storePair();
     var bp = document.getElementById('bldg-panel');
     if (bp && bp.getAttribute('aria-hidden') === 'false') load('store-page-link.js');

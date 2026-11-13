@@ -1,0 +1,54 @@
+ASSET IDENTIFICATION
+--------------------
+File:            sedan.glb
+What it is:      "Sedan" model from Car Kit (3.1) - a generic, unbranded
+                 low-poly compact sedan. It is NOT a Honda Civic model.
+Author:          Kenney (Kenney Vleugels)
+Publisher site:  https://kenney.nl/assets/car-kit
+Pack homepage:   https://kenney.nl/assets/car-kit
+License:         Creative Commons Zero (CC0) 1.0 Universal
+                 http://creativecommons.org/publicdomain/zero/1.0/
+Downloaded:      2026-11-09
+Retrieved via:   GitHub mirror of the official pack (the mirror carries the
+                 pack unmodified, including this original License.txt):
+                 https://github.com/Arslan12216775/kenney_car-kit
+                 (file path: Models/GLB format/sedan.glb)
+Note:            kenney.nl's own zip link returned HTTP 403 at retrieval
+                 time (the site rotates its media URLs); the file obtained
+                 is the pack's original sedan.glb - its vertex count (3,184)
+                 matches independent catalogue listings of Kenney's
+                 sedan.glb (e.g. Cinevva's CC0 library).
+
+CC0 in one line: the content may be used for personal, educational, and
+commercial purposes; attribution is appreciated but NOT required.
+
+----------------------------------------------------------------------
+ORIGINAL LICENSE TEXT FROM THE PACK (Car Kit 3.1, reproduced verbatim)
+----------------------------------------------------------------------
+
+Car Kit (3.1)
+
+Created/distributed by Kenney (www.kenney.nl)
+Creation date: 02-04-2026 14:03
+
+	------------------------------
+
+License: (Creative Commons Zero, CC0)
+http://creativecommons.org/publicdomain/zero/1.0/
+
+You can use this content for personal, educational, and commercial purposes.
+
+Support by crediting 'Kenney' or 'www.kenney.nl' (this is not a requirement)
+
+	------------------------------
+
+• Website : www.kenney.nl
+• Donate  : www.kenney.nl/donate
+
+• Patreon : patreon.com/kenney
+
+Follow on social media for updates:
+
+• Twitter:	 twitter.com/KenneyNL
+• BlueSky:	 kenney.bsky.social
+• Instagram: instagram.com/Kenney_nl
