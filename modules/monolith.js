@@ -5337,15 +5337,22 @@
        points are granted so the tree works today.
        ================================================================ */
     var MOVE_ORDER=['punch','kick','throw','defense','dash','spin','wave','art'];
+    /* FIX-7 item 6 (Han 2026-11-12): every skill's effect RANGE
+       widened +50% (punch 2.2->3.3, kick 2.8->4.2, throw 8->12,
+       dash 3.4->5.1, spin 2.6->3.9, wave 9->13.5, art base 3->4.5;
+       the Weapon Art family forms in ESPIL_ART_MOVES widened the
+       same way). Damage / cooldown / arc / MP untouched - ranges
+       are Han's feel call; defense has no spatial effect and is
+       unchanged. */
     var MOVES={
       punch:{name:'Punch',key:'Q',icon:'👊',color:0xbfe9ff,css:'#bfe9ff',
-        dmg:8,range:2.2,cd:.45,arc:1.9,y:1.05,
+        dmg:8,range:3.3,cd:.45,arc:1.9,y:1.05,
         desc:'A quick punch.'},
       kick:{name:'Kick',key:'W',icon:'🦵',color:0x7dfce6,css:'#7dfce6',
-        dmg:13,range:2.8,cd:.65,arc:2.2,y:.6,
+        dmg:13,range:4.2,cd:.65,arc:2.2,y:.6,
         desc:'A heavy kick. Slower, longer reach.'},
       throw:{name:'Quote Tool',key:'E',icon:'「」',art:'quote',color:0xffd76e,css:'#ffd76e',
-        dmg:10,range:8,cd:.9,arc:1.6,y:1.3,proj:true,
+        dmg:10,range:12,cd:.9,arc:1.6,y:1.3,proj:true,
         desc:'Quote a tool from your knowledge. It flies forth and bursts on arrival.'},
       defense:{name:'Defense',key:'R',icon:'🛡️',color:0x9fe8b3,css:'#9fe8b3',
         dmg:0,range:0,cd:2.5,arc:0,y:1.0,guard:true,
@@ -5355,16 +5362,16 @@
          weapon family in the weapon tree). MP cost stays 0 - Han
          decision D7 (MP costs) is undecided; do not invent costs. */
       dash:{name:'Dash Strike',key:'A',icon:'💨',art:'dash',color:0x9fd8ff,css:'#9fd8ff',
-        dmg:11,range:3.4,cd:.8,arc:1.7,y:1.0,dashMove:true,
+        dmg:11,range:5.1,cd:.8,arc:1.7,y:1.0,dashMove:true,
         desc:'Dash forward and strike whatever you reach.'},
       spin:{name:'Spinning Strike',key:'S',icon:'🌀',art:'spin',color:0x7dfce6,css:'#7dfce6',
-        dmg:15,range:2.6,cd:1.4,arc:6.3,y:.9,
+        dmg:15,range:3.9,cd:1.4,arc:6.3,y:.9,
         desc:'A full-circle strike that hits everything around you.'},
       wave:{name:'Ranged Wave',key:'D',icon:'🌊',art:'wave',color:0x6fb7ff,css:'#6fb7ff',
-        dmg:12,range:9,cd:1.1,arc:1.2,y:1.2,proj:true,
+        dmg:12,range:13.5,cd:1.1,arc:1.2,y:1.2,proj:true,
         desc:'A wave of force down the facing line.'},
       art:{name:'Weapon Art',key:'F',icon:'⚔️',art:'art',color:0xffd76e,css:'#ffd76e',
-        dmg:0,range:3,cd:2.2,arc:2.4,y:1.05,
+        dmg:0,range:4.5,cd:2.2,arc:2.4,y:1.05,
         desc:'Your equipped weapon\'s signature art. Its form follows the weapon family; unlocked per family in the weapon tree.'}
     };
     /* Skill bar slots, QWER row then ASDF row. Locked slots show a lock;
@@ -8676,15 +8683,15 @@
     function espilTreeOnMove(d){ if(!(d>0))return; var t=espilTrees(); t.prof.shoes=(t.prof.shoes||0)+d; espilTreesMark(); }
     /* Weapon Art forms, one per family (Item C). */
     var ESPIL_ART_MOVES={
-      sword:{name:'Crescent Slash',icon:'⚔️',art:'art',color:0xffd76e,css:'#ffd76e',dmg:22,range:3.2,cd:2.0,arc:2.6,y:1.05,desc:'A wide crescent cut of the blade.'},
-      bow:{name:'Piercing Shot',icon:'🏹',art:'art',color:0x7dfce6,css:'#7dfce6',dmg:20,range:12,cd:2.2,arc:.8,y:1.25,proj:true,desc:'A shot that pierces down the facing line.'},
-      staff:{name:'Quote Burst',icon:'✨',art:'art',color:0xc9a6ff,css:'#c9a6ff',dmg:24,range:4.2,cd:2.4,arc:6.3,y:1.1,desc:'A burst of quoted force in every direction.'},
-      dagger:{name:'Flurry',icon:'🗡️',art:'art',color:0xbfe9ff,css:'#bfe9ff',dmg:18,range:2.4,cd:1.4,arc:1.8,y:1.0,desc:'A flurry of close cuts.'}
+      sword:{name:'Crescent Slash',icon:'⚔️',art:'art',color:0xffd76e,css:'#ffd76e',dmg:22,range:4.8,cd:2.0,arc:2.6,y:1.05,desc:'A wide crescent cut of the blade.'},
+      bow:{name:'Piercing Shot',icon:'🏹',art:'art',color:0x7dfce6,css:'#7dfce6',dmg:20,range:18,cd:2.2,arc:.8,y:1.25,proj:true,desc:'A shot that pierces down the facing line.'},
+      staff:{name:'Quote Burst',icon:'✨',art:'art',color:0xc9a6ff,css:'#c9a6ff',dmg:24,range:6.3,cd:2.4,arc:6.3,y:1.1,desc:'A burst of quoted force in every direction.'},
+      dagger:{name:'Flurry',icon:'🗡️',art:'art',color:0xbfe9ff,css:'#bfe9ff',dmg:18,range:3.6,cd:1.4,arc:1.8,y:1.0,desc:'A flurry of close cuts.'}
     };
     function espilArtMoveDef(){
       var fam=espilFamilyEquipped();
       if(fam&&ESPIL_ART_MOVES[fam])return ESPIL_ART_MOVES[fam];
-      return {name:'Weapon Art',icon:'⚔️',art:'art',color:0xffd76e,css:'#ffd76e',dmg:6,range:2.4,cd:2.2,arc:2.2,y:1.05,desc:'Equip a weapon to give the art its form.'};
+      return {name:'Weapon Art',icon:'⚔️',art:'art',color:0xffd76e,css:'#ffd76e',dmg:6,range:3.6,cd:2.2,arc:2.2,y:1.05,desc:'Equip a weapon to give the art its form.'};
     }
     var ESPIL_FAM_NAME={sword:'Sword',staff:'Staff',bow:'Bow',dagger:'Dagger'};
     var ESPIL_WEAPON_NODES=function(fam){
@@ -9161,6 +9168,16 @@
     }
     function espilKkSetup(av,model,clips){
       espilKkHideProps(model);
+      /* FIX-7 item 3 (Han 2026-11-12, measured on the rig): the
+         Rogue GLB is authored facing +z, but the avatar facing law
+         (group rotation.y = faceY) expects the model's front on
+         its local -z - so the guest ran VISUALLY BACKWARD (rig
+         bone measurement: ankle->toe direction vs code forward,
+         dot = -0.97). buildWalkerAvatar has always carried the
+         same PI counter-rotation for the masters' +z bodies; the
+         placeholder setup missed it. Rotate the model, never the
+         group: physics, plates and shadows stay put. */
+      model.rotation.y=Math.PI;
       model.traverse(function(o){ if(o.isMesh)o.castShadow=true; });
       /* Measure in the bind pose, scale to the player height, then
          ground the feet exactly (Box3 discipline copied from

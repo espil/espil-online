@@ -17,6 +17,15 @@
    scene's own hemisphere light (intensity .18 + .8 * daylight in
    the world's cycle), so the glow tracks the rendered darkness
    exactly, whatever the player's local clock says.
+   FIX-7 item 5 (Han 2026-11-12, renewing his 2026-10-21 max-z
+   dark-screen order): the W2 removal of the screen overlay is
+   superseded for the SCREEN - at night only the character was
+   darkening while the screen did not. #espil-daynight is back as
+   a plain black screen at the maximum z-index (2147483647),
+   pointer-events none, opacity on the unchanged local-clock
+   curve (opacityFor below). It is Han's specified simple screen,
+   not the purged day/night filter system: no colour grading, no
+   per-layer dimming - the glow system above is untouched.
    Interiors are EXEMPT (round 3 #7: interiors always bright):
    while window.__espilInside is set the factor is forced to 0,
    so no glow is applied while the player is inside, and interior
@@ -38,6 +47,33 @@
   }
   window.__espilDayNightOpacity = opacityFor;
   var forcedF = null; /* 0..1 override (probe seam) */
+
+  /* FIX-7 item 5: the dark screen itself. Created once, kept at
+     the maximum z-index so every layer of UI sits under it and
+     the whole screen darkens uniformly; pointer-events none so
+     it never intercepts input. Opacity is written only when it
+     moves (>= 0.01) - the 1 s tick below keeps dawn/dusk ramps
+     smooth without per-frame work. */
+  var dnEl = null, dnOp = -1;
+  function dayNightScreen() {
+    if (!document.body) return;
+    if (!dnEl || !dnEl.isConnected) {
+      dnEl = document.getElementById('espil-daynight');
+      if (!dnEl) {
+        dnEl = document.createElement('div');
+        dnEl.id = 'espil-daynight';
+        document.body.appendChild(dnEl);
+      }
+      dnEl.style.cssText = 'position:fixed;inset:0;background:#000;' +
+        'pointer-events:none;z-index:2147483647;opacity:0;';
+      dnOp = -1;
+    }
+    var op = opacityFor(new Date());
+    if (Math.abs(op - dnOp) >= 0.01) {
+      dnOp = op;
+      dnEl.style.opacity = String(op);
+    }
+  }
 
   var GLOW = null; /* THREE.Color, built lazily */
   var world = null;      /* { scene, hemi, walls:Map } */
@@ -96,6 +132,7 @@
     return Math.max(0, Math.min(1, dl));
   }
   function apply() {
+    dayNightScreen(); /* FIX-7 item 5: independent of the glow early-return below */
     var ins = insideNow();
     var w = resolveWorld();
     var f;
@@ -144,5 +181,8 @@
   };
   apply();
   setInterval(apply, 30000);
-  setInterval(function () { if (insideNow() !== appliedInside) apply(); }, 1000);
+  setInterval(function () {
+    dayNightScreen(); /* FIX-7 item 5: 1 s screen tick (cheap, change-gated) */
+    if (insideNow() !== appliedInside) apply();
+  }, 1000);
 })();

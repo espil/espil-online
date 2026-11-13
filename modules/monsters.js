@@ -1,8 +1,10 @@
 /* __espilMonsters v1 - survival-game monsters + zones (Han 2026-11-06).
    LOCAL, Vancouver only. No network, no GLB: monsters are 2D animated
-   sprite billboards (THREE.Sprite) - the Asset line replaces the
-   placeholder frames through the same KINDS table, so the art swap is
-   data-only. Production recycles shared bases: a kind is a base x a
+   sprite frames on upright yaw-only planes (FIX-7 item 7, Han
+   2026-11-12; nameplate/HP stay THREE.Sprite billboards) - the
+   Asset line replaces the placeholder frames through the same
+   KINDS table, so the art swap is data-only. Production recycles
+   shared bases: a kind is a base x a
    texture tint x a scale, so kinds multiply without new geometry.
    GRADES follow the Zealandia 8-colour ladder (white/yellow/green/
    blue/purple/red/gold/pink, rarity honestly begins at blue).
@@ -680,9 +682,25 @@
        rat set (393x361) uses w 1.2 against the crawler h 1.1 */
     var cfg0 = spriteCfgFor(kind);
     if (cfg0 && cfg0.w && cfg0.h) { w = cfg0.w * kind.scale; h = cfg0.h * kind.scale; }
-    var body = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: kindTexture(kind), transparent: true, depthWrite: false
-    }));
+    /* FIX-7 item 7 (Han 2026-11-12): the body is an UPRIGHT PLANE,
+       not a THREE.Sprite. A Sprite is a spherical billboard - it
+       pitches with the camera, so at the game's steep view angle
+       the monster presented its full frontal card while every
+       real object around it was foreshortened, and the farther it
+       was the more the undistorted card read as flat 2D pasted on
+       the world. The plane stays vertical in the world and only
+       YAWS toward the player (set in the tick), so its height
+       foreshortens with pitch and distance exactly like a real
+       upright object and its feet stay planted on the contact
+       shadow. Monsters stay 2D sprite ART (canon) - frames, tint,
+       flash and fades all ride material.map / color / opacity,
+       which behave identically on MeshBasicMaterial. The
+       nameplate and HP bar stay Sprites (UI furniture). */
+    var body = new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({
+        map: kindTexture(kind), transparent: true, depthWrite: false,
+        side: THREE.DoubleSide
+      }));
     body.scale.set(w, h, 1);
     var plate = new THREE.Sprite(new THREE.SpriteMaterial({
       map: nameplateTexture(kind), transparent: true, depthWrite: false
@@ -735,6 +753,10 @@
         if (s.parent) s.parent.remove(s);
         if (s.material) s.material.dispose();
       });
+      /* the body plane owns its geometry (FIX-7 item 7); the two
+         Sprites share the renderer's static geometry - never
+         dispose theirs */
+      if (m.body && m.body.isMesh && m.body.geometry) m.body.geometry.dispose();
       if (m.shadow) {
         if (m.shadow.parent) m.shadow.parent.remove(m.shadow);
         m.shadow.geometry.dispose(); m.shadow.material.dispose();
@@ -914,6 +936,9 @@
       stepSprite(m, dt, sKey);
     }
     m.body.position.set(m.x, m.h / 2 + bobY, m.z);
+    /* FIX-7 item 7: yaw the upright body plane toward the player
+       (never pitch it - that is the whole point of the plane). */
+    if (pp) m.body.rotation.y = Math.atan2(dx, dz);
     m.plate.position.set(m.x, m.h + 0.75 + bobY, m.z);
     m.hpSprite.position.set(m.x, m.h + 0.42 + bobY, m.z);
     m.shadow.position.set(m.x, 0.03, m.z);
