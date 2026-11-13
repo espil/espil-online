@@ -776,6 +776,44 @@
         });
         list.appendChild(b);
       });
+      /* Fix batch 7 item 1 (Han 2026-11-12): restore the reel's
+         default enlargement of the currently centred option. The
+         original reel enlarged its centred entry through pair.css's
+         .city-name.is-centered, driven by monolith's
+         updateReelCenter() on scroll and by a startup centring
+         call - but that driver only ever toggles monolith's own
+         buttons, which this layer hides. The flow's own buttons
+         therefore never centred except on click, and the selected
+         option stayed at the base size. Track the centre for the
+         flow's buttons instead: the button nearest the list's
+         vertical centre carries .is-centered (and with it the
+         enlarged font), at rest on arrival and on every scroll,
+         exactly the original reel's behaviour. Scoped to
+         .espil-city-btn and to the city step, so the auth lists
+         that share #city-status are untouched. */
+      var flowReelFrame = 0;
+      function updateFlowReelCenter() {
+        flowReelFrame = 0;
+        if (step !== 'city') return;
+        var btns = list.querySelectorAll('.espil-city-btn');
+        if (!btns.length) return;
+        var lr = list.getBoundingClientRect();
+        var centre = lr.top + lr.height / 2;
+        var closest = null, dist = Infinity;
+        for (var n = 0; n < btns.length; n++) {
+          var r = btns[n].getBoundingClientRect();
+          var d = Math.abs(r.top + r.height / 2 - centre);
+          if (d < dist) { dist = d; closest = btns[n]; }
+        }
+        for (var m = 0; m < btns.length; m++) {
+          btns[m].classList.toggle('is-centered', btns[m] === closest);
+        }
+      }
+      list.addEventListener('scroll', function () {
+        if (!flowReelFrame) flowReelFrame = requestAnimationFrame(updateFlowReelCenter);
+      }, { passive: true });
+      requestAnimationFrame(updateFlowReelCenter);
+      setTimeout(updateFlowReelCenter, 350);
     }, 300);
     /* pin picks for non-Vancouver cities: capture-phase, so
        monolith's own pin handler (which would refuse them) never
@@ -973,6 +1011,13 @@
         return;
       }
       try { localStorage.setItem('espil_username', v); } catch (e) {}
+      /* Fix batch 7 item 2 (Han 2026-11-12): stamp this tab's
+         session with the name the guest just gave HERE, so the
+         game page can tell "named on the landing a moment ago"
+         apart from any older stored name and never ask again.
+         sessionStorage rides the same-tab dive exactly like the
+         espil_pending_city handoff mark does. */
+      try { sessionStorage.setItem('espil_guest_named_v1', v); } catch (e) {}
       try {
         var rec = { gender: guestGender, ts: Date.now() };
         if (window.__espilPendingLook && typeof window.__espilPendingLook === 'object') rec.look = window.__espilPendingLook;
@@ -1178,6 +1223,67 @@
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watch);
     else watch();
+  } catch (e) {}
+})();
+
+/* __espilGuestNameOnce v1 - GUEST NAME ASKED ONCE (Han 2026-11-12,
+   fix batch 7 item 2). The landing Guest step already collected the
+   name (and the character choice): guestGo() stores the name in
+   espil_username and stamps this tab's sessionStorage with
+   espil_guest_named_v1. But the game page's character gate still
+   presented its own #char-name input, empty - so the guest was
+   asked for the name a second time (measured on the rig: input
+   visible + empty while espil_username already held the name).
+   On a handoff arrival carrying that stamp, and only there, the
+   input is pre-filled with the landing name (its consumers -
+   presence's join name above all - read the input first) and
+   hidden, so it is never presented as a question. The gender
+   cards keep their landing pre-selection untouched. Signed-in
+   arrivals (a server-marked session record) and direct game-page
+   arrivals (no handoff mark, no stamp) keep today's behaviour
+   exactly, including a returning guest's freedom to type a new
+   name at the gate. The stamp is consumed on application. */
+(function () {
+  'use strict';
+  try {
+    if (window.__ESPIL_GAME_PAGE !== true) return;
+    if (!document.documentElement.classList.contains('espil-handoff')) return;
+    var named = '';
+    try { named = (sessionStorage.getItem('espil_guest_named_v1') || '').trim(); } catch (e) {}
+    if (!named) return;
+    var signedIn = false;
+    try {
+      var rec = JSON.parse(localStorage.getItem('espil_session_v1') || 'null');
+      signedIn = !!(rec && rec.id && rec.server === true);
+    } catch (e) {}
+    if (signedIn) return;
+    function apply() {
+      var inp = document.getElementById('char-name');
+      if (!inp) return false;
+      inp.value = named;
+      inp.style.display = 'none';
+      inp.setAttribute('data-espil-guest-named', '1');
+      try { sessionStorage.removeItem('espil_guest_named_v1'); } catch (e) {}
+      return true;
+    }
+    if (!apply()) {
+      var ticks = 0;
+      var iv = setInterval(function () {
+        ticks++;
+        if (apply() || ticks > 40) clearInterval(iv);
+      }, 250);
+    }
+    /* The pair markup is static, so the pass above normally lands
+       before the gate opens; re-apply on the panel's own open in
+       case anything re-shows the bare input. */
+    var panel = document.getElementById('char-custom');
+    if (panel) {
+      try {
+        new MutationObserver(function () {
+          if (panel.getAttribute('aria-hidden') === 'false') apply();
+        }).observe(panel, { attributes: true, attributeFilter: ['aria-hidden'] });
+      } catch (e) {}
+    }
   } catch (e) {}
 })();
 
