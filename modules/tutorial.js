@@ -16,6 +16,17 @@
 (function () {
   'use strict';
 
+  /* FIX BATCH 7 item 4 (Han 2026-11-12): ALL guides OFF except
+     the movement guide (the dive guide in entry-flow.js, which
+     is a different component and stays on). This tutorial never
+     presents: start() is the single entry every presentation
+     funnels through (the boot watcher and the Settings replay),
+     so gating it keeps the chip dark and every step silent, and
+     wireReplay() adds no replay button. The state machinery
+     (keys, __espilTutorialState) is untouched - one flag
+     restores the tutorial. */
+  var GUIDES_OFF = true;
+
   var DONE_KEY = 'espil_tut_done_v1';
   var STEP_KEY = 'espil_tut_step_v1';
 
@@ -280,6 +291,7 @@
     show();
   }
   function start(fromStep) {
+    if (GUIDES_OFF) return;   /* guides off: the tutorial never starts */
     if (started && step >= 0) return;
     started = true;
     step = (typeof fromStep === 'number' && fromStep >= 0 && fromStep < STEPS.length) ? fromStep : 0;
@@ -405,6 +417,7 @@
 
   /* ---- Settings replay button (where the old Guide button sat) ---- */
   function wireReplay() {
+    if (GUIDES_OFF) return;   /* guides off: no tutorial replay button */
     if (document.getElementById('set-tutorial')) return;
     var lo = document.getElementById('set-logout');
     if (!lo || !lo.parentNode) return;

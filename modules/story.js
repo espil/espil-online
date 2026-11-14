@@ -67,7 +67,15 @@
 
    Hooks: window.__espilStoryState() mirrors
    window.__espilStory.state(); window.__espilStory carries
-   the actions + probe hooks. */
+   the actions + probe hooks.
+
+   FIX BATCH 7 item 4 (Han 2026-11-12): ALL guides OFF except
+   the movement guide (the dive guide in entry-flow.js, not
+   this module). This module's guide layer - the objective
+   chip (#espil-story-obj), the step/completion banner
+   (#espil-story-banner) and the Q6 glowing pickup marker -
+   never presents; see the GUIDES_OFF gate below. Quest
+   function (dialogue, prompts, state, rewards) is unchanged. */
 (function () {
   'use strict';
   if (window.__espilStoryState) return;
@@ -91,6 +99,13 @@
   var Q7_TITLE = '다운타운의 수호자';   /* DRAFT title record (local) */
   var ERRAND_ITEM = 'Banana Milk';    /* Q2 designated store item */
   var Q3_ITEM = 'Cup Ramen';          /* Q3 recovery item reward */
+
+  /* Guides off (Han 2026-11-12, fix batch 7 item 4): the guide
+     layer's three presentation entries - renderChip(), banner()
+     and the Q6 pickup marker's visible flag - check this flag
+     first and never present while it is set. One flag restores
+     the guides; nothing else in the module reads it. */
+  var GUIDES_OFF = true;
 
   var GALLERY = { x: 3, z: 33 };
   var CLOCK = { x: 861, z: -189 };          /* Gastown Steam Clock */
@@ -692,6 +707,7 @@
     document.body.appendChild(su);
   }
   function banner(text) {
+    if (GUIDES_OFF) return;   /* guides off: the banner never presents */
     buildDom();
     var bn = $('espil-story-banner'); if (!bn) return;
     bn.textContent = text; bn.classList.add('open');
@@ -744,6 +760,12 @@
     return '';
   }
   function renderChip() {
+    if (GUIDES_OFF) {
+      /* guides off: the objective chip never presents */
+      var el0 = $('espil-story-obj');
+      if (el0) el0.classList.remove('open');
+      return;
+    }
     buildDom();
     var el = $('espil-story-obj');
     if (!el) return;
@@ -959,8 +981,10 @@
         }
       }
     }
-    /* Q6 pickup prompt surface */
-    if (pickupGroup) pickupGroup.visible = !!(p.active && p.active.id === 'q6' && p.active.step === 'find');
+    /* Q6 pickup marker surface - guides off: the glowing marker
+       never shows; the pickup itself (atPickup/interact) still
+       works when the player reaches the point. */
+    if (pickupGroup) pickupGroup.visible = !GUIDES_OFF && !!(p.active && p.active.id === 'q6' && p.active.step === 'find');
   }
 
   /* ================= events + main tick ================= */
