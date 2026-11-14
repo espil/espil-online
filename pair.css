@@ -2201,3 +2201,25 @@
       font:800 .72rem/1 "Manrope",sans-serif; letter-spacing:.1em; padding:8px 10px;
     }
     #espil-diveguide-mini .dg-mini-close { border:0; padding:8px 4px; color:rgba(232,220,192,.6); }
+
+/* Fix batch 8 item 1 (Han 2026-11-14): keyboard fit for the
+   landing auth form. entry-flow.js (__espilKbFit) tracks the
+   visual viewport; while the software keyboard is up it flags
+   html.espil-kb-open and publishes --espil-vvh (the visible
+   height) and --espil-kbinset (how much of the layout viewport
+   the keyboard covers). The readout is bottom-anchored to the
+   layout viewport, which the keyboard does NOT shrink on the
+   iOS model - so lift the auth readout by the inset, back above
+   the keyboard line, and cap the form to the visible height so
+   it scrolls inside the visible band instead of under the
+   keyboard. Keyboard closed: the flag is gone and the resting
+   layout is exactly as before. */
+html.espil-kb-open #city-status.auth-open {
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + var(--espil-kbinset, 0px));
+}
+html.espil-kb-open body #city-status #signin-div.modal {
+  max-height: calc(var(--espil-vvh, 100dvh) - 132px);
+}
+html.espil-kb-open body #city-status #signin-div {
+  max-height: calc(var(--espil-vvh, 100dvh) - 132px);
+}

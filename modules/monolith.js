@@ -11425,6 +11425,30 @@
       }
       return false;
     };
+    /* Fix batch 8 item 5 (Han 2026-11-14) - MINIMAL DELTA, this
+       hook only. The landing flow's city layer (entry-flow.js)
+       lists its own buttons and hides this reel's, so
+       updateReelCenter() above - the driver that turned the Earth
+       to face the centred city (2026-10-06) - never sees the
+       flow's centred city and the globe stopped following the
+       swipe. This hook re-exposes exactly that facing step for
+       the flow's centre tracker: same marker-direction math, same
+       targets, same guards (no facing while a city is selected /
+       entering), same intro-safe zoom. It selects nothing. */
+    window.__espilGlobeFaceCity=function(name){
+      if(typeof markers==='undefined'||!markers.length)return false;
+      if(selected||entryActive||cityPhaseActive)return false;
+      for(var i=0;i<markers.length;i++){
+        if(markers[i].userData&&markers[i].userData.name===name){
+          var cityDir=markers[i].position.clone().normalize().applyAxisAngle(new THREE.Vector3(0,1,0),earthSpin.rotation.y);
+          targetYaw=Math.atan2(cityDir.x,cityDir.z);
+          targetPitch=Math.asin(Math.max(-1,Math.min(1,cityDir.y)));
+          if(!window.__espilIntroActive)targetDistance=4.2;
+          return true;
+        }
+      }
+      return false;
+    };
     animate();
   }());
   

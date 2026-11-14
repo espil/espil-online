@@ -521,7 +521,25 @@
     '.espil-flow-copy{margin:0;padding:8px 14px 12px;color:rgba(232,220,192,.78);font:600 .76rem/1.65 "Manrope",sans-serif;letter-spacing:.04em}' +
     '#espil-city-back{display:none}' +
     '#city-status.city-step:not(.flow-open) #espil-city-back{display:flex}' +
-    '#city-status.is-city #espil-city-back{display:none !important}';
+    '#city-status.is-city #espil-city-back{display:none !important}' +
+    /* Fix batch 8 item 4 (Han 2026-11-14): the menu and guidance
+       views carry their choices in a reel with the city-list
+       treatment AS-IS - the pair.css .city-list declarations
+       copied verbatim (fixed 165px window, 62px breathing
+       padding, snap, fade mask, pan-y touch, hidden scrollbar).
+       Before this, the views were plain blocks: their content fit
+       the readout, nothing overflowed, and a swipe had no
+       scrollable surface to bite on (measured scrollTop 0 before
+       and after a touch drag). The reel gives every list step the
+       same window the city step has. Item 2 uses the same reel:
+       the row nearest its centre carries pair.css's .is-centered
+       enlargement, tracked on scroll exactly like the city reel. */
+    '.espil-flow-reel{position:relative;height:165px;overflow-y:auto;overflow-x:hidden;padding:62px 0;' +
+      'scroll-snap-type:y mandatory;scrollbar-width:none;' +
+      'mask-image:linear-gradient(to bottom,transparent 0,#000 24%,#000 76%,transparent 100%);' +
+      '-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 24%,#000 76%,transparent 100%);' +
+      'overscroll-behavior:contain;touch-action:pan-y}' +
+    '.espil-flow-reel::-webkit-scrollbar{display:none}';
   document.head.appendChild(css);
 
   /* ---------------- DOM: menu + panels ---------------- */
@@ -550,11 +568,13 @@
     menu.innerHTML =
       '<div class="espil-flow-title">Espil Online</div>' +
       '<p class="espil-flow-sub">A digital replica of this world, in real time.</p>' +
+      '<div class="espil-flow-reel">' +
       flowItem('espil-menu-play', 'Play', true) +
       flowItem('espil-menu-shop', 'Shop', false) +
       flowItem('espil-menu-zealandia', 'Zealandia', false) +
       flowItem('espil-menu-about', 'About', false) +
-      flowItem('espil-menu-back', 'Back', false);
+      flowItem('espil-menu-back', 'Back', false) +
+      '</div>';
     ui.appendChild(menu);
 
     var zea = el('div', 'espil-zealandia-panel', 'espil-flow-view');
@@ -564,7 +584,9 @@
       '<div class="espil-flow-title">Zealandia</div>' +
       '<p class="espil-flow-copy">Zealandia is where the real game continues - in the Espil app for mobile and PC. ' +
       'There is no entry into Zealandia on the web: here the journey ends at the Auckland Time Stone, and the app takes over from there.</p>' +
-      flowItem('espil-zealandia-back', 'Back', false);
+      '<div class="espil-flow-reel">' +
+      flowItem('espil-zealandia-back', 'Back', false) +
+      '</div>';
     ui.appendChild(zea);
 
     var about = el('div', 'espil-about-panel', 'espil-flow-view');
@@ -575,7 +597,9 @@
       '<p class="espil-flow-copy">Espil Online is a digital replica of this world, based on the real world in real time - ' +
       'the sky, the weather and the alignment of the stars move with the real world. Vancouver is the first city; ' +
       'the destination is a map of the whole world, with the city chosen by where you are.</p>' +
-      flowItem('espil-about-back', 'Back', false);
+      '<div class="espil-flow-reel">' +
+      flowItem('espil-about-back', 'Back', false) +
+      '</div>';
     ui.appendChild(about);
 
     var prep = el('div', 'espil-cityprep-panel', 'espil-flow-view');
@@ -584,7 +608,9 @@
     prep.innerHTML =
       '<div class="espil-flow-title" id="espil-cityprep-name">City</div>' +
       '<p class="espil-flow-copy">This city\'s data pack is in preparation. When it is ready, the city opens here exactly as it stands in the real world.</p>' +
-      flowItem('espil-cityprep-back', 'Back to city selection', false);
+      '<div class="espil-flow-reel">' +
+      flowItem('espil-cityprep-back', 'Back to city selection', false) +
+      '</div>';
     ui.appendChild(prep);
 
     cs.appendChild(ui);
@@ -597,6 +623,47 @@
     $('espil-zealandia-back').addEventListener('click', function () { presentFlowView($('espil-mainmenu')); });
     $('espil-about-back').addEventListener('click', function () { presentFlowView($('espil-mainmenu')); });
     $('espil-cityprep-back').addEventListener('click', function () { closePrep(); });
+    /* Fix batch 8 items 2+4: every view's reel tracks its centre
+       on scroll, like the city reel - the row nearest the reel's
+       vertical centre carries .is-centered. */
+    var reels = ui.querySelectorAll('.espil-flow-reel');
+    for (var ri = 0; ri < reels.length; ri++) {
+      (function (reel) {
+        var frame = 0;
+        reel.addEventListener('scroll', function () {
+          if (!frame) frame = requestAnimationFrame(function () {
+            frame = 0;
+            centerFlowReel(reel.parentNode);
+          });
+        }, { passive: true });
+      })(reels[ri]);
+    }
+  }
+  /* The flow-reel centre tracker (items 2+4): nearest row to the
+     reel's vertical centre is the centred one. On presentation
+     presentFlowView resets the reel to the top, where the FIRST
+     row is the nearest - so the first row starts active (item 2),
+     and once the user scrolls this tracker governs, exactly the
+     batch-7 reconciliation for the city reel. Views without a
+     reel keep their first item centred. */
+  function centerFlowReel(view) {
+    if (!view) return;
+    var items = view.querySelectorAll('.espil-flow-item');
+    if (!items.length) return;
+    var closest = items[0];
+    var reel = view.querySelector('.espil-flow-reel');
+    if (reel) {
+      var rr = reel.getBoundingClientRect();
+      var centre = rr.top + rr.height / 2, dist = Infinity;
+      for (var i = 0; i < items.length; i++) {
+        var r = items[i].getBoundingClientRect();
+        var d = Math.abs(r.top + r.height / 2 - centre);
+        if (d < dist) { dist = d; closest = items[i]; }
+      }
+    }
+    for (var j = 0; j < items.length; j++) {
+      items[j].classList.toggle('is-centered', items[j] === closest);
+    }
   }
   function show(n) { if (n) n.setAttribute('aria-hidden', 'false'); }
   function hide(n) { if (n) n.setAttribute('aria-hidden', 'true'); }
@@ -610,7 +677,15 @@
   function presentFlowView(view) {
     buildUI();
     FLOW_VIEW_IDS.forEach(function (id) { var n = $(id); if (n && n !== view) hide(n); });
-    if (view) show(view);
+    if (view) {
+      show(view);
+      /* Fix batch 8 item 2: a presented list starts at its first
+         row - reel back to the top and let the centre tracker put
+         the active treatment on row one. */
+      var vreel = view.querySelector('.espil-flow-reel');
+      if (vreel) vreel.scrollTop = 0;
+      centerFlowReel(view);
+    }
     var cs = $('city-status');
     if (cs) {
       cs.classList.toggle('flow-open', !!view);
@@ -709,6 +784,15 @@
     var cs = $('city-status');
     if (cs) { cs.classList.remove('gate-hidden'); cs.classList.add('city-step'); /* city selection is live, with its Back entry */ }
     activateCityLayer();
+    /* Fix batch 8 item 2: on RE-presentation (menu Back -> Play
+       again) the city reel starts at its first row again, with
+       the first row active. The first presentation is covered by
+       the layer's own arrival pass. */
+    var cl = $('city-list');
+    if (cl && cl.querySelector('.espil-city-btn')) {
+      cl.scrollTop = 0;
+      if (flowCenterCity) flowCenterCity();
+    }
   }
 
   /* ---------------- city selection layer ----------------
@@ -720,6 +804,27 @@
      info panel and DIVE run untouched), every other city to the
      preparation panel. */
   var cityLayerActive = false;
+  /* Fix batch 8 item 5 (Han 2026-11-14): the centred city faces
+     the globe's centre again. The original reel coupled the two:
+     monolith's updateReelCenter() read its centred marker and set
+     the globe's target yaw/pitch from the marker's direction.
+     That driver only ever sees monolith's own buttons - the ones
+     this layer hides - so with the flow's buttons in place the
+     globe never turned (measured: Tokyo centred, its pin stuck
+     342px from the canvas centre, unmoving). The flow layer now
+     reports every centre change through monolith's restored
+     facing hook (__espilGlobeFaceCity, which carries the
+     original math), and remembers the last faced city so a
+     re-presentation does not re-drive an unchanged facing. */
+  var flowCenterCity = null;
+  var flowFacedCity = null;
+  function faceFlowCity(name) {
+    if (!name || name === flowFacedCity) return;
+    flowFacedCity = name;
+    if (typeof window.__espilGlobeFaceCity === 'function') {
+      try { window.__espilGlobeFaceCity(name); } catch (e) {}
+    }
+  }
   function harvestCities() {
     var out = [];
     var pins = document.querySelectorAll('#city-pins .city-pin');
@@ -767,6 +872,7 @@
         b.addEventListener('click', function () {
           var btns = list.querySelectorAll('.espil-city-btn');
           for (var j = 0; j < btns.length; j++) btns[j].classList.toggle('is-centered', btns[j] === b);
+          faceFlowCity(c.name); /* item 5: a click centres the city too - face it */
           if (c.name === 'Vancouver') {
             for (var k = 0; k < orig.length; k++) {
               if ((orig[k].textContent || '').trim() === 'Vancouver') { orig[k].click(); return; }
@@ -808,7 +914,10 @@
         for (var m = 0; m < btns.length; m++) {
           btns[m].classList.toggle('is-centered', btns[m] === closest);
         }
+        /* item 5: the globe follows the centred city */
+        if (closest) faceFlowCity(closest.getAttribute('data-city'));
       }
+      flowCenterCity = updateFlowReelCenter;
       list.addEventListener('scroll', function () {
         if (!flowReelFrame) flowReelFrame = requestAnimationFrame(updateFlowReelCenter);
       }, { passive: true });
@@ -923,6 +1032,19 @@
     if (provNote) provNote.style.display = formShown ? '' : 'none';
     authDiv.setAttribute('data-authstep', name || '');
     authDiv.setAttribute('data-authmode', formMode ? name : '');
+    /* Fix batch 8 item 2 (Han 2026-11-14): the three-entry choice
+       list is a city-list-styled list, so its FIRST row (Login)
+       starts in the active state on every presentation - before
+       this, no row carried the treatment (measured: all three at
+       the base 12.16px, none centred). The rows are pair.css
+       .city-name buttons, so the centred treatment is the same
+       .is-centered enlargement the reels use. */
+    if (name === 'choice' && choiceBox) {
+      var cItems = choiceBox.querySelectorAll('.auth-choice-item');
+      for (var ci = 0; ci < cItems.length; ci++) {
+        cItems[ci].classList.toggle('is-centered', ci === 0);
+      }
+    }
     if (formMode) {
       var nameLabel = document.getElementById('auth-name-label');
       var nameInput = document.getElementById('auth-name');
@@ -1428,5 +1550,119 @@
     if (ev && ev.detail && ev.detail.type === 'arrival') arm();
   });
   window.addEventListener('espil-arrival', arm);
+})();
+
+/* __espilGenderOnce v1 - GENDER NEVER ASKED TWICE (Han 2026-11-14,
+   fix batch 8 item 3). The gender is decided at the login/guest
+   step: the landing Guest step writes it into the saved character
+   record (localStorage espil_character, the record the avatar
+   build itself reads), and a signed-in player's saved look
+   carries the same record. But the game page's character gate
+   still PRESENTED the Male/Female cards on every entry - pre-
+   selected is not enough; Han's order is that the question is
+   not asked again. So: when a decision exists in the record, the
+   gate's gender cards (.char-grid) are hidden and the panel is
+   stamped data-espil-gender-decided; the gate's own confirm path
+   keeps running untouched and builds from the record exactly as
+   it does today. When NO decision exists anywhere - a first-ever
+   signed-in account with no saved look - the cards present once,
+   here at the gate, and confirming writes the record, so the
+   question never comes back. This supersedes the batch-7 note
+   that the cards "keep their landing pre-selection untouched":
+   for decided paths there is no presentation at all now.
+   Changing the choice later stays possible in the in-game
+   customizer. Guest pin, session parking, the name-once fix and
+   the avatar build's gender branch are untouched. */
+(function () {
+  'use strict';
+  try {
+    if (window.__ESPIL_GAME_PAGE !== true) return;
+    var gender = '';
+    try {
+      var rec = JSON.parse(localStorage.getItem('espil_character') || 'null');
+      if (rec && (rec.gender === 'male' || rec.gender === 'female')) gender = rec.gender;
+    } catch (e) {}
+    if (!gender) return; /* no decision anywhere: the gate asks, once */
+    function apply() {
+      var panel = document.getElementById('char-custom');
+      if (!panel) return false;
+      var grid = panel.querySelector('.char-grid');
+      if (grid) grid.style.display = 'none';
+      panel.setAttribute('data-espil-gender-decided', gender);
+      return true;
+    }
+    if (!apply()) {
+      var ticks = 0;
+      var iv = setInterval(function () {
+        ticks++;
+        if (apply() || ticks > 40) clearInterval(iv);
+      }, 250);
+    }
+    /* The pair markup is static, so the pass above lands before
+       the gate opens; re-apply on the panel's own open in case
+       anything re-shows the bare cards. */
+    var panel = document.getElementById('char-custom');
+    if (panel) {
+      try {
+        new MutationObserver(function () {
+          if (panel.getAttribute('aria-hidden') === 'false') apply();
+        }).observe(panel, { attributes: true, attributeFilter: ['aria-hidden'] });
+      } catch (e) {}
+    }
+  } catch (e) {}
+})();
+
+/* __espilKbFit v1 - KEYBOARD FIT (Han 2026-11-14, fix batch 8
+   item 1). On mobile, filling the landing guest-registration or
+   login form raised the software keyboard over the form: the
+   readout is anchored to the bottom of the LAYOUT viewport, and
+   on the iOS model the keyboard does not shrink that viewport -
+   it only shrinks the VISUAL viewport - so the bottom-anchored
+   form stayed behind the keyboard (measured: password field at
+   y 563-601 with the visible area ending at 470). This component
+   tracks window.visualViewport: while the keyboard inset (layout
+   height minus visual height) exceeds 80px it publishes the
+   visual height and the inset as CSS variables and flags
+   html.espil-kb-open; pair.css then lifts the readout clear of
+   the keyboard and caps the form to the visual height, and the
+   focused field is scrolled into the form's own visible band.
+   Keyboard closed -> inset 0 -> the class and the lift vanish,
+   so the resting layout is byte-identical to before. Desktop
+   never engages (inset stays 0). */
+(function () {
+  'use strict';
+  try {
+    var vv = window.visualViewport;
+    if (!vv) return;
+    var root = document.documentElement;
+    function focusedFormField() {
+      var dv = document.getElementById('signin-div');
+      var a = document.activeElement;
+      if (dv && a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA') && dv.contains(a)) return a;
+      return null;
+    }
+    function refit() {
+      var a = focusedFormField();
+      if (a) { try { a.scrollIntoView({ block: 'nearest' }); } catch (e) {} }
+    }
+    function update() {
+      var inset = Math.max(0, Math.round(window.innerHeight - vv.height - (vv.offsetTop || 0)));
+      root.style.setProperty('--espil-vvh', Math.round(vv.height) + 'px');
+      root.style.setProperty('--espil-kbinset', inset + 'px');
+      var open = inset > 80;
+      root.classList.toggle('espil-kb-open', open);
+      if (open) refit();
+    }
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    document.addEventListener('focusin', function (e) {
+      var dv = document.getElementById('signin-div');
+      if (dv && e.target && e.target.tagName === 'INPUT' && dv.contains(e.target)) {
+        setTimeout(function () { update(); refit(); }, 60);
+        setTimeout(refit, 350);
+      }
+    });
+    update();
+  } catch (e) {}
 })();
 
