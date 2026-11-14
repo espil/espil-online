@@ -1315,11 +1315,29 @@
        patched. Scope: the LOCAL player only.
        Interiors: while __espilInside is set the cutout is DISABLED -
        indoors the enclosing room must stay whole; the in/outdoor
-       transition is a door crossing, so no pop is visible. */
+       transition is a door crossing, so no pop is visible.
+       DITHER (Han 2026-11-14: "handle wall occlusion with the
+       dither method"): the cutout's total discard is superseded -
+       inside the SAME trigger region (the circle + the in-front
+       depth test, unchanged) the wall now keeps a Bayer 4x4
+       screen-door subset of its fragments (uOccKeep at the centre,
+       feathering to full density at the rim), so the character
+       reads THROUGH the stippled wall while the wall stays
+       recognisable. Still fragment discard only - never an opacity
+       fade. The trigger, the patched set and the tick are the
+       2026-11-03 system's; only the fragment treatment changed.
+       Layer mode note: in the Mapbox pipeline the buildings are
+       fill-extrusions and the patched THREE materials are hidden
+       (espilP1Hide), so this shader never reaches them - the
+       extrusion side is treated separately by espilDitherLayerTick
+       below (a stipple-pattern layer for the occluding features
+       only, driven by the camera clamp's own segment law). */
     var ESPIL_OCCLUDE_RADIUS_FACTOR=1.35; /* circle radius = projected character half-height x this (>1: the circle is larger than the character) */
     var ESPIL_OCCLUDE_CHAR_H=1.8; /* character height in metres used for the projection */
     var ESPIL_OCCLUDE_EPS=0.00002; /* window-depth epsilon: a fragment must be at least ~this much closer than the character centre to be cut */
-    var espilOccludeU={centre:{value:new THREE.Vector2(-10000,-10000)},radius:{value:0},charZ:{value:1},enabled:{value:0}};
+    var ESPIL_DITHER_KEEP=0.30; /* dither (Han 2026-11-14): fraction of wall fragments KEPT at the circle centre on the THREE path (the rest are discarded - screen-door) */
+    var ESPIL_DITHER_EXT_KEEP=0.3125; /* the same density law for the layer-mode extrusion stipple pattern (fraction of pattern texels opaque; 5/16 - tuned on the corner frames: at 0.5 the character ghosted too faintly through the wall) */
+    var espilOccludeU={centre:{value:new THREE.Vector2(-10000,-10000)},radius:{value:0},charZ:{value:1},enabled:{value:0},keep:{value:ESPIL_DITHER_KEEP}};
     var espilOccludePatched=new WeakSet(), espilOccludePatchedCount=0;
     var espilOccludeMaster=true; /* probe/Han toggle via __espilOccludeState.setEnabled */
     var espilOccludeState={enabled:false,centrePx:null,radiusPx:0,charDepth:null,patchedMaterials:0};
@@ -1334,11 +1352,14 @@
         shader.uniforms.uOccRadius=espilOccludeU.radius;
         shader.uniforms.uOccCharZ=espilOccludeU.charZ;
         shader.uniforms.uOccEnabled=espilOccludeU.enabled;
+        shader.uniforms.uOccKeep=espilOccludeU.keep;
         var anchor='void main() {';
         if(shader.fragmentShader.indexOf(anchor)<0){ console.warn('[Occlude] fragment anchor missing, material not patched'); return; }
-        shader.fragmentShader=('uniform vec2 uOccCentre;\nuniform float uOccRadius;\nuniform float uOccCharZ;\nuniform float uOccEnabled;\n')+
+        shader.fragmentShader=('uniform vec2 uOccCentre;\nuniform float uOccRadius;\nuniform float uOccCharZ;\nuniform float uOccEnabled;\nuniform float uOccKeep;\n'+
+          'float espilOccBayer2(vec2 a){ a=floor(a); return fract(a.x/2.0+a.y*a.y*0.75); }\n'+
+          'float espilOccBayer4(vec2 a){ return espilOccBayer2(0.5*a)*0.25+espilOccBayer2(a); }\n')+
           shader.fragmentShader.replace(anchor,
-            anchor+'\n  if(uOccEnabled>0.5){ vec2 espilOccD=gl_FragCoord.xy-uOccCentre; if(dot(espilOccD,espilOccD)<uOccRadius*uOccRadius && gl_FragCoord.z<uOccCharZ-'+ESPIL_OCCLUDE_EPS+') discard; }');
+            anchor+'\n  if(uOccEnabled>0.5){ vec2 espilOccD=gl_FragCoord.xy-uOccCentre; float espilOccD2=dot(espilOccD,espilOccD); if(espilOccD2<uOccRadius*uOccRadius && gl_FragCoord.z<uOccCharZ-'+ESPIL_OCCLUDE_EPS+'){ float espilOccKeep=mix(uOccKeep,1.0,smoothstep(0.70,1.0,sqrt(espilOccD2)/uOccRadius)); if(espilOccBayer4(gl_FragCoord.xy)>=espilOccKeep) discard; } }');
         espilOccludePatchedCount++;
       };
       m.needsUpdate=true;
@@ -1373,11 +1394,121 @@
       espilOccludeState.radiusPx=on?Math.round(rad*10)/10:0;
       espilOccludeState.charDepth=on?Math.round(cz*1000000)/1000000:null;
       espilOccludeState.patchedMaterials=espilOccludePatchedCount;
+      espilDitherLayerTick(); /* layer-mode extrusion stipple (Han 2026-11-14), throttled inside */
     }
     window.__espilOccludeState=function(){
-      return {enabled:espilOccludeState.enabled,master:espilOccludeMaster,centrePx:espilOccludeState.centrePx,radiusPx:espilOccludeState.radiusPx,charDepth:espilOccludeState.charDepth,patchedMaterials:espilOccludePatchedCount,factor:ESPIL_OCCLUDE_RADIUS_FACTOR};
+      return {enabled:espilOccludeState.enabled,master:espilOccludeMaster,centrePx:espilOccludeState.centrePx,radiusPx:espilOccludeState.radiusPx,charDepth:espilOccludeState.charDepth,patchedMaterials:espilOccludePatchedCount,factor:ESPIL_OCCLUDE_RADIUS_FACTOR,mode:'dither-bayer4',keep:espilOccludeU.keep.value};
     };
     window.__espilOccludeState.setEnabled=function(b){ espilOccludeMaster=!!b; return espilOccludeMaster; };
+    /* ---- DITHER, layer mode (Han 2026-11-14) ----
+       In the Mapbox pipeline the occluders are fill-extrusions on
+       the 'espil-buildings' source; the THREE shader above never
+       reaches them. The treatment here: the features the APPLIED
+       camera segment (chest/head -> the clamped camera point, the
+       camera clamp's own law, marched the same way espilCamMarch
+       marches) passes through below their roofs are moved out of
+       the solid base layer into 'espil-buildings-dither', a twin
+       extrusion layer (same source, same height/colour) whose
+       fill-extrusion-pattern is a Bayer 4x4 checker image - a true
+       stipple: the kept texels draw the wall, the clear texels let
+       the character behind it draw. Everything else stays solid.
+       The set is recomputed at a 200 ms cadence and the layer
+       filters are rewritten only when the set changes. Records map
+       to feature indices by ring signature against
+       espilP1BldCache (both derive from espilDistrict.buildings
+       with the same skip rules and order); an ambiguous or
+       unmatched record is never treated (fail-safe). Suppressed
+       under exactly the camera clamp's suppressions (indoors,
+       store pause, scripted arrival/landing). */
+    var espilDitherExt={ids:[],key:null,lastMs:0,featMap:null,featMapSrc:null,active:false};
+    var _espilDithHits=[];
+    function espilDitherBayer2(x,y){ var v=x/2+y*y*0.75; return v-Math.floor(v); }
+    function espilDitherBayer4(x,y){ return espilDitherBayer2(Math.floor(x/2),Math.floor(y/2))*0.25+espilDitherBayer2(x,y); }
+    function espilDitherFeatMap(){
+      var cache=(typeof espilP1BldCache!=='undefined')?espilP1BldCache:null;
+      if(!cache||!cache.rings)return null;
+      if(espilDitherExt.featMap&&espilDitherExt.featMapSrc===cache)return espilDitherExt.featMap;
+      var map={};
+      for(var i=0;i<cache.rings.length;i++){
+        var r=cache.rings[i]; if(!r||r.length<6)continue;
+        var key=Math.round(r[0]*100)+','+Math.round(r[1]*100)+'|'+(r.length/2)+'|'+Math.round(r[r.length-2]*100)+','+Math.round(r[r.length-1]*100);
+        if(map[key]!==undefined){ map[key]=-1; continue; } /* ambiguous signature - never treat */
+        map[key]=i;
+      }
+      espilDitherExt.featMap=map; espilDitherExt.featMapSrc=cache;
+      return map;
+    }
+    function espilDitherFeatI(rec,map){
+      var ring=rec.ring; if(!ring||ring.length<3)return -1;
+      var f=ring[0], l=ring[ring.length-1];
+      var key=Math.round(f[0]*100)+','+Math.round(f[1]*100)+'|'+ring.length+'|'+Math.round(l[0]*100)+','+Math.round(l[1]*100);
+      var v=map[key]; return (typeof v==='number')?v:-1;
+    }
+    function espilDitherCollect(ax,ay,az,bx,by,bz,recs,out){
+      var dist=Math.hypot(bx-ax,by-ay,bz-az);
+      var steps=Math.max(2,Math.ceil(dist/0.4));
+      for(var i=1;i<=steps;i++){
+        var f=i/steps;
+        var x=ax+(bx-ax)*f, y=ay+(by-ay)*f, z=az+(bz-az)*f;
+        for(var j=0;j<recs.length;j++){
+          var rec=recs[j];
+          if(x<rec.x0||x>rec.x1||z<rec.z0||z>rec.z1)continue;
+          if(y>rec.h+0.35)continue;
+          if(espilPolyProbe(rec,x,z).inside&&out.indexOf(rec)<0&&out.length<6)out.push(rec);
+        }
+      }
+    }
+    function espilDitherLayerTick(){
+      var S=espilDitherExt;
+      var now=performance.now();
+      if(now-S.lastMs<200)return;
+      S.lastMs=now;
+      var live=false, ids=[];
+      try{
+        if(espilOccludeMaster&&typeof ESPIL_P1!=='undefined'&&ESPIL_P1&&espilP1.layerLive&&!espilP1.failed&&espilP1.buildingsAdded&&espilP1.map&&
+           !window.__espilInside&&!window.__espilStorePaused&&typeof walkPlayer!=='undefined'&&walkPlayer&&walkPlayer.pos&&!walkPlayer._espilArrive&&!walkPlayer._espilLanding&&
+           typeof espilPolyHash!=='undefined'&&espilPolyHash&&typeof espilCamPos!=='undefined'&&espilCamPos){
+          var fmap=espilDitherFeatMap();
+          if(fmap){
+            var p=walkPlayer.pos;
+            var recs=espilCollectRecsNear((p.x+espilCamPos.x)/2,(p.z+espilCamPos.z)/2,espilCamDEff/2+6);
+            _espilDithHits.length=0;
+            espilDitherCollect(p.x,p.y+1.3,p.z,espilCamPos.x,espilCamPos.y,espilCamPos.z,recs,_espilDithHits);
+            espilDitherCollect(p.x,p.y+1.75,p.z,espilCamPos.x,espilCamPos.y,espilCamPos.z,recs,_espilDithHits);
+            /* Shoulder segments (±0.40 m at chest height): the
+               character's silhouette is wider than the centre ray,
+               so a building edge threading just past the centre ray
+               still covers half the body on screen. The corridor
+               matches the cutout's own screen-space radius
+               (half-height x 1.35) in world terms. */
+            var _vx=espilCamPos.x-p.x,_vz=espilCamPos.z-p.z,_vl=Math.sqrt(_vx*_vx+_vz*_vz);
+            if(_vl>0.001){ var _px=-_vz/_vl*0.40,_pz=_vx/_vl*0.40;
+              espilDitherCollect(p.x+_px,p.y+1.3,p.z+_pz,espilCamPos.x+_px,espilCamPos.y,espilCamPos.z+_pz,recs,_espilDithHits);
+              espilDitherCollect(p.x-_px,p.y+1.3,p.z-_pz,espilCamPos.x-_px,espilCamPos.y,espilCamPos.z-_pz,recs,_espilDithHits);
+            }
+            for(var i=0;i<_espilDithHits.length;i++){ var fi=espilDitherFeatI(_espilDithHits[i],fmap); if(fi>=0&&ids.indexOf(fi)<0)ids.push(fi); }
+            ids.sort(function(a,b){return a-b;});
+            live=ids.length>0;
+          }
+        }
+      }catch(e){ live=false; ids=[]; }
+      var key=ids.join(',');
+      if(key!==S.key){
+        S.key=key; S.ids=ids;
+        try{
+          var m2=espilP1.map;
+          if(m2&&m2.getLayer('espil-buildings-3d'))m2.setFilter('espil-buildings-3d',ids.length?['!in','i'].concat(ids):['!in','i']);
+          if(m2&&m2.getLayer('espil-buildings-dither'))m2.setFilter('espil-buildings-dither',ids.length?['in','i'].concat(ids):['in','i']);
+        }catch(e){}
+      }
+      S.active=live;
+    }
+    window.__espilDitherState=function(){
+      return {master:espilOccludeMaster,
+        three:{mode:'bayer4',keep:espilOccludeU.keep.value,enabled:espilOccludeState.enabled,centrePx:espilOccludeState.centrePx,radiusPx:espilOccludeState.radiusPx,patchedMaterials:espilOccludePatchedCount},
+        extrusion:{live:!!(typeof ESPIL_P1!=='undefined'&&ESPIL_P1&&espilP1.layerLive&&!espilP1.failed),active:espilDitherExt.active,occluders:espilDitherExt.ids.slice(),keep:ESPIL_DITHER_EXT_KEEP}};
+    };
+    window.__espilDitherState.setKeep=function(f){ if(typeof f==='number'&&f>0&&f<=1)espilOccludeU.keep.value=f; return espilOccludeU.keep.value; };
     var curvedMatCache={};
     function curvedMat(color){
       var key='c'+color, m=curvedMatCache[key];
@@ -2807,6 +2938,28 @@
              silhouette overhangs the footprint and would wall off open
              ground beside tall buildings. */
           espilP1.map.addLayer({id:'espil-buildings-collision',type:'fill',source:'espil-buildings',paint:{'fill-color':'#000000','fill-opacity':0}});
+          /* DITHER layer (Han 2026-11-14): a twin of the base
+             extrusion (same source, height and colour) carrying a
+             Bayer 4x4 checker pattern image, so the features
+             espilDitherLayerTick moves here (filter on property i)
+             render as a stipple the character reads through while
+             every other building stays solid in the base layer.
+             Created with a match-nothing filter; the tick owns the
+             filters from there. The pattern image is white - the
+             paint colour shades it exactly like the base layer. */
+          try{
+            if(!espilP1.map.hasImage('espil-dither-checker')){
+              var dcv=document.createElement('canvas'); dcv.width=dcv.height=4;
+              var dg=dcv.getContext('2d'); var dimg=dg.createImageData(4,4);
+              for(var dy=0;dy<4;dy++)for(var dx=0;dx<4;dx++){
+                var dOff=(dy*4+dx)*4, dOn=espilDitherBayer4(dx,dy)<ESPIL_DITHER_EXT_KEEP;
+                dimg.data[dOff]=255; dimg.data[dOff+1]=255; dimg.data[dOff+2]=255; dimg.data[dOff+3]=dOn?255:0;
+              }
+              dg.putImageData(dimg,0,0);
+              espilP1.map.addImage('espil-dither-checker',dg.getImageData(0,0,4,4));
+            }
+            espilP1.map.addLayer({id:'espil-buildings-dither',type:'fill-extrusion',source:'espil-buildings',filter:['in','i'],paint:{'fill-extrusion-color':'#c9c4bb','fill-extrusion-height':['get','hv'],'fill-extrusion-base':0,'fill-extrusion-opacity':1,'fill-extrusion-pattern':'espil-dither-checker'}});
+          }catch(e){}
         }else{
           espilP1.map.getSource('espil-buildings').setData(espilP1BuildingsGeoJSON());
         }
@@ -11373,7 +11526,7 @@
     var lastFrameT=performance.now();
     function animate(){
       requestAnimationFrame(animate);
-      espilOccludeTick(); /* wall-occlusion cutout uniforms (Han 2026-11-03) */
+      espilOccludeTick(); /* wall-occlusion dither uniforms + extrusion stipple tick (Han 2026-11-14; system from 2026-11-03) */
       var nowMs=performance.now();
       var dt=Math.min(.05,(nowMs-lastFrameT)/1000);lastFrameT=nowMs;
       if(cityPhaseActive){
