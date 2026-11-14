@@ -5689,6 +5689,7 @@
         if(skillState.cd[mid]>0){skillState.cd[mid]=Math.max(0,skillState.cd[mid]-dt);anyCd=true;}
       }
       if(anyCd)paintCooldowns();
+      espilHealTick(dt); /* HEAL FX (2026-11-13): drives the heal bar/count animation + world FX */
       if(skillState.mp<skillState.maxmp){skillState.mp=Math.min(skillState.maxmp,skillState.mp+5*dt);paintStatus();}
       /* Batch 6: armour tree regeneration (a_regen) */
       var _rg=espilTreeAlloc('a_regen');
@@ -5769,23 +5770,30 @@
       var lv=document.getElementById('ms-lv');
       if(lv)lv.textContent='KEEPER';
       paintKnowledge();
-      /* Han 2026-10-14: HP/MP render into the glass potion flasks (--p fill). */
-      var hpP=Math.max(0,Math.min(100,100*skillState.hp/skillState.maxhp));
+      /* Han 2026-10-14: HP/MP render into the glass potion flasks (--p fill).
+         HEAL FX (Han 2026-11-13): while a heal animation runs, the
+         flasks render the animation's display value (smooth fill +
+         tick-up number) - hard-capped at true state, so a mid-window
+         hit is never masked. Inactive = true state, byte-identical. */
+      var _hfx=(typeof espilHealDisp!=='undefined')?espilHealDisp:null;
+      var hpShow=(_hfx&&_hfx.hp.active)?Math.min(_hfx.hp.val,skillState.hp):skillState.hp;
+      var mpShow=(_hfx&&_hfx.mp.active)?Math.min(_hfx.mp.val,skillState.mp):skillState.mp;
+      var hpP=Math.max(0,Math.min(100,100*hpShow/skillState.maxhp));
       var hw=document.getElementById('hp-water'),hs=document.getElementById('hp-swirl'),
           hpc=document.getElementById('hp-pct'),hfv=document.getElementById('hp-flask-val'),
           hwrap=document.getElementById('hp-flask-wrap');
       if(hw)hw.style.setProperty('--p',hpP);
       if(hs)hs.style.setProperty('--p',hpP);
       if(hpc)hpc.textContent=Math.round(hpP);
-      if(hfv)hfv.textContent=Math.round(skillState.hp)+'/'+skillState.maxhp;
+      if(hfv)hfv.textContent=Math.round(hpShow)+'/'+skillState.maxhp;
       if(hwrap)hwrap.classList.toggle('low',hpP<=25);
-      var mpP=Math.max(0,Math.min(100,100*skillState.mp/skillState.maxmp));
+      var mpP=Math.max(0,Math.min(100,100*mpShow/skillState.maxmp));
       var mw=document.getElementById('mp-water'),ms=document.getElementById('mp-swirl'),
           mpc=document.getElementById('mp-pct'),mfv=document.getElementById('mp-flask-val');
       if(mw)mw.style.setProperty('--p',mpP);
       if(ms)ms.style.setProperty('--p',mpP);
       if(mpc)mpc.textContent=Math.round(mpP);
-      if(mfv)mfv.textContent=Math.round(skillState.mp)+'/'+skillState.maxmp;
+      if(mfv)mfv.textContent=Math.round(mpShow)+'/'+skillState.maxmp;
       var exp=document.getElementById('ms-exp'),expt=document.getElementById('ms-exp-t');
       var expPct=skillState.maxexp>0?100*skillState.exp/skillState.maxexp:0;
       if(exp)exp.style.width=expPct+'%';
@@ -7196,7 +7204,7 @@
        Goods and art are this build's own; the Leo purse is local
        until the backend track (Phase B) gives it a server home. */
     var ESPIL_SHOP_STOCK={
-      convenience:[['Triangle Kimbap',120,'#e8e3d5'],['Cup Ramen',150,'#d96b4f'],['Cola',90,'#b3312c'],['Iced Coffee',110,'#6b4a2f'],['Banana Milk',95,'#f2d13c'],['Choco Bar',60,'#5a3a22'],['Umbrella',450,'#3c6e91'],['Batteries AA',210,'#7d8894'],['Hot Pack',80,'#c9532f'],['Mineral Water',50,'#7fb8d8']],
+      convenience:[['Triangle Kimbap',120,'#e8e3d5'],['Cup Ramen',150,'#d96b4f'],['Cola',90,'#b3312c'],['Iced Coffee',110,'#6b4a2f'],['Banana Milk',110,'#f2d13c'],['Choco Bar',60,'#5a3a22'],['Umbrella',450,'#3c6e91'],['Batteries AA',210,'#7d8894'],['Hot Pack',80,'#c9532f'],['Mineral Water',50,'#7fb8d8']],
       fastfood:[['Burger Set',590,'#d98e2b'],['Cheeseburger',420,'#e0aa3c'],['Fries',180,'#e8c53a'],['Chicken Strips',460,'#c96a34'],['Cola',90,'#b3312c'],['Coffee',110,'#6b4a2f'],['Nuggets (6)',320,'#d9a03c'],['Sundae',150,'#e8e3d5']]
     };
     var espilShopBag=[];
@@ -8440,14 +8448,292 @@
         vig:Math.round(espilHurt.vig*1000)/1000, vigPeak:espilHurt.vigPeak,
         punch:espilHurt.punch, kb:espilHurt.kb, sound:espilHurt.sound };
     };
+    /* ================================================================
+       HEAL FX (Han 2026-11-13, via COO): the 5-step healing-feel
+       treatment, applied to EVERY HP-recovery moment:
+         1. Fill it smoothly - the flask/HUD fill animates up instead
+            of jumping (drives paintStatus display values).
+         2. Rising pluses - small "+" signs rise from the player.
+         3. Aura - a light pillar wraps the player (one reused THREE
+            cylinder in mapScene).
+         4. Big number - the recovered amount (+N) shows BIG above
+            the head, with a confetti burst.
+         5. Count it up - the HP number ticks up to the true value.
+       ONE shared entry point: espilHealTrigger(dHp, dMp), called by
+       __espilApplyRecovery (food/drink through panels' listener, and
+       any future caller) and by espilReviveCommon (village revive,
+       death-screen potion, arena stock + cash revives). No other
+       heal presentation exists anywhere.
+       PRESENTATION ONLY: HP/MP state changes instantly, in the same
+       amounts as before (the D4 draft table is untouched); this layer
+       only animates what is DISPLAYED, over 900 ms, and lands
+       EXACTLY on true state. Rules:
+       - Damage wins: if true state drops below an animation's
+         target mid-window, that bar's animation cancels and state
+         renders at once; the renderer also hard-caps the display at
+         true state, so a heal can never mask a hit.
+       - Trickle gains above the target (MP regen, armour a_regen)
+         are absorbed into the target, so the count still lands
+         exactly on state.
+       - Rapid successive heals: no queue. The bar animation
+         RESTARTS from the current display value toward the new true
+         state with a fresh window; the world FX restarts with the
+         LATEST event's amount (amounts are per-event, not summed).
+       - Passive trickles are not events and never fire the FX -
+         they already move the bars smoothly on their own.
+       - An MP-only event (e.g. Canned Coffee) runs the same 5 steps
+         on the MP bar in a blue palette, big number = the MP amount;
+         when both rise, HP is the headline and MP rides as a sub-line.
+       Cost: 23 pooled DOM nodes + 1 pooled THREE mesh, created once;
+       per active frame <= 24 style writes + 3 projections + O(1)
+       bar math; zero per-frame allocation; idle cost is one
+       early-return per frame.
+       ================================================================ */
+    var ESPIL_HEAL_DUR_MS=900;    /* steps 1+5: fill + count-up window */
+    var ESPIL_HEAL_FX_S=1.15;     /* steps 2-4: pluses/aura/number life */
+    var espilHealDisp={
+      hp:{active:false,from:0,to:0,t:0,val:0},
+      mp:{active:false,from:0,to:0,t:0,val:0},
+      triggers:0,lastHp:0,lastMp:0
+    };
+    function espilHealDispVal(bar){
+      var b=espilHealDisp[bar];
+      return b.active?b.val:((bar==='hp')?skillState.hp:skillState.mp);
+    }
+    /* mmo-hud.js reads this so its HP/MP bars share the same display
+       values (its own state read stays the fallback when inactive -
+       the values returned here already fall back to true state). */
+    window.__espilHealDisplay=function(){
+      return { active:espilHealDisp.hp.active||espilHealDisp.mp.active,
+        hp:espilHealDispVal('hp'), mp:espilHealDispVal('mp'),
+        maxhp:skillState.maxhp, maxmp:skillState.maxmp };
+    };
+    window.__espilHealFxState=function(){
+      var f=espilHealFx;
+      return { triggers:espilHealDisp.triggers,
+        lastHp:espilHealDisp.lastHp, lastMp:espilHealDisp.lastMp,
+        hpAnim:espilHealDisp.hp.active?{from:Math.round(espilHealDisp.hp.from*10)/10,to:espilHealDisp.hp.to,val:Math.round(espilHealDisp.hp.val*10)/10}:null,
+        mpAnim:espilHealDisp.mp.active?{from:Math.round(espilHealDisp.mp.from*10)/10,to:espilHealDisp.mp.to,val:Math.round(espilHealDisp.mp.val*10)/10}:null,
+        dispHp:Math.round(espilHealDispVal('hp')*10)/10, dispMp:Math.round(espilHealDispVal('mp')*10)/10,
+        worldActive:f.active, worldT:Math.round(f.t*100)/100,
+        pillarVisible:!!(f.pillar&&f.pillar.visible),
+        numText:f.numBig?f.numBig.textContent:null };
+    };
+    function espilHealStartBar(bar,delta){
+      var b=espilHealDisp[bar];
+      var cur=(bar==='hp')?skillState.hp:skillState.mp;
+      b.from=b.active?b.val:(cur-delta);
+      b.to=cur; b.t=0; b.val=b.from; b.active=true;
+    }
+    function espilHealTickBar(bar,dt){
+      var b=espilHealDisp[bar];
+      if(!b.active)return false;
+      var cur=(bar==='hp')?skillState.hp:skillState.mp;
+      if(cur<b.to){ b.active=false; b.val=cur; return true; }  /* damage/death wins */
+      if(cur>b.to)b.to=cur;                                   /* absorb trickle gains */
+      b.t+=dt*1000;
+      var k=Math.min(1,b.t/ESPIL_HEAL_DUR_MS), e=1-Math.pow(1-k,3);
+      b.val=b.from+(b.to-b.from)*e;
+      if(k>=1){ b.active=false; b.val=b.to; }
+      return true;
+    }
+    function espilHealTick(dt){
+      var dirty=false;
+      if(espilHealTickBar('hp',dt))dirty=true;
+      if(espilHealTickBar('mp',dt))dirty=true;
+      if(dirty)paintStatus();
+      espilHealFxTick(dt);
+    }
+    function espilHealTrigger(dHp,dMp){
+      /* amounts RECOVERED: a revive can set MP below its pre-death
+         value (50% of max < current) - that is not a negative heal. */
+      dHp=Math.max(0,dHp||0); dMp=Math.max(0,dMp||0);
+      if(dHp<=0&&dMp<=0)return;
+      espilHealDisp.triggers++;
+      espilHealDisp.lastHp=dHp; espilHealDisp.lastMp=dMp;
+      if(dHp>0)espilHealStartBar('hp',dHp);
+      if(dMp>0)espilHealStartBar('mp',dMp);
+      espilHealFxStart(dHp,dMp);
+      paintStatus();
+    }
+    /* ---- steps 2-4: player-anchored world FX (pooled) ---- */
+    var espilHealFx={ active:false, t:0, dHp:0, dMp:0,
+      layer:null, numWrap:null, numBig:null, numSub:null,
+      pluses:[], confetti:[], plusSeed:[], confSeed:[],
+      pillar:null, pillarMat:null, vec:null };
+    function espilHealFxEnsure(){
+      var f=espilHealFx;
+      if(f.layer)return true;
+      try{
+        var layer=document.createElement('div');
+        layer.id='espil-healfx';
+        layer.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:9993;overflow:hidden;display:none;';
+        var wrap=document.createElement('div');
+        wrap.style.cssText='position:absolute;left:-600px;top:-600px;transform:translate(-50%,-50%);text-align:center;white-space:nowrap;';
+        var big=document.createElement('div');
+        big.style.cssText='font:900 46px Manrope,sans-serif;line-height:1;'+
+          'text-shadow:0 0 16px rgba(105,240,174,.9),0 2px 6px rgba(0,0,0,.8);';
+        var sub=document.createElement('div');
+        sub.style.cssText='font:800 19px Manrope,sans-serif;line-height:1.25;'+
+          'text-shadow:0 0 10px rgba(124,199,255,.9),0 2px 5px rgba(0,0,0,.8);';
+        wrap.appendChild(big); wrap.appendChild(sub); layer.appendChild(wrap);
+        var i,el;
+        for(i=0;i<8;i++){
+          el=document.createElement('div');
+          el.textContent='+';
+          el.style.cssText='position:absolute;left:-600px;top:-600px;transform:translate(-50%,-50%);'+
+            'font:900 20px Manrope,sans-serif;text-shadow:0 0 8px rgba(105,240,174,.8),0 1px 4px rgba(0,0,0,.7);opacity:0;';
+          layer.appendChild(el); f.pluses.push(el);
+        }
+        for(i=0;i<14;i++){
+          el=document.createElement('div');
+          el.style.cssText='position:absolute;left:-600px;top:-600px;width:7px;height:11px;border-radius:2px;opacity:0;';
+          layer.appendChild(el); f.confetti.push(el);
+        }
+        document.body.appendChild(layer);
+        f.layer=layer; f.numWrap=wrap; f.numBig=big; f.numSub=sub;
+        return true;
+      }catch(e){ return false; }
+    }
+    function espilHealPillarTex(){
+      var cv=document.createElement('canvas'); cv.width=4; cv.height=256;
+      var g=cv.getContext('2d');
+      var gr=g.createLinearGradient(0,0,0,256);
+      gr.addColorStop(0,'rgba(255,255,255,0)');
+      gr.addColorStop(.35,'rgba(255,255,255,.38)');
+      gr.addColorStop(.62,'rgba(255,255,255,.85)');
+      gr.addColorStop(.85,'rgba(255,255,255,.55)');
+      gr.addColorStop(1,'rgba(255,255,255,.12)');
+      g.fillStyle=gr; g.fillRect(0,0,4,256);
+      var tx=new THREE.CanvasTexture(cv);
+      return tx;
+    }
+    function espilHealFxStart(dHp,dMp){
+      var f=espilHealFx;
+      if(!espilHealFxEnsure())return;
+      var hpLed=dHp>0;
+      var mainCol=hpLed?'#69f0ae':'#7cc7ff';
+      f.dHp=dHp; f.dMp=dMp; f.t=0; f.active=true;
+      f.numBig.textContent='+'+Math.round(hpLed?dHp:dMp);
+      f.numBig.style.color=mainCol;
+      f.numBig.style.textShadow=hpLed?
+        '0 0 16px rgba(105,240,174,.9),0 2px 6px rgba(0,0,0,.8)':
+        '0 0 16px rgba(124,199,255,.9),0 2px 6px rgba(0,0,0,.8)';
+      f.numSub.textContent=(hpLed&&dMp>0)?('+'+Math.round(dMp)+' MP'):'';
+      f.numSub.style.color='#7cc7ff';
+      var i,r;
+      f.plusSeed.length=0;
+      for(i=0;i<f.pluses.length;i++){
+        r=Math.random;
+        var blue=(!hpLed)||(dMp>0&&i>=6);
+        f.pluses[i].style.color=blue?'#7cc7ff':'#69f0ae';
+        f.pluses[i].style.fontSize=(15+Math.floor(r()*10))+'px';
+        f.plusSeed.push({dx:(r()*104-52),delay:i*0.05+r()*0.09,rise:0.68+r()*0.28});
+      }
+      var pal=hpLed?['#69f0ae','#ffd76a','#ffffff','#a7f3c9']:['#7cc7ff','#ffffff','#bfe3ff','#ffd76a'];
+      f.confSeed.length=0;
+      for(i=0;i<f.confetti.length;i++){
+        r=Math.random;
+        f.confetti[i].style.background=pal[i%pal.length];
+        f.confSeed.push({vx:(r()*190-95),vy:-(60+r()*110),rot:r()*360,spin:(r()*520-260)});
+      }
+      if(mapScene&&typeof THREE!=='undefined'){
+        try{
+          if(!f.pillar){
+            var geo=new THREE.CylinderGeometry(0.85,1.05,3.4,24,1,true);
+            f.pillarMat=new THREE.MeshBasicMaterial({map:espilHealPillarTex(),color:0x69f0ae,
+              transparent:true,opacity:0,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,
+              depthWrite:false,fog:false});
+            f.pillar=new THREE.Mesh(geo,f.pillarMat);
+            f.pillar.renderOrder=6; f.pillar.frustumCulled=false; f.pillar.visible=false;
+            mapScene.add(f.pillar);
+          }
+          f.pillarMat.color.set(hpLed?0x69f0ae:0x7cc7ff);
+        }catch(e){}
+      }
+      f.layer.style.display='block';
+    }
+    function espilHealFxHide(){
+      var f=espilHealFx,i;
+      if(f.layer)f.layer.style.display='none';
+      if(f.pillar)f.pillar.visible=false;
+      for(i=0;i<f.pluses.length;i++)f.pluses[i].style.opacity='0';
+      for(i=0;i<f.confetti.length;i++)f.confetti[i].style.opacity='0';
+    }
+    function espilHealFxTick(dt){
+      var f=espilHealFx;
+      if(!f.active)return;
+      f.t+=dt;
+      if(f.t>=ESPIL_HEAL_FX_S){ f.active=false; espilHealFxHide(); return; }
+      var t=f.t;
+      if(!walkPlayer||typeof mapCamera==='undefined'||!mapCamera||
+         !document.body.classList.contains('in-map')){
+        if(f.layer)f.layer.style.display='none';
+        if(f.pillar)f.pillar.visible=false;
+        return;
+      }
+      if(f.layer&&f.layer.style.display==='none')f.layer.style.display='block';
+      if(!f.vec)f.vec=new THREE.Vector3();
+      var v=f.vec, px=walkPlayer.pos.x, py=walkPlayer.pos.y, pz=walkPlayer.pos.z;
+      function sx(h){ v.set(px,py+h,pz).project(mapCamera); return (v.x*.5+.5)*window.innerWidth; }
+      function sy(h){ v.set(px,py+h,pz).project(mapCamera); return (-v.y*.5+.5)*window.innerHeight; }
+      v.set(px,py+0.2,pz).project(mapCamera);
+      if(v.z>1||v.z<-1||Math.abs(v.x)>1.15||Math.abs(v.y)>1.15){
+        if(f.layer)f.layer.style.display='none';
+        if(f.pillar)f.pillar.visible=false;
+        return;
+      }
+      var X=sx(0.2), Ymid=sy(1.05), Ytop=sy(2.3), Ynum=sy(2.55);
+      var i,el,lt,p;
+      /* step 2: rising pluses */
+      for(i=0;i<f.pluses.length;i++){
+        el=f.pluses[i]; var sd=f.plusSeed[i];
+        lt=t-sd.delay;
+        if(lt<0||lt>sd.rise){ el.style.opacity='0'; continue; }
+        p=lt/sd.rise;
+        el.style.left=(X+sd.dx*(0.55+0.45*p))+'px';
+        el.style.top=(Ymid+(Ytop-Ymid)*p)+'px';
+        el.style.opacity=String(p<0.15?(p/0.15):(p>0.7?((1-p)/0.3):1));
+      }
+      /* step 4: big number (pop, settle, fade) + confetti burst */
+      var popK=Math.min(1,t/0.16), scale=0.55+0.65*(1-Math.pow(1-popK,3));
+      if(t>0.16)scale=1.2-0.2*Math.min(1,(t-0.16)/0.14);
+      var nOp=t<0.8?1:Math.max(0,1-(t-0.8)/0.35);
+      f.numWrap.style.left=X+'px';
+      f.numWrap.style.top=(Ynum-t*14)+'px';
+      f.numWrap.style.opacity=String(nOp);
+      f.numWrap.style.transform='translate(-50%,-50%) scale('+scale.toFixed(3)+')';
+      for(i=0;i<f.confetti.length;i++){
+        el=f.confetti[i]; var cs=f.confSeed[i];
+        if(t>0.95){ el.style.opacity='0'; continue; }
+        el.style.left=(X+cs.vx*t)+'px';
+        el.style.top=(Ynum+cs.vy*t+300*t*t)+'px';
+        el.style.opacity=String(t<0.55?1:Math.max(0,1-(t-0.55)/0.4));
+        el.style.transform='translate(-50%,-50%) rotate('+(cs.rot+cs.spin*t).toFixed(1)+'deg)';
+      }
+      /* step 3: aura pillar follows the player */
+      if(f.pillar&&f.pillarMat){
+        f.pillar.visible=true;
+        f.pillar.position.set(px,py+1.65,pz);
+        f.pillar.rotation.y+=dt*0.9;
+        var pOp=t<0.12?(t/0.12)*0.5:(t>0.75?0.5*Math.max(0,1-(t-0.75)/0.4):0.5);
+        f.pillarMat.opacity=pOp;
+        var ps=1+0.1*Math.min(1,t/0.5);
+        f.pillar.scale.set(ps,1,ps);
+      }
+    }
     /* S4 contract: panels' food-use listener restores through here. */
     window.__espilApplyRecovery=function(hp,mp){
       hp=Math.max(0,Math.floor(hp||0)); mp=Math.max(0,Math.floor(mp||0));
+      var _hb=skillState.hp, _mb=skillState.mp;
       if(!espilDead&&(hp>0||mp>0)){
         skillState.hp=Math.min(skillState.maxhp,skillState.hp+hp);
         skillState.mp=Math.min(skillState.maxmp,skillState.mp+mp);
         saveSkills(); paintStatus();
       }
+      /* HEAL FX: fire on the ACTUAL applied delta (post-clamp), so a
+         full-bar use stays silent and state remains the only truth. */
+      espilHealTrigger(skillState.hp-_hb,skillState.mp-_mb);
       return {hp:skillState.hp,mp:skillState.mp};
     };
     window.__espilCombatState=function(){
@@ -8530,12 +8816,17 @@
     }
     function espilReviveCommon(frac){
       try{ if(walkPlayer&&walkPlayer.av&&walkPlayer.av.__espilSetState)walkPlayer.av.__espilSetState('idle'); }catch(e){} /* Batch 6 Item D */
+      var _hb=skillState.hp, _mb=skillState.mp;
       skillState.hp=Math.max(1,Math.ceil(skillState.maxhp*frac));
       skillState.mp=Math.ceil(skillState.maxmp*frac);
       espilDead=false;
       espilGraceEnd=espilGameT+ESPIL_REVIVE_GRACE_S;
       espilHideDeathUI();
       saveSkills(); paintStatus();
+      /* HEAL FX (2026-11-13): every revive flavour funnels through
+         here, so the 5-step treatment fires for all of them; the
+         pillar/number anchor at the (possibly teleported) body. */
+      espilHealTrigger(skillState.hp-_hb,skillState.mp-_mb);
     }
     function espilReviveVillage(){
       if(!espilDead)return;

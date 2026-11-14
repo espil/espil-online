@@ -1531,12 +1531,20 @@
     try {
       var ss = window.__espilSkills ? window.__espilSkills.state : null;
       if (ss) {
-        var hpf = Math.max(0, Math.min(100, ss.hp / (ss.maxhp || 100) * 100));
-        var mpf = Math.max(0, Math.min(100, ss.mp / (ss.maxmp || 50) * 100));
+        /* HEAL FX (2026-11-13): while monolith's heal animation runs,
+           render its display values so this bar fills smoothly and
+           its number counts up with the flasks; the hook already
+           falls back to true state when no animation is active. */
+        var hd = null;
+        try { hd = window.__espilHealDisplay ? window.__espilHealDisplay() : null; } catch (e) {}
+        var hpv = hd ? hd.hp : ss.hp;
+        var mpv = hd ? hd.mp : ss.mp;
+        var hpf = Math.max(0, Math.min(100, hpv / (ss.maxhp || 100) * 100));
+        var mpf = Math.max(0, Math.min(100, mpv / (ss.maxmp || 50) * 100));
         bars.querySelector('.h2-track.hp i').style.width = hpf + '%';
         bars.querySelector('.h2-track.mp i').style.width = mpf + '%';
         var hn = bars.querySelector('.h2-hp-num');
-        var ht = Math.ceil(ss.hp) + '/' + ss.maxhp;
+        var ht = Math.ceil(hpv) + '/' + ss.maxhp;
         if (hn && hn.textContent !== ht) hn.textContent = ht;
       }
       var lvl = 1;
