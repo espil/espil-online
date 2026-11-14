@@ -1025,25 +1025,48 @@
          panel uses). A record with neither gets NO label at all:
          no name, no label (the blank-pill defect class ends here).
          Tenant store names never become the label (Han 2026-10-27).
-       - Only records whose footprint is within ESPIL_LABEL_RADIUS
-         (35 m, signed ring distance) of the player show a label;
-         moving out of radius removes it.
+       - Name data resolves lazily for records whose footprint is
+         within ESPIL_LABEL_RADIUS (35 m, signed ring distance),
+         but a label is PRESENTED only inside the Use range
+         (fix batch 8 item 6, Han 2026-11-14 - the last bullet).
        - The label floats at ESPIL_LABEL_HEAD_H (2.2 m - about the
          approaching character's head height) above the record's
          ground anchor, in a colour-highlighted logwood div.
        - The anchor (the ground point UNDER the label) is the
          storefront point: the closest point on the record's ring to
-         its own centre (the main facade), pushed 0.6 m outward.
+         its own centre (the main facade) - the ring point itself,
+         ON the wall face (fix batch 8 item 6: the batch-4 build
+         pushed it 0.6 m outward off the wall; that offset is gone).
        - The Use key's judgment position is that ground anchor: on
          the P1 line Space opens the panel of the record whose
          anchor is within ESPIL_LABEL_INTERACT_R (3.5 m), replacing
-         both the old centre rule and the 2 m ring gate. */
+         both the old centre rule and the 2 m ring gate.
+       Fix batch 8 item 6 (Han 2026-11-14): the name must be fixed
+       to the wall at that exact location, keep its pixel size when
+       zoomed out, and appear only when the user comes within
+       Use-key range - not all names at once. Item 6 therefore
+       REPLACES the 35 m presentation radius with the Use range:
+       a label is presented iff the player's distance to the wall
+       anchor is <= ESPIL_LABEL_SHOW_R, which IS
+       ESPIL_LABEL_INTERACT_R (3.5 m) - one number, the same
+       predicate that lights the Use prompt (the tick's is-near
+       class) and opens the panel. The 35 m radius survives only
+       as the lazy name-resolution and entry-glow neighbourhood.
+       Pixel size needed no change: the label is a screen-space
+       div (font 12.5 px; no scale anywhere in its style or in the
+       tick) - measured 24 px rendered height at camera distances
+       2.28 / 4.96 / 19.54 m, before and after this change.
+       Wall-fixed is structural: the tick projects the fixed world
+       anchor (the wall point, at head height) through the map
+       camera every frame; the label itself never moves in screen
+       space, so it cannot drift or slide off the wall. */
     var ESPIL_LABEL_RADIUS=35, ESPIL_LABEL_HEAD_H=2.2, ESPIL_LABEL_INTERACT_R=3.5, ESPIL_LABEL_MAX=12;
+    var ESPIL_LABEL_SHOW_R=ESPIL_LABEL_INTERACT_R; /* item 6: the presentation range IS the Use range - one number */
     var espilLabelLayer=null, espilLabelEntries=[], espilLabelPool=[], espilLabelNear=null;
     function espilLabelAnchor(rec){
       if(rec._espilAnchor)return rec._espilAnchor;
       var pr=espilPolyProbe(rec,rec.cx,rec.cz);
-      rec._espilAnchor={x:pr.cx+pr.nx*0.6, z:pr.cz+pr.nz*0.6};
+      rec._espilAnchor={x:pr.cx, z:pr.cz}; /* item 6: ON the wall face - no outward offset */
       return rec._espilAnchor;
     }
     function espilCollectRecsNear(px,pz,r){
@@ -1111,9 +1134,12 @@
           if(d>ESPIL_LABEL_RADIUS)continue;
           espilLabelResolveName(rec);
           if(!rec._espilLblName)continue; /* no displayable name -> no label */
-          cands.push({rec:rec,d:d});
+          var a0=espilLabelAnchor(rec);
+          var ad=Math.hypot(px-a0.x,pz-a0.z);
+          if(ad>ESPIL_LABEL_SHOW_R)continue; /* item 6: present only inside the Use range */
+          cands.push({rec:rec,d:d,ad:ad});
         }
-        cands.sort(function(a,b){return a.d-b.d;});
+        cands.sort(function(a,b){return a.ad-b.ad;});
         var layer=espilLabelLayerGet();
         for(var j=0;j<cands.length&&j<ESPIL_LABEL_MAX;j++){
           var c=cands[j], a=espilLabelAnchor(c.rec);
@@ -1126,7 +1152,7 @@
           }
           if(el.textContent!==c.rec._espilLblName)el.textContent=c.rec._espilLblName;
           el.style.display='none'; /* the per-frame tick positions + shows */
-          entries.push({rec:c.rec,name:c.rec._espilLblName,ax:a.x,az:a.z,d:c.d,el:el});
+          entries.push({rec:c.rec,name:c.rec._espilLblName,ax:a.x,az:a.z,d:c.d,ad:c.ad,el:el});
         }
       }
       for(var k=entries.length;k<espilLabelPool.length;k++){
@@ -1156,9 +1182,10 @@
     window.__espilStoreLabelState=function(){
       return {
         radius:ESPIL_LABEL_RADIUS, headH:ESPIL_LABEL_HEAD_H, interactR:ESPIL_LABEL_INTERACT_R,
+        showR:ESPIL_LABEL_SHOW_R, anchorMode:'wall',
         nearAnchor:espilLabelNear?{d:+espilLabelNear.d.toFixed(2),x:+espilLabelNear.ax.toFixed(1),z:+espilLabelNear.az.toFixed(1)}:null,
         labels:espilLabelEntries.map(function(e){
-          return {name:e.name,x:+e.ax.toFixed(1),z:+e.az.toFixed(1),d:+e.d.toFixed(1),visible:e.el.style.display!=='none'};
+          return {name:e.name,x:+e.ax.toFixed(1),z:+e.az.toFixed(1),d:+e.d.toFixed(1),ad:+e.ad.toFixed(2),visible:e.el.style.display!=='none'};
         })
       };
     };
