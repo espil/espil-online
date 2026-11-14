@@ -69,7 +69,15 @@
 
    Hook: window.__espilArenaState() mirrors
    window.__espilArena.state(); window.__espilArena carries the
-   actions + test hooks the rig probes use. */
+   actions + test hooks the rig probes use.
+
+   PROMPT PILL OFF (Han 2026-11-13, confirmed decision,
+   superseding the fix-7 guides-inventory keep and qualifying
+   the 2026-11-11 raise at HEAD 0ad1b186): the portal proximity
+   prompt pill (#espil-arena-prompt) never presents - see the
+   PROMPT_OFF gate below. Entry is unchanged: monolith's Use
+   system (tryInteract) and this module's F key both call
+   portalUse(); only the pill's presentation is gated. */
 (function () {
   'use strict';
   if (window.__espilArenaState) return;
@@ -92,6 +100,14 @@
   var CASH_REVIVE_ITEM = 'arena-revive-credit';   /* cashshop.js catalogue id (persistent entitlement) */
   var LS_KEY = 'espil_arena_best_v1';
   var LEO_KEY = 'espil_leo_balance';
+
+  /* Prompt pill off (Han 2026-11-13): the portal proximity
+     prompt (#espil-arena-prompt) never presents while this flag
+     is set - the tick below checks it before toggling the
+     pill's 'open' class. The portal, the Use/F-key entry paths
+     and the forming panel never read it. One flag restores
+     the pill. */
+  var PROMPT_OFF = true;
 
   /* reward tables (DESIGN-v1 section 3, all DRAFT) */
   var LEO_PER_ROUND = 10;               /* round clear pays round x 10 Leo, guaranteed */
@@ -777,8 +793,11 @@
     if (portalRing) { var s = 1 + Math.sin(Date.now() / 500) * 0.05; portalRing.scale.set(s, s, s); }
     var prompt = $('espil-arena-prompt');
     if (prompt) {
-      var show = !run && distTo(PORTAL.x, PORTAL.z) <= PORTAL_RANGE;
-      prompt.classList.toggle('open', !!show);
+      if (PROMPT_OFF) { prompt.classList.remove('open'); }   /* prompt pill off (Han 2026-11-13): never presents */
+      else {
+        var show = !run && distTo(PORTAL.x, PORTAL.z) <= PORTAL_RANGE;
+        prompt.classList.toggle('open', !!show);
+      }
     }
     if (!run) return;
     var now = Date.now();
