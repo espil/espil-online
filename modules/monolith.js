@@ -3578,6 +3578,213 @@
       mapScene.add(av.group);mapScene.add(av.shadow);
       av.shadow.position.set(walkPlayer.pos.x,.03,walkPlayer.pos.z);
     }
+    /* === FOOT-SLIDE SYNC (Han 2026-11-15, gamedevinspire reel
+       "Fix Foot Sliding in Unity with Root Motion" adapted to the
+       web build): sliding is a rate mismatch - code translates the
+       character at one speed while the locomotion clip cycles at
+       another. The reel's root motion does not exist here (root
+       tracks are stripped; physics owns translation), so the same
+       principle is applied in web form: each walk/run clip's
+       natural STRIDE SPEED (the ground speed at which its stance
+       foot is stationary, measured in-page from the foot bones at
+       build time) is cached per clip, and the active locomotion
+       action's timeScale is driven every tick to
+       actualSpeed / strideSpeed, clamped to [0.2, 64]. The band:
+       measured operating points run from ~0.44 (a remote crossing
+       the 0.35 m/s walk threshold on the female walk clip) to ~29
+       (street-boosted run on the masters run clip); 64 keeps more
+       than 2x headroom over the highest legitimate point while a
+       degenerate stride estimate can never demand an unbounded
+       rate, and 0.2 keeps a near-zero speed from freezing the
+       cycle outright. If a clip's stride cannot be measured (no
+       foot bones), that clip keeps its previous behaviour -
+       timeScale is never written for it. Idle and one-shots are
+       never touched. === */
+    var ESPIL_STRIDE_TS_MIN=0.2, ESPIL_STRIDE_TS_MAX=64;
+    function espilStrideBone(model,wants){
+      var norm=wants.map(function(w){ return String(w).replace(/[^a-z0-9]/gi,'').toLowerCase(); });
+      var boneHit=null, anyHit=null;
+      model.traverse(function(o){
+        var n=(o.name||'').replace(/[^a-z0-9]/gi,'').toLowerCase();
+        if(norm.indexOf(n)<0)return;
+        if(o.isBone){ if(!boneHit)boneHit=o; }
+        else if(!anyHit)anyHit=o;
+      });
+      return boneHit||anyHit;
+    }
+    function espilMeasureStride(model,clip){
+      if(!model||!clip||!(clip.duration>0))return null;
+      if(typeof clip.__espilStride==='number')return clip.__espilStride>0?clip.__espilStride:null;
+      try{
+        var hips=espilStrideBone(model,['mixamorigHips','hips']);
+        var fl=espilStrideBone(model,['mixamorigLeftFoot','footl']);
+        var fr=espilStrideBone(model,['mixamorigRightFoot','footr']);
+        var tl=espilStrideBone(model,['mixamorigLeftToeBase','toesl']);
+        var tr=espilStrideBone(model,['mixamorigRightToeBase','toesr']);
+        if(!hips||(!fl&&!fr))return null;
+        var sm=new THREE.AnimationMixer(model);
+        var act=sm.clipAction(clip);
+        act.play();
+        sm.update(0);
+        /* Estimator (the rig lab's cross-validated method): sample
+           one full cycle; per foot, stance = the flat-contact set
+           (ankle AND toe in their low height bands, heights taken as
+           model-local Y - hips-relative heights are polluted by the
+           hips bob and misread the KayKit run stance entirely);
+           stride speed = the mean central-difference velocity of
+           the ankle/toe midpoint along the stride axis over the
+           stance set, with the ankle-only estimator as fallback. */
+        var N=200, dur=clip.duration, dt=dur/N, i, fi, t;
+        var hv=new THREE.Vector3(), av3=new THREE.Vector3(), tv=new THREE.Vector3();
+        var inv=new THREE.Matrix4();
+        var feet=[['L',fl,tl],['R',fr,tr]];
+        var series={L:[],R:[]};
+        for(i=0;i<N;i++){
+          t=dur*i/N;
+          act.time=t;
+          sm.update(0);
+          model.updateMatrixWorld(true);
+          /* Sample in the model's LOCAL frame: world-axis sampling
+             understates the sweep by cos(faceY) whenever the avatar
+             group stands rotated (spawn facing 0.5 rad cost the
+             local KayKit a factor 0.878 on the rig). Local y is the
+             up axis, so the stance height bands carry over. */
+          inv.copy(model.matrixWorld).invert();
+          hips.getWorldPosition(hv); hv.applyMatrix4(inv);
+          for(fi=0;fi<2;fi++){
+            var fb=feet[fi][1];
+            if(!fb)continue;
+            fb.getWorldPosition(av3); av3.applyMatrix4(inv);
+            var rec={ax:av3.x-hv.x, ay:av3.y, az:av3.z-hv.z, tx:null, ty:null, tz:null};
+            var tb=feet[fi][2];
+            if(tb){
+              tb.getWorldPosition(tv); tv.applyMatrix4(inv);
+              rec.tx=tv.x-hv.x; rec.ty=tv.y; rec.tz=tv.z-hv.z;
+            }
+            series[feet[fi][0]].push(rec);
+          }
+        }
+        sm.stopAllAction();
+        try{ sm.uncacheRoot(model); }catch(_){}
+        /* stride axis: the horizontal axis with the larger total
+           foot excursion (facing conventions differ per family) */
+        var rxSum=0, rzSum=0;
+        ['L','R'].forEach(function(k){
+          var s=series[k]; if(s.length<8)return;
+          var mnx=1e9,mxx=-1e9,mnz=1e9,mxz=-1e9;
+          s.forEach(function(p){ if(p.ax<mnx)mnx=p.ax; if(p.ax>mxx)mxx=p.ax; if(p.az<mnz)mnz=p.az; if(p.az>mxz)mxz=p.az; });
+          rxSum+=mxx-mnx; rzSum+=mxz-mnz;
+        });
+        var useX=rxSum>=rzSum;
+        function fwd(p){ return useX?p.ax:p.az; }
+        function stanceSpeed(s,midMode){
+          var aMn=1e9,aMx=-1e9,tMn=1e9,tMx=-1e9;
+          s.forEach(function(p){
+            if(p.ay<aMn)aMn=p.ay; if(p.ay>aMx)aMx=p.ay;
+            if(p.ty!==null){ if(p.ty<tMn)tMn=p.ty; if(p.ty>tMx)tMx=p.ty; }
+          });
+          var aThr=aMn+(midMode?0.35:0.30)*(aMx-aMn);
+          var tThr=tMn+0.35*(tMx-tMn);
+          var f=s.map(function(p){
+            return (p.tx===null)?fwd(p):(fwd(p)+(useX?p.tx:p.tz))/2;
+          });
+          var sum=0,cnt=0;
+          for(var j=0;j<s.length;j++){
+            var p=s[j];
+            var ok=midMode?(p.ay<=aThr&&(p.ty===null||p.ty<=tThr)):(p.ay<=aThr);
+            if(!ok)continue;
+            var d=(f[(j+1)%s.length]-f[(j-1+s.length)%s.length])/(2*dt);
+            sum+=d; cnt++;
+          }
+          if(cnt<6)return null;
+          var v=Math.abs(sum/cnt);
+          return v>0.01?v:null;
+        }
+        var per=[];
+        ['L','R'].forEach(function(k){
+          var s=series[k]; if(s.length<8)return;
+          var v=stanceSpeed(s,true);
+          if(v===null)v=stanceSpeed(s,false);
+          if(v!==null)per.push(v);
+        });
+        if(!per.length)return null;
+        var stride=0;
+        per.forEach(function(v){ stride+=v; });
+        stride/=per.length;
+        /* The samples above are model-LOCAL (GLB-native units):
+           convert to base-scale metres with the builder's declared
+           base scale. Registration timing vs the layer-mode growth
+           (visual root x ESPIL_AVATAR_F, applied per frame) and the
+           avatar group's facing therefore cannot leak into the
+           cached value - both leaked on the rig before this frame
+           discipline (async file-clip registration measured ~2.9x
+           the lab stride; a rotated spawn facing cost a cos factor).
+           espilStrideSync converts back with the visual root's
+           live scale every tick. */
+        var _base=(model.userData&&typeof model.userData.__avBaseScale==='number'&&model.userData.__avBaseScale>0)?model.userData.__avBaseScale:model.scale.x;
+        if(_base>0)stride=stride*_base;
+        if(!(stride>=0.05&&stride<=12))return null;
+        clip.__espilStride=stride;
+        return stride;
+      }catch(_){ return null; }
+    }
+    function espilStrideRegister(av,model,actionName){
+      if(actionName!=='walk'&&actionName!=='run')return;
+      if(!av||!av.actions||!av.actions[actionName])return;
+      var act=av.actions[actionName];
+      var s=espilMeasureStride(model,act.getClip());
+      if(s){
+        act.__espilStride=s;
+        if(actionName==='walk')av.__strideWalk=s; else av.__strideRun=s;
+      }
+    }
+    function espilStrideSync(av,speed){
+      if(!av||!av.mixer)return;
+      var name=av.curAnim;
+      if(name!=='walk'&&name!=='run')return;
+      var act=av.actions[name];
+      if(!act)return;
+      var s=act.__espilStride;
+      if(!(s>0))return;
+      /* cached strides are base-scale metres - convert to the
+         stride the rendered body actually sweeps right now */
+      var vr=av.__visualRoot||av.visual;
+      if(vr&&vr.userData&&typeof vr.userData.__avBaseScale==='number'&&vr.userData.__avBaseScale>0){
+        s=s*(vr.scale.x/vr.userData.__avBaseScale);
+      }
+      var ts=speed/s;
+      if(ts<ESPIL_STRIDE_TS_MIN)ts=ESPIL_STRIDE_TS_MIN;
+      else if(ts>ESPIL_STRIDE_TS_MAX)ts=ESPIL_STRIDE_TS_MAX;
+      act.timeScale=ts;
+      av.__strideTs=ts;
+      av.__strideSpeed=speed;
+    }
+    window.__espilStrideSyncState=function(){
+      var out={local:null,remotes:[],clamp:[ESPIL_STRIDE_TS_MIN,ESPIL_STRIDE_TS_MAX]};
+      try{
+        var p=(typeof walkPlayer!=='undefined')?walkPlayer:null;
+        if(p&&p.av){
+          var av=p.av, ca=av.actions[av.curAnim];
+          out.local={family:av.__kaykit?'kaykit':'master',gender:av.__gender||null,anim:av.curAnim,
+            walkStride:(typeof av.__strideWalk==='number')?av.__strideWalk:null,
+            runStride:(typeof av.__strideRun==='number')?av.__strideRun:null,
+            currentTimeScale:ca?ca.timeScale:null,
+            currentSpeed:(typeof p._fsSpeed==='number')?p._fsSpeed:null};
+        }
+        if(typeof __espilRemotes!=='undefined'&&__espilRemotes){
+          for(var id in __espilRemotes){
+            var R=__espilRemotes[id];
+            if(!R)continue;
+            var ra=R.actions[R.curAnim];
+            out.remotes.push({id:id,family:R.__kaykit?'kaykit':'master',anim:R.curAnim,speed:R.speed,
+              walkStride:(typeof R.__strideWalk==='number')?R.__strideWalk:null,
+              runStride:(typeof R.__strideRun==='number')?R.__strideRun:null,
+              currentTimeScale:ra?ra.timeScale:null});
+          }
+        }
+      }catch(_){}
+      return out;
+    };
     function buildWalkerAvatar(gender){
       gender=(gender==='female')?'female':'male';
       /* Body + skeleton come from ONE GLB per gender (Mixamo 22-bone
@@ -3623,6 +3830,9 @@
           if(idleClip)av.actions.idle=mixer.clipAction(idleClip);
           if(walkClip)av.actions.walk=mixer.clipAction(walkClip);
           if(runClip)av.actions.run=mixer.clipAction(runClip);
+          espilStrideRegister(av,model,'walk'); /* FOOT-SLIDE SYNC: embedded locomotion strides, measured once at build */
+          espilStrideRegister(av,model,'run');
+          try{ mixer.update(0); }catch(_){}
           av.ready=true;
           av.playAnim('idle');
           /* === 15-animation system (QA relay 2026-10-07): separate GLBs per clip.
@@ -3647,6 +3857,7 @@
                 if(!loop){act.setLoop(THREE.LoopOnce);act.clampWhenFinished=true;}
                 var oldAct=av.actions[actionName];
                 av.actions[actionName]=act;
+                if(actionName==='walk'||actionName==='run'){ espilStrideRegister(av,model,actionName); try{ mixer.update(0); }catch(_){} } /* FOOT-SLIDE SYNC: file clips (male walk/run) replace the embedded set - measure the clip that actually plays */
                 /* Take over playback when the replaced action is the
                    one on stage (Han PC verdict 2026-10-19 #6): male.glb's
                    embedded 'baselayer' idle is a static bind pose (the
@@ -8141,6 +8352,7 @@
           var model=__espilCloneModel(M);
           model.rotation.y=Math.PI;
           model.scale.setScalar(1.5);
+          model.userData.__avBaseScale=1.5; /* FOOT-SLIDE SYNC: stride normalisation base (the remote tick grows this root by the layer factor) */
           model.position.y=M.groundY;
           model.traverse(function(o){ if(o.isMesh){ o.castShadow=true; } });
           R.visual=model; R.baseY=M.groundY;
@@ -8154,6 +8366,9 @@
           if(idleClip)R.actions.idle=mixer.clipAction(idleClip);
           if(walkClip)R.actions.walk=mixer.clipAction(walkClip);
           if(runClip)R.actions.run=mixer.clipAction(runClip);
+          espilStrideRegister(R,model,'walk'); /* FOOT-SLIDE SYNC: stride cached on the shared master clip */
+          espilStrideRegister(R,model,'run');
+          try{ mixer.update(0); }catch(_){}
           R.ready=true;
           R.playAnim('idle');
         }catch(_){ }
@@ -8216,6 +8431,7 @@
               var want=R.speed>6.5?'run':(R.speed>0.35?'walk':'idle');
               if(!R.actions[want])want='idle';
               R.playAnim(want);
+              espilStrideSync(R,R.speed); /* FOOT-SLIDE SYNC: R.speed is the smoothed stream speed */
               R.mixer.update(R.acc);
               R.acc=0;
             }
@@ -9673,6 +9889,9 @@
         if(ESPIL_KK_ONESHOT[key]){ act.setLoop(THREE.LoopOnce); act.clampWhenFinished=true; }
         av.actions[key]=act;
       }
+      espilStrideRegister(av,model,'walk'); /* FOOT-SLIDE SYNC: KayKit locomotion strides (local + remote share this setup) */
+      espilStrideRegister(av,model,'run');
+      try{ mixer.update(0); }catch(_){}
       av.ready=true;
       av.playAnim('idle');
     }
@@ -10561,6 +10780,15 @@
         }
         p.av.playAnim(wantAnim);
       }
+      /* FOOT-SLIDE SYNC (Han 2026-11-15): the actual ground speed is
+         this tick's real horizontal displacement over dt - it already
+         carries joystick magnitude, the run multiplier, the street
+         speed boost and collision losses, so partial input syncs too. */
+      if(!p._fsLast)p._fsLast={x:p.pos.x,z:p.pos.z};
+      var _fsDx=p.pos.x-p._fsLast.x, _fsDz=p.pos.z-p._fsLast.z;
+      p._fsLast.x=p.pos.x; p._fsLast.z=p.pos.z;
+      p._fsSpeed=dt>0.0001?Math.sqrt(_fsDx*_fsDx+_fsDz*_fsDz)/dt:0;
+      espilStrideSync(p.av,p._fsSpeed);
       if(p.av.mixer)p.av.mixer.update(dt);
       /* Procedural swing lunge — the GLB has no attack clip, so the slash
          reads through a quick forward lunge + torso twist. */
