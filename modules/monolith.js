@@ -10631,6 +10631,46 @@
       }catch(e){ fail(); }
     }
     var ESPIL_CB_CLIPS={idle:'Idle',walk:'WalkBasic',run:'RunBasic'};
+    /* RUN PLAYBACK CORRECTION (Han screen verdict 2026-11-16:
+       the chibi RUN reads too fast; RUNFIX-REPORT.md in
+       guest-swap/). The stride estimator's flat-contact stance
+       set - ankle AND toe inside the lowest 35% height bands -
+       is cross-validated on the masters and the KayKit body,
+       whose gaits keep a foot down through most of the cycle.
+       RunBasic is a true run: it has a flight phase, and on
+       these short-legged clips the 35% set still covers
+       50-58% of the cycle, so the stance mean is diluted with
+       swing-phase samples and the registered stride comes out
+       low (male 1.203, female 1.626), which drives the run
+       timeScale high by the same ratio. Measured with a tight
+       near-ground contact band (15%: contact fraction
+       0.33-0.46, a plausible running duty factor), the same
+       clips read male 1.47 / female 2.03 across the ankle, toe
+       and midpoint estimators - ratios 1.22 / 1.25 over the
+       registered values. The run registration is therefore
+       scaled by their mean, 1.23, which lowers the run
+       timeScale by ~19% at every speed. The correction is
+       applied to the shared template clip's cached stride
+       (guarded, once per clip) so every clone - local and
+       remote - inherits it, and the action/avatar readouts
+       are re-derived from the corrected cache. Walk is NOT
+       corrected: a walk's duty factor (over half the cycle
+       per foot, with double support) matches the wide set,
+       and Han's verdict names the run. Masters and KayKit
+       registrations are untouched. */
+    var ESPIL_CB_RUN_STRIDE_F=1.23;
+    function espilCbRunStrideFix(av){
+      var act=av&&av.actions&&av.actions.run;
+      if(!act)return;
+      var clip=act.getClip();
+      if(!clip||typeof clip.__espilStride!=='number')return;
+      if(!clip.__espilCbRunFixed){
+        clip.__espilStride*=ESPIL_CB_RUN_STRIDE_F;
+        clip.__espilCbRunFixed=true;
+      }
+      act.__espilStride=clip.__espilStride;
+      av.__strideRun=clip.__espilStride;
+    }
     function espilCbSetup(av,model,clips,T){
       /* Authored facing is +z (ankle->toe measured on the rig for
          both genders) against the facing law's -z front - the same
@@ -10654,6 +10694,7 @@
       }
       espilStrideRegister(av,model,'walk'); /* FOOT-SLIDE SYNC: strides cached on the shared template clips */
       espilStrideRegister(av,model,'run');
+      espilCbRunStrideFix(av); /* RUN PLAYBACK CORRECTION (Han 2026-11-16): see ESPIL_CB_RUN_STRIDE_F above */
       try{ mixer.update(0); }catch(_){}
       av.ready=true;
       av.playAnim('idle');
