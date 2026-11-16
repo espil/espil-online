@@ -3617,10 +3617,13 @@
       if(typeof clip.__espilStride==='number')return clip.__espilStride>0?clip.__espilStride:null;
       try{
         var hips=espilStrideBone(model,['mixamorigHips','hips']);
-        var fl=espilStrideBone(model,['mixamorigLeftFoot','footl']);
-        var fr=espilStrideBone(model,['mixamorigRightFoot','footr']);
-        var tl=espilStrideBone(model,['mixamorigLeftToeBase','toesl']);
-        var tr=espilStrideBone(model,['mixamorigRightToeBase','toesr']);
+        /* the plain names ('leftfoot' etc.) are the Chibi pack rig's
+           unprefixed Mixamo names (Han 2026-11-16 guest body); the
+           masters/KayKit names above match first for their families */
+        var fl=espilStrideBone(model,['mixamorigLeftFoot','footl','leftfoot']);
+        var fr=espilStrideBone(model,['mixamorigRightFoot','footr','rightfoot']);
+        var tl=espilStrideBone(model,['mixamorigLeftToeBase','toesl','lefttoebase']);
+        var tr=espilStrideBone(model,['mixamorigRightToeBase','toesr','righttoebase']);
         if(!hips||(!fl&&!fr))return null;
         var sm=new THREE.AnimationMixer(model);
         var act=sm.clipAction(clip);
@@ -3765,7 +3768,7 @@
         var p=(typeof walkPlayer!=='undefined')?walkPlayer:null;
         if(p&&p.av){
           var av=p.av, ca=av.actions[av.curAnim];
-          out.local={family:av.__kaykit?'kaykit':'master',gender:av.__gender||null,anim:av.curAnim,
+          out.local={family:av.__chibi?'chibi':(av.__kaykit?'kaykit':'master'),gender:av.__gender||null,anim:av.curAnim,
             walkStride:(typeof av.__strideWalk==='number')?av.__strideWalk:null,
             runStride:(typeof av.__strideRun==='number')?av.__strideRun:null,
             currentTimeScale:ca?ca.timeScale:null,
@@ -3776,7 +3779,7 @@
             var R=__espilRemotes[id];
             if(!R)continue;
             var ra=R.actions[R.curAnim];
-            out.remotes.push({id:id,family:R.__kaykit?'kaykit':'master',anim:R.curAnim,speed:R.speed,
+            out.remotes.push({id:id,family:R.__chibi?'chibi':(R.__kaykit?'kaykit':'master'),anim:R.curAnim,speed:R.speed,
               walkStride:(typeof R.__strideWalk==='number')?R.__strideWalk:null,
               runStride:(typeof R.__strideRun==='number')?R.__strideRun:null,
               currentTimeScale:ra?ra.timeScale:null});
@@ -8328,9 +8331,15 @@
     function __espilBuildRemoteAvatar(gender){
       /* Batch 6 Item D: peers are guests too (accounts disabled),
          so remotes take the same guest renderer as the local player.
-         Han order 5 (2026-11-10): that renderer is the KayKit GLB
-         placeholder while ESPIL_KAYKIT_PLACEHOLDER is on. */
-      if(espilGuestNow())return espilKaykitPlaceholderOn()?__espilBuildKaykitRemote(gender):__espilBuildSpriteRemote(gender);
+         Guest body (Han 2026-11-16): the Chibi pack dummy by
+         default, with the same revert switch as the local builder
+         ('kaykit' restores the Han order 5 KayKit placeholder). */
+      if(espilGuestNow()){
+        var mode=espilGuestBodyMode();
+        if(mode==='chibi')return __espilBuildChibiRemote(gender);
+        if(mode==='kaykit')return __espilBuildKaykitRemote(gender);
+        return __espilBuildSpriteRemote(gender);
+      }
       var g=new THREE.Group();
       var shadow=new THREE.Mesh(new THREE.CircleGeometry(.55,20),
         new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.26,depthWrite:false}));
@@ -9686,10 +9695,18 @@
       try{ return !window.localStorage.getItem('espil_session_v1'); }catch(e){ return true; }
     }
     function buildPlayerAvatar(gender){
-      /* Han order 5 (2026-11-10): while ESPIL_KAYKIT_PLACEHOLDER is
-         on, guests ride the KayKit GLB placeholder instead of the 2D
-         sprite builder; signed-in sessions keep the in-tree masters. */
-      if(espilGuestNow())return espilKaykitPlaceholderOn()?buildKaykitAvatar(gender):buildSpriteAvatar(gender);
+      /* Guest body (Han 2026-11-16): guests ride the Chibi pack
+         dummy by default. espilGuestBodyMode() carries the revert
+         switch: window.__ESPIL_GUEST_BODY__ = 'kaykit' restores the
+         Han order 5 (2026-11-10) KayKit GLB placeholder exactly,
+         'sprite' returns to the 2D sprite builder. Signed-in
+         sessions keep the in-tree masters. */
+      if(espilGuestNow()){
+        var mode=espilGuestBodyMode();
+        if(mode==='chibi')return buildChibiAvatar(gender);
+        if(mode==='kaykit')return buildKaykitAvatar(gender);
+        return buildSpriteAvatar(gender);
+      }
       return buildWalkerAvatar(gender);
     }
 
@@ -10400,6 +10417,354 @@
       R.playAnim=function(name){ espilKkPlayAnim(R,name); };
       ESPIL_KK_REMOTES_BUILT++;
       espilKkLoad(R,null);
+      return R;
+    }
+    /* ================================================================
+       Han order (2026-11-16) - the guest dummy becomes Han's own
+       selling asset: the itch "Chibi 3D Characters - 8 Animated GLB
+       Pack", style1 per gender (the dummy is ONE placeholder look
+       per gender, exactly as the KayKit dummy was one look for both
+       genders; styles 2-4 stay in the pack, ready to rotate in or
+       be assigned the moment Han widens the scope - NO customizer
+       selection is built here). The files ship byte-identical in
+       assets/chibi-guests/ (licence beside them; they are Espil's
+       own commercial assets). Signed-in sessions are untouched.
+       REVERT: window.__ESPIL_GUEST_BODY__ = 'kaykit' before this
+       file loads (or ESPIL_GUEST_BODY below) restores the KayKit
+       placeholder path exactly; 'sprite' returns to the 2D path.
+       The KayKit files stay in the tree untouched.
+
+       Container reality (measured on the rig, 2026-11-16): the
+       pack files are gltfpack output. Geometry is meshopt-
+       compressed - the pair pages already publish
+       window.MeshoptDecoder, wired here the espilAuckLoader way.
+       Textures are KTX2/Basis, which the bundled GLTFLoader
+       refuses without a KTX2 loader, so a minimal loader below
+       transcodes each mip level to RGBA32 with the Basis
+       transcoder the tiles vendor tree already ships (the same
+       wasm three's own KTX2Loader drives) and hands the parser
+       plain DataTextures. Models are cached per gender as a
+       template and cloned per avatar (the masters' pattern), so a
+       room full of guests costs one parse per gender, not the
+       KayKit path's fresh 3.6 MB parse per peer.
+
+       Clip coverage is the pack's own: Idle / Walk / Run /
+       WalkBasic / RunBasic, nothing else. The game locomotion
+       slots map to WalkBasic / RunBasic - measured stride speeds
+       (male 0.80 / 1.30, female 0.95 / 1.88 m/s) sit in the same
+       band as the existing families, while Walk / Run measure as
+       a slow-stroll / sprint pair (0.39 / 2.50, 0.62 / 2.90) whose
+       walk would need frantic rate-ups in normal play; the unused
+       pair stays embedded, harmless. Attack / jump / swim / hit /
+       death have NO clips: hit and death are effect-carried (hurt
+       FX + death UI - the signed-in masters have no death state
+       handler at all), and the rest fall back to the current
+       locomotion with the move FX and the procedural swing lunge
+       carrying the read - the same contract as a master clip that
+       has not loaded. No slot ever points at a missing clip.
+       ================================================================ */
+    var ESPIL_GUEST_BODY='chibi';
+    function espilGuestBodyMode(){
+      var w=window.__ESPIL_GUEST_BODY__;
+      if(w==='chibi'||w==='kaykit'||w==='sprite')return w;
+      if(window.__ESPIL_KAYKIT_PLACEHOLDER__===true)return 'kaykit'; /* the order-5 override still honoured */
+      return ESPIL_GUEST_BODY;
+    }
+    var ESPIL_CB_FILES={male:'assets/chibi-guests/chibi_male_style1.glb',
+                        female:'assets/chibi-guests/chibi_female_style1.glb'};
+    var ESPIL_CB_TARGET_H=1.7; /* the game's player height, as the KayKit dummy */
+    var ESPIL_CB_BASIS_JS='modules/tiles3d/vendor/three/addons/libs/basis/basis_transcoder.js';
+    var ESPIL_CB_BASIS_WASM='modules/tiles3d/vendor/three/addons/libs/basis/basis_transcoder.wasm';
+    var ESPIL_CB_LOCAL=null,ESPIL_CB_REMOTES_BUILT=0;
+    window.__espilGuestBodyState=function(){
+      var L=ESPIL_CB_LOCAL;
+      return {mode:espilGuestBodyMode(),files:ESPIL_CB_FILES,targetH:ESPIL_CB_TARGET_H,
+        local:L?{ready:!!L.ready,anim:L.curAnim||null,acts:Object.keys(L.actions||{}),dead:!!L.__cbDead,gender:L.__gender||null}:null,
+        remotesBuilt:ESPIL_CB_REMOTES_BUILT,
+        kaykitOn:espilKaykitPlaceholderOn()};
+    };
+    /* Basis transcoder, initialised once (main thread; three
+       textures per gender, once per page, is not worker work). */
+    var espilCbBasisPromise=null;
+    function espilCbBasis(){
+      if(espilCbBasisPromise)return espilCbBasisPromise;
+      espilCbBasisPromise=new Promise(function(resolve,reject){
+        function withScript(){
+          fetch(ESPIL_CB_BASIS_WASM).then(function(r){
+            if(!r.ok)throw new Error('basis wasm '+r.status);
+            return r.arrayBuffer();
+          }).then(function(wasm){
+            var mod={wasmBinary:wasm,onRuntimeInitialized:function(){
+              try{ mod.initializeBasis(); }catch(e){ reject(e); return; }
+              resolve(mod);
+            }};
+            try{ BASIS(mod); }catch(e){ reject(e); }
+          }).catch(reject);
+        }
+        if(typeof BASIS!=='undefined'){ withScript(); return; }
+        var s=document.createElement('script');
+        s.src=ESPIL_CB_BASIS_JS;
+        s.onload=function(){ withScript(); };
+        s.onerror=function(){ reject(new Error('basis transcoder script failed to load')); };
+        document.head.appendChild(s);
+      });
+      return espilCbBasisPromise;
+    }
+    function espilCbKtx2Loader(basisMod){
+      return {load:function(url,onLoad,onProgress,onError){
+        fetch(url).then(function(r){ return r.arrayBuffer(); }).then(function(buf){
+          try{
+            var f=new basisMod.KTX2File(new Uint8Array(buf));
+            if(!f.isValid()){ try{ f.close(); f.delete(); }catch(_){} throw new Error('invalid KTX2 texture'); }
+            var levels=f.getLevels(),w=f.getWidth(),h=f.getHeight();
+            if(!levels||!w||!h||!f.startTranscoding()){ try{ f.close(); f.delete(); }catch(_){} throw new Error('KTX2 startTranscoding failed'); }
+            var FMT=13; /* Basis cTFRGBA32: uncompressed - every GPU takes it */
+            var mips=[];
+            for(var mip=0;mip<levels;mip++){
+              var info=f.getImageLevelInfo(mip,0,0);
+              var mw=levels>1?info.origWidth:info.width;
+              var mh=levels>1?info.origHeight:info.height;
+              var dst=new Uint8Array(f.getImageTranscodedSizeInBytes(mip,0,0,FMT));
+              if(!f.transcodeImage(dst,mip,0,0,FMT,0,-1,-1)){ try{ f.close(); f.delete(); }catch(_){} throw new Error('KTX2 transcode failed'); }
+              mips.push({data:dst,width:mw,height:mh});
+            }
+            try{ f.close(); f.delete(); }catch(_){}
+            var tex=new THREE.DataTexture(mips[0].data,w,h,THREE.RGBAFormat,THREE.UnsignedByteType);
+            tex.mipmaps=mips;
+            tex.generateMipmaps=false;
+            tex.minFilter=THREE.LinearMipmapLinearFilter;
+            tex.magFilter=THREE.LinearFilter;
+            tex.needsUpdate=true;
+            if(onLoad)onLoad(tex);
+          }catch(e){ if(onError)onError(e); }
+        }).catch(function(e){ if(onError)onError(e); });
+      }};
+    }
+    function espilCbLoader(basisMod){
+      var l=new THREE.GLTFLoader();
+      try{ if(window.MeshoptDecoder)l.setMeshoptDecoder(window.MeshoptDecoder); }catch(e){}
+      l.setKTX2Loader(espilCbKtx2Loader(basisMod));
+      return l;
+    }
+    /* Root-motion discipline, mirrored from buildWalkerAvatar's
+       stripRootMotion: the Hips position track is stripped once,
+       on the template's clips - game physics owns placement.
+       Rotations (the pose lives in them) and all other tracks stay. */
+    function espilCbStripRoot(clip){
+      clip.tracks=clip.tracks.filter(function(t){
+        var n=(t.name||'').toLowerCase();
+        var isPos=n.indexOf('.position')>=0;
+        var isRoot=/^(mixamorig[_:]?hips|hips|armature|root)/.test(n);
+        return !(isPos&&isRoot);
+      });
+      return clip;
+    }
+    /* True rendered bounds for this file family: a whole-model
+       Box3 reads the quantized geometry box (0.017 m - meaningless),
+       so the height is sampled through the skin itself
+       (boneTransform after skeleton.update()). Measured on the rig
+       for both style1 files: 433.5 skin units tall, feet at
+       exactly 0, rendering as the pack's verified 1.70 m at
+       scale 1 - the unit factor below is that measurement, and a
+       future file whose span differs still self-corrects through
+       the same formula. */
+    var ESPIL_CB_NATIVE_SPAN=433.5, ESPIL_CB_NATIVE_H=1.70;
+    function espilCbMeasure(model){
+      var out={s:1,groundOff:0};
+      var sk=null;
+      model.traverse(function(o){ if(o.isSkinnedMesh&&!sk)sk=o; });
+      if(!sk||!sk.geometry||!sk.geometry.attributes||!sk.geometry.attributes.position)return out;
+      try{
+        model.updateMatrixWorld(true);
+        if(sk.skeleton)sk.skeleton.update();
+        var pos=sk.geometry.attributes.position;
+        var v=new THREE.Vector3();
+        var mnY=Infinity,mxY=-Infinity;
+        for(var i=0;i<pos.count;i++){
+          v.fromBufferAttribute(pos,i);
+          sk.boneTransform(i,v);
+          v.applyMatrix4(sk.matrixWorld);
+          if(v.y<mnY)mnY=v.y;
+          if(v.y>mxY)mxY=v.y;
+        }
+        var h=mxY-mnY, unit=ESPIL_CB_NATIVE_H/ESPIL_CB_NATIVE_SPAN;
+        if(h>1&&isFinite(h)){
+          out.s=ESPIL_CB_TARGET_H/(h*unit);
+          out.groundOff=-mnY*unit*out.s;
+        }
+      }catch(e){}
+      return out;
+    }
+    var __espilChibiTemplates={
+      m:{state:0,scene:null,clips:null,waiters:[],s:1,groundOff:0},
+      f:{state:0,scene:null,clips:null,waiters:[],s:1,groundOff:0}
+    };
+    function __espilEnsureChibi(gender,cb){
+      var key=(gender==='f'||gender==='female')?'f':'m';
+      var T=__espilChibiTemplates[key];
+      if(T.state===2){ cb(T); return; }
+      T.waiters.push(cb);
+      if(T.state===1)return;
+      T.state=1;
+      function fail(){
+        T.state=0;
+        var ws=T.waiters; T.waiters=[];
+        for(var i=0;i<ws.length;i++){ try{ ws[i](null); }catch(_){} }
+      }
+      try{
+        if(typeof THREE.GLTFLoader==='undefined')throw new Error('no GLTFLoader');
+        espilCbBasis().then(function(basisMod){
+          espilCbLoader(basisMod).load(ESPIL_CB_FILES[key==='f'?'female':'male'],function(gltf){
+            T.scene=gltf.scene;
+            T.clips=(gltf.animations||[]).map(espilCbStripRoot);
+            /* Globe View material tag, same as __espilEnsureMaster:
+               avatar materials are CPU-anchored instead of
+               shader-bent, so the sweep must skip them. */
+            T.scene.traverse(function(o){ if(o&&o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(function(mm){ mm.userData=mm.userData||{}; mm.userData.espilAvatarMat=true; }); } });
+            var meas=espilCbMeasure(T.scene);
+            T.s=meas.s; T.groundOff=meas.groundOff;
+            T.state=2;
+            var ws=T.waiters; T.waiters=[];
+            for(var i=0;i<ws.length;i++){ try{ ws[i](T); }catch(_){} }
+          },undefined,fail);
+        }).catch(fail);
+      }catch(e){ fail(); }
+    }
+    var ESPIL_CB_CLIPS={idle:'Idle',walk:'WalkBasic',run:'RunBasic'};
+    function espilCbSetup(av,model,clips,T){
+      /* Authored facing is +z (ankle->toe measured on the rig for
+         both genders) against the facing law's -z front - the same
+         PI counter-rotation the masters and the KayKit body carry.
+         Rotate the model, never the group. */
+      model.rotation.y=Math.PI;
+      model.traverse(function(o){ if(o.isMesh)o.castShadow=true; });
+      model.scale.setScalar(T.s||1);
+      model.position.y+=(T.groundOff||0);
+      av.__visualRoot=model;
+      model.userData.__avBaseScale=T.s||1;
+      model.userData.__avBaseY=model.position.y;
+      av.group.add(model);
+      var mixer=new THREE.AnimationMixer(model);
+      av.mixer=mixer;
+      function findClip(name){ for(var i=0;i<clips.length;i++){ if(clips[i].name===name)return clips[i]; } return null; }
+      for(var key in ESPIL_CB_CLIPS){
+        var clip=findClip(ESPIL_CB_CLIPS[key]);
+        if(!clip)continue;
+        av.actions[key]=mixer.clipAction(clip);
+      }
+      espilStrideRegister(av,model,'walk'); /* FOOT-SLIDE SYNC: strides cached on the shared template clips */
+      espilStrideRegister(av,model,'run');
+      try{ mixer.update(0); }catch(_){}
+      av.ready=true;
+      av.playAnim('idle');
+    }
+    /* Locomotion crossfade + one-shot player, mirroring the KayKit
+       pair (generation guard included). While dead, locomotion
+       calls are ignored; while a hit one-shot is on stage,
+       locomotion calls are ignored - with this pack no one-shot
+       clips exist, so playOneShot honestly reports the miss and
+       the FX/lunge paths carry those reads (see the header). */
+    function espilCbPlayAnim(av,name){
+      if(av.__cbDead)return;
+      if(av.__cbHold&&name!==av.__cbHold)return;
+      if(!av.mixer||!av.actions[name]||av.curAnim===name)return;
+      var prev=av.actions[av.curAnim],next=av.actions[name];
+      av.curAnim=name;
+      next.reset().fadeIn(.18).play();
+      next.__espilGen=(next.__espilGen||0)+1;
+      if(prev&&prev!==next){ prev.fadeOut(.18); (function(pp,gg){ setTimeout(function(){ if(pp.__espilGen===gg)pp.stop(); },220); })(prev,prev.__espilGen||0); }
+    }
+    function espilCbPlayOneShot(av,name,durMs){
+      if(name==='dead'){ av.__espilSetState('dead'); return true; }
+      if(av.__cbDead)return false;
+      if(!av.mixer||!av.actions[name])return false;
+      var act=av.actions[name];
+      var cur=av.actions[av.curAnim];
+      av.curAnim=name;
+      act.__espilGen=(act.__espilGen||0)+1;
+      var actGen=act.__espilGen;
+      act.reset().fadeIn(.12).play();
+      if(cur&&cur!==act){ cur.fadeOut(.12); (function(pp,gg){ setTimeout(function(){ if(pp.__espilGen===gg)pp.stop(); },180); })(cur,cur.__espilGen||0); }
+      if(name==='hit')av.__cbHold='hit';
+      var dur=durMs||((act.getClip().duration||1)*1000);
+      setTimeout(function(){
+        if(av.__cbHold===name)av.__cbHold=null;
+        if(av.curAnim!==name)return;
+        act.fadeOut(.15);
+        setTimeout(function(){ if(act.__espilGen===actGen)act.stop(); },180);
+        av.curAnim=null;
+      },dur);
+      return true;
+    }
+    function espilCbSetState(av,s){
+      if(s==='dead'){
+        av.__cbDead=true; av.__cbHold=null;
+        /* No death clip exists in the pack: the body settles to
+           idle and locomotion locks until revive; the death UI
+           and the death FX carry the read (the signed-in masters
+           register no death state at all). */
+        var idle=av.actions.idle, cur=av.actions[av.curAnim];
+        if(idle&&av.mixer&&cur&&cur!==idle){
+          av.curAnim='idle';
+          idle.__espilGen=(idle.__espilGen||0)+1;
+          idle.reset().fadeIn(.12).play();
+          cur.fadeOut(.12);
+        }else if(idle&&av.mixer&&av.curAnim!=='idle'){
+          av.curAnim='idle';
+          idle.__espilGen=(idle.__espilGen||0)+1;
+          idle.reset().fadeIn(.12).play();
+        }
+      }else{
+        av.__cbDead=false;
+        espilCbPlayAnim(av,'idle');
+      }
+    }
+    function espilCbPlayJump(av,isDouble){
+      /* No jump clips in the pack: the miss is reported and the
+         hop is carried by physics + the current locomotion, the
+         same contract as a master whose jump file has not landed. */
+      return espilCbPlayOneShot(av,isDouble?'doubleJump':'jump');
+    }
+    function buildChibiAvatar(gender){
+      gender=(gender==='female')?'female':'male';
+      var g=new THREE.Group();
+      var shadow=new THREE.Mesh(new THREE.CircleGeometry(.55,20),
+        new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.26,depthWrite:false}));
+      shadow.rotation.x=-Math.PI/2;
+      var av={group:g,shadow:shadow,ready:false,mixer:null,actions:{},curAnim:null,__gender:gender,__chibi:true};
+      av.playAnim=function(name){ espilCbPlayAnim(av,name); };
+      av.playOneShot=function(name,durMs){ return espilCbPlayOneShot(av,name,durMs); };
+      av.playJump=function(isDouble){ return espilCbPlayJump(av,isDouble); };
+      av.__espilSetState=function(s){ espilCbSetState(av,s); };
+      ESPIL_CB_LOCAL=av;
+      __espilEnsureChibi(gender,function(T){
+        if(!T||!T.scene){ if(window.__espilToast)window.__espilToast('Character failed to load'); return; }
+        try{ espilCbSetup(av,__espilCloneModel(T),T.clips,T); }
+        catch(e){ if(window.__espilToast)window.__espilToast('Character failed to load'); }
+      });
+      return av;
+    }
+    function __espilBuildChibiRemote(gender){
+      gender=(gender==='female')?'female':'male';
+      var g=new THREE.Group();
+      var shadow=new THREE.Mesh(new THREE.CircleGeometry(.55,20),
+        new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.26,depthWrite:false}));
+      shadow.rotation.x=-Math.PI/2;
+      /* Same field contract as the GLB remote: the remote tick
+         drives playAnim + mixer.update with its tiered stride.
+         visual stays null on purpose - the tick would force the
+         masters' 1.5 scale onto R.visual; the chibi model carries
+         its own measured scale from espilCbSetup. */
+      var R={group:g,shadow:shadow,mixer:null,actions:{},curAnim:null,ready:false,visual:null,baseY:0,
+             cur:{x:0,y:0,z:0},tgt:{x:0,y:0,z:0,a:0},faceY:0,speed:0,fixSpeed:0,fixAt:0,lastAt:0,plate:null,
+             phase:(__espilPhaseSeq++)%7,acc:0,gone:false,bubble:null,bubbleCv:null,bubbleTex:null,bubbleUntil:0,
+             __chibi:true,__gender:gender};
+      R.playAnim=function(name){ espilCbPlayAnim(R,name); };
+      ESPIL_CB_REMOTES_BUILT++;
+      __espilEnsureChibi(gender,function(T){
+        if(R.gone||!T||!T.scene)return;
+        try{ espilCbSetup(R,__espilCloneModel(T),T.clips,T); }catch(e){}
+      });
       return R;
     }
     /* Item B appearance half: the equipped weapon rides on the

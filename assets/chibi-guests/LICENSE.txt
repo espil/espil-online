@@ -1,0 +1,27 @@
+CHIBI 3D CHARACTER GLB PACK
+Commercial License
+
+Copyright (c) 2026 Espil (Espil Online). All rights reserved.
+
+WHAT YOU MAY DO
+- Use the models and animations in an unlimited number of commercial and
+  non-commercial games, apps, and interactive projects, including projects
+  you sell.
+- Modify, recolor, resize, and combine the assets for use in your project.
+- Use the assets in screenshots, trailers, and store pages for your project.
+
+WHAT YOU MAY NOT DO
+- Resell, redistribute, or give away the assets themselves, in original or
+  modified form, as a standalone asset pack or stock art, whether free or paid.
+- Upload the assets to stock/asset marketplaces or asset-sharing sites.
+- Use the assets to train image-generation models or build a competing
+  character or asset pack.
+- Claim the assets as your own unmodified work.
+
+One purchase = one individual or studio team. No DRM, no royalties,
+no attribution required (appreciated but optional: "Models: Espil").
+
+AI DISCLOSURE
+These models were generated with AI 3D tooling (Meshy AI) from the seller's
+own character designs, then rigged, animated, and optimized by the seller;
+triangle counts, skins, and animation clips were verified after compression.
