@@ -131,6 +131,48 @@
         if(v===target){clearInterval(fadeTimer);fadeTimer=null;if(done)done();}
       },60);
     }
+    /* Underwater muffle (water-entry feel step 5, Han 2026-11-15):
+       the BGM element joins a small WebAudio graph (media source ->
+       lowpass -> destination) the first time setMuffle is called;
+       until then the element plays exactly as it always has. The
+       tracks are same-origin files, so the media source is clean.
+       The graph is built only after the first user unlock (an
+       AudioContext created before a gesture would sit suspended
+       and silence the element). If the graph cannot be built,
+       setMuffle falls back to a plain volume duck and muffleState
+       reports graph:false. */
+    var bgmCtx=null,bgmFilter=null,bgmGraphOk=false,bgmMuffled=false;
+    function bgmEnsureGraph(){
+      if(bgmFilter)return bgmGraphOk;
+      if(!started||!audio)return false;
+      try{
+        var AC=window.AudioContext||window.webkitAudioContext;
+        if(!AC)return false;
+        bgmCtx=new AC();
+        var src=bgmCtx.createMediaElementSource(audio);
+        bgmFilter=bgmCtx.createBiquadFilter();
+        bgmFilter.type='lowpass'; bgmFilter.frequency.value=9000;
+        src.connect(bgmFilter); bgmFilter.connect(bgmCtx.destination);
+        bgmGraphOk=true;
+      }catch(e){ bgmGraphOk=false; }
+      return bgmGraphOk;
+    }
+    function setMuffle(on){
+      bgmMuffled=!!on;
+      if(bgmEnsureGraph()&&bgmCtx){
+        try{
+          if(bgmCtx.state==='suspended')bgmCtx.resume();
+          var t=bgmCtx.currentTime;
+          bgmFilter.frequency.cancelScheduledValues(t);
+          bgmFilter.frequency.setValueAtTime(bgmFilter.frequency.value,t);
+          bgmFilter.frequency.linearRampToValueAtTime(on?480:9000,t+.25);
+          return;
+        }catch(e){}
+      }
+      /* fallback: duck the element volume (a track swap's fadeTo may
+         overwrite it; the next setMuffle call re-applies). */
+      try{ if(audio)audio.volume=on?bgmVol()*.3:bgmVol(); }catch(e){}
+    }
     function unlock(){
       if(started)return; started=true; play();
     }
@@ -179,6 +221,8 @@
       onMapEnter:function(cityId){},
       onMapExit:function(){},
       currentTrack:function(){return {title:currentTheme.title,artist:currentTheme.artist,muted:muted};},
+      setMuffle:setMuffle,
+      muffleState:function(){return {on:bgmMuffled,freq:bgmFilter?Math.round(bgmFilter.frequency.value):null,graph:bgmGraphOk};},
       pop:pop,
       tick:tick,
       toggle:function(){

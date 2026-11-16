@@ -9118,6 +9118,394 @@
         f.pillar.scale.set(ps,1,ps);
       }
     }
+    /* ================================================================
+       WATER-ENTRY FEEL (Han 2026-11-15, reel DfEo_LhxVRJ): the five
+       steps as ONE shared treatment, fired ONLY from the swimming
+       state transition in updateWalkMap (the game's single .swimming=
+       assignment). Local player only: presence does not sync swim
+       state, so remotes have no swim presentation to hang this on.
+       1 splash crown + droplet rain (one pooled Points set - the
+       falling half IS the rain), 2 ripple rings on the surface,
+       3 fully synthesised splash + droplet ticks on a water bus
+       (no audio files), 4 a bubble column FIXED at the entry point
+       (it stays after the swimmer leaves - the reel's picture),
+       5 a lowered swim camera whose intermittent dips under the
+       surface drive a DOM tint + BGM/water-bus muffle together
+       (Han's 2026-11-15 decision (a): near the surface with
+       occasional submersion, NOT the reel's fully-under camera).
+       Exit: small splash + ring + a .45 s procedural shake-off
+       (no shake clip exists). All pools are built once; the tick
+       allocates nothing per frame. Anchor drift vs DIAGNOSIS.md:
+       swim transition 10604 -> 10655, camera floor ~10783 -> 10832,
+       skillSfx 5934 -> 5984 (foot-slide hunks added ~+50 lines). */
+    var ESPIL_WATER_SPLASH_N=90, ESPIL_WATER_BUBBLE_N=42, ESPIL_WATER_RING_N=3;
+    var ESPIL_WATER_SOUND_DEBOUNCE_MS=300;
+    var espilWater={
+      entries:0, exits:0, lastKind:null, lastEntryAt:0, lastExitAt:0,
+      splashBursts:0, ringsSpawned:0, bubbleEmitters:0,
+      splashVoices:0, dropletTicks:0, exitSplashes:0, shakes:0,
+      muffleOn:false, camUnder:false, camY:null, sinkPoint:null,
+      t:0, shakeT:-1, shakePlayer:null, lastSoundAt:0, peak:0, peakArr:null,
+      dropPts:null, dropPos:null, drops:[], dropTex:null,
+      bubPts:null, bubPos:null, bub:[], bubTex:null, bubEmit:null,
+      rings:[], tintEl:null,
+      bus:null, busFilter:null, analyser:null, noiseBuf:null
+    };
+    function espilWaterDropTexture(){
+      if(espilWater.dropTex)return espilWater.dropTex;
+      var c=document.createElement('canvas'); c.width=c.height=64;
+      var x=c.getContext('2d');
+      var g=x.createRadialGradient(32,32,2,32,32,30);
+      g.addColorStop(0,'rgba(255,255,255,.95)');
+      g.addColorStop(.55,'rgba(212,240,252,.75)');
+      g.addColorStop(1,'rgba(180,225,248,0)');
+      x.fillStyle=g; x.fillRect(0,0,64,64);
+      var t=new THREE.CanvasTexture(c); espilWater.dropTex=t; return t;
+    }
+    function espilWaterBubbleTexture(){
+      if(espilWater.bubTex)return espilWater.bubTex;
+      var c=document.createElement('canvas'); c.width=c.height=64;
+      var x=c.getContext('2d');
+      x.fillStyle='rgba(200,238,255,.18)';
+      x.beginPath(); x.arc(32,32,24,0,Math.PI*2); x.fill();
+      x.strokeStyle='rgba(232,248,255,.95)'; x.lineWidth=5;
+      x.beginPath(); x.arc(32,32,24,0,Math.PI*2); x.stroke();
+      x.fillStyle='rgba(255,255,255,.85)';
+      x.beginPath(); x.arc(23,22,6,0,Math.PI*2); x.fill();
+      var t=new THREE.CanvasTexture(c); espilWater.bubTex=t; return t;
+    }
+    function espilWaterEnsure(){
+      var W=espilWater;
+      if(W.dropPts)return true;
+      if(typeof THREE==='undefined'||!mapScene)return false;
+      try{
+        var i;
+        W.dropPos=new Float32Array(ESPIL_WATER_SPLASH_N*3);
+        for(i=0;i<ESPIL_WATER_SPLASH_N;i++){
+          W.drops.push({on:false,x:0,y:-999,z:0,vx:0,vy:0,vz:0,life:0,killY:WATER_Y-.05});
+          W.dropPos[i*3+1]=-999;
+        }
+        var dg=new THREE.BufferGeometry();
+        dg.setAttribute('position',new THREE.BufferAttribute(W.dropPos,3).setUsage(THREE.DynamicDrawUsage));
+        W.dropPts=new THREE.Points(dg,new THREE.PointsMaterial({size:.34,map:espilWaterDropTexture(),
+          transparent:true,opacity:.92,color:0x9fd4e8,depthWrite:false,sizeAttenuation:true}));
+        W.dropPts.frustumCulled=false; W.dropPts.renderOrder=11;
+        mapScene.add(W.dropPts);
+        W.bubPos=new Float32Array(ESPIL_WATER_BUBBLE_N*3);
+        for(i=0;i<ESPIL_WATER_BUBBLE_N;i++){
+          W.bub.push({on:false,x:0,y:-999,z:0,vy:0,ph:0,life:0});
+          W.bubPos[i*3+1]=-999;
+        }
+        var bg=new THREE.BufferGeometry();
+        bg.setAttribute('position',new THREE.BufferAttribute(W.bubPos,3).setUsage(THREE.DynamicDrawUsage));
+        W.bubPts=new THREE.Points(bg,new THREE.PointsMaterial({size:.17,map:espilWaterBubbleTexture(),
+          transparent:true,opacity:.55,color:0xdff4ff,depthWrite:false,sizeAttenuation:true}));
+        W.bubPts.frustumCulled=false; W.bubPts.renderOrder=9;
+        mapScene.add(W.bubPts);
+        for(i=0;i<ESPIL_WATER_RING_N;i++){
+          var ring=new THREE.Mesh(new THREE.RingGeometry(.86,1,48),
+            new THREE.MeshBasicMaterial({color:0xbfe6f5,transparent:true,opacity:0,
+              depthWrite:false,side:THREE.DoubleSide,fog:false}));
+          ring.rotation.x=-Math.PI/2; ring.visible=false; ring.renderOrder=10;
+          ring.frustumCulled=false;
+          mapScene.add(ring);
+          W.rings.push({mesh:ring,t:0,life:1.4,maxR:3.2,on:false});
+        }
+        return true;
+      }catch(e){ return false; }
+    }
+    function espilWaterSpawnSplash(x,z,count,pow,spread,y0,killY){
+      var W=espilWater;
+      if(!espilWaterEnsure())return;
+      var spawned=0, i, d;
+      function arm(d){
+        var a=Math.random()*Math.PI*2, r=(.25+Math.random()*.75)*spread;
+        d.on=true; d.life=0;
+        d.x=x+Math.cos(a)*r*.35; d.z=z+Math.sin(a)*r*.35; d.y=y0;
+        d.vx=Math.cos(a)*r*pow; d.vz=Math.sin(a)*r*pow;
+        d.vy=(2.2+Math.random()*2.0)*pow;
+        d.killY=killY;
+      }
+      for(i=0;i<W.drops.length&&spawned<count;i++){ d=W.drops[i]; if(d.on)continue; arm(d); spawned++; }
+      /* pool busy: overwrite the oldest falling drops (design rule) */
+      while(spawned<count){
+        var old=null;
+        for(i=0;i<W.drops.length;i++){ d=W.drops[i]; if(d.on&&(!old||d.life>old.life))old=d; }
+        if(!old)break;
+        arm(old); spawned++;
+      }
+      if(spawned>0)W.splashBursts++;
+    }
+    function espilWaterSpawnRings(x,z,count,maxR){
+      var W=espilWater;
+      if(!espilWaterEnsure())return;
+      var spawned=0;
+      for(var i=0;i<W.rings.length&&spawned<count;i++){
+        var r=W.rings[i];
+        if(r.on)continue;
+        r.on=true; r.t=-spawned*.18; r.maxR=maxR;
+        r.mesh.position.set(x,WATER_Y+.03,z);
+        r.mesh.visible=false;
+        spawned++; W.ringsSpawned++;
+      }
+    }
+    function espilWaterStartBubbles(x,z){
+      var W=espilWater;
+      if(!espilWaterEnsure())return;
+      W.bubEmit={x:x,z:z,until:W.t+2.8,acc:0};
+      W.bubbleEmitters++;
+      W.sinkPoint={x:x,z:z};
+    }
+    function espilWaterAudio(){
+      var W=espilWater;
+      try{
+        if(!walkAudioCtx)walkAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
+        if(walkAudioCtx.state==='suspended')walkAudioCtx.resume();
+        var ctx=walkAudioCtx;
+        if(!W.bus){
+          W.busFilter=ctx.createBiquadFilter(); W.busFilter.type='lowpass'; W.busFilter.frequency.value=18000;
+          W.bus=ctx.createGain(); W.bus.gain.value=.9;
+          W.analyser=ctx.createAnalyser(); W.analyser.fftSize=512;
+          W.bus.connect(W.busFilter); W.busFilter.connect(W.analyser); W.analyser.connect(ctx.destination);
+          var len=Math.floor(ctx.sampleRate*.5), buf=ctx.createBuffer(1,len,ctx.sampleRate), dd=buf.getChannelData(0);
+          for(var i=0;i<len;i++)dd[i]=Math.random()*2-1;
+          W.noiseBuf=buf;
+        }
+        return ctx;
+      }catch(e){ return null; }
+    }
+    function espilWaterSplashSound(pow){
+      var W=espilWater, ctx=espilWaterAudio();
+      if(!ctx||!W.bus)return;
+      var now=performance.now();
+      if(now-W.lastSoundAt<ESPIL_WATER_SOUND_DEBOUNCE_MS)return;
+      W.lastSoundAt=now;
+      try{
+        var t=ctx.currentTime;
+        /* (a) deep sploosh: noise through a lowpass swept down */
+        var src=ctx.createBufferSource(); src.buffer=W.noiseBuf; src.loop=true;
+        var f=ctx.createBiquadFilter(); f.type='lowpass';
+        f.frequency.setValueAtTime(2800,t);
+        f.frequency.exponentialRampToValueAtTime(240,t+.45*pow);
+        var g=ctx.createGain();
+        g.gain.setValueAtTime(.5*pow,t);
+        g.gain.exponentialRampToValueAtTime(.001,t+.55*pow);
+        src.connect(f); f.connect(g); g.connect(W.bus);
+        src.start(t); src.stop(t+.6*pow+.05);
+        /* (b) the low thump under it (skillSfx 'thud' precedent) */
+        var o=ctx.createOscillator(), og=ctx.createGain();
+        o.type='sine';
+        o.frequency.setValueAtTime(130,t);
+        o.frequency.exponentialRampToValueAtTime(44,t+.38);
+        og.gain.setValueAtTime(.34*pow,t);
+        og.gain.exponentialRampToValueAtTime(.001,t+.4);
+        o.connect(og); og.connect(W.bus);
+        o.start(t); o.stop(t+.42);
+        W.splashVoices++;
+        /* droplet patter while the crown falls back */
+        var ticks=7+Math.floor(Math.random()*5);
+        for(var i=0;i<ticks;i++){
+          var tt=t+.15+Math.random()*.75;
+          var ts=ctx.createBufferSource(); ts.buffer=W.noiseBuf;
+          ts.playbackRate.value=.8+Math.random()*.5;
+          var tf=ctx.createBiquadFilter(); tf.type='bandpass';
+          tf.frequency.value=2200+Math.random()*2000; tf.Q.value=8;
+          var tg=ctx.createGain();
+          tg.gain.setValueAtTime(.05+Math.random()*.07,tt);
+          tg.gain.exponentialRampToValueAtTime(.001,tt+.045);
+          ts.connect(tf); tf.connect(tg); tg.connect(W.bus);
+          ts.start(tt,Math.random()*.3); ts.stop(tt+.06);
+          W.dropletTicks++;
+        }
+      }catch(e){}
+    }
+    function espilWaterEnter(p,preVy){
+      var W=espilWater;
+      var now=performance.now();
+      var kind='walk';
+      if(p._espilWaterLeapAt&&now-p._espilWaterLeapAt<1600&&preVy<-.5)kind='leap';
+      else if(preVy<-5)kind='fall';
+      p._espilWaterLeapAt=0;
+      W.entries++; W.lastKind=kind; W.lastEntryAt=now;
+      var pow=kind==='fall'?Math.min(1.6,Math.max(.8,Math.abs(preVy)/7)):(kind==='leap'?1:.45);
+      espilWaterSpawnSplash(p.pos.x,p.pos.z,kind==='walk'?42:ESPIL_WATER_SPLASH_N,pow,1.25,WATER_Y+.05,WATER_Y-.05);
+      espilWaterSpawnRings(p.pos.x,p.pos.z,kind==='walk'?2:3,kind==='walk'?1.6:3.2);
+      if(kind!=='walk')espilWaterStartBubbles(p.pos.x,p.pos.z);
+      espilWaterSplashSound(pow);
+    }
+    function espilWaterExit(p){
+      var W=espilWater;
+      var now=performance.now();
+      W.exits++; W.lastExitAt=now;
+      var leap=p.velY>2.5;
+      if(leap)p._espilWaterLeapAt=now;
+      /* Teleports (revive, arena, story jumps) also flip the state -
+         a splash belongs only to a real exit near the last water
+         point, so a far flip is counted but fires nothing. */
+      var lx=(p._espilWaterX!=null)?p._espilWaterX:p.pos.x,
+          lz=(p._espilWaterZ!=null)?p._espilWaterZ:p.pos.z;
+      var dx=p.pos.x-lx, dz=p.pos.z-lz;
+      if(dx*dx+dz*dz>900)return;
+      W.exitSplashes++;
+      espilWaterSpawnSplash(lx,lz,26,leap?.8:.5,.8,WATER_Y+.05,WATER_Y-.05);
+      espilWaterSpawnRings(lx,lz,1,1.6);
+      espilWaterSplashSound(.5);
+      if(!leap){
+        /* shake-off: no clip exists, so the rendered group gets a
+           short damped roll; physics and position are untouched. */
+        W.shakeT=0; W.shakePlayer=p; W.shakes++;
+        espilWaterSpawnSplash(p.pos.x,p.pos.z,10,.35,.5,p.pos.y+.9,p.pos.y-.1);
+      }
+    }
+    function espilWaterEnsureTint(){
+      var W=espilWater;
+      if(W.tintEl)return W.tintEl;
+      var el=document.createElement('div');
+      el.id='espil-water-tint';
+      el.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:9992;opacity:0;transition:opacity .25s;'+
+        'background:linear-gradient(180deg, rgba(10,80,105,.34), rgba(6,52,78,.44));';
+      document.body.appendChild(el);
+      W.tintEl=el; return el;
+    }
+    function espilWaterSetMuffle(on){
+      var W=espilWater;
+      W.muffleOn=on;
+      try{ if(window.EspilAudio&&window.EspilAudio.setMuffle)window.EspilAudio.setMuffle(on); }catch(e){}
+      if(W.busFilter&&walkAudioCtx){
+        try{
+          /* mirror EspilAudio.setMuffle: a context left suspended
+             (headless rigs, long-idle tabs) freezes currentTime and
+             with it the ramp below - nudge it on every flip. */
+          if(walkAudioCtx.state==='suspended')walkAudioCtx.resume();
+          var t=walkAudioCtx.currentTime;
+          W.busFilter.frequency.cancelScheduledValues(t);
+          W.busFilter.frequency.setValueAtTime(W.busFilter.frequency.value,t);
+          W.busFilter.frequency.linearRampToValueAtTime(on?1200:18000,t+.25);
+        }catch(e){}
+      }
+    }
+    function espilWaterFxTick(dt){
+      var W=espilWater;
+      W.t+=dt;
+      var p=walkPlayer, i, d;
+      /* step 5: submersion is read off the APPLIED camera (this tick
+         runs after the follow-camera block in updateWalkMap). */
+      var under=false;
+      if(typeof mapCamera!=='undefined'&&mapCamera){
+        W.camY=Math.round(mapCamera.position.y*100)/100;
+        under=!!(p&&p.swimming)&&mapCamera.position.y<.06;
+      }
+      if(under!==W.camUnder){
+        W.camUnder=under;
+        espilWaterSetMuffle(under);
+      }
+      if(W.camUnder||W.tintEl)espilWaterEnsureTint().style.opacity=W.camUnder?'1':'0';
+      /* step 1: droplets (burst up, gravity brings the rain) */
+      if(W.dropPts){
+        var anyDrop=false;
+        for(i=0;i<W.drops.length;i++){
+          d=W.drops[i];
+          if(!d.on)continue;
+          anyDrop=true;
+          d.life+=dt;
+          d.vy-=9.8*dt;
+          d.x+=d.vx*dt; d.y+=d.vy*dt; d.z+=d.vz*dt;
+          if((d.vy<0&&d.y<d.killY)||d.life>.95){ d.on=false; d.y=-999; }
+          W.dropPos[i*3]=d.x; W.dropPos[i*3+1]=d.y; W.dropPos[i*3+2]=d.z;
+        }
+        if(anyDrop)W.dropPts.geometry.attributes.position.needsUpdate=true;
+      }
+      /* step 4: bubble column fixed at the sink point */
+      if(W.bubPts){
+        var em=W.bubEmit;
+        if(em){
+          if(W.t>=em.until)W.bubEmit=null;
+          else{
+            em.acc+=dt*14;
+            while(em.acc>=1){
+              em.acc-=1;
+              for(i=0;i<W.bub.length;i++){
+                var b=W.bub[i];
+                if(b.on)continue;
+                b.on=true; b.life=0;
+                b.x=em.x+(Math.random()-.5)*.5;
+                b.z=em.z+(Math.random()-.5)*.5;
+                b.y=-.6+Math.random()*.2;
+                b.vy=.55+Math.random()*.4;
+                b.ph=Math.random()*6.28;
+                break;
+              }
+            }
+          }
+        }
+        var anyBub=false;
+        for(i=0;i<W.bub.length;i++){
+          var bb=W.bub[i];
+          if(!bb.on)continue;
+          anyBub=true;
+          bb.life+=dt;
+          bb.y+=bb.vy*dt;
+          if(bb.y>=WATER_Y-.02||bb.life>6){ bb.on=false; bb.y=-999; }
+          W.bubPos[i*3]=bb.x+Math.sin(W.t*3+bb.ph)*.07;
+          W.bubPos[i*3+1]=bb.y;
+          W.bubPos[i*3+2]=bb.z+Math.cos(W.t*2.6+bb.ph)*.07;
+        }
+        if(anyBub)W.bubPts.geometry.attributes.position.needsUpdate=true;
+      }
+      /* step 2: ripple rings */
+      for(i=0;i<W.rings.length;i++){
+        var r=W.rings[i];
+        if(!r.on)continue;
+        r.t+=dt;
+        if(r.t<0){ r.mesh.visible=false; continue; }
+        var k=r.t/r.life;
+        if(k>=1){ r.on=false; r.mesh.visible=false; continue; }
+        r.mesh.visible=true;
+        var rad=.4+(r.maxR-.4)*k;
+        r.mesh.scale.set(rad,rad,1);
+        r.mesh.material.opacity=.55*(1-k);
+      }
+      /* exit shake-off (render group only) */
+      if(W.shakeT>=0){
+        var sp2=W.shakePlayer;
+        if(sp2&&sp2.av&&sp2.av.group){
+          W.shakeT+=dt;
+          var sk=W.shakeT/.45;
+          if(sk>=1){ W.shakeT=-1; sp2.av.group.rotation.z=0; }
+          else sp2.av.group.rotation.z=Math.sin(sk*Math.PI*5)*(1-sk)*.06;
+        }else W.shakeT=-1;
+      }
+      /* analyser peak for the sound legs (the rig cannot listen) */
+      if(W.analyser){
+        if(!W.peakArr)W.peakArr=new Float32Array(W.analyser.fftSize);
+        W.analyser.getFloatTimeDomainData(W.peakArr);
+        var pk=0;
+        for(i=0;i<W.peakArr.length;i++){ var av=Math.abs(W.peakArr[i]); if(av>pk)pk=av; }
+        if(pk>W.peak)W.peak=pk;
+      }
+    }
+    window.__espilWaterFXState=function(){
+      var W=espilWater;
+      var da=0, ba=0, ra=0, i;
+      for(i=0;i<W.drops.length;i++)if(W.drops[i].on)da++;
+      for(i=0;i<W.bub.length;i++)if(W.bub[i].on)ba++;
+      for(i=0;i<W.rings.length;i++)if(W.rings[i].on)ra++;
+      var mf={on:false,freq:null,graph:false};
+      try{ if(window.EspilAudio&&window.EspilAudio.muffleState)mf=window.EspilAudio.muffleState(); }catch(e){}
+      return { entries:W.entries, exits:W.exits,
+        lastKind:W.lastKind, lastEntryAt:W.lastEntryAt, lastExitAt:W.lastExitAt,
+        splashBursts:W.splashBursts, ringsSpawned:W.ringsSpawned,
+        bubbleEmitters:W.bubbleEmitters, splashVoices:W.splashVoices,
+        dropletTicks:W.dropletTicks, exitSplashes:W.exitSplashes, shakes:W.shakes,
+        dropletsAlive:da, bubblesAlive:ba, ringsActive:ra,
+        bubbleEmitterOn:!!W.bubEmit,
+        sinkPoint:W.sinkPoint?{x:Math.round(W.sinkPoint.x*10)/10,z:Math.round(W.sinkPoint.z*10)/10}:null,
+        camY:W.camY, camUnder:W.camUnder,
+        muffleOn:W.muffleOn, bgmMuffle:mf,
+        busFreq:W.busFilter?Math.round(W.busFilter.frequency.value):null,
+        peak:Math.round(W.peak*1000)/1000,
+        shakeActive:W.shakeT>=0 };
+    };
     /* S4 contract: panels' food-use listener restores through here. */
     window.__espilApplyRecovery=function(hp,mp){
       hp=Math.max(0,Math.floor(hp||0)); mp=Math.max(0,Math.floor(mp||0));
@@ -10658,6 +11046,13 @@
       if(p.swimming&&!_wasSwim&&_preVy<-5&&p.av&&p.av.actions&&p.av.actions.swim&&['jump','doubleJump'].indexOf(p.av.curAnim)<0){
         try{p.av.playAnim('swim');}catch(e){}
       }
+      /* WATER-ENTRY FEEL (Han 2026-11-15): the five steps hang on
+         this transition and nowhere else - no other code calls
+         espilWaterEnter / espilWaterExit. The last water point is
+         kept so an exit splash lands where the water actually was. */
+      if(p.swimming&&!_wasSwim)espilWaterEnter(p,_preVy);
+      else if(!p.swimming&&_wasSwim)espilWaterExit(p);
+      if(p.swimming){p._espilWaterX=p.pos.x;p._espilWaterZ=p.pos.z;}
       var _ms=moveSpeeds();
       var SPEED=p.swimming?_ms.swim:((p.running?_ms.run:_ms.walk)*(window.__espilSpeedBoost||1)); /* fast track (Han 2026-10-28): street tiles x2 */
       p._dx=mx*SPEED*dt;p._dz=mz*SPEED*dt;
@@ -10829,11 +11224,23 @@
           p.pos.y+sp*espilCamDEff+1.2,
           p.pos.z+Math.cos(walkCamYaw)*cp*espilCamDEff
         );
-        if(want.y<1.4)want.y=1.4;
+        if(p.swimming){
+          /* WATER FEEL step 5 (Han decision (a), 2026-11-15): while
+             swimming the 1.4 floor is NOT applied - the target drops
+             toward the surface (pitch term at .38 weight, -.38 base)
+             with a slow swell, so the camera skims the water and
+             dips under only intermittently at low pitch. The dips
+             are what espilWaterFxTick reads as submersion. On land
+             the original floor returns unchanged. */
+          want.y=p.pos.y+sp*espilCamDEff*.38-.38+Math.sin(espilWater.t*.85)*.22;
+          if(want.y<-1.1)want.y=-1.1;
+        }
+        else if(want.y<1.4)want.y=1.4;
         var k=Math.min(1,dt*7);
         mapCamera.position.lerp(want,k);
         mapCamera.lookAt(p.pos.x,p.pos.y+1.7,p.pos.z);
       }
+      espilWaterFxTick(dt); /* WATER-ENTRY FEEL: pools, tint, muffle, shake */
       if(typeof espilOwnerChipTick==='function')espilOwnerChipTick(false);
       /* Building proximity: store-name labels + interact prompt. */
       updateBuildingProximity(p.pos.x,p.pos.z,performance.now());
