@@ -97,7 +97,54 @@
      for its surfaces. NOTE for rig verification: the sync fires at
      init, ahead of any entry interaction; the gate reads the
      record when it fires. */
-  var API_BASE = 'https://api.espil.online';
+  var API_BASE = (typeof window.__espilAuthApiBase === 'string' && window.__espilAuthApiBase) || 'https://api.espil.online';
+  /* Character first-setup adoption (Han 2026-11-16,
+     customizer-once/DESIGN.md §3.3): the server record is the
+     truth and espil_character.setupDone is only its mirror.
+     A server character overwrites the device's gender/bodyChoice
+     and sets the mirror (a storage edit is undone at the next
+     sync); no server record + a device choice POSTs that choice
+     as the account's one-time setup (existing users keep the
+     body they already picked - design §5.1). A failed POST
+     leaves a pending mark and the next sync retries through
+     this same path (§3.4 fail-soft). Guests never reach here:
+     this runs only inside the signed-in branch below. */
+  var ESPIL_BODY_CHOICES_EF = ['master', 'style1', 'style2', 'style3', 'style4'];
+  function espilCharacterAdopt(character) {
+    var rec = null;
+    try { rec = JSON.parse(localStorage.getItem('espil_character') || 'null'); } catch (_) {}
+    if (character && (character.gender === 'male' || character.gender === 'female') &&
+        ESPIL_BODY_CHOICES_EF.indexOf(character.bodyChoice) >= 0) {
+      var out = (rec && typeof rec === 'object') ? rec : {};
+      out.gender = character.gender;
+      out.bodyChoice = character.bodyChoice;
+      out.setupDone = true;
+      delete out.setupPending;
+      try { localStorage.setItem('espil_character', JSON.stringify(out)); } catch (_) {}
+      return;
+    }
+    if (character) return; /* malformed server value: assert nothing */
+    if (rec && (rec.gender === 'male' || rec.gender === 'female') &&
+        ESPIL_BODY_CHOICES_EF.indexOf(rec.bodyChoice) >= 0 && window.fetch) {
+      var markPending = function () {
+        try {
+          var cur = JSON.parse(localStorage.getItem('espil_character') || 'null');
+          if (cur && cur.setupDone !== true) { cur.setupPending = true; localStorage.setItem('espil_character', JSON.stringify(cur)); }
+        } catch (_) {}
+      };
+      fetch(API_BASE + '/auth/character/setup', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gender: rec.gender, bodyChoice: rec.bodyChoice })
+      }).then(function (r) {
+        return r.json().catch(function () { return null; }).then(function (b) { return { status: r.status, body: b }; });
+      }).then(function (res) {
+        if (res && (res.status === 200 || res.status === 409) && res.body && res.body.character) {
+          espilCharacterAdopt(res.body.character);
+        } else { markPending(); }
+      }).catch(function () { markPending(); });
+    }
+  }
   function serverSessionSync() {
     if (!window.fetch) return;
     fetch(API_BASE + '/auth/session', { credentials: 'include' }).then(function (r) {
@@ -107,6 +154,7 @@
         try { localStorage.setItem(LS_SESSION, JSON.stringify({ id: body.user.name, at: Date.now(), server: true })); } catch (_) {}
         try { localStorage.setItem('espil_username', body.user.name); } catch (_) {}
         try { localStorage.removeItem(LS_SESSION_PARK); } catch (_) {}
+        try { espilCharacterAdopt(body.character || null); } catch (_) {}
       } else {
         var s = session();
         if (s && s.server) { try { localStorage.removeItem(LS_SESSION); } catch (_) {} }

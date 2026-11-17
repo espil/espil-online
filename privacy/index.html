@@ -47,7 +47,7 @@
   <p>로그인 상태를 유지하기 위해 서버에는 세션 기록(세션 토큰의 해시값, 생성 시각과 만료 시각)이 저장되고, 이용자의 브라우저에는 세션 쿠키가 놓입니다. 로그아웃하면 해당 세션은 서버에서 폐기됩니다.</p>
 
   <h2>3. 기기에만 저장되는 정보</h2>
-  <p>게임 내 위치 복원 정보, 캐릭터 외형, 게임 설정은 이용자 기기의 로컬 저장소(localStorage)에만 저장됩니다. 이 정보는 서버로 전송되지 않으며, 브라우저의 저장 데이터를 삭제하면 함께 지워집니다.</p>
+  <p>게임 내 위치 복원 정보, 캐릭터 외형, 게임 설정은 이용자 기기의 로컬 저장소(localStorage)에만 저장됩니다. 이 정보는 서버로 전송되지 않으며, 브라우저의 저장 데이터를 삭제하면 함께 지워집니다. 다만 계정의 캐릭터 설정(성별과 몸통 선택)은 계정과 함께 서버에 저장됩니다.</p>
 
   <h2>4. 채팅과 접속 상태</h2>
   <p>실시간 채팅 내용과 접속 상태(프레즌스)는 서버에 저장되지 않습니다. 접속해 있는 동안에는 다른 이용자에게 내 캐릭터와 게임 내 위치가 표시될 수 있으나, 연결이 종료되면 이 정보는 남지 않습니다.</p>
@@ -92,7 +92,7 @@
     <p>To keep you signed in, the server stores a session record (a hash of the session token, plus its creation and expiry times), and a session cookie is placed in your browser. When you log out, that session is discarded on the server.</p>
 
     <h2>3. Information Stored Only on Your Device</h2>
-    <p>Your in-game position for restoration, your character&rsquo;s appearance, and game settings are stored only in your device&rsquo;s local storage (localStorage). This information is not sent to the server, and it is removed when you clear your browser&rsquo;s stored data.</p>
+    <p>Your in-game position for restoration, your character&rsquo;s appearance, and game settings are stored only in your device&rsquo;s local storage (localStorage). This information is not sent to the server, and it is removed when you clear your browser&rsquo;s stored data. However, your account&rsquo;s character setup (your gender and body selection) is stored on the server together with your account.</p>
 
     <h2>4. Chat and Presence</h2>
     <p>Real-time chat content and connection status (presence) are not stored on the server. While you are connected, your character and in-game position may be visible to other users, but this information does not remain after the connection ends.</p>

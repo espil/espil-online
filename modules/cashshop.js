@@ -17,7 +17,7 @@
    is NEVER mixed with Leo - nothing Leo-priced is sold here and no
    purchase here touches espil_leo_balance. Ledger localStorage
    espil_cash_v1 { v, balanceCents, owned: [catalogue ids],
-   entitlements: { arenaRevives }, txns: [...] }.
+   entitlements: { arenaRevives, bodyChanges }, txns: [...] }.
 
    Item grants land in the game's ONE item store, the
    espil_owned_items name list - the same list panels.js renders in
@@ -83,6 +83,8 @@
       grants: ['Frog Staff'], blurb: '무기 치장. 들고 있는 무기의 겉모습만 바꿉니다.' },
     { id: 'fashion-umbrella', shelf: 'fashion', name: 'Umbrella Sword', kr: '우산 소드', price: 400, once: true,
       grants: ['Umbrella Sword'], blurb: '무기 치장. 들고 있는 무기의 겉모습만 바꿉니다.' },
+    { id: 'appearance-change-ticket', shelf: 'fashion', name: 'Appearance Change Ticket', kr: '외형 변경권', price: 300,
+      grants: [], entitlement: 'bodyChanges', blurb: '캐릭터의 성별과 몸통을 다시 정할 수 있는 권리 1회. 최초 설정 이후의 외형 변경은 이 변경권으로만 가능합니다 - 입장 화면(캐릭터 게이트)에서 변경하고 확인하면 1장이 사용됩니다.' },
     { id: 'revival-potion-10', shelf: 'potion', name: 'Revival Potion x10', kr: '부활 포션 10개', price: 100,
       grants: rep('Revival Potion', 10), blurb: '쓰러졌을 때 그 자리에서 HP/MP 50%로 부활합니다. (10개에 $1 - S1 기준 가격)' },
     { id: 'bundle-recovery', shelf: 'convenience', name: 'Recovery Bundle', kr: '회복 묶음', price: 200,
@@ -105,13 +107,14 @@
 
   /* ---------------- ledger ---------------- */
   function loadLedger() {
-    var d = { v: 1, balanceCents: 0, owned: [], entitlements: { arenaRevives: 0 }, txns: [] };
+    var d = { v: 1, balanceCents: 0, owned: [], entitlements: { arenaRevives: 0, bodyChanges: 0 }, txns: [] };
     try {
       var raw = JSON.parse(localStorage.getItem(LS_CASH) || 'null');
       if (raw && typeof raw === 'object') {
         if (typeof raw.balanceCents === 'number' && isFinite(raw.balanceCents)) d.balanceCents = Math.max(0, Math.floor(raw.balanceCents));
         if (Array.isArray(raw.owned)) d.owned = raw.owned.filter(function (x) { return typeof x === 'string'; });
         if (raw.entitlements && typeof raw.entitlements.arenaRevives === 'number') d.entitlements.arenaRevives = Math.max(0, Math.floor(raw.entitlements.arenaRevives));
+        if (raw.entitlements && typeof raw.entitlements.bodyChanges === 'number') d.entitlements.bodyChanges = Math.max(0, Math.floor(raw.entitlements.bodyChanges));
         if (Array.isArray(raw.txns)) d.txns = raw.txns.slice(-60);
       }
     } catch (e) {}
@@ -177,6 +180,21 @@
     saveLedger();
     render();
     return { ok: true, id: c.id, granted: granted, entitlement: c.entitlement || null };
+  }
+  /* Spend one unit of a held entitlement (the consumption side
+     of the grant above). The character gate spends 'bodyChanges'
+     this way when it is loaded; when it is not (the gate renders
+     before the arrival bundle), the gate writes the same ledger
+     store directly - one store, two doors, never concurrent. */
+  function spendEntitlement(name) {
+    if (!name || !(name in ledger.entitlements)) return false;
+    var n = ledger.entitlements[name] || 0;
+    if (n <= 0) return false;
+    ledger.entitlements[name] = n - 1;
+    logTxn('spend', 0, name);
+    saveLedger();
+    render();
+    return true;
   }
   var buyLock = false;
   var spentTokens = {};
@@ -415,6 +433,7 @@
     charge: charge,
     credit: credit,
     grant: grant,
+    spendEntitlement: spendEntitlement,
     buy: function (itemId) { return buy(itemId, null); },
     open: open,
     close: close,
@@ -422,7 +441,7 @@
       return {
         balanceCents: ledger.balanceCents,
         owned: ledger.owned.slice(),
-        entitlements: { arenaRevives: ledger.entitlements.arenaRevives || 0 },
+        entitlements: { arenaRevives: ledger.entitlements.arenaRevives || 0, bodyChanges: ledger.entitlements.bodyChanges || 0 },
         potionStock: potionStock(),
         txns: ledger.txns.slice(-10),
         payment: 'stripe_not_connected',

@@ -774,7 +774,118 @@
        every gate opening; changing it needs no re-registration -
        confirmCharacter writes it into the record and
        espilApplyAvatarGender rebuilds the avatar on the spot. */
-    var chosenBody=null,bodyRowActive=false;
+    var chosenBody=null,bodyRowActive=false,espilGateLocked=false;
+    /* ---- character first-setup lock (Han 2026-11-16) ----
+       After sign-up the character is set ONCE in this gate;
+       afterwards appearance changes go through the store only
+       (customizer-once/DESIGN.md). The server record is the
+       truth; espil_character.setupDone is its device mirror,
+       written only by the entry-flow adoption and by the
+       confirm path below - never trusted on its own beyond
+       rendering this gate. Guests are outside the rule (§3.5):
+       every helper here is a no-op for them. */
+    var ESPIL_CHAR_API=(typeof window.__espilAuthApiBase==='string'&&window.__espilAuthApiBase)||'https://api.espil.online';
+    function espilCharRecord(){
+      try{var s=JSON.parse(window.localStorage.getItem('espil_character')||'null');
+        return (s&&typeof s==='object')?s:null;}catch(e){ return null; }
+    }
+    function espilSetupDone(){
+      if(espilGuestNow())return false;
+      var r=espilCharRecord();
+      return !!(r&&r.setupDone===true);
+    }
+    function espilBodyName(c){ return c==='master'?'Master':'Style '+(c||'style1').slice(-1); }
+    /* Change tickets live in the cash ledger (espil_cash_v1).
+       This gate renders BEFORE the arrival bundle loads
+       cashshop.js, so the count is read from the ledger store
+       itself - read-only here. cashshop stays the writer for
+       buys; the spend at confirm time goes through __espilCash
+       when it exists and through this same store otherwise. */
+    function espilBodyChangesHeld(){
+      try{var l=JSON.parse(window.localStorage.getItem('espil_cash_v1')||'null');
+        var n=l&&l.entitlements?Number(l.entitlements.bodyChanges):0;
+        return isFinite(n)&&n>0?Math.floor(n):0;}catch(e){ return 0; }
+    }
+    function espilSpendBodyChange(){
+      if(window.__espilCash&&typeof window.__espilCash.spendEntitlement==='function'){
+        return window.__espilCash.spendEntitlement('bodyChanges');
+      }
+      try{
+        var l=JSON.parse(window.localStorage.getItem('espil_cash_v1')||'null');
+        if(!l||typeof l!=='object')return false;
+        if(!l.entitlements||typeof l.entitlements!=='object')l.entitlements={};
+        var n=Number(l.entitlements.bodyChanges)||0;
+        if(n<=0)return false;
+        l.entitlements.bodyChanges=Math.floor(n)-1;
+        if(!Array.isArray(l.txns))l.txns=[];
+        l.txns.push({t:Date.now(),type:'spend',cents:0,label:'appearance-change'});
+        if(l.txns.length>60)l.txns=l.txns.slice(-60);
+        window.localStorage.setItem('espil_cash_v1',JSON.stringify(l));
+        return true;
+      }catch(e){ return false; }
+    }
+    function espilCharPost(path,payload){
+      if(!window.fetch)return Promise.reject(new Error('no fetch'));
+      return fetch(ESPIL_CHAR_API+path,{method:'POST',credentials:'include',
+        headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+        .then(function(r){ return r.json().catch(function(){return null;})
+          .then(function(b){ return {status:r.status,body:b}; }); });
+    }
+    function espilCharMirror(character){
+      try{
+        var r=espilCharRecord()||{};
+        r.gender=character.gender; r.bodyChoice=character.bodyChoice; r.setupDone=true;
+        delete r.setupPending;
+        window.localStorage.setItem('espil_character',JSON.stringify(r));
+      }catch(e){}
+    }
+    function espilCharPending(){
+      try{
+        var r=espilCharRecord();
+        if(r&&r.setupDone!==true){ r.setupPending=true;
+          window.localStorage.setItem('espil_character',JSON.stringify(r)); }
+      }catch(e){}
+    }
+    /* The confirm-time server write (design §3.2/§3.4/§4.4):
+       a first setup posts /setup; a changed confirm by an
+       already-set user spends one change ticket (when held)
+       and posts /change. A 409 on setup means the account was
+       set up elsewhere: the local edit is discarded, the
+       server character is re-adopted and re-applied, and the
+       player is told. Failures stay quiet and pending - the
+       next session sync re-adopts or retries (§3.4). */
+    function espilCharServerSync(prev,gender,bodyChoice){
+      if(espilGuestNow())return;
+      var wasSet=!!(prev&&prev.setupDone===true);
+      if(!wasSet){
+        espilCharPost('/auth/character/setup',{gender:gender,bodyChoice:bodyChoice}).then(function(res){
+          if(res&&res.status===200&&res.body&&res.body.character){
+            espilCharMirror(res.body.character);
+          }else if(res&&res.status===409&&res.body&&res.body.character){
+            espilCharMirror(res.body.character);
+            espilApplyAvatarGender(res.body.character.gender);
+            if(window.__espilToast)window.__espilToast('이미 설정된 캐릭터입니다. 저장된 캐릭터로 들어갑니다.');
+          }else{
+            espilCharPending();
+          }
+        }).catch(function(){ espilCharPending(); });
+        return;
+      }
+      var changed=!prev||prev.gender!==gender||(prev.bodyChoice||null)!==(bodyChoice||null);
+      if(!changed)return;
+      if(espilBodyChangesHeld()>0)espilSpendBodyChange();
+      espilCharPost('/auth/character/change',{gender:gender,bodyChoice:bodyChoice}).then(function(res){
+        if(res&&res.status===404){
+          /* The server lost the record (a fresh database): run
+             the one-time setup again with the same values. */
+          espilCharPost('/auth/character/setup',{gender:gender,bodyChoice:bodyChoice}).then(function(r2){
+            if(r2&&r2.body&&r2.body.character)espilCharMirror(r2.body.character);
+          }).catch(function(){});
+        }else if(res&&res.body&&res.body.character){
+          espilCharMirror(res.body.character);
+        }
+      }).catch(function(){});
+    }
     function espilRenderBodyRow(){
       var row=document.getElementById('char-body-row');
       if(!row){ bodyRowActive=false; return; }
@@ -783,14 +894,36 @@
         st.textContent='#char-custom .char-body-label{font:700 .62rem/1.4 Manrope,sans-serif;letter-spacing:.14em;color:#8a6a3b;margin:10px 0 4px;}'
           +'#char-custom .char-body-grid{display:flex;gap:6px;flex-wrap:wrap;}'
           +'#char-custom .char-body-card{flex:1 1 30%;padding:8px 4px;border-radius:10px;border:2px solid #cfa96f;background:linear-gradient(180deg,#fffef8,#ffedcb);color:#5a4020;font:700 12px Manrope,sans-serif;cursor:pointer;}'
-          +'#char-custom .char-body-card.is-selected{border-color:#b57708;background:linear-gradient(180deg,#ffe9b8,#ffd98c);box-shadow:0 2px 8px rgba(150,100,20,.35);}';
+          +'#char-custom .char-body-card.is-selected{border-color:#b57708;background:linear-gradient(180deg,#ffe9b8,#ffd98c);box-shadow:0 2px 8px rgba(150,100,20,.35);}'
+          +'#char-custom .char-body-lock{padding:8px 10px;border-radius:10px;border:2px dashed #cfa96f;background:rgba(255,244,214,.65);color:#5a4020;font:700 12px Manrope,sans-serif;}'
+          +'#char-custom .char-body-note{margin-top:6px;color:#8a6a3b;font:600 11px Manrope,sans-serif;}'
+          +'#char-custom .char-body-badge{margin:0 0 6px;padding:6px 10px;border-radius:10px;background:linear-gradient(180deg,#ffe9b8,#ffd98c);border:2px solid #b57708;color:#5a4020;font:700 12px Manrope,sans-serif;}';
         (document.head||document.documentElement).appendChild(st);
       }
       var opts=null;
       if(espilGuestBodyMode()==='chibi'){
         opts=espilGuestNow()?['style1','style2','style3','style4']:ESPIL_BODY_CHOICES;
       }
-      if(!opts){ row.hidden=true; row.innerHTML=''; bodyRowActive=false; chosenBody=null; return; }
+      if(!opts){ row.hidden=true; row.innerHTML=''; bodyRowActive=false; chosenBody=null; espilGateLocked=false; return; }
+      /* First-setup lock (Han 2026-11-16): a signed-in user who
+         completed the one-time setup sees the lock line, not the
+         cards - unless they hold an appearance change ticket,
+         which reopens this one gate session (design §2.3).
+         Guests are never locked (§3.5). */
+      espilGateLocked=false;
+      var setUp=espilSetupDone(), held=espilBodyChangesHeld();
+      if(!espilGuestNow()&&setUp&&held<=0){
+        espilGateLocked=true;
+        bodyRowActive=false; chosenBody=null;
+        row.hidden=false;
+        row.innerHTML='';
+        var llab=document.createElement('div'); llab.className='char-body-label'; llab.textContent='BODY';
+        row.appendChild(llab);
+        var lockEl=document.createElement('div'); lockEl.className='char-body-lock';
+        lockEl.textContent=espilBodyName(espilBodyChoice())+' · 외형 변경은 상점의 \'외형 변경권\'으로 가능합니다';
+        row.appendChild(lockEl);
+        return;
+      }
       if(!chosenBody||opts.indexOf(chosenBody)<0)chosenBody=espilBodyChoice();
       if(opts.indexOf(chosenBody)<0)chosenBody=opts[0];
       bodyRowActive=true;
@@ -798,6 +931,11 @@
       row.innerHTML='';
       var lab=document.createElement('div'); lab.className='char-body-label'; lab.textContent='BODY';
       row.appendChild(lab);
+      if(!espilGuestNow()&&setUp&&held>0){
+        var badge=document.createElement('div'); badge.className='char-body-badge';
+        badge.textContent='외형 변경권 '+held+'장 사용 가능 - 변경하고 확인하면 1장이 사용됩니다';
+        row.appendChild(badge);
+      }
       var grid=document.createElement('div'); grid.className='char-body-grid';
       opts.forEach(function(o){
         var b=document.createElement('button');
@@ -810,10 +948,17 @@
         grid.appendChild(b);
       });
       row.appendChild(grid);
+      if(!espilGuestNow()&&!setUp){
+        var hint=document.createElement('div'); hint.className='char-body-note';
+        hint.textContent='첫 설정은 무료입니다. 이후 외형 변경은 상점에서 가능합니다.';
+        row.appendChild(hint);
+      }
     }
     function confirmCharacter(gender){
-      try{var __rec={gender:gender,ts:Date.now()}; try{var __lk=window.__espilPendingLook?window.__espilPendingLook():null; if(__lk)__rec.look=__lk;}catch(_){} var __bc=(bodyRowActive&&chosenBody)?chosenBody:espilBodyChoiceSaved(); if(__bc)__rec.bodyChoice=__bc; window.localStorage.setItem('espil_character',JSON.stringify(__rec));}catch(e){} /* customizer look rides the character record (Han 2026-10-28); bodyChoice rides it the same way (Han 2026-11-16) */
+      var __prev=espilCharRecord(); /* first-setup lock: the pre-write record decides setup vs change below */
+      try{var __rec={gender:gender,ts:Date.now()}; try{var __lk=window.__espilPendingLook?window.__espilPendingLook():null; if(__lk)__rec.look=__lk;}catch(_){} var __bc=(bodyRowActive&&chosenBody)?chosenBody:espilBodyChoiceSaved(); if(__bc)__rec.bodyChoice=__bc; if(__prev&&__prev.setupDone===true)__rec.setupDone=true; if(__prev&&__prev.setupPending===true)__rec.setupPending=true; window.localStorage.setItem('espil_character',JSON.stringify(__rec));}catch(e){} /* customizer look rides the character record (Han 2026-10-28); bodyChoice rides it the same way (Han 2026-11-16); the setup mirror flags ride it too so a confirm never erases them (Han 2026-11-16) */
       espilApplyAvatarGender(gender); /* the preload may have built the other gender's avatar before this first-time pick */
+      try{ espilCharServerSync(__prev,gender,(typeof __bc==='string'&&__bc)?__bc:espilBodyChoice()); }catch(e){} /* first-setup / ticketed-change server write; guests no-op inside */
       var panel=document.getElementById('char-custom');
       var note=document.getElementById('char-bypass');
       if(note)note.hidden=true;
@@ -902,8 +1047,8 @@
       var female=document.getElementById('char-female');
       var confirm=document.getElementById('char-confirm');
       var back=document.getElementById('char-back');
-      if(male)male.addEventListener('click',function(){setChosen('male');if(window.EspilAudio&&window.EspilAudio.tick)window.EspilAudio.tick();});
-      if(female)female.addEventListener('click',function(){setChosen('female');if(window.EspilAudio&&window.EspilAudio.tick)window.EspilAudio.tick();});
+      if(male)male.addEventListener('click',function(){if(espilGateLocked)return; /* first-setup lock: the saved gender card is display-only (Han 2026-11-16) */ setChosen('male');if(window.EspilAudio&&window.EspilAudio.tick)window.EspilAudio.tick();});
+      if(female)female.addEventListener('click',function(){if(espilGateLocked)return; setChosen('female');if(window.EspilAudio&&window.EspilAudio.tick)window.EspilAudio.tick();});
       if(confirm)confirm.addEventListener('click',function(){confirmCharacter(chosenGender);});
       if(back)back.addEventListener('click',function(){
         var panel=document.getElementById('char-custom');
