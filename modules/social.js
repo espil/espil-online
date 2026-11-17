@@ -490,7 +490,30 @@
       return r.status === 200 ? r.json() : null;
     }).then(function (body) {
       if (body && body.signedIn && body.user && body.user.name) {
-        try { localStorage.setItem(LS_SESSION, JSON.stringify({ id: body.user.name, at: Date.now(), server: true })); } catch (_) {}
+        /* Finding A fix (2026-11-17): merge-preserving write.
+           This copy used to replace the whole record with
+           {id, at, server} and silently dropped the uid that
+           entry-flow's serverSessionSync writes - whichever
+           sync resolved last won, and this module arms last in
+           the common flow, so the record usually lost its uid
+           and the home-space identity key fell back to the
+           mutable account name. Start from the existing record
+           so fields this module does not own survive its
+           writes, then overlay the authoritative fields from
+           THIS response (uid included): either sync, in any
+           order, now leaves the full {id, uid, at, server}
+           record, and a future entry-flow-only field survives
+           here too. uid is overlaid, never merely preserved,
+           so an account switch cannot inherit the old uid. */
+        try {
+          var prevSes = session();
+          var nextSes = (prevSes && typeof prevSes === 'object') ? prevSes : {};
+          nextSes.id = body.user.name;
+          if (body.user.id) nextSes.uid = body.user.id;
+          nextSes.at = Date.now();
+          nextSes.server = true;
+          localStorage.setItem(LS_SESSION, JSON.stringify(nextSes));
+        } catch (_) {}
         try { localStorage.setItem('espil_username', body.user.name); } catch (_) {}
       } else {
         var s = session();
