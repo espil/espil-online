@@ -33,6 +33,18 @@
    a lagging ghost chunk, pop damage numbers (size by damage, drift
    alternating, crit shakes), and a single hit sound replayed at a
    random rate (baritone on crit).
+   HIT FEEL, REEL STEPS (Han 2026-11-17): squash-and-stretch on hit
+   (a damped spring composed with the wind-up swell at ONE scale
+   point, feet planted), knockback as an ease-out slide over the
+   exact distance the old teleport produced, spark bursts at the
+   hit point (pre-created pool), and a hit-stop REQUEST to
+   monolith's shared deadline (window.__espilHitStop - monolith
+   owns the stop and the camera shake; this module's tick honours
+   the same deadline while damage numbers keep animating). All of
+   it hooks inside __espilMonsterHit's body, so it rides the
+   Phase B move of that body into __espilDealDamage's monster
+   delegate unchanged. An evaded hit gains NONE of it (a whiff is
+   not a hit): no squash, no slide, no sparks, no stop.
    Death dispatches espil-guide {type:'monster-drop', kind, grade,
    parts:[...], items:[{name, line, grade, count}]} - drops OPEN
    (Batch 6) on three separated lines for S5 crafting.
@@ -111,6 +123,42 @@
                                           the old HP before draining */
   var GHOST_RATE = 0.55;               /* ghost drain, maxHp fraction/s */
   var BAR_RATE = 1.6;                  /* real bar drain, maxHp frac/s */
+
+  /* ---- Hit feel, reel steps 2/3/5 (Han 2026-11-17, via COO;
+     the click.game.hub 5-step reel - steps 1 FLASH and the damage
+     half of 5 BURST already existed above; step 4 HIT STOP lives
+     in monolith, this module only requests it) ----
+     SQUASH: a hit drives a damped spring (squashX, 0 = rest). The
+     spring starts at full depth the moment the hit lands and
+     oscillates back through a stretch overshoot to rest. Depth is
+     mass-damped on the knockback mass (scale squared): the
+     lightest current kind (scale 2.6, mass 6.76) takes the full
+     draft depth (sy 0.82); heavier kinds take proportionally less,
+     floored so even a titan visibly gives. */
+  var SQUASH_DEPTH = 0.18;             /* vertical squash at sy min
+                                          = 1 - depth (draft 0.82) */
+  var SQUASH_REF_MASS = 6.76;          /* 2.6^2: full-depth mass */
+  var SQUASH_MIN_F = 0.35;             /* depth factor floor */
+  var SQUASH_K = 300;                  /* spring stiffness */
+  var SQUASH_C = 15;                   /* spring damping (under-
+                                          damped: stretch overshoot
+                                          on the way back) */
+  var SQUASH_STRETCH = 0.6;            /* horizontal stretch per
+                                          unit of vertical squash */
+  /* KNOCKBACK AS SLIDE: the old instant displacement becomes an
+     ease-out-cubic slide over KB_DUR seconds. The TOTAL distance
+     is the exact figure the old teleport produced (full kb, half
+     kb, or zero, from the same walkable / safe-zone checks on the
+     same target points) - only the form changes. */
+  var KB_DUR = 0.16;                   /* s, slide duration */
+  /* SPARKS (the missing half of BURST): a pre-created pool of
+     point bursts at the hit point. 24 burst slots x 10 sparks in
+     ONE THREE.Points cloud - zero allocation per hit. Additive
+     blending, so fading the colour to black fades the spark out. */
+  var SPARK_SLOTS = 24;
+  var SPARK_PER = 10;
+  var SPARK_LIFE = 0.3;                /* s */
+  var SPARK_GRAV = 6;                  /* m/s^2 downward pull */
 
   /* ---- Grades: Zealandia 8-colour ladder ---- */
   var GRADE_COLOUR = {
@@ -392,7 +440,8 @@
     monsters: [], seq: 0, playerZone: null, forcedZone: null,
     activeZones: {}, zoneEvalAt: 0, spawnAcc: {}, gates: [], gatesBuilt: false,
     gateTryAt: 0, sepAt: 0, tickN: 0, outMapSince: 0, booted: false,
-    feel: { hits: 0, crits: 0, cancels: 0, numbers: 0, flashes: 0, evades: 0 }, dmgSeq: 0
+    feel: { hits: 0, crits: 0, cancels: 0, numbers: 0, flashes: 0, evades: 0,
+            squashes: 0, kbs: 0, sparks: 0 }, dmgSeq: 0
   };
 
   /* ---- entry mode (landing flow, Han 2026-11-09) ----
@@ -623,6 +672,173 @@
     else if (m.windupT > 0) m.body.material.color.setHex(0xffb066);
     else m.body.material.color.setHex(0xffffff);
   }
+
+  /* ---------------- hit feel: squash / slide / sparks ----------------
+     Everything below is driven from __espilMonsterHit (the single
+     damage entry point) and integrated in stepMonster / the tick. */
+
+  /* squash depth for this kind: full SQUASH_DEPTH at or below the
+     reference mass, proportionally less above it (mass = scale^2,
+     the knockback mass), floored at SQUASH_MIN_F */
+  function squashDepth(m) {
+    var mass = m.kind.scale * m.kind.scale;
+    var f = SQUASH_REF_MASS / mass;
+    if (f > 1) f = 1;
+    if (f < SQUASH_MIN_F) f = SQUASH_MIN_F;
+    return SQUASH_DEPTH * f;
+  }
+
+  /* THE body-scale compose point. The wind-up swell used to own
+     m.body.scale outright (three write sites in stepMonster plus
+     one reset in the hit path); now every factor is computed here
+     and written ONCE per tick, and stepMonster plants the feet
+     from the same composed Y factor:
+       scaleX factor = swell * (1 + squashX * SQUASH_STRETCH)
+       scaleY factor = swell * (1 - squashX)
+     squashX is the spring state (positive = squashed, negative =
+     stretch overshoot on the spring's way back). The spring is
+     integrated here with semi-implicit Euler in <= 20 ms substeps
+     (stable at the dt clamp). Results land in scratch vars - no
+     per-tick allocation. */
+  var composeSX = 1, composeSY = 1;
+  function composeBodyScale(m, dt) {
+    var swell = 1;
+    if (m.windupT > 0) {
+      var wf = 1 - Math.max(0, m.windupT) / (m.windupDur || 1);
+      swell = 1 + 0.16 * wf;
+    }
+    if (dt > 0 && (m.squashX !== 0 || m.squashV !== 0)) {
+      var rem = dt;
+      while (rem > 0) {
+        var h = Math.min(rem, 0.02);
+        m.squashV += (-SQUASH_K * m.squashX - SQUASH_C * m.squashV) * h;
+        m.squashX += m.squashV * h;
+        rem -= h;
+      }
+      if (Math.abs(m.squashX) < 0.001 && Math.abs(m.squashV) < 0.01) {
+        m.squashX = 0; m.squashV = 0;
+      }
+    }
+    composeSX = swell * (1 + m.squashX * SQUASH_STRETCH);
+    composeSY = swell * (1 - m.squashX);
+  }
+
+  /* knockback slide integration: ease-out cubic over KB_DUR, the
+     offset target is a pure function of elapsed slide time, so the
+     slide lands on EXACTLY kbDist however the frames fall. Each
+     tick's increment passes the same walkable / safe-zone gate the
+     old teleport checked; an axis-separated step is tried when the
+     straight step is blocked, and a fully blocked step ends the
+     slide early (the wall-corner case - the old code's answer to a
+     blocked destination was half distance or none, on the same
+     gate). dt = 0 (hit stop) freezes the slide with the world. */
+  function stepKb(m, dt) {
+    if (!m.kbActive || dt <= 0) return;
+    m.kbT += dt;
+    var p = Math.min(1, m.kbT / KB_DUR);
+    var target = m.kbDist * (1 - Math.pow(1 - p, 3));
+    var step = target - m.kbApplied;
+    if (step > 0) {
+      var nx = m.x + m.kbDirX * step, nz = m.z + m.kbDirZ * step;
+      if (walkable(nx, nz) && (m.instance || !inSafeZone(nx, nz))) {
+        m.x = nx; m.z = nz; m.kbApplied = target;
+      } else if (walkable(nx, m.z) && (m.instance || !inSafeZone(nx, m.z))) {
+        m.x = nx; m.kbApplied += m.kbDirX * m.kbDirX * step;
+      } else if (walkable(m.x, nz) && (m.instance || !inSafeZone(m.x, nz))) {
+        m.z = nz; m.kbApplied += m.kbDirZ * m.kbDirZ * step;
+      } else {
+        m.kbActive = false;
+      }
+    }
+    if (p >= 1 && m.kbApplied >= m.kbDist - 1e-9) m.kbActive = false;
+  }
+
+  /* ---- spark pool (BURST, particle half) ----
+     One THREE.Points cloud, SPARK_SLOTS bursts of SPARK_PER points
+     each, all buffers pre-created. A burst writes positions and
+     velocities into its slot's slice; stepping integrates with
+     gravity and fades colour toward black (additive blending
+     makes black invisible). Dead points park at y = -999. */
+  var sparkPts = null, sparkPos = null, sparkCol = null;
+  var sparkVel = null, sparkSlots = null, sparkNext = 0, sparkAlive = 0;
+  function ensureSparks() {
+    if (sparkPts) return true;
+    if (typeof THREE === 'undefined') return false;
+    var scene = sceneRoot();
+    if (!scene) return false;
+    var n = SPARK_SLOTS * SPARK_PER;
+    sparkPos = new Float32Array(n * 3);
+    sparkCol = new Float32Array(n * 3);
+    sparkVel = new Float32Array(n * 3);
+    sparkSlots = [];
+    for (var i = 0; i < SPARK_SLOTS; i++) sparkSlots.push({ t: 0, active: false });
+    for (var j = 0; j < n; j++) sparkPos[j * 3 + 1] = -999;
+    var geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(sparkCol, 3));
+    var mat = new THREE.PointsMaterial({
+      size: 0.32, vertexColors: true, transparent: true,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    });
+    sparkPts = new THREE.Points(geo, mat);
+    sparkPts.frustumCulled = false;
+    sparkPts.renderOrder = 5;
+    scene.add(sparkPts);
+    return true;
+  }
+  function spawnSparks(x, y, z) {
+    try {
+      if (!ensureSparks()) return;
+      var sIdx = sparkNext;
+      var slot = sparkSlots[sIdx];
+      sparkNext = (sparkNext + 1) % SPARK_SLOTS;
+      if (!slot.active) sparkAlive++;
+      slot.t = 0; slot.active = true;
+      var base = sIdx * SPARK_PER;
+      for (var i = 0; i < SPARK_PER; i++) {
+        var j = (base + i) * 3;
+        var a = Math.random() * Math.PI * 2;
+        var hs = 1.2 + Math.random() * 1.4;         /* horizontal 1.2-2.6 m/s */
+        sparkPos[j] = x; sparkPos[j + 1] = y; sparkPos[j + 2] = z;
+        sparkVel[j] = Math.cos(a) * hs;
+        sparkVel[j + 1] = 1.0 + Math.random() * 2.0; /* up 1.0-3.0 m/s */
+        sparkVel[j + 2] = Math.sin(a) * hs;
+        sparkCol[j] = 1.0; sparkCol[j + 1] = 0.85; sparkCol[j + 2] = 0.5;
+      }
+      sparkPts.geometry.attributes.position.needsUpdate = true;
+      sparkPts.geometry.attributes.color.needsUpdate = true;
+      S.feel.sparks++;
+    } catch (e) { /* a spark can never break a hit */ }
+  }
+  function stepSparks(dt) {
+    if (!sparkPts || !sparkAlive) return;
+    for (var s = 0; s < SPARK_SLOTS; s++) {
+      var slot = sparkSlots[s];
+      if (!slot.active) continue;
+      slot.t += dt;
+      var base = s * SPARK_PER;
+      if (slot.t >= SPARK_LIFE) {
+        slot.active = false; sparkAlive--;
+        for (var i = 0; i < SPARK_PER; i++) {
+          var j0 = (base + i) * 3;
+          sparkPos[j0 + 1] = -999;
+          sparkCol[j0] = 0; sparkCol[j0 + 1] = 0; sparkCol[j0 + 2] = 0;
+        }
+        continue;
+      }
+      var fade = 1 - slot.t / SPARK_LIFE;
+      for (var k = 0; k < SPARK_PER; k++) {
+        var j = (base + k) * 3;
+        sparkVel[j + 1] -= SPARK_GRAV * dt;
+        sparkPos[j] += sparkVel[j] * dt;
+        sparkPos[j + 1] += sparkVel[j + 1] * dt;
+        sparkPos[j + 2] += sparkVel[j + 2] * dt;
+        sparkCol[j] = fade; sparkCol[j + 1] = fade * 0.85; sparkCol[j + 2] = fade * 0.5;
+      }
+    }
+    sparkPts.geometry.attributes.position.needsUpdate = true;
+    sparkPts.geometry.attributes.color.needsUpdate = true;
+  }
   function drawHpBar(m) {
     var c = m.hpCanvas.getContext('2d');
     c.clearRect(0, 0, 128, 16);
@@ -719,6 +935,8 @@
       spawnX: x, spawnZ: z, zone: kind.zone, level: kind.level,
       hp: kind.hp, maxHp: kind.hp, state: 'walk', gone: false,
       windupT: 0, windupDur: 0, windupDmg: 0,
+      squashX: 0, squashV: 0,
+      kbActive: false, kbDirX: 0, kbDirZ: 0, kbDist: 0, kbApplied: 0, kbT: 0,
       barHp: kind.hp, ghostHp: kind.hp, ghostHoldT: 0,
       body: body, plate: plate, hpSprite: hpSprite, hpCanvas: hp.canvas, hpTex: hp.tex,
       shadow: shadow, w: w, h: h, faceY: Math.random() * Math.PI * 2,
@@ -782,11 +1000,19 @@
   function stepMonster(m, dt, pp) {
     if (m.state === 'dying') {
       m.dieT -= dt;
+      /* a killing hit's slide still plays out under the fade (the
+         old teleport had already moved the logical position; the
+         slide now covers the same distance while the body fades
+         and sinks - the fade/sink treatment itself is unchanged).
+         The composed scale is released: death carries no squash. */
+      stepKb(m, dt);
+      if (m.body.scale.x !== m.w || m.body.scale.y !== m.h) m.body.scale.set(m.w, m.h, 1);
+      m.squashX = 0; m.squashV = 0;
       stepSprite(m, dt, 'death');
       var f = Math.max(0, m.dieT / 0.9);
       m.body.material.opacity = f;
       m.plate.material.opacity = f; m.hpSprite.material.opacity = f;
-      m.body.position.y = m.h / 2 - (1 - f) * 0.6;
+      m.body.position.set(m.x, m.h / 2 - (1 - f) * 0.6, m.z);
       if (m.dieT <= 0) removeMonster(m);
       return;
     }
@@ -840,12 +1066,11 @@
            damage taken during the wind-up can cancel it outright
            (see __espilMonsterHit). */
         m.windupT -= dt;
-        var wf = 1 - Math.max(0, m.windupT) / (m.windupDur || 1);
-        m.body.scale.set(m.w * (1 + 0.16 * wf), m.h * (1 + 0.16 * wf), 1);
+        /* the swell itself is written by composeBodyScale at the
+           tail of this step (one scale point for swell + squash) */
         spd = 0;
         if (m.windupT <= 0) {
           m.windupT = 0; m.windupDmg = 0;
-          m.body.scale.set(m.w, m.h, 1);
           m.atkT = m.kind.atkCd;
           if (dist < m.kind.reach * 1.2) {
             try {
@@ -862,9 +1087,9 @@
       }
     } else {
       if (m.windupT > 0) {
-        /* the player broke away mid-telegraph: the attack fizzles */
+        /* the player broke away mid-telegraph: the attack fizzles
+           (windupT = 0 releases the swell at the compose point) */
         m.windupT = 0; m.windupDmg = 0;
-        m.body.scale.set(m.w, m.h, 1);
         m.atkT = Math.max(m.atkT, 0.4);
       }
       m.wanderT -= dt;
@@ -935,7 +1160,18 @@
       else if (chasing) sKey = 'aggro';
       stepSprite(m, dt, sKey);
     }
-    m.body.position.set(m.x, m.h / 2 + bobY, m.z);
+    /* knockback slide: integrated after the AI's own movement, so
+       the two compose instead of fighting (the wander anchor stays
+       the spawn point either way) */
+    stepKb(m, dt);
+    /* THE scale compose point (wind-up swell x squash spring) and
+       the foot-plant: the body is centre-anchored, so its centre
+       height follows the composed Y factor - feet stay on the
+       ground through a squash instead of lifting, and a swell
+       grows upward instead of sinking. */
+    composeBodyScale(m, dt);
+    m.body.scale.set(m.w * composeSX, m.h * composeSY, 1);
+    m.body.position.set(m.x, m.h * composeSY / 2 + bobY, m.z);
     /* FIX-7 item 7: yaw the upright body plane toward the player
        (never pitch it - that is the whole point of the plane). */
     if (pp) m.body.rotation.y = Math.atan2(dx, dz);
@@ -1247,6 +1483,8 @@
       feel: {
         hits: S.feel.hits, crits: S.feel.crits, cancels: S.feel.cancels,
         numbers: S.feel.numbers, flashes: S.feel.flashes, evades: S.feel.evades,
+        squashes: S.feel.squashes, kbs: S.feel.kbs, sparks: S.feel.sparks,
+        activeSparks: sparkAlive * SPARK_PER,
         activeNumbers: dmgPool.length, activeDropTags: dropPool.length
       },
       drops: (S.lastDrops || []).map(function (d) {
@@ -1261,6 +1499,10 @@
           z: Math.round(m.z * 100) / 100, hp: m.hp, maxHp: m.maxHp,
           level: m.level, zone: m.zone, state: m.state, instance: !!m.instance,
           flash: m.flashT > 0, winding: m.windupT > 0,
+          scaleX: m.body ? Math.round((m.body.scale.x / (m.w || 1)) * 1000) / 1000 : 1,
+          scaleY: m.body ? Math.round((m.body.scale.y / (m.h || 1)) * 1000) / 1000 : 1,
+          squashX: Math.round(m.squashX * 1000) / 1000,
+          kbRemain: m.kbActive ? Math.round((m.kbDist - m.kbApplied) * 1000) / 1000 : 0,
           sprite: m.sprite ? (m.sprite.base || 'kind') : null,
           frame: m.sprite ? (m.frameKey + ':' + m.frameIdx) : null,
           windupDmg: Math.round(m.windupDmg * 10) / 10,
@@ -1309,6 +1551,7 @@
                  instance: !!m.instance };
       }
       m.hp -= applied;
+      var killed = m.hp <= 0;
       /* ---- feel: flash, number, sound (on the applied figure) ---- */
       m.flashT = 0.2;
       S.feel.flashes++;
@@ -1317,6 +1560,37 @@
       if (crit) S.feel.crits++;
       spawnDmgNumber(m, applied, crit);
       playHitSound(crit);
+      /* ---- feel, reel steps (Han 2026-11-17): squash, sparks,
+         hit stop. Everything hooks HERE, inside the entry point's
+         body, so every hit from every caller receives it and it
+         rides the Phase B move of this body into
+         __espilDealDamage's monster delegate. ----
+         SQUASH: the spring starts at full depth now and is
+         integrated at the compose point in stepMonster. The
+         killing hit gets NO squash - the death fade/sink already
+         carries it, and the two treatments must not stack. */
+      if (!killed) {
+        m.squashX = squashDepth(m);
+        m.squashV = 0;
+        S.feel.squashes++;
+      }
+      /* BURST, particle half: sparks at the hit point (the body
+         centre at chest height). Killing hits included - a burst
+         is not the death treatment, it is the hit's own. */
+      spawnSparks(m.x, m.h * 0.55, m.z);
+      /* HIT STOP: requested from monolith's shared deadline (it
+         owns the stop, the scope switch and the camera shake).
+         Only player-originated hits ask: monolith's
+         espilApplyMoveHit always passes an opts object, while
+         story.js's scripted cleanup kill (99999) passes NONE -
+         and that cleanup must not gain a kill-grade stop, so the
+         absence of opts is the suppression key. */
+      if (opts) {
+        try {
+          if (typeof window.__espilHitStop === 'function')
+            window.__espilHitStop(killed ? 'kill' : (crit ? 'crit' : 'hit'));
+        } catch (e) {}
+      }
       /* ---- wind-up cancel: applied pain at/above CANCEL_FRAC of
          maxHp taken during the telegraph cancels the attack ---- */
       var cancelled = false;
@@ -1324,7 +1598,7 @@
         m.windupDmg += applied;
         if (m.windupDmg >= m.maxHp * CANCEL_FRAC) {
           m.windupT = 0; m.windupDmg = 0;
-          m.body.scale.set(m.w, m.h, 1);
+          /* the swell releases at the compose point (windupT = 0) */
           m.atkT = Math.max(m.atkT, m.kind.atkCd * 0.6);
           S.feel.cancels++;
           cancelled = true;
@@ -1333,9 +1607,15 @@
       /* the ghost chunk restarts its linger on every hit */
       m.ghostHoldT = GHOST_HOLD;
       drawHpBar(m);
-      /* knockback away from the attacker; the distance shrinks with
-         the kind's mass (scale squared), so small kinds get shoved
-         and brutes barely move */
+      /* knockback away from the attacker, AS A SLIDE (reel step
+         3): the distance still shrinks with the kind's mass (scale
+         squared), and the full / half / none outcome is decided by
+         the SAME walkable / safe-zone checks on the SAME target
+         points the old teleport used - the total distance is the
+         old figure to the centimetre; only the form changed from
+         an instant jump to an ease-out slide integrated in
+         stepMonster (stepKb). A re-hit mid-slide restarts the
+         slide from the current position, as the teleport did. */
       var dx = m.x - fromX, dz = m.z - fromZ;
       var d = Math.sqrt(dx * dx + dz * dz) || 1;
       var mass = m.kind.scale * m.kind.scale;
@@ -1343,8 +1623,15 @@
       var kx = dx / d * kb, kz = dz / d * kb;
       var kbFull = walkable(m.x + kx, m.z + kz) && (m.instance || !inSafeZone(m.x + kx, m.z + kz));
       var kbHalf = walkable(m.x + kx * 0.5, m.z + kz * 0.5) && (m.instance || !inSafeZone(m.x + kx * 0.5, m.z + kz * 0.5));
-      if (kbFull) { m.x += kx; m.z += kz; }
-      else if (kbHalf) { m.x += kx * 0.5; m.z += kz * 0.5; }
+      var kbDist = kbFull ? kb : (kbHalf ? kb * 0.5 : 0);
+      if (kbDist > 0) {
+        m.kbDirX = dx / d; m.kbDirZ = dz / d;
+        m.kbDist = kbDist; m.kbApplied = 0; m.kbT = 0;
+        m.kbActive = true;
+        S.feel.kbs++;
+      } else {
+        m.kbActive = false;
+      }
       if (m.hp > 0) return { id: m.id, hp: m.hp, dead: false, killed: false, applied: applied, evaded: false, crit: crit, cancelled: cancelled, kind: m.kind.id, zone: m.zone, grade: m.kind.grade, instance: !!m.instance };
       /* death (Batch 6 Item B): drops OPEN on the three separated
          lines - weapon materials guaranteed, armour and accessory
@@ -1515,16 +1802,24 @@
           }
         });
       }
-      if (now - S.sepAt > 150) { S.sepAt = now; separateMonsters(); }
+      /* HIT STOP (reel step 4): monolith owns the shared deadline
+         (window.__espilHitStopUntil, performance.now epoch). While
+         it runs, this tick's world dt is 0 - monsters, slides,
+         springs and sparks freeze with the world - but the damage
+         numbers below keep the REAL dt: the reel's picture is the
+         world held while the number pops. */
+      var mdt = (now < (window.__espilHitStopUntil || 0)) ? 0 : dt;
+      if (mdt > 0 && now - S.sepAt > 150) { S.sepAt = now; separateMonsters(); }
       for (var k = S.monsters.length - 1; k >= 0; k--) {
         var m = S.monsters[k];
         if (!m || m.gone) continue;
-        stepMonster(m, dt, pp);
+        stepMonster(m, mdt, pp);
         if (m.gone) continue;
         /* centre guard: never render inside a blocked cell */
         if (walkable(m.x, m.z)) { m.safeX = m.x; m.safeZ = m.z; }
         else { m.x = m.safeX; m.z = m.safeZ; }
       }
+      stepSparks(mdt);
       stepDmgNumbers(dt);
     } catch (e) { /* the monster layer never breaks the page */ }
   }

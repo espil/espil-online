@@ -9476,6 +9476,111 @@
        math is untouched. */
     var espilHurt={hits:0,lastDmg:0,shake:0,shakePeak:0,vig:0,vigPeak:0,punch:0,kb:0,sound:0};
     var espilHurtVigEl=null, espilHurtCtx=null, espilHurtCanvas=null, espilHurtLastTick=0;
+    /* ================================================================
+       HIT STOP + HIT SHAKE (Han 2026-11-17, via COO): step 4 of the
+       enemy hit-feel reel - a landed hit freezes the world for a
+       few frames and nudges the camera. There is NO global clock
+       in this game (every module runs its own RAF loop with its
+       own dt clamp), so the stop is a SHARED DEADLINE:
+       window.__espilHitStopUntil (performance.now epoch, ms). The
+       monsters tick, this file's main animate and the sprite-avatar
+       stepper (espilAv2Step) each consult it and zero their own
+       world dt while it runs. Damage numbers are exempt (the
+       monsters tick steps them on real dt) - the reel's picture is
+       the world held while the number pops. Presence/network is
+       never stopped: remote players are other clients; only their
+       local interpolation pauses, under the scope switch below.
+       Requests come ONLY from inside __espilMonsterHit's body
+       (monsters.js), graded by the hit: normal / crit / kill.
+       Merge rules: the deadline is a max(), never a sum - a
+       simultaneous multi-hit takes the highest grade ONCE; a
+       re-request during a stop extends only past the current
+       deadline, and only that real extension is charged to the
+       rolling per-second budget, so chain hits cannot stun-lock
+       the world. The camera shake reuses espilHurtFeedback's
+       proven method (CSS transform on the largest canvas) on a
+       SEPARATE state - the two shakes never write each other's
+       channel state. */
+    /* THE STOP-SCOPE SWITCH: 'world' = the main loop and the
+       avatar stepper freeze too (the local player feels the hit
+       land); 'monsters' = only the monsters tick honours the
+       deadline. Flip this ONE line to change the scope. */
+    var ESPIL_HIT_STOP_SCOPE='world';
+    var ESPIL_HIT_STOP_DUR={hit:0.045,crit:0.07,kill:0.10};   /* s, by grade */
+    var ESPIL_HIT_STOP_SHAKE={hit:3,crit:5,kill:6};           /* px, by grade */
+    var ESPIL_HIT_STOP_CAP=0.25;  /* max ADDED stop per rolling 1 s */
+    var espilHitStopLog=[];       /* {t, added} grants in the window */
+    var espilHitStopStats={requests:0,granted:0,covered:0,denied:0,shakes:0,lastGrade:null};
+    var espilHitShake={shake:0,peak:0};
+    var espilHitShakeCanvas=null, espilHitShakeLastTick=0;
+    window.__espilHitStopUntil=0;
+    window.__espilHitStop=function(grade){
+      var dur=ESPIL_HIT_STOP_DUR[grade];
+      if(!dur)return;
+      espilHitStopStats.requests++;
+      espilHitStopStats.lastGrade=grade;
+      var now=performance.now();
+      while(espilHitStopLog.length&&now-espilHitStopLog[0].t>1000)espilHitStopLog.shift();
+      var used=0;
+      for(var i=0;i<espilHitStopLog.length;i++)used+=espilHitStopLog[i].added;
+      var cur=window.__espilHitStopUntil||0;
+      var newUntil=Math.max(cur,now+dur*1000);
+      var added=(newUntil-Math.max(cur,now))/1000;
+      if(added<=0){ espilHitStopStats.covered++; }
+      else{
+        if(used+added>ESPIL_HIT_STOP_CAP+1e-9){ espilHitStopStats.denied++; return; }
+        espilHitStopLog.push({t:now,added:added});
+        window.__espilHitStopUntil=newUntil;
+        espilHitStopStats.granted++;
+      }
+      /* shake: the grade's peak, max-merged like the deadline -
+         simultaneous hits shake once, at the highest grade */
+      var px=ESPIL_HIT_STOP_SHAKE[grade]||0;
+      if(px>espilHitShake.shake){ espilHitShake.shake=px; espilHitShake.peak=px; espilHitStopStats.shakes++; }
+      espilHitShakeLastTick=now;
+    };
+    window.__espilHitStopState=function(){
+      var now=performance.now(), used=0;
+      for(var i=0;i<espilHitStopLog.length;i++)if(now-espilHitStopLog[i].t<=1000)used+=espilHitStopLog[i].added;
+      return { scope:ESPIL_HIT_STOP_SCOPE,
+        until:window.__espilHitStopUntil||0,
+        remainingMs:Math.max(0,Math.round((window.__espilHitStopUntil||0)-now)),
+        active:now<(window.__espilHitStopUntil||0),
+        granted1s:Math.round(used*1000)/1000,
+        cap:ESPIL_HIT_STOP_CAP,
+        dur:{hit:ESPIL_HIT_STOP_DUR.hit,crit:ESPIL_HIT_STOP_DUR.crit,kill:ESPIL_HIT_STOP_DUR.kill},
+        shakePx:{hit:ESPIL_HIT_STOP_SHAKE.hit,crit:ESPIL_HIT_STOP_SHAKE.crit,kill:ESPIL_HIT_STOP_SHAKE.kill},
+        shake:Math.round(espilHitShake.shake*100)/100, shakePeak:espilHitShake.peak,
+        stats:{requests:espilHitStopStats.requests,granted:espilHitStopStats.granted,
+          covered:espilHitStopStats.covered,denied:espilHitStopStats.denied,
+          shakes:espilHitStopStats.shakes,lastGrade:espilHitStopStats.lastGrade} };
+    };
+    /* shake decay driver: the espilHurtFeedback method (33 ms
+       interval, largest canvas, random offsets, 26/s decay) on
+       this block's own state */
+    setInterval(function(){
+      if(espilHitShake.shake<=0)return;
+      var now=performance.now();
+      var dt=Math.min(.1,(now-espilHitShakeLastTick)/1000||.033);
+      espilHitShakeLastTick=now;
+      espilHitShake.shake=Math.max(0,espilHitShake.shake-dt*26);
+      try{
+        if(!espilHitShakeCanvas||!espilHitShakeCanvas.isConnected){
+          var cvs=document.querySelectorAll('canvas'), best=null, ba=0;
+          for(var ci=0;ci<cvs.length;ci++){
+            var a=cvs[ci].clientWidth*cvs[ci].clientHeight;
+            if(a>ba){ ba=a; best=cvs[ci]; }
+          }
+          espilHitShakeCanvas=best;
+        }
+        if(espilHitShakeCanvas){
+          if(espilHitShake.shake>.05){
+            var ox=(Math.random()*2-1)*espilHitShake.shake, oy=(Math.random()*2-1)*espilHitShake.shake*.7;
+            espilHitShakeCanvas.style.transform='translate('+ox.toFixed(1)+'px,'+oy.toFixed(1)+'px)';
+          }else espilHitShakeCanvas.style.transform='';
+        }
+      }catch(e){}
+    },33);
     function espilHurtEnsureVig(){
       if(espilHurtVigEl)return espilHurtVigEl;
       var el=document.createElement('div');
@@ -11628,6 +11733,10 @@
       requestAnimationFrame(espilAv2Step);
       var dt=Math.min(.05,Math.max(0,(now-espilAv2Last)/1000||0));
       espilAv2Last=now;
+      /* HIT STOP (Han 2026-11-17): avatar animation/interpolation
+         honours the same shared deadline under the world scope
+         (espilAv2Last already advanced - no catch-up jump after) */
+      if(ESPIL_HIT_STOP_SCOPE==='world'&&now<(window.__espilHitStopUntil||0))dt=0;
       if(dt<=0)return;
       espilAv2Clock+=dt;
       var camYaw=(typeof walkCamYaw==='number')?walkCamYaw:0;
@@ -13395,6 +13504,11 @@
       espilOccludeTick(); /* wall-occlusion dither uniforms + extrusion stipple tick (Han 2026-11-14; system from 2026-11-03) */
       var nowMs=performance.now();
       var dt=Math.min(.05,(nowMs-lastFrameT)/1000);lastFrameT=nowMs;
+      /* HIT STOP (Han 2026-11-17): the shared deadline - while it
+         runs, the world's dt is 0 (lastFrameT already advanced, so
+         the first frame after the stop is a normal frame, never a
+         catch-up jump). Scope switch: ESPIL_HIT_STOP_SCOPE. */
+      if(ESPIL_HIT_STOP_SCOPE==='world'&&nowMs<(window.__espilHitStopUntil||0))dt=0;
       if(cityPhaseActive){
         /* Walkable downtown map owns the frame. */
         updateWalkMap(dt,nowMs/1000);
