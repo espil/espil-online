@@ -3698,6 +3698,17 @@
        timeScale is never written for it. Idle and one-shots are
        never touched. === */
     var ESPIL_STRIDE_TS_MIN=0.2, ESPIL_STRIDE_TS_MAX=64;
+    /* ANIMATION SPEED HALVED (Han direct order, 2026-11-16): the
+       distance-proportional locomotion playback still read too
+       fast on Han's screen, so every timeScale espilStrideSync
+       computes is multiplied by ESPIL_ANIM_SPEED_F = 0.5 - walk
+       and run, local and remote, every player body family
+       together. Strides and movement speeds are unchanged. The
+       factor is applied before the [0.2, 64] clamp; the measured
+       operating band (~0.44 to ~29 unhalved, ~0.22 to ~14.5
+       halved) never reaches either clamp end, so the halving is
+       exact at every legitimate operating point. */
+    var ESPIL_ANIM_SPEED_F=0.5;
     function espilStrideBone(model,wants){
       var norm=wants.map(function(w){ return String(w).replace(/[^a-z0-9]/gi,'').toLowerCase(); });
       var boneHit=null, anyHit=null;
@@ -3852,7 +3863,7 @@
       if(vr&&vr.userData&&typeof vr.userData.__avBaseScale==='number'&&vr.userData.__avBaseScale>0){
         s=s*(vr.scale.x/vr.userData.__avBaseScale);
       }
-      var ts=speed/s;
+      var ts=(speed/s)*ESPIL_ANIM_SPEED_F;
       if(ts<ESPIL_STRIDE_TS_MIN)ts=ESPIL_STRIDE_TS_MIN;
       else if(ts>ESPIL_STRIDE_TS_MAX)ts=ESPIL_STRIDE_TS_MAX;
       act.timeScale=ts;
@@ -7325,16 +7336,17 @@
     function espilPaintEnterAffordance(){
       var e=document.getElementById('bldg-enter'); if(!e)return;
       /* Batch 5 (Han 2026-11-07): every rendered building shows
-         Enter. A non-Konbiniya building's Enter is labelled with
+         Enter. A non-Konbiniya building's Enter was labelled with
          its real destination - the Konbiniya interior - so the
-         panel never implies the building has its own interior. */
-      if(espilIsKonbiniyaRec(espilBldgPanelRec)){
-        e.style.display='';
-        e.textContent='Enter';
-      }else{
-        e.style.display='';
-        e.textContent='Enter · Konbiniya interior';
-      }
+         panel never implied the building has its own interior.
+         "KONBINIYA ENTER" PROMPT REMOVED (Han direct order,
+         2026-11-16): the prompt shown when entering any building
+         no longer names the Konbiniya - that label was the display
+         part of every building reading as the Konbiniya. The
+         button, its show path and the entry routing behind it are
+         unchanged; only the Konbiniya naming is gone. */
+      e.style.display='';
+      e.textContent='Enter';
     }
     window.__espilInterior=null; window.__espilInteriorReturn=null;
     var ESPIL_INT={x:0,z:8000};
