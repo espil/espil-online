@@ -2127,6 +2127,12 @@
          publishes the rectangle while a space stands. */
       var _psr=window.__espilPlaceSpaceRect;
       if(_psr&&x>=_psr.x0&&x<=_psr.x1&&z>=_psr.z0&&z<=_psr.z1)return 0;
+      /* HOME SPACE (Han 2026-11-16, design 2.2): the player's own
+         home rectangle is instance ground the same way - the room
+         floor is exactly 0 inside it. The home module publishes
+         the rectangle while the player is home. */
+      var _hmr=window.__espilHomeRect;
+      if(_hmr&&x>=_hmr.x0&&x<=_hmr.x1&&z>=_hmr.z0&&z<=_hmr.z1)return 0;
       return best;
     }
     /* ============ ESPIL DISTRICT BUILD (sample district, 2026-10-16) ============
@@ -5156,6 +5162,13 @@
          resume. The mark is this window's sessionStorage, written
          by the address boot shell. */
       try{ if(sessionStorage.getItem('espil_store_space_v1'))return; }catch(e){}
+      /* HOME SPACE (Han 2026-11-16, design 7.2): a home stay never
+         writes the position save either - the home sits in the
+         instance band (z >= 24000), and a save from inside it
+         would overwrite the street resume point the player
+         returns to. The home is in-page, so there is no
+         sessionStorage mark; the inside record is the test. */
+      if(window.__espilInside&&window.__espilInside.home)return;
       try{
         localStorage.setItem(LAST_POS_KEY,JSON.stringify({
           x:walkPlayer.pos.x,y:walkPlayer.pos.y,z:walkPlayer.pos.z,
@@ -5906,6 +5919,14 @@
           if(window.__espilPlaceSpaceUse)window.__espilPlaceSpaceUse();
           return;
         }
+        /* HOME SPACE (Han 2026-11-16, design 8.1 hunk 5): inside
+           the player's own home, Space at the door leaves; Space
+           anywhere else does nothing - the home has no kiosk or
+           shop surface for the press to fall through to. */
+        if(window.__espilInside.home){
+          if(_dd<1.8){ if(window.__espilHomeExitSpace)window.__espilHomeExitSpace(); return; }
+          return;
+        }
         if(_dd<1.8){ if(window.__espilInside.arena){ if(window.__espilArena)window.__espilArena.exitRun(); return; } espilLeaveBuilding(); return; }
         if(window.__espilInside.arena)return; /* ARENA SEAM: no kiosk/shop surface inside the arena space */
         /* v3 (Han 2026-10-26): inside, Space works the kiosk - near it,
@@ -6156,6 +6177,10 @@
          the walk tick reads these two constants instead (the same
          4.5 / 7.0 the sample store page walked at). */
       if(window.__espilInside&&window.__espilInside.placeSpace){ r.walk=ESPIL_PLACE_WALK; r.run=ESPIL_PLACE_RUN; }
+      /* HOME SPACE (Han 2026-11-16, design 2.2): the home is a
+         small room too - the same lobby-class speeds, on its own
+         constants so the home pace can be tuned alone. */
+      if(window.__espilInside&&window.__espilInside.home){ r.walk=ESPIL_HOME_WALK; r.run=ESPIL_HOME_RUN; }
       return r;
     }
     /* MapleStory-style pixel skill icons, drawn on a 16x16 canvas at runtime. */
@@ -7684,6 +7709,16 @@
     var ESPIL_KB_EYE=1.6, ESPIL_KB_TURN=Math.PI/2, ESPIL_KB_P1_ZOOM=22.0, ESPIL_KB_P1_PITCH=85;
     var espilFpvApplied=false;
     function espilKbFpvActive(){
+      /* HOME THIRD-PERSON (Han 2026-11-17, home design 9 Q2
+         DECIDED): the home is the one interior that is NOT
+         first-person - the player sees the character they
+         picked. Every other interior keeps the FPV rule above.
+         The inside record itself is untouched by this: monster
+         safety, the position-save guard and the inside tick all
+         read the record, never this predicate. With the
+         predicate off, the home's A/D, attack and skill inputs
+         take the street law, like the camera does. */
+      if(window.__espilInside&&window.__espilInside.home)return false;
       return !!(window.__espilInside&&espilInsideRec&&typeof walkPlayer!=='undefined'&&walkPlayer);
     }
     window.__espilKbFpvState=function(){
@@ -7754,6 +7789,13 @@
          interior's return, which would drop the player at the
          building's street anchor inside the child window. */
       if(window.__espilInside&&window.__espilInside.placeSpace){ if(window.__espilPlaceSpaceExit)window.__espilPlaceSpaceExit(); return; }
+      /* HOME SPACE (Han 2026-11-16, design 8.1 hunk 6): leaving
+         from inside the player's own home is the home exit, for
+         the same reason as the place guard above - the street
+         interior's return would drop the player at the saved
+         point without the home exit's cleanup (zoom, the home
+         rectangle, the inside record's home shape). */
+      if(window.__espilInside&&window.__espilInside.home){ if(window.__espilHomeExitSpace)window.__espilHomeExitSpace(); return; }
       if(espilIntPrevZoom!==null&&typeof espilP1!=='undefined'&&espilP1&&espilP1.map){ espilP1.zoomT=espilIntPrevZoom; }
       espilIntPrevZoom=null; espilKioskHint=false;
       var out=espilInsideOutside;
@@ -7905,6 +7947,196 @@
         var fx=ep?ep.x:out.x, fz=ep?ep.z:(out.z+8);
         p.pos.set(fx,0.05,fz); p.velY=0; p.onGround=true;
       }
+    };
+    /* ============ HOME SPACE (Han 2026-11-16) =====
+       Every player's own home, on the arena-space pattern: an
+       in-page instance teleport (the player really moves and
+       presence follows - H is a repeated quick return, so the
+       place space's child window and its per-press load do not
+       fit), a slot derived purely from the player's identity,
+       and an interior record, so the Konbiniya FPV predicate
+       engages with no new camera code. The slot lives in its own
+       band (z >= ESPIL_HOME_Z0, clear of the place band's end at
+       22240) on a 128 x 128 grid at the place band's 320 m
+       spacing; the hash input is namespaced ("home/<key>") so a
+       home slot can never coincide with a place slot's input.
+       Identity: a signed-in player's account UUID (the session
+       record's uid, stored by entry-flow's serverSessionSync;
+       a record written before uid existed falls back to its id -
+       the display name - as the temporary key until the first
+       sync rewrites it, design 8.1 hunk 9); a guest's device key
+       (espil_home_key_v1, 128-bit random, made once on the first
+       H press - guest data is device-scoped by canon). The name
+       itself is never the key: names can change. Nothing is
+       stored server-side in v1 - the slot is a pure derivation,
+       so there is no Worker change and no migration. */
+    var ESPIL_HOME_WALK=4.5, ESPIL_HOME_RUN=7.0;
+    var ESPIL_HOME_Z0=24000, ESPIL_HOME_GRID=128, ESPIL_HOME_SPACING=320;
+    var ESPIL_HOME_W=14, ESPIL_HOME_D=11, ESPIL_HOME_H=3.2;
+    var ESPIL_HOME_KEY_LS='espil_home_key_v1';
+    function espilHomeFnv1a(str){
+      var h=2166136261;
+      for(var i=0;i<str.length;i++)h=Math.imul(h^str.charCodeAt(i),16777619);
+      return h>>>0;
+    }
+    function espilHomeGuestKey(){
+      try{
+        var k=window.localStorage.getItem(ESPIL_HOME_KEY_LS);
+        if(k)return k;
+        var buf=new Uint8Array(16), hex='';
+        if(window.crypto&&window.crypto.getRandomValues)window.crypto.getRandomValues(buf);
+        else for(var i=0;i<16;i++)buf[i]=Math.floor(Math.random()*256);
+        for(var j=0;j<16;j++){ var s=buf[j].toString(16); hex+=(s.length<2?'0':'')+s; }
+        window.localStorage.setItem(ESPIL_HOME_KEY_LS,hex);
+        return hex;
+      }catch(e){ return 'volatile'; }
+    }
+    function espilHomeIdentityKey(){
+      try{
+        var s=JSON.parse(window.localStorage.getItem('espil_session_v1')||'null');
+        if(s&&(s.uid||s.id))return 'acct:'+(s.uid||s.id);
+      }catch(e){}
+      return 'guest:'+espilHomeGuestKey();
+    }
+    function espilHomeSlotFor(key){
+      var h=espilHomeFnv1a('home/'+key);
+      var col=h%ESPIL_HOME_GRID, row=Math.floor(h/ESPIL_HOME_GRID)%ESPIL_HOME_GRID;
+      return { x:(col-ESPIL_HOME_GRID/2)*ESPIL_HOME_SPACING, z:ESPIL_HOME_Z0+row*ESPIL_HOME_SPACING, slot:(row*ESPIL_HOME_GRID+col) };
+    }
+    function espilHomeOwnerName(){
+      /* The sign over the door's opposite wall: the player's own
+         display name, from the same sources presence.myName
+         reads (the gate's name input, then the stored username).
+         No name -> the sign just says Home. */
+      try{
+        var inp=document.getElementById('char-name');
+        var v=inp?inp.value.trim():'';
+        if(!v)v=(window.localStorage.getItem('espil_username')||'').trim();
+        return v||null;
+      }catch(e){ return null; }
+    }
+    var espilHomeGroup=null, espilHomeBuiltFor=null;
+    function espilBuildHome(slot,key){
+      if(espilHomeGroup&&espilHomeBuiltFor===key)return;
+      if(espilHomeGroup&&typeof mapScene!=='undefined'&&mapScene){ mapScene.remove(espilHomeGroup); espilHomeGroup=null; }
+      var g=new THREE.Group(); g.position.set(slot.x,0,slot.z);
+      function M(geo,mat,x,y,z,ry){
+        var m=new THREE.Mesh(geo,mat); m.position.set(x,y,z); if(ry)m.rotation.y=ry;
+        m.frustumCulled=false; g.add(m); return m;
+      }
+      function LM(c){ return new THREE.MeshLambertMaterial({color:c}); }
+      var W=ESPIL_HOME_W, D=ESPIL_HOME_D, H=ESPIL_HOME_H;
+      var fl=M(new THREE.PlaneGeometry(W,D),LM(0x8a6b4a),0,0.01,0); fl.rotation.x=-Math.PI/2;
+      var rug=M(new THREE.PlaneGeometry(5,3.5),LM(0x74353a),0,0.03,0.6); rug.rotation.x=-Math.PI/2;
+      var ce=M(new THREE.PlaneGeometry(W,D),LM(0xcfc9bb),0,H,0); ce.rotation.x=Math.PI/2;
+      var lightMat=new THREE.MeshBasicMaterial({color:0xfff2cc});
+      M(new THREE.PlaneGeometry(4,2),lightMat,0,H-0.05,0).rotation.x=Math.PI/2;
+      var wallMat=LM(0xcfc8bb);
+      M(new THREE.BoxGeometry(W,H,0.4),wallMat,0,H/2,-D/2);                 /* north */
+      var segW=(W-2.4)/2;                                                   /* south, with the door gap */
+      M(new THREE.BoxGeometry(segW,H,0.4),wallMat,-(1.2+segW/2),H/2,D/2);
+      M(new THREE.BoxGeometry(segW,H,0.4),wallMat,(1.2+segW/2),H/2,D/2);
+      M(new THREE.BoxGeometry(2.4,0.7,0.4),wallMat,0,H-0.35,D/2);           /* lintel */
+      M(new THREE.BoxGeometry(0.4,H,D),wallMat,-W/2,H/2,0);                 /* west */
+      M(new THREE.BoxGeometry(0.4,H,D),wallMat,W/2,H/2,0);                  /* east */
+      var postMat=LM(0x6d5a41);
+      M(new THREE.BoxGeometry(0.3,2.5,0.3),postMat,-1.2,1.25,D/2-0.1);      /* door frame */
+      M(new THREE.BoxGeometry(0.3,2.5,0.3),postMat,1.2,1.25,D/2-0.1);
+      var exitCvs=document.createElement('canvas'); exitCvs.width=256; exitCvs.height=96;
+      var ectx=exitCvs.getContext('2d');
+      ectx.fillStyle='#20242c'; ectx.fillRect(0,0,256,96);
+      ectx.fillStyle='#8ef7e8'; ectx.font='700 56px "Avenir Next","Segoe UI",sans-serif';
+      ectx.textAlign='center'; ectx.textBaseline='middle'; ectx.fillText('EXIT',128,50);
+      var ex=M(new THREE.PlaneGeometry(1.5,0.56),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(exitCvs)}),0,2.15,D/2-0.25);
+      ex.rotation.y=Math.PI;
+      /* the owner's sign on the north wall, in the interior
+         sign grammar (espilInteriorSetSign): drawn once, at
+         build time, with the name the player carries now */
+      var signCvs=document.createElement('canvas'); signCvs.width=1024; signCvs.height=256;
+      var sctx=signCvs.getContext('2d');
+      sctx.fillStyle='#20242c'; sctx.fillRect(0,0,1024,256);
+      sctx.strokeStyle='rgba(142,247,232,.6)'; sctx.lineWidth=6; sctx.strokeRect(14,14,996,228);
+      sctx.fillStyle='#eaf6ff'; sctx.font='600 84px "Avenir Next","Segoe UI",sans-serif';
+      sctx.textAlign='center'; sctx.textBaseline='middle';
+      var nm=espilHomeOwnerName();
+      var label=nm?(nm+"'s Home"):'Home'; if(label.length>26)label=label.slice(0,25)+'...';
+      sctx.fillText(label,512,128);
+      M(new THREE.PlaneGeometry(6,1.5),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(signCvs)}),0,2.0,-D/2+0.25);
+      /* fixed primitive props (design 5.1 - no furniture GLB
+         exists in the tree): a low table on the rug, two bench
+         sofas facing it, a two-tier shelf on the west wall, and
+         a bed form in the north-east corner */
+      var propMat=LM(0x6d5a41), softMat=LM(0x5a6b8a), shelfMat=LM(0x74563a);
+      M(new THREE.BoxGeometry(1.8,0.45,0.9),propMat,0,0.23,0.6);
+      M(new THREE.BoxGeometry(2.4,0.55,0.9),softMat,-1.5,0.28,-1.6);
+      M(new THREE.BoxGeometry(2.4,0.55,0.9),softMat,1.5,0.28,-1.6);
+      M(new THREE.BoxGeometry(0.45,0.07,2.6),shelfMat,-W/2+0.3,0.95,-2);
+      M(new THREE.BoxGeometry(0.45,0.07,2.6),shelfMat,-W/2+0.3,1.55,-2);
+      M(new THREE.BoxGeometry(0.45,1.9,0.07),shelfMat,-W/2+0.3,0.95,-3.28);
+      M(new THREE.BoxGeometry(0.45,1.9,0.07),shelfMat,-W/2+0.3,0.95,-0.72);
+      M(new THREE.BoxGeometry(2.1,0.4,1.2),propMat,5.2,0.2,-4.2);
+      M(new THREE.BoxGeometry(1.2,0.06,1.24),softMat,5.55,0.43,-4.2);
+      M(new THREE.BoxGeometry(0.5,0.18,0.8),LM(0xe8e2d2),4.35,0.49,-4.2);
+      mapScene.add(g);
+      espilHomeGroup=g; espilHomeBuiltFor=key;
+    }
+    window.__espilHomeEnterSpace=function(){
+      var p=walkPlayer; if(!p)return null;
+      if(p.flying||p._fall)espilFlyClear(); /* fly state clears on space entry, as on interior entry */
+      var key=espilHomeIdentityKey();
+      var slot=espilHomeSlotFor(key);
+      espilBuildHome(slot,key);
+      /* HOME THIRD-PERSON (Han 2026-11-17): no entry framing -
+         the street third-person camera keeps its own zoom; the
+         boom is contained in the room by the home branch of
+         espilCamClampUpdate below. */
+      espilInsideRec={cx:p.pos.x, cz:p.pos.z, name:'Home', home:true};
+      espilInsideDoor={x:slot.x, z:slot.z+ESPIL_HOME_D/2-0.6};
+      espilInsideOutside={x:p.pos.x, y:p.pos.y, z:p.pos.z};
+      window.__espilHomeRect={x0:slot.x-ESPIL_HOME_W/2, z0:slot.z-ESPIL_HOME_D/2, x1:slot.x+ESPIL_HOME_W/2, z1:slot.z+ESPIL_HOME_D/2};
+      espilFadeThrough(function(){
+        p.pos.set(slot.x,0.05,slot.z+ESPIL_HOME_D/2-2.4); p.velY=0; p.onGround=true;
+        walkCamYaw=0; /* the spawn stands inside the south door, facing into the room */
+        window.__espilInside={name:'Home',interior:true,home:true,routedFrom:null,door:{x:slot.x,z:slot.z+ESPIL_HOME_D/2-0.6},x:espilInsideOutside.x,z:espilInsideOutside.z};
+      });
+      return {x:slot.x, z:slot.z};
+    };
+    /* The home exit: back to the exact point H was pressed at,
+       through the approved footprint-edge relocation when that
+       point now sits inside a footprint (the place exit's rule);
+       a corrupt saved point falls back to the spawn pin (3, 33)
+       so the exit never strands the player in the air. */
+    window.__espilHomeExitSpace=function(){
+      var p=walkPlayer; if(!p)return;
+      var out=espilInsideOutside;
+      espilInsideRec=null; espilInsideDoor=null; espilInsideOutside=null; espilInsideHint=false;
+      window.__espilInside=null;
+      window.__espilHomeRect=null;
+      var fx=null, fz=null;
+      if(out&&isFinite(out.x)&&isFinite(out.z)){
+        var ep=null;
+        try{ ep=(typeof espilResumeEdgePoint==='function')?espilResumeEdgePoint(out.x,out.z):null; }catch(e){ ep=null; }
+        fx=ep?ep.x:out.x; fz=ep?ep.z:out.z;
+      }
+      if(fx===null){ fx=3; fz=33; }
+      p.pos.set(fx,0.05,fz); p.velY=0; p.onGround=true;
+    };
+    window.__espilHomeState=function(){
+      var ins=window.__espilInside||null;
+      var key=null, slot=null;
+      /* read-only peek: the guest key is made on the first H
+         press (design 8.1 hunk 10), never by an inspection */
+      try{
+        var s=JSON.parse(window.localStorage.getItem('espil_session_v1')||'null');
+        if(s&&(s.uid||s.id))key='acct:'+(s.uid||s.id);
+        else{ var gk=window.localStorage.getItem(ESPIL_HOME_KEY_LS); if(gk)key='guest:'+gk; }
+        if(key)slot=espilHomeSlotFor(key);
+      }catch(e){}
+      return { inside:!!(ins&&ins.home), identityKey:key,
+        anchor:slot?{x:slot.x,z:slot.z,slot:slot.slot}:null,
+        rect:window.__espilHomeRect||null,
+        returnPoint:espilInsideOutside?{x:espilInsideOutside.x,z:espilInsideOutside.z}:null,
+        builtFor:espilHomeBuiltFor };
     };
     function openBuildingOpts(){
       var o=document.getElementById('bldg-opts'); if(!o)return;
@@ -8170,6 +8402,23 @@
         if(_pdd>=1.8)espilInsideHint=false;
         return;
       }
+      /* HOME SPACE (Han 2026-11-16, design 8.1 hunk 3): inside the
+         player's own home the shop-room box clamp does not apply
+         either - the player is held inside the home rectangle
+         (0.6 m wall margin), and the door hint names the exit. */
+      if(window.__espilInside.home){
+        var _hr=window.__espilHomeRect;
+        if(_hr){
+          if(p.pos.x<_hr.x0+0.6)p.pos.x=_hr.x0+0.6;
+          if(p.pos.x>_hr.x1-0.6)p.pos.x=_hr.x1-0.6;
+          if(p.pos.z<_hr.z0+0.6)p.pos.z=_hr.z0+0.6;
+          if(p.pos.z>_hr.z1-0.6)p.pos.z=_hr.z1-0.6;
+        }
+        var _hdd=espilInsideDoor?Math.sqrt((p.pos.x-espilInsideDoor.x)*(p.pos.x-espilInsideDoor.x)+(p.pos.z-espilInsideDoor.z)*(p.pos.z-espilInsideDoor.z)):99;
+        if(_hdd<1.8&&!espilInsideHint){ espilInsideHint=true; if(window.__espilToast)window.__espilToast('Press Space to leave'); }
+        if(_hdd>=1.8)espilInsideHint=false;
+        return;
+      }
       if(p.pos.x<ESPIL_INT.x-11.5*espilIntScale.x)p.pos.x=ESPIL_INT.x-11.5*espilIntScale.x;
       if(p.pos.x>ESPIL_INT.x+11.5*espilIntScale.x)p.pos.x=ESPIL_INT.x+11.5*espilIntScale.x;
       if(p.pos.z<ESPIL_INT.z-6.1*espilIntScale.z)p.pos.z=ESPIL_INT.z-6.1*espilIntScale.z;
@@ -8290,9 +8539,37 @@
     })();
 
     function teleportHome(){
-      /* QA #14 placeholder: no home set yet → go to spawn, toast notice. */
-      if(window.__espilToast)window.__espilToast('No home location set yet');
-      if(typeof resetToSpawn==='function'){try{resetToSpawn();}catch(_){}}
+      /* HOME SPACE (Han 2026-11-16): H takes each player to their
+         own home (the block above __espilHomeEnterSpace). Every
+         guard lives here, in the one function both entry points
+         call - the H key in the world key handler and the
+         keyboard menu's HOME item - so both take the same rules.
+         The matrix (design 7.1): already home -> leave (the
+         toggle); inside any other instance (arena, a place
+         space's child window, a routed interior) -> refuse, the
+         street self is not in this window or the run owns the
+         body; driving -> refuse, the car is a persistent object
+         whose state machine a teleport would strand (building
+         entry's auto-park belongs to arriving at a door on
+         foot); dead -> refuse, the revive choice owns the body.
+         Flying, swimming, an open stall and a guest's story in
+         progress are NOT guards: flight clears on entry like
+         every other space entry, and the rest never touch the
+         home's mechanics. */
+      /* Occupancy is read from the closure records, not only the
+         published window record: every space entry sets
+         espilInsideRec (interiors, place, home) and
+         espilInsideOutside (all four, the arena included)
+         synchronously, while window.__espilInside is published
+         inside the entry fade - a guard that read the window
+         record alone would stand open for the whole fade. */
+      var ins=window.__espilInside, rec=(typeof espilInsideRec!=='undefined')?espilInsideRec:null;
+      if((ins&&ins.home)||(rec&&rec.home)){ if(window.__espilHomeExitSpace)window.__espilHomeExitSpace(); return; }
+      if(ins||rec||espilInsideOutside){ if(window.__espilToast)window.__espilToast('You cannot go home from here'); return; }
+      if(espilDead){ if(window.__espilToast)window.__espilToast('You cannot go home right now'); return; }
+      var veh=window.__espilVehicles;
+      if(veh&&veh.state&&veh.state().driving){ if(window.__espilToast)window.__espilToast('You cannot go home while driving'); return; }
+      if(window.__espilHomeEnterSpace)window.__espilHomeEnterSpace();
     }
     /* ---- Chat window (2026-10-11, Han 2026-10-05 spec): always-on log,
        high-transparency bg, text legible, Enter activates input.
@@ -11852,9 +12129,49 @@
       espilCamBlockedAt=Math.round(hit*100)/100;
       return Math.max(ESPIL_CAM_MIN,hit-ESPIL_CAM_MARGIN);
     }
+    function espilHomeCamAllowed(p){
+      /* HOME THIRD-PERSON (Han 2026-11-17): the street boom at
+         full distance leaves the 14 x 11 m room through its
+         walls and ceiling, and the baked-record march above has
+         no volumes in the home band - so inside the home the
+         boom is capped analytically at the room box shrunk by
+         0.3 m (the walls are 0.4 thick centred on the rect edge,
+         so the cap keeps the camera inside the inner face; the
+         ceiling caps at the room height less the same margin).
+         The ray is the follow camera's own: chest origin,
+         walkCamYaw / walkCamPitch. The 0.6 floor keeps a close
+         over-shoulder view instead of entering the avatar when
+         the player backs flush against a wall. */
+      var r=window.__espilHomeRect; if(!r)return walkCamDist;
+      var m=0.3, x0=r.x0+m, x1=r.x1-m, z0=r.z0+m, z1=r.z1-m, y1=ESPIL_HOME_H-m;
+      var ox=p.pos.x, oy=p.pos.y+1.3, oz=p.pos.z;
+      var cp=Math.cos(walkCamPitch), sp=Math.sin(walkCamPitch);
+      var dx=Math.sin(walkCamYaw)*cp, dy=sp, dz=Math.cos(walkCamYaw)*cp;
+      var t=walkCamDist;
+      if(dx>1e-6)t=Math.min(t,(x1-ox)/dx); else if(dx<-1e-6)t=Math.min(t,(x0-ox)/dx);
+      if(dz>1e-6)t=Math.min(t,(z1-oz)/dz); else if(dz<-1e-6)t=Math.min(t,(z0-oz)/dz);
+      if(dy>1e-6)t=Math.min(t,(y1-oy)/dy); else if(dy<-1e-6)t=Math.min(t,(0.3-oy)/dy);
+      if(t<0.6)t=0.6;
+      return t;
+    }
     function espilCamClampUpdate(dt){
       var p=walkPlayer;
       if(!p||!p.pos)return;
+      if(window.__espilInside&&window.__espilInside.home&&window.__espilHomeRect){
+        espilCamChecks++;
+        var hAllowed=espilHomeCamAllowed(p);
+        espilCamAllowed=hAllowed;
+        if(hAllowed<espilCamEff)espilCamEff=Math.max(hAllowed,espilCamEff-dt*30); /* clamp in fast */
+        else espilCamEff=Math.min(walkCamDist,espilCamEff+dt*6);                /* release slowly */
+        if(espilCamEff>walkCamDist)espilCamEff=walkCamDist;
+        espilCamDEff=Math.min(walkCamDist,espilCamEff);
+        var hd=espilCamDEff, hcp=Math.cos(walkCamPitch);
+        espilCamPos={x:Math.round((p.pos.x+Math.sin(walkCamYaw)*hcp*hd)*100)/100,
+                     y:Math.round((p.pos.y+Math.sin(walkCamPitch)*hd+1.2)*100)/100,
+                     z:Math.round((p.pos.z+Math.cos(walkCamYaw)*hcp*hd)*100)/100};
+        espilCamInside=false; espilCamSegClear=true;
+        return;
+      }
       if(window.__espilInside||window.__espilStorePaused||p._espilArrive||p._espilLanding){ espilCamDEff=walkCamDist; return; }
       espilCamChecks++;
       var allowed=espilCamSegAllowed(p);
@@ -11966,11 +12283,20 @@
       p.pos.x+=p._dx;collideCircleAxis(p,'x');
       p.pos.z+=p._dz;collideCircleAxis(p,'z');
       /* 5km city boundary: circular, 5000m radius from landmark (Han 2026-10-07).
-         Genshin-style invisible wall — slide along the edge. */
-      var distC=Math.sqrt(p.pos.x*p.pos.x+p.pos.z*p.pos.z);
-      if(distC>MAP_BOUND){
-        var s=MAP_BOUND/distC;
-        p.pos.x*=s;p.pos.z*=s;
+         Genshin-style invisible wall — slide along the edge.
+         HOME SPACE deviation (2026-11-17, BUILD-REPORT deviation 1):
+         instance spaces stand outside the city disc by design (the
+         home band starts at z 24,000, past the 15 km bound), so the
+         boundary must not drag an in-instance player back toward
+         the city - the fly tick above already returns early while
+         inside for the same reason. In-instance holding is the
+         inside tick's own clamp, below. */
+      if(!window.__espilInside){
+        var distC=Math.sqrt(p.pos.x*p.pos.x+p.pos.z*p.pos.z);
+        if(distC>MAP_BOUND){
+          var s=MAP_BOUND/distC;
+          p.pos.x*=s;p.pos.z*=s;
+        }
       }
       espilPlayerCollide(p); /* player-player collision (2026-10-27) */
       espilInsideTick(p); /* IN-PLACE INTERIOR (Han batch 5 #1): footprint clamp + door state while inside a building */

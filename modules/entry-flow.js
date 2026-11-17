@@ -151,7 +151,7 @@
       return r.status === 200 ? r.json() : null;
     }).then(function (body) {
       if (body && body.signedIn && body.user && body.user.name) {
-        try { localStorage.setItem(LS_SESSION, JSON.stringify({ id: body.user.name, at: Date.now(), server: true })); } catch (_) {}
+        try { localStorage.setItem(LS_SESSION, JSON.stringify({ id: body.user.name, uid: body.user.id, at: Date.now(), server: true })); } catch (_) {}
         try { localStorage.setItem('espil_username', body.user.name); } catch (_) {}
         try { localStorage.removeItem(LS_SESSION_PARK); } catch (_) {}
         try { espilCharacterAdopt(body.character || null); } catch (_) {}
