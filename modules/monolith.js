@@ -736,6 +736,7 @@
       var csub=panel?panel.querySelector('.char-sub'):null;
       if(csub)csub.textContent=(window.__espilT?window.__espilT('charSub').replace('{city}',espilCityDisplayName()):'Your traveler for '+espilCityDisplayName()+'.');
       setChosen(saved?espilSavedGender():'male');
+      espilRenderBodyRow(); /* body selection (Han 2026-11-16): pre-selects the saved choice */
       if(note)note.hidden=true; /* no auto-entry note in the production flow */
       if(panel)panel.setAttribute('aria-hidden','false');
       if(window.EspilAudio&&window.EspilAudio.pop)window.EspilAudio.pop();
@@ -751,8 +752,54 @@
       if(confirm)confirm.innerHTML=((window.__espilT?window.__espilT(g==='female'?'enterAsFemale':'enterAsMale'):'ENTER AS '+g.toUpperCase())+' &rarr;');
       if(note&&TEST_BYPASS)note.innerHTML='TESTING BYPASS &mdash; entering as <b>'+g.charAt(0).toUpperCase()+g.slice(1)+'</b>&hellip;';
     }
+    /* ---- gate body row (Han 2026-11-16) ----
+       Rendered into #char-body-row in the gate panel. Guests (in
+       chibi mode) pick Style 1-4; signed-in users pick Master or
+       Style 1-4. Under the guest-body revert modes there is no
+       chibi body anywhere, so the row hides and the saved choice
+       is simply preserved. The saved choice is pre-selected on
+       every gate opening; changing it needs no re-registration -
+       confirmCharacter writes it into the record and
+       espilApplyAvatarGender rebuilds the avatar on the spot. */
+    var chosenBody=null,bodyRowActive=false;
+    function espilRenderBodyRow(){
+      var row=document.getElementById('char-body-row');
+      if(!row){ bodyRowActive=false; return; }
+      if(!document.getElementById('espil-bodychoice-style')){
+        var st=document.createElement('style'); st.id='espil-bodychoice-style';
+        st.textContent='#char-custom .char-body-label{font:700 .62rem/1.4 Manrope,sans-serif;letter-spacing:.14em;color:#8a6a3b;margin:10px 0 4px;}'
+          +'#char-custom .char-body-grid{display:flex;gap:6px;flex-wrap:wrap;}'
+          +'#char-custom .char-body-card{flex:1 1 30%;padding:8px 4px;border-radius:10px;border:2px solid #cfa96f;background:linear-gradient(180deg,#fffef8,#ffedcb);color:#5a4020;font:700 12px Manrope,sans-serif;cursor:pointer;}'
+          +'#char-custom .char-body-card.is-selected{border-color:#b57708;background:linear-gradient(180deg,#ffe9b8,#ffd98c);box-shadow:0 2px 8px rgba(150,100,20,.35);}';
+        (document.head||document.documentElement).appendChild(st);
+      }
+      var opts=null;
+      if(espilGuestBodyMode()==='chibi'){
+        opts=espilGuestNow()?['style1','style2','style3','style4']:ESPIL_BODY_CHOICES;
+      }
+      if(!opts){ row.hidden=true; row.innerHTML=''; bodyRowActive=false; chosenBody=null; return; }
+      if(!chosenBody||opts.indexOf(chosenBody)<0)chosenBody=espilBodyChoice();
+      if(opts.indexOf(chosenBody)<0)chosenBody=opts[0];
+      bodyRowActive=true;
+      row.hidden=false;
+      row.innerHTML='';
+      var lab=document.createElement('div'); lab.className='char-body-label'; lab.textContent='BODY';
+      row.appendChild(lab);
+      var grid=document.createElement('div'); grid.className='char-body-grid';
+      opts.forEach(function(o){
+        var b=document.createElement('button');
+        b.type='button';
+        b.className='char-body-card'+(o===chosenBody?' is-selected':'');
+        b.setAttribute('data-body',o);
+        b.setAttribute('aria-pressed',o===chosenBody?'true':'false');
+        b.textContent=(o==='master')?'Master':'Style '+o.slice(-1);
+        b.addEventListener('click',function(){ chosenBody=o; espilRenderBodyRow(); if(window.EspilAudio&&window.EspilAudio.tick)window.EspilAudio.tick(); });
+        grid.appendChild(b);
+      });
+      row.appendChild(grid);
+    }
     function confirmCharacter(gender){
-      try{var __rec={gender:gender,ts:Date.now()}; try{var __lk=window.__espilPendingLook?window.__espilPendingLook():null; if(__lk)__rec.look=__lk;}catch(_){} window.localStorage.setItem('espil_character',JSON.stringify(__rec));}catch(e){} /* customizer look rides the character record (Han 2026-10-28) */
+      try{var __rec={gender:gender,ts:Date.now()}; try{var __lk=window.__espilPendingLook?window.__espilPendingLook():null; if(__lk)__rec.look=__lk;}catch(_){} var __bc=(bodyRowActive&&chosenBody)?chosenBody:espilBodyChoiceSaved(); if(__bc)__rec.bodyChoice=__bc; window.localStorage.setItem('espil_character',JSON.stringify(__rec));}catch(e){} /* customizer look rides the character record (Han 2026-10-28); bodyChoice rides it the same way (Han 2026-11-16) */
       espilApplyAvatarGender(gender); /* the preload may have built the other gender's avatar before this first-time pick */
       var panel=document.getElementById('char-custom');
       var note=document.getElementById('char-bypass');
@@ -3562,14 +3609,64 @@
         if(s&&(s.gender==='female'||s.gender==='male'))return s.gender;}catch(e){}
       return 'male';
     }
+    /* ---- CHARACTER BODY SELECTION (Han 2026-11-16: selection
+       fully open - guests AND signed-in users pick a body at the
+       character gate). The choice rides the character record as
+       espil_character.bodyChoice: 'master' (the in-tree GLB
+       masters) or 'style1'..'style4' (the selling Chibi pack
+       variants, per gender). Defaults keep every existing
+       character exactly as it was: a guest with no saved choice
+       is style1 (the landed dummy), a signed-in user with no
+       saved choice is the master body. Storage is this device's
+       localStorage for BOTH populations - the signed-in look's
+       own live persistence is this same record (the custmerge
+       account-adoption path is suspended with the customizer,
+       CUSTMERGE_ENABLED=false); nothing is stored server-side.
+       The presence join frame carries the choice as `body`
+       (Worker-sanitised) so peers render the chosen body. ---- */
+    var ESPIL_BODY_CHOICES=['master','style1','style2','style3','style4'];
+    function espilBodyChoiceSaved(){
+      try{var s=JSON.parse(window.localStorage.getItem('espil_character')||'null');
+        if(s&&ESPIL_BODY_CHOICES.indexOf(s.bodyChoice)>=0)return s.bodyChoice;}catch(e){}
+      return null;
+    }
+    function espilBodyChoice(){
+      var saved=espilBodyChoiceSaved();
+      if(saved)return saved;
+      return espilGuestNow()?'style1':'master';
+    }
+    function espilCbStyleNum(choice){
+      var m=/^style([1-4])$/.exec(choice||'');
+      return m?+m[1]:1;
+    }
+    /* The body key buildPlayerAvatar would stamp for this gender
+       right now - espilApplyAvatarGender rebuilds when the live
+       avatar's key differs (a body change at the gate with the
+       same gender must swap the body, not no-op). Under the
+       guest-body revert modes the chibi choice is inert: guests
+       render the single revert body, signed-in users the master. */
+    function espilAvatarBodyKey(gender){
+      var mode=espilGuestBodyMode();
+      if(espilGuestNow()){
+        if(mode==='chibi')return 'chibi:'+espilBodyChoice();
+        if(mode==='kaykit')return 'kaykit';
+        return 'sprite';
+      }
+      var bc=espilBodyChoice();
+      if(bc!=='master'&&mode==='chibi')return 'chibi:'+bc;
+      return 'master';
+    }
     /* Rebuild the avatar in place when the confirmed gender differs
        from the one the current avatar was built with (the preload
        builds the avatar BEFORE a first-time player picks a gender,
-       so the confirm path re-applies it). No-op when already right. */
+       so the confirm path re-applies it). No-op when already right.
+       The body key is compared too (Han 2026-11-16): a body change
+       at the gate - master <-> chibi style, or style <-> style -
+       rebuilds through the same path even when gender is unchanged. */
     window.__espilApplyAvatarGender=function(g){espilApplyAvatarGender(g);}; /* customizer edit mode re-applies a changed gender in place (Han 2026-10-28) */
     function espilApplyAvatarGender(gender){
       if(!walkPlayer||!walkPlayer.av||!mapScene)return;
-      if(walkPlayer.av.__gender===gender)return;
+      if(walkPlayer.av.__gender===gender&&walkPlayer.av.__bodyKey===espilAvatarBodyKey(gender))return;
       var old=walkPlayer.av;
       if(old.group&&old.group.parent)old.group.parent.remove(old.group);
       if(old.shadow&&old.shadow.parent)old.shadow.parent.remove(old.shadow);
@@ -8328,15 +8425,43 @@
       }catch(_){ }
     }
     var __espilPhaseSeq=0;
-    function __espilBuildRemoteAvatar(gender){
+    function __espilBuildRemoteAvatar(gender,info){
+      /* The roster carries the Worker's single-letter gender
+         ('m'/'f'); every avatar builder takes the full word (the
+         local path passes espilSavedGender()'s). Normalise ONCE
+         here, at the remote boundary (found by the selection
+         build's real-relay two-client test, 2026-11-16: with
+         live roster data a female peer otherwise fell through
+         the builders' full-word check and rendered as the male
+         body - the swap's synthetic rig calls passed the full
+         word, so its remote leg never saw it). */
+      gender=(gender==='f'||gender==='female')?'female':'male';
       /* Batch 6 Item D: peers are guests too (accounts disabled),
          so remotes take the same guest renderer as the local player.
          Guest body (Han 2026-11-16): the Chibi pack dummy by
          default, with the same revert switch as the local builder
          ('kaykit' restores the Han order 5 KayKit placeholder). */
-      if(espilGuestNow()){
-        var mode=espilGuestBodyMode();
-        if(mode==='chibi')return __espilBuildChibiRemote(gender);
+      /* Per-peer body routing (Han 2026-11-16, selection fully
+         open): the peer's carried body choice - the presence
+         frame's `body`, sanitised by the Worker to 'master' or
+         'style1'..'style4' - decides the renderer: a chosen chibi
+         style renders from that style's template, 'master'
+         renders the master clone below. With NO carried choice
+         (an older client, or the Worker build without the field
+         still serving) the pre-selection behaviour applies
+         unchanged: a guest session renders every peer with the
+         guest body, a signed-in session with the master clone.
+         The revert modes keep their single body and ignore the
+         style, exactly as they do for the local player. */
+      var peerBody=(info&&typeof info.body==='string'&&ESPIL_BODY_CHOICES.indexOf(info.body)>=0)?info.body:null;
+      var mode=espilGuestBodyMode();
+      if(peerBody&&peerBody!=='master'){
+        if(mode==='chibi')return __espilBuildChibiRemote(gender,espilCbStyleNum(peerBody));
+        if(mode==='kaykit')return __espilBuildKaykitRemote(gender);
+        return __espilBuildSpriteRemote(gender);
+      }
+      if(!peerBody&&espilGuestNow()){
+        if(mode==='chibi')return __espilBuildChibiRemote(gender,espilCbStyleNum(espilBodyChoice()));
         if(mode==='kaykit')return __espilBuildKaykitRemote(gender);
         return __espilBuildSpriteRemote(gender);
       }
@@ -8454,7 +8579,7 @@
       var now=performance.now();
       var R=__espilRemotes[id];
       if(!R){
-        R=__espilBuildRemoteAvatar(info&&info.gender);
+        R=__espilBuildRemoteAvatar(info&&info.gender,info);
         R.cur={x:x,y:y,z:z}; R.tgt={x:x,y:y,z:z,a:(typeof a==='number'?a:0)}; R.vx=(typeof vx==='number')?vx:0; R.vz=(typeof vz==='number')?vz:0;
         R.faceY=R.tgt.a; R.fixAt=now; R.lastAt=now;
         R.plate=__espilMakeNameplate(info&&info.name,(info&&info.look&&window.__espilOutfitHex)?window.__espilOutfitHex(info.look.outfit):null); /* nameplate accent = the peer's outfit colour (Han 2026-10-28) */
@@ -9701,13 +9826,28 @@
          Han order 5 (2026-11-10) KayKit GLB placeholder exactly,
          'sprite' returns to the 2D sprite builder. Signed-in
          sessions keep the in-tree masters. */
+      /* Body selection (Han 2026-11-16, fully open): the saved
+         bodyChoice routes both populations - a guest renders their
+         chosen chibi style (default style1); a signed-in user
+         renders the master body unless they picked a chibi style
+         at the gate, in which case they ride that style's template
+         exactly as a guest does. The revert modes keep their
+         single body and ignore the choice. The built avatar is
+         stamped with its body key so espilApplyAvatarGender can
+         tell a body change from a no-op. */
+      var av=null;
       if(espilGuestNow()){
         var mode=espilGuestBodyMode();
-        if(mode==='chibi')return buildChibiAvatar(gender);
-        if(mode==='kaykit')return buildKaykitAvatar(gender);
-        return buildSpriteAvatar(gender);
+        if(mode==='chibi')av=buildChibiAvatar(gender,espilCbStyleNum(espilBodyChoice()));
+        else if(mode==='kaykit')av=buildKaykitAvatar(gender);
+        else av=buildSpriteAvatar(gender);
+      }else{
+        var bc=espilBodyChoice();
+        if(bc!=='master'&&espilGuestBodyMode()==='chibi')av=buildChibiAvatar(gender,espilCbStyleNum(bc));
+        else av=buildWalkerAvatar(gender);
       }
-      return buildWalkerAvatar(gender);
+      av.__bodyKey=espilAvatarBodyKey(gender);
+      return av;
     }
 
     /* ---------------- Item C: the three gear trees ----------------
@@ -10424,9 +10564,11 @@
        selling asset: the itch "Chibi 3D Characters - 8 Animated GLB
        Pack", style1 per gender (the dummy is ONE placeholder look
        per gender, exactly as the KayKit dummy was one look for both
-       genders; styles 2-4 stay in the pack, ready to rotate in or
-       be assigned the moment Han widens the scope - NO customizer
-       selection is built here). The files ship byte-identical in
+       genders). SELECTION OPENED the same day (Han 2026-11-16
+       16:51/16:52): styles 1-4 per gender are all in-tree now and
+       selectable at the character gate by guests and signed-in
+       users alike - see espilBodyChoice and the gate body row.
+       The files ship byte-identical in
        assets/chibi-guests/ (licence beside them; they are Espil's
        own commercial assets). Signed-in sessions are untouched.
        REVERT: window.__ESPIL_GUEST_BODY__ = 'kaykit' before this
@@ -10472,14 +10614,30 @@
     }
     var ESPIL_CB_FILES={male:'assets/chibi-guests/chibi_male_style1.glb',
                         female:'assets/chibi-guests/chibi_female_style1.glb'};
+    /* Body selection (Han 2026-11-16): styles 1-4 per gender are
+       all in-tree; the file for a (gender, style) pair is derived,
+       never table-driven, so a style can never point at a missing
+       file. ESPIL_CB_FILES above stays as the style1 pair (the
+       state hook's original shape). */
+    function espilCbFile(gender,style){
+      var g=(gender==='female')?'female':'male';
+      var n=(style===2||style===3||style===4)?style:1;
+      return 'assets/chibi-guests/chibi_'+g+'_style'+n+'.glb';
+    }
+    function espilCbFilesAll(){
+      var out={male:{},female:{}};
+      for(var n=1;n<=4;n++){ out.male['style'+n]=espilCbFile('male',n); out.female['style'+n]=espilCbFile('female',n); }
+      return out;
+    }
     var ESPIL_CB_TARGET_H=1.7; /* the game's player height, as the KayKit dummy */
     var ESPIL_CB_BASIS_JS='modules/tiles3d/vendor/three/addons/libs/basis/basis_transcoder.js';
     var ESPIL_CB_BASIS_WASM='modules/tiles3d/vendor/three/addons/libs/basis/basis_transcoder.wasm';
     var ESPIL_CB_LOCAL=null,ESPIL_CB_REMOTES_BUILT=0;
     window.__espilGuestBodyState=function(){
       var L=ESPIL_CB_LOCAL;
-      return {mode:espilGuestBodyMode(),files:ESPIL_CB_FILES,targetH:ESPIL_CB_TARGET_H,
-        local:L?{ready:!!L.ready,anim:L.curAnim||null,acts:Object.keys(L.actions||{}),dead:!!L.__cbDead,gender:L.__gender||null}:null,
+      return {mode:espilGuestBodyMode(),files:ESPIL_CB_FILES,filesAll:espilCbFilesAll(),targetH:ESPIL_CB_TARGET_H,
+        bodyChoice:(typeof espilBodyChoice==='function')?espilBodyChoice():null,
+        local:L?{ready:!!L.ready,anim:L.curAnim||null,acts:Object.keys(L.actions||{}),dead:!!L.__cbDead,gender:L.__gender||null,style:L.__cbStyle||null,bodyKey:L.__bodyKey||null}:null,
         remotesBuilt:ESPIL_CB_REMOTES_BUILT,
         kaykitOn:espilKaykitPlaceholderOn()};
     };
@@ -10595,12 +10753,21 @@
       }catch(e){}
       return out;
     }
-    var __espilChibiTemplates={
-      m:{state:0,scene:null,clips:null,waiters:[],s:1,groundOff:0},
-      f:{state:0,scene:null,clips:null,waiters:[],s:1,groundOff:0}
-    };
-    function __espilEnsureChibi(gender,cb){
-      var key=(gender==='f'||gender==='female')?'f':'m';
+    /* Templates are keyed per (gender, style) since the selection
+       opened (Han 2026-11-16): eight possible templates, each
+       parsed at most once and cloned per avatar, exactly the
+       masters' pattern the style1 pair established. */
+    var __espilChibiTemplates={};
+    (function(){
+      ['m','f'].forEach(function(gk){
+        for(var si=1;si<=4;si++){
+          __espilChibiTemplates[gk+si]={state:0,scene:null,clips:null,waiters:[],s:1,groundOff:0,
+            style:si,gender:(gk==='f'?'female':'male')};
+        }
+      });
+    })();
+    function __espilEnsureChibi(gender,style,cb){
+      var key=((gender==='f'||gender==='female')?'f':'m')+((style===2||style===3||style===4)?style:1);
       var T=__espilChibiTemplates[key];
       if(T.state===2){ cb(T); return; }
       T.waiters.push(cb);
@@ -10609,12 +10776,22 @@
       function fail(){
         T.state=0;
         var ws=T.waiters; T.waiters=[];
+        /* Fail-soft (selection): a style file that fails to load
+           falls back to style1 of the same gender - the avatar
+           still renders a chibi body, and espilCbSetup records
+           the style actually built from the template it got.
+           Style1 failing keeps the original behaviour: the
+           waiters receive null and the builders report the miss. */
+        if(T.style!==1){
+          for(var i=0;i<ws.length;i++){ __espilEnsureChibi(gender,1,ws[i]); }
+          return;
+        }
         for(var i=0;i<ws.length;i++){ try{ ws[i](null); }catch(_){} }
       }
       try{
         if(typeof THREE.GLTFLoader==='undefined')throw new Error('no GLTFLoader');
         espilCbBasis().then(function(basisMod){
-          espilCbLoader(basisMod).load(ESPIL_CB_FILES[key==='f'?'female':'male'],function(gltf){
+          espilCbLoader(basisMod).load(espilCbFile(T.gender,T.style),function(gltf){
             T.scene=gltf.scene;
             T.clips=(gltf.animations||[]).map(espilCbStripRoot);
             /* Globe View material tag, same as __espilEnsureMaster:
@@ -10672,6 +10849,7 @@
       av.__strideRun=clip.__espilStride;
     }
     function espilCbSetup(av,model,clips,T){
+      av.__cbStyle=(T&&T.style)||1; /* the style actually built (post fail-soft) */
       /* Authored facing is +z (ankle->toe measured on the rig for
          both genders) against the facing law's -z front - the same
          PI counter-rotation the masters and the KayKit body carry.
@@ -10766,27 +10944,29 @@
          same contract as a master whose jump file has not landed. */
       return espilCbPlayOneShot(av,isDouble?'doubleJump':'jump');
     }
-    function buildChibiAvatar(gender){
+    function buildChibiAvatar(gender,style){
       gender=(gender==='female')?'female':'male';
+      style=(style===2||style===3||style===4)?style:1;
       var g=new THREE.Group();
       var shadow=new THREE.Mesh(new THREE.CircleGeometry(.55,20),
         new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.26,depthWrite:false}));
       shadow.rotation.x=-Math.PI/2;
-      var av={group:g,shadow:shadow,ready:false,mixer:null,actions:{},curAnim:null,__gender:gender,__chibi:true};
+      var av={group:g,shadow:shadow,ready:false,mixer:null,actions:{},curAnim:null,__gender:gender,__chibi:true,__cbStyleWanted:style};
       av.playAnim=function(name){ espilCbPlayAnim(av,name); };
       av.playOneShot=function(name,durMs){ return espilCbPlayOneShot(av,name,durMs); };
       av.playJump=function(isDouble){ return espilCbPlayJump(av,isDouble); };
       av.__espilSetState=function(s){ espilCbSetState(av,s); };
       ESPIL_CB_LOCAL=av;
-      __espilEnsureChibi(gender,function(T){
+      __espilEnsureChibi(gender,style,function(T){
         if(!T||!T.scene){ if(window.__espilToast)window.__espilToast('Character failed to load'); return; }
         try{ espilCbSetup(av,__espilCloneModel(T),T.clips,T); }
         catch(e){ if(window.__espilToast)window.__espilToast('Character failed to load'); }
       });
       return av;
     }
-    function __espilBuildChibiRemote(gender){
+    function __espilBuildChibiRemote(gender,style){
       gender=(gender==='female')?'female':'male';
+      style=(style===2||style===3||style===4)?style:1;
       var g=new THREE.Group();
       var shadow=new THREE.Mesh(new THREE.CircleGeometry(.55,20),
         new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.26,depthWrite:false}));
@@ -10799,10 +10979,10 @@
       var R={group:g,shadow:shadow,mixer:null,actions:{},curAnim:null,ready:false,visual:null,baseY:0,
              cur:{x:0,y:0,z:0},tgt:{x:0,y:0,z:0,a:0},faceY:0,speed:0,fixSpeed:0,fixAt:0,lastAt:0,plate:null,
              phase:(__espilPhaseSeq++)%7,acc:0,gone:false,bubble:null,bubbleCv:null,bubbleTex:null,bubbleUntil:0,
-             __chibi:true,__gender:gender};
+             __chibi:true,__gender:gender,__cbStyleWanted:style};
       R.playAnim=function(name){ espilCbPlayAnim(R,name); };
       ESPIL_CB_REMOTES_BUILT++;
-      __espilEnsureChibi(gender,function(T){
+      __espilEnsureChibi(gender,style,function(T){
         if(R.gone||!T||!T.scene)return;
         try{ espilCbSetup(R,__espilCloneModel(T),T.clips,T); }catch(e){}
       });

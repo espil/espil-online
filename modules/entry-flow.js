@@ -1122,6 +1122,31 @@
     }
     if (gMale) gMale.addEventListener('click', function () { setGuestGender('male'); });
     if (gFemale) gFemale.addEventListener('click', function () { setGuestGender('female'); });
+    /* Body style (Han 2026-11-16: guest character selection):
+       the guest picks one of the Chibi pack's four styles for
+       their gender. The saved choice (espil_character.bodyChoice,
+       device-local - guests have no server record) pre-selects
+       for a returning guest; a first-time guest starts at
+       Style 1. guestGo writes the pick into the same record the
+       gender rides, and the in-game gate offers the same choice
+       again on every entry. */
+    var guestStyle = 1;
+    try {
+      var savedRec = JSON.parse(localStorage.getItem('espil_character') || 'null');
+      if (savedRec && /^style[1-4]$/.test(savedRec.bodyChoice || '')) guestStyle = +savedRec.bodyChoice.slice(-1);
+    } catch (e) {}
+    var gStyleBtns = [1, 2, 3, 4].map(function (n) { return document.getElementById('guest-style-' + n); });
+    function setGuestStyle(n) {
+      guestStyle = n;
+      gStyleBtns.forEach(function (b, i) {
+        if (!b) return;
+        var on = (i + 1 === n);
+        b.classList.toggle('is-on', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+    }
+    gStyleBtns.forEach(function (b, i) { if (b) b.addEventListener('click', function () { setGuestStyle(i + 1); }); });
+    setGuestStyle(guestStyle);
     var GUEST_RESERVED = ['espil', '에스필', 'lunaris', '루나리스', 'leo', '레오', 'admin', '어드민', 'official', 'system', 'guest'];
     var guestNameEl = document.getElementById('guest-name');
     var guestMsg = document.getElementById('guest-msg');
@@ -1141,7 +1166,7 @@
          espil_pending_city handoff mark does. */
       try { sessionStorage.setItem('espil_guest_named_v1', v); } catch (e) {}
       try {
-        var rec = { gender: guestGender, ts: Date.now() };
+        var rec = { gender: guestGender, ts: Date.now(), bodyChoice: 'style' + guestStyle };
         if (window.__espilPendingLook && typeof window.__espilPendingLook === 'object') rec.look = window.__espilPendingLook;
         localStorage.setItem('espil_character', JSON.stringify(rec));
       } catch (e) {}

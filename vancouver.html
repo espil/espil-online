@@ -330,6 +330,7 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
             <span class="char-tag" data-i18n="readyF">Ready</span>
           </button>
         </div>
+        <div id="char-body-row" hidden></div>
         <input id="char-name" type="text" maxlength="16" autocomplete="off" placeholder="Your name" aria-label="Your name" style="display:block;width:100%;box-sizing:border-box;margin:10px 0 2px;background:rgba(6,12,18,.85);border:1px solid rgba(134,238,228,.45);border-radius:9px;padding:9px 11px;font-size:14px;color:#fff;outline:none;" />
         <p class="bypass-note" id="char-bypass" hidden>TESTING BYPASS &mdash; entering as <b>Male</b>&hellip;</p>
         <button class="char-confirm" id="char-confirm" type="button">ENTER AS MALE &rarr;</button>
@@ -359,6 +360,12 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
           <div style="display:flex;gap:8px;margin-top:10px;">
             <button class="city-name auth-guest-char is-on" id="guest-char-male" type="button" aria-pressed="true" style="flex:1;">Male</button>
             <button class="city-name auth-guest-char" id="guest-char-female" type="button" aria-pressed="false" style="flex:1;">Female</button>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <button class="city-name auth-guest-char is-on" id="guest-style-1" type="button" aria-pressed="true" style="flex:1;">Style 1</button>
+            <button class="city-name auth-guest-char" id="guest-style-2" type="button" aria-pressed="false" style="flex:1;">Style 2</button>
+            <button class="city-name auth-guest-char" id="guest-style-3" type="button" aria-pressed="false" style="flex:1;">Style 3</button>
+            <button class="city-name auth-guest-char" id="guest-style-4" type="button" aria-pressed="false" style="flex:1;">Style 4</button>
           </div>
           <button class="city-name auth-guest-go" id="guest-go" type="button">Enter as guest</button>
           <p id="guest-msg" style="min-height:1.2em;margin:9px 0 0;font-size:.76rem;line-height:1.5;color:#ffd97a;"></p>

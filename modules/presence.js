@@ -57,6 +57,21 @@
     try { var rec = JSON.parse(localStorage.getItem('espil_character') || 'null'); if (rec && rec.look) return rec.look; } catch(_){}
     return null;
   }
+  function myBody(){
+    /* The chosen body rides the join frame (Han 2026-11-16:
+       character selection fully open). The Worker sanitizes it to
+       'master' or 'style1'..'style4' and relays it on the roster,
+       so peers render the body picked at the character gate - a
+       guest's chibi style, or a signed-in user's master / chosen
+       style. With no saved choice the defaults follow the
+       session, exactly as the avatar builders default: guests
+       style1, signed-in the master body. */
+    try {
+      var rec = JSON.parse(localStorage.getItem('espil_character') || 'null');
+      if (rec && ['master', 'style1', 'style2', 'style3', 'style4'].indexOf(rec.bodyChoice) >= 0) return rec.bodyChoice;
+    } catch(_){}
+    try { return localStorage.getItem('espil_session_v1') ? 'master' : 'style1'; } catch(_){ return 'style1'; }
+  }
   function line(who, text, sys){
     try { window.dispatchEvent(new CustomEvent('espil-chat-recv', { detail: { who: who, text: text, sys: !!sys } })); } catch(_){}
   }
@@ -137,7 +152,7 @@
         var inp = $('char-name');
         if (inp && inp.value.trim()) localStorage.setItem('espil_username', nm);
       } catch(_){}
-      try { ws.send(JSON.stringify({ t: 'join', name: nm, gender: myGender(), look: myLook() })); } catch(_){}
+      try { ws.send(JSON.stringify({ t: 'join', name: nm, gender: myGender(), look: myLook(), body: myBody() })); } catch(_){}
     };
     ws.onmessage = function(ev){
       var m; try { m = JSON.parse(ev.data); } catch(_){ return; }
@@ -188,7 +203,7 @@
         else if (m.code === 'rate_limited') { sysLine('Slow down a little.'); }
         else if (m.code === 'dm_target_gone') { onDmTargetGone(m); }
         else if (m.code === 'not_joined' && ws) {
-          try { ws.send(JSON.stringify({ t: 'join', name: myName(), gender: myGender(), look: myLook() })); } catch(_){}
+          try { ws.send(JSON.stringify({ t: 'join', name: myName(), gender: myGender(), look: myLook(), body: myBody() })); } catch(_){}
         }
       }
     };

@@ -149,6 +149,7 @@
       rec.look2 = acc.character;
       if (acc.look) rec.look = acc.look;
       if (acc.portrait) rec.portrait = acc.portrait;
+      if (acc.bodyChoice) rec.bodyChoice = acc.bodyChoice; /* body selection (Han 2026-11-16) rides the adoption like the look; dormant while suspended */
       rec.ts = Date.now();
       localStorage.setItem('espil_character', JSON.stringify(rec));
     } catch (e) {}
@@ -215,6 +216,7 @@
           accs[key].character = data;
           if (rec.look) accs[key].look = rec.look;
           if (rec.portrait) accs[key].portrait = rec.portrait;
+          if (rec.bodyChoice) accs[key].bodyChoice = rec.bodyChoice; /* body selection (Han 2026-11-16); dormant while suspended */
           accs[key].characterTs = Date.now();
           localStorage.setItem('espil_accounts_v1', JSON.stringify(accs));
         }
