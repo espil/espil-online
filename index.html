@@ -5,8 +5,12 @@
   /* Handoff cover stamp (Han live-bug fix, 2026-10-21): when this
      game-page load continues a Dive or a city switch (a pending city
      waits in sessionStorage), mark <html> before first paint so the
-     landing chrome never renders on this load. */
-  try{ if(/\/vancouver(\.html)?$/.test(location.pathname)&&sessionStorage.getItem('espil_pending_city'))document.documentElement.classList.add('espil-handoff'); }catch(e){}
+     landing chrome never renders on this load.
+     PLACE SPACE (2026-11-16): a place-space arrival (the boot
+     shell's espil_store_space_v1 mark) carries the same handoff
+     grade - the login gate and the dive are skipped for it exactly
+     as for a landing dive, per the building-spaces design 10-2. */
+  try{ if(/\/vancouver(\.html)?$/.test(location.pathname)&&(sessionStorage.getItem('espil_pending_city')||sessionStorage.getItem('espil_store_space_v1')))document.documentElement.classList.add('espil-handoff'); }catch(e){}
   </script>
   <script>
 /* 2026-10-13: ALL API keys live in /.env (gitignored, keys only). See .env.example.

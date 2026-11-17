@@ -727,9 +727,22 @@
       gateCharacter();
     }
     function gateCharacter(){
-      if(window.__espilCustMergeGate && window.__espilCustMergeGate()){ return; } /* Han 2026-10-30: character creation is the Character Customizer room's v3 window (embedded by the custmerge module); the pair's basic choice below remains as its fallback */
       var saved=null;
       try{saved=window.localStorage.getItem('espil_character');}catch(e){}
+      if(window.__espilCustMergeGate && window.__espilCustMergeGate()){ return; } /* Han 2026-10-30: character creation is the Character Customizer room's v3 window (embedded by the custmerge module); the pair's basic choice below remains as its fallback */
+      /* Place-space arrivals (Han 2026-11-16, DESIGN-v3 §7): the
+         visit's identity is the shared session/guest record and the
+         character was already chosen there - a place window never
+         re-asks. With a saved record, confirm it in place and let
+         the entry continue; with none (a first-ever visit through
+         an address), the choice below presents as usual. */
+      try{
+        if(saved&&sessionStorage.getItem('espil_store_space_v1')){
+          espilApplyAvatarGender(espilSavedGender());
+          confirmCharacter(espilSavedGender());
+          return;
+        }
+      }catch(e){}
       if(saved){ espilApplyAvatarGender(espilSavedGender()); } /* Han 2026-10-30 #2: the character screen opens after EVERY login, guests included - a returning traveler's saved gender and look come pre-selected below, so ENTER simply continues. */
       var panel=document.getElementById('char-custom');
       var note=document.getElementById('char-bypass');
@@ -1963,6 +1976,12 @@
          this gives the surface/camera law the same ground.) */
       var idx=x-0, idz1=z-8000, idz2=z-8400;
       if(idx*idx+idz1*idz1<=30*30||idx*idx+idz2*idz2<=26*26)return 0;
+      /* PLACE SPACE (Han 2026-11-16, design 5): the active place
+         slot's room rectangle is instance ground too - the lobby
+         floor is exactly 0 inside it. modules/place-space.js
+         publishes the rectangle while a space stands. */
+      var _psr=window.__espilPlaceSpaceRect;
+      if(_psr&&x>=_psr.x0&&x<=_psr.x1&&z>=_psr.z0&&z<=_psr.z1)return 0;
       return best;
     }
     /* ============ ESPIL DISTRICT BUILD (sample district, 2026-10-16) ============
@@ -2399,6 +2418,19 @@
     }
     function espilEntryStart(){
       var p=walkPlayer; if(!p)return;
+      /* PLACE SPACE (Han 2026-11-16, design 10-2): a place-space
+         arrival (the boot shell's mark in this window's
+         sessionStorage) skips the saved-position restore AND the
+         dive - the player is placed on the ground at the arrival
+         pick and the place-space module summons them into the
+         building's own space from there. No espil-arrival /
+         espil-guide 'arrival' event fires on this path, so the
+         arrival-armed world systems stay down in the child window
+         (design 9-5); presence never connects (its own lock in
+         presence.js is the second bolt). */
+      var placeMark=null;
+      try{ placeMark=JSON.parse(sessionStorage.getItem('espil_store_space_v1')||'null'); }catch(e){}
+      if(placeMark&&placeMark.city&&placeMark.slug){ espilPlaceEntryStart(); return; }
       var cfg=espilCityCfg();
       var last=null; try{ last=loadLastPos(); }catch(e){}
       var target=null;
@@ -4972,6 +5004,13 @@
     var LAST_POS_KEY='espil_last_pos';
     function saveLastPos(){
       if(!walkPlayer)return;
+      /* PLACE SPACE (Han 2026-11-16, design 9-1): a place-space
+         child window never writes the position save - the parent
+         window owns the street position, and a save from inside
+         the instance band (z >= 12000) would poison the street
+         resume. The mark is this window's sessionStorage, written
+         by the address boot shell. */
+      try{ if(sessionStorage.getItem('espil_store_space_v1'))return; }catch(e){}
       try{
         localStorage.setItem(LAST_POS_KEY,JSON.stringify({
           x:walkPlayer.pos.x,y:walkPlayer.pos.y,z:walkPlayer.pos.z,
@@ -5413,9 +5452,13 @@
       cityPhaseActive=true;
       espilEntryStart(); /* ESPIL TILES BRIDGE (self-city port, 2026-10-16): entries arrive by sky descent; since Han 2026-10-21 ALL entries dive, in-bounds resumes included */
       targetDistance=1.34; /* continue the entry dive (2026-10-06 QA #3) */
-      /* Han 2026-10-14: city name shows ONCE, big and front-center, on entry. */
+      /* Han 2026-10-14: city name shows ONCE, big and front-center, on entry.
+         PLACE SPACE (2026-11-16): not in a place-space child window -
+         the visit is to one building, not a city arrival. */
       var ci=document.getElementById('city-intro'),cin=document.getElementById('city-intro-name');
-      if(ci&&cin){
+      var placeArrival=false;
+      try{ placeArrival=!!sessionStorage.getItem('espil_store_space_v1'); }catch(e){}
+      if(ci&&cin&&!placeArrival){
         cin.textContent=selected?selected.userData.name:'Vancouver';
         ci.classList.remove('show');void ci.offsetWidth;ci.classList.add('show');
         setTimeout(function(){ci.classList.remove('show');},2700);
@@ -5707,6 +5750,17 @@
          the door leaves; Space anywhere else toggles the shop UI. */
       if(window.__espilInside&&espilInsideDoor){
         var _dd=Math.sqrt((walkPlayer.pos.x-espilInsideDoor.x)*(walkPlayer.pos.x-espilInsideDoor.x)+(walkPlayer.pos.z-espilInsideDoor.z)*(walkPlayer.pos.z-espilInsideDoor.z));
+        /* PLACE SPACE (Han 2026-11-16): inside a building's own
+           space, Space at the door exits the space (the window
+           closes, or the same-window street return when there is
+           no opener); Space anywhere else is the store-selection
+           Use - the aimed bay's book opens. Both live in
+           modules/place-space.js behind these two hooks. */
+        if(window.__espilInside.placeSpace){
+          if(_dd<1.8){ if(window.__espilPlaceSpaceExit)window.__espilPlaceSpaceExit(); return; }
+          if(window.__espilPlaceSpaceUse)window.__espilPlaceSpaceUse();
+          return;
+        }
         if(_dd<1.8){ if(window.__espilInside.arena){ if(window.__espilArena)window.__espilArena.exitRun(); return; } espilLeaveBuilding(); return; }
         if(window.__espilInside.arena)return; /* ARENA SEAM: no kiosk/shop surface inside the arena space */
         /* v3 (Han 2026-10-26): inside, Space works the kiosk - near it,
@@ -5945,13 +5999,19 @@
     function moveSpeeds(){
       var a=skillState.alloc;
       var sw=espilTreeAlloc('s_swift'), st2=espilTreeAlloc('s_stride'), lp=espilTreeAlloc('s_leap');
-      return {
+      var r={
         walk:13.5*(1+.015*(a['m_walk']||0))*(1+.015*sw),
         run:21.6*(1+.02*(a['m_run']||0))*(1+.015*sw+.03*st2),
         swim:4,
         jumpV:9*(1+.01*(a['m_jump']||0))*(1+.015*lp),
         djumpV:9*(1+.02*(a['m_djump']||0))*(1+.015*lp)
       };
+      /* PLACE SPACE (Han 2026-11-16, design 5): inside a building's
+         own space the street speeds are far too fast for a lobby -
+         the walk tick reads these two constants instead (the same
+         4.5 / 7.0 the sample store page walked at). */
+      if(window.__espilInside&&window.__espilInside.placeSpace){ r.walk=ESPIL_PLACE_WALK; r.run=ESPIL_PLACE_RUN; }
+      return r;
     }
     /* MapleStory-style pixel skill icons, drawn on a 16x16 canvas at runtime. */
     var SKILL_ICONS={};
@@ -7543,6 +7603,12 @@
     }
     function espilLeaveBuilding(){
       var p=walkPlayer; if(!p)return;
+      /* PLACE SPACE (Han 2026-11-16): leaving from inside a
+         building's own space is the place exit (the window closes,
+         or the same-window street return) - never the street
+         interior's return, which would drop the player at the
+         building's street anchor inside the child window. */
+      if(window.__espilInside&&window.__espilInside.placeSpace){ if(window.__espilPlaceSpaceExit)window.__espilPlaceSpaceExit(); return; }
       if(espilIntPrevZoom!==null&&typeof espilP1!=='undefined'&&espilP1&&espilP1.map){ espilP1.zoomT=espilIntPrevZoom; }
       espilIntPrevZoom=null; espilKioskHint=false;
       var out=espilInsideOutside;
@@ -7616,6 +7682,84 @@
       espilInsideDoor=null; espilInsideOutside=null; espilInsideHint=false;
       window.__espilInside=null;
       if(out){ p.pos.set(out.x,out.y,out.z); p.velY=0; }
+    };
+    /* ============ PLACE SPACE (building spaces, Han 2026-11-16) =====
+       A building's OWN space, on the arena-space pattern: an
+       instance slot in the store band (z >= 12000, derived by
+       modules/place-space.js from the building's identity string),
+       entry / exit teleports, a saved street point - but the entry
+       record is an INTERIOR record (espilInsideRec is set), so the
+       Konbiniya FPV predicate engages and the visit is true
+       first-person with NO new camera code: eye 1.6 m, the avatar
+       and its shadow hidden, A/D turn at the interior rate, attack
+       inputs inert - all of it the existing interior machinery.
+       modules/place-space.js builds the lobby, the signage and the
+       storybook, and drives these two hooks. The space exists only
+       in the child window the address boot shell hands over to;
+       the street window never enters it. */
+    var ESPIL_PLACE_WALK=4.5, ESPIL_PLACE_RUN=7.0;
+    /* The place-mode entry start (called from espilEntryStart when
+       the boot shell's mark is present): no saved-position restore,
+       no dive, no arrival events - the player stands on the ground
+       at the arrival pick until the city is loaded, the loader
+       closes, and __espilPlaceSpaceReady tells the place-space
+       module to summon the player into the lobby. */
+    function espilPlaceEntryStart(){
+      var p=walkPlayer; if(!p)return;
+      espilInjectStyle();
+      document.body.classList.add('espil-ui-pre');
+      var pick=null; try{ pick=window.__espilSpawnPick||null; window.__espilSpawnPick=null; }catch(e){}
+      var tx=pick?pick.x:3, tz=pick?pick.z:33;
+      p.pos.x=tx; p.pos.z=tz; p.pos.y=0; p.velY=0; p.onGround=true; p.jumps=0;
+      espilEntrySpawn={x:tx,z:tz};
+      espilShowMapLoader();
+      var tries=0;
+      (function placeWhenReady(){
+        if(!walkPlayer)return;
+        if(espilEntryFullyLoaded()||++tries>125){
+          espilHideMapLoader();
+          espilUiRise();
+          window.__espilPlaceSpaceReady=true;
+          return;
+        }
+        setTimeout(placeWhenReady,200);
+      })();
+    }
+    window.__espilPlaceEnterSpace=function(info){
+      var p=walkPlayer; if(!p||!info)return null;
+      if(p.flying||p._fall)espilFlyClear(); /* fly state clears on space entry, as on interior entry */
+      /* The routed interior's entry framing: the FPV street zoom,
+         restored on the same-window exit below. */
+      if(typeof espilP1!=='undefined'&&espilP1&&espilP1.map){ espilIntPrevZoom=(typeof espilP1.zoomT==='number')?espilP1.zoomT:null; espilP1.zoomT=ESPIL_KB_P1_ZOOM; }
+      espilInsideRec={cx:info.street.x, cz:info.street.z, name:info.name||'', placeSpace:true};
+      espilInsideDoor={x:info.door.x, z:info.door.z};
+      espilInsideOutside={x:info.street.x, y:0, z:info.street.z};
+      var faceYaw=(typeof info.yaw==='number')?info.yaw:0;
+      espilFadeThrough(function(){
+        p.pos.set(info.spawn.x,0.05,info.spawn.z); p.velY=0; p.onGround=true;
+        walkCamYaw=faceYaw;
+        window.__espilInside={name:info.name||info.address||'Building',interior:true,placeSpace:true,place:{city:info.city,slug:info.slug},routedFrom:null,door:{x:info.door.x,z:info.door.z},x:info.street.x,z:info.street.z};
+      });
+      return {x:info.anchor.x, z:info.anchor.z};
+    };
+    /* The same-window exit (design 10-3c): only for a window with
+       no opener (a direct address visit) - the space is released
+       and the player steps back onto the street in front of the
+       building. The child-window exit is a window close and never
+       runs this. */
+    window.__espilPlaceExitSpace=function(){
+      var p=walkPlayer; if(!p)return;
+      if(espilIntPrevZoom!==null&&typeof espilP1!=='undefined'&&espilP1&&espilP1.map){ espilP1.zoomT=espilIntPrevZoom; }
+      espilIntPrevZoom=null;
+      var out=espilInsideOutside;
+      espilInsideRec=null; espilInsideDoor=null; espilInsideOutside=null; espilInsideHint=false;
+      window.__espilInside=null;
+      window.__espilPlaceSpaceRect=null;
+      if(out&&p){
+        var ep=(typeof espilResumeEdgePoint==='function')?espilResumeEdgePoint(out.x,out.z):null;
+        var fx=ep?ep.x:out.x, fz=ep?ep.z:(out.z+8);
+        p.pos.set(fx,0.05,fz); p.velY=0; p.onGround=true;
+      }
     };
     function openBuildingOpts(){
       var o=document.getElementById('bldg-opts'); if(!o)return;
@@ -7861,6 +8005,24 @@
         var _add=espilInsideDoor?Math.sqrt((p.pos.x-espilInsideDoor.x)*(p.pos.x-espilInsideDoor.x)+(p.pos.z-espilInsideDoor.z)*(p.pos.z-espilInsideDoor.z)):99;
         if(_add<1.8&&!espilInsideHint){ espilInsideHint=true; if(window.__espilToast)window.__espilToast('Press Space to leave the arena'); }
         if(_add>=1.8)espilInsideHint=false;
+        return;
+      }
+      /* PLACE SPACE (Han 2026-11-16, design 5): inside a building's
+         own space the shop-room box clamp does not apply - the
+         player is held inside the lobby rectangle the place-space
+         module published (0.6 m wall margin), and the door hint
+         names the space exit. */
+      if(window.__espilInside.placeSpace){
+        var _pr=window.__espilPlaceSpaceRect;
+        if(_pr){
+          if(p.pos.x<_pr.x0+0.6)p.pos.x=_pr.x0+0.6;
+          if(p.pos.x>_pr.x1-0.6)p.pos.x=_pr.x1-0.6;
+          if(p.pos.z<_pr.z0+0.6)p.pos.z=_pr.z0+0.6;
+          if(p.pos.z>_pr.z1-0.6)p.pos.z=_pr.z1-0.6;
+        }
+        var _pdd=espilInsideDoor?Math.sqrt((p.pos.x-espilInsideDoor.x)*(p.pos.x-espilInsideDoor.x)+(p.pos.z-espilInsideDoor.z)*(p.pos.z-espilInsideDoor.z)):99;
+        if(_pdd<1.8&&!espilInsideHint){ espilInsideHint=true; if(window.__espilToast)window.__espilToast('Press Space to leave'); }
+        if(_pdd>=1.8)espilInsideHint=false;
         return;
       }
       if(p.pos.x<ESPIL_INT.x-11.5*espilIntScale.x)p.pos.x=ESPIL_INT.x-11.5*espilIntScale.x;

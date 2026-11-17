@@ -1447,6 +1447,11 @@
 (function () {
   'use strict';
   if (window.__ESPIL_GAME_PAGE !== true) return;
+  /* PLACE SPACE (Han 2026-11-16, design 10-2): a place-space
+     arrival carries the handoff treatment - the first-visit
+     guide surfaces never present inside a building's own space;
+     the visit continues the parent window's session. */
+  try { if (sessionStorage.getItem('espil_store_space_v1')) return; } catch (e) {}
   var SKIP_KEY = 'espil_diveguide_skip_v1';
   var SEEN_KEY = 'espil_diveguide_seen_v1';
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }

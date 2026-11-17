@@ -131,6 +131,13 @@
   function stopPing(){ if (pingTimer) { clearInterval(pingTimer); pingTimer = null; } }
 
   function connect(r){
+    /* PLACE SPACE double lock (Han 2026-11-16, design 9-2): a
+       place-space child window NEVER connects - one account must
+       not appear at two coordinates, and the parent window's
+       heartbeat already represents this player standing at the
+       street point. The place entry path fires no arrival event,
+       so this lock is the second bolt, not the only one. */
+    try { if (sessionStorage.getItem('espil_store_space_v1')) return; } catch(_){}
     room = r;
     clearTimeout(retryTimer);
     if (ws) { try { ws.onclose = null; ws.close(); } catch(_){} ws = null; }

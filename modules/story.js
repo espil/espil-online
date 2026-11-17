@@ -80,6 +80,16 @@
   'use strict';
   if (window.__espilStoryState) return;
 
+  /* PLACE SPACE child gate (Han 2026-11-16, design 9-3): in a
+     place-space child window this module is DISPLAY-ONLY. The
+     purchase channel (the opener message listener and the
+     purchase-record drain) is fully off - it neither reads
+     espil_store_purchase_v1 nor marks it seen - and progress is
+     never written: the parent window is the sole story author,
+     and its own drain advances Q2 from the child's bridge emit. */
+  var PLACE_CHILD = false;
+  try { PLACE_CHILD = !!sessionStorage.getItem('espil_store_space_v1'); } catch (e) {}
+
   /* ================= constants (DRAFT unless noted) ============ */
   var LS_KEY = 'espil_story_v1';
   var LEO_KEY = 'espil_leo_balance';
@@ -227,6 +237,7 @@
   function saveProgress() {
     loadProgress();
     if (!signedIn()) return;   /* guests: session memory only */
+    if (PLACE_CHILD) return;   /* place-space child: the parent window is the sole story author (design 9-3) */
     try { localStorage.setItem(LS_KEY, JSON.stringify(progress)); } catch (e) {}
   }
   function questStatus(qid) {
@@ -448,7 +459,11 @@
   /* espil-guide: purchases (Q2 + funnel) and instance deaths */
   window.addEventListener('espil-guide', function (e) {
     var d = (e && e.detail) || {};
-    if (d.type === 'bought' && d.item) handleBought(d.item);
+    /* place-space child: the 'bought' event here is the child's
+       own in-book purchase - panels.js grants the bag item from
+       it, but the quest step belongs to the parent window, which
+       advances from the bridge emit (design 9-3/9-4). */
+    if (d.type === 'bought' && d.item && !PLACE_CHILD) handleBought(d.item);
     if (d.type === 'monster-drop' && d.id != null && trackedSpawns[d.id]) {
       var qid = trackedSpawns[d.id];
       delete trackedSpawns[d.id];
@@ -492,12 +507,14 @@
   var PURCHASE_SEEN_KEY = 'espil_store_purchase_seen_v1';
   window.addEventListener('message', function (e) {
     try {
+      if (PLACE_CHILD) return;   /* purchase channel fully off in a place-space child (design 9-3) */
       if (!e || e.origin !== location.origin) return;
       var d = e.data || {};
       if (d.type === 'espil-store-purchase' && d.item) handleBought(String(d.item));
     } catch (err) {}
   });
   function drainPurchaseRecords() {
+    if (PLACE_CHILD) return;   /* never reads the records, never marks them seen (design 9-3) */
     try {
       var a = JSON.parse(localStorage.getItem(PURCHASE_KEY) || '[]');
       if (!Array.isArray(a) || !a.length) return;

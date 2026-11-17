@@ -19,6 +19,11 @@
 (function () {
   'use strict';
   if (window.__espilSocial) return;
+  /* PLACE SPACE (Han 2026-11-16, design 9-2/9-5): never arm in a
+     place-space child window - lazyload already withholds this
+     module there; this is the module's own bolt in case any other
+     path ever loads it in such a window. */
+  try { if (sessionStorage.getItem('espil_store_space_v1')) return; } catch (_) {}
   window.__espilSocial = true;
 
   function $(id) { return document.getElementById(id); }

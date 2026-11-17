@@ -32,9 +32,17 @@
   var STORES = [
     { slug: '1238-robson-st', name: 'Konbiniya Japan Centre', pattern: /konbiniya/i, address: /1238\s+robson/i }
   ];
+  /* PLACE SPACE destination flag (Han 2026-11-16): ON (the shipped
+     state) the address opens the building's own place space - the
+     boot shell now living at the address hands the visit to the
+     game page in place-space mode. OFF is the revert switch: the
+     entry opens sample.html, the preserved standalone store page,
+     and today's popup behaviour reproduces exactly. The pause /
+     resume core below is untouched either way. */
+  var PLACE_SPACE_DEST = true;
   function storeUrl(store) {
     var base = window.__espilStorePageBase || '/vancouver/';
-    return base + store.slug + '/';
+    return base + store.slug + (PLACE_SPACE_DEST ? '/' : '/sample.html');
   }
 
   /* ---------------- pause core: hold rAF while paused ---------------- */

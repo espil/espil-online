@@ -115,6 +115,30 @@
   }
   function socialBundle() { load('social.js'); load('stall2.js'); load('tutorial.js'); load('panels.js'); }
   function storePair() { load('store.js'); load('store-page-link.js'); }
+  /* PLACE SPACE branch (Han 2026-11-16, design 9-5): in a
+     place-space child window (the boot shell's mark in this
+     window's sessionStorage) the arming allowlist is exactly:
+     place-space.js (the space itself), panels.js (the bag - the
+     purchase grant path) and story.js (armed but internally
+     gated: it never consumes purchases or writes progress here;
+     the parent window is the sole story author). Everything else
+     in this loader stays down - presence/social (the parent's
+     heartbeat already represents the player), vehicles, arena,
+     monsters/npcs, store + store-page-link (no re-entry from
+     inside), tiles3d (the child's map load must not spend the
+     tiles quota). No seam below this branch runs in such a
+     window. */
+  var placeChild = false;
+  try { placeChild = !!sessionStorage.getItem('espil_store_space_v1'); } catch (e) {}
+  if (placeChild) {
+    load('place-space.js'); load('panels.js'); load('story.js');
+    window.__espilLazyState = function () {
+      var out = {};
+      Object.keys(loaded).forEach(function (k) { out[k] = true; });
+      return { loaded: out, loading: Object.keys(loading).filter(function (k) { return !loaded[k]; }), placeChild: true };
+    };
+    return;
+  }
   /* The city-switch dive dispatches espil-dive-start on window;
      the standard gate entry does not, so the tutorial also rides
      the arrival bundle above - its own boot watcher only starts
