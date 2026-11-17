@@ -972,6 +972,12 @@
      render lands first and the saved position is applied to the
      final card box. */
   var LS_POS = 'espil_panel_pos_v1';
+  /* Flip-book guard (Han 2026-11-16): while the mobile book is
+     open a hosted panel's position is the book page's, so saved
+     offsets are neither read nor written. The body class can
+     only be set by the coarse-pointer book, so desktop drag and
+     persistence are unreachable-unchanged. */
+  function panelBooked() { return !!(document.body && document.body.classList.contains('espil-book-open')); }
   function panelPosAll() { var o = getJSON(LS_POS, {}); return o && typeof o === 'object' ? o : {}; }
   function panelPosGet(key) {
     var p = panelPosAll()[key];
@@ -1016,6 +1022,7 @@
   }
   function panelApplyPos(panel, key) {
     var card = panelCard(panel); if (!card) return;
+    if (panelBooked()) return;
     if (panel.getAttribute('aria-hidden') !== 'false') return;
     var pos = panelClamp(panel, card, panelPosGet(key));
     card._egPos = pos;
@@ -1028,6 +1035,7 @@
     head.addEventListener('pointerdown', function (e) {
       if (e.button > 0) return;                        /* primary button / touch contact only */
       if (e.target.closest('button, a, input, select, textarea, label')) return;  /* header controls stay clickable */
+      if (panelBooked()) return;                       /* booked: the page owns the position */
       var start = card._egPos || panelPosGet(key);
       var sx = e.clientX, sy = e.clientY, moved = false;
       try { head.setPointerCapture(e.pointerId); } catch (err) {}

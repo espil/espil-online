@@ -383,7 +383,27 @@
     if (!document.body) return;
     ensureDom();
     var inMap = document.body.classList.contains('in-map');
-    btnEl.classList.toggle('show', inMap);
+    /* Flip-book companion fix (Han 2026-11-16): on coarse
+       pointers this pill (z-index 9000) floats over every z-50
+       panel and can cover a panel's own close button, so it
+       hides while any dialog is open. Desktop is deliberately
+       excluded - the matchMedia gate makes this branch inert
+       under fine pointers and the pill behaves exactly as
+       before on PC. */
+    var dialogOpen = false;
+    try {
+      if (window.matchMedia && matchMedia('(pointer:coarse)').matches) {
+        /* only a RENDERED dialog counts: hidden subtrees (e.g.
+           the flip book's leaf-face clones, which inherit
+           aria-hidden="false" from their source panel) have no
+           client rects and must not hold the pill down. */
+        var dl = document.querySelectorAll('[role="dialog"][aria-hidden="false"]');
+        for (var di = 0; di < dl.length && !dialogOpen; di++) {
+          if (dl[di].getClientRects().length > 0) dialogOpen = true;
+        }
+      }
+    } catch (e) { dialogOpen = false; }
+    btnEl.classList.toggle('show', inMap && !dialogOpen);
     if (!inMap) close();
   }
   if (document.body) tickBtn();

@@ -952,6 +952,87 @@
       /* quest chip: the left column under the time/FPS chip
          (minimap 10..102, chip 106..~126, quest from 132) */
       'body.in-map #espil-tut{top:132px!important;left:10px!important;right:auto!important;transform:none!important;max-width:54vw;text-align:left}' +
+    '}' +
+    /* ---- FLIP BOOK MENU (Han 2026-11-16) -------------------------
+       The mobile menu as a bound book of pages: the hbi form
+       re-implemented natively (no turn.js, no jQuery - the pattern
+       only). A frame rail owns the ONLY close button; pages host
+       the existing panels so state never forks; shell geometry is
+       vw/vh only. Built and shown under coarse pointers only -
+       this whole block is inert on desktop. */
+    '@media (pointer:coarse){' +
+      '#espil-hud2-book{position:fixed;inset:0;z-index:9995;display:none;align-items:center;justify-content:center;background:rgba(5,7,10,.55)}' +
+      '#espil-hud2-book.open{display:flex}' +
+      '.bk-frame{display:flex;flex-direction:column;width:94vw;height:84dvh;border:2px solid #54381f;border-radius:14px;' +
+        'background:linear-gradient(180deg,#3a2817,#241708);box-shadow:0 18px 50px rgba(0,0,0,.6);overflow:hidden;color:#fff;' +
+        'font-family:"Manrope",sans-serif}' +
+      '.bk-rail{flex:none;height:9dvh;display:flex;align-items:center;gap:2.5vw;padding:0 2.5vw;' +
+        'border-bottom:1px solid rgba(255,233,168,.35)}' +
+      '.bk-nav{flex:none;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.4);' +
+        'background:rgba(255,255,255,.08);color:#fff;font-size:22px;line-height:1;display:flex;align-items:center;' +
+        'justify-content:center;padding:0;cursor:pointer;touch-action:manipulation}' +
+      '.bk-nav[disabled]{opacity:.35;cursor:default}' +
+      '.bk-title{flex:1;font:800 15px "Manrope",sans-serif;color:#ffe9a8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+      '.bk-pos{flex:none;font:800 11px "Manrope",sans-serif;color:rgba(255,255,255,.75)}' +
+      '.bk-close{flex:none;width:clamp(44px,11vw,54px);height:clamp(44px,11vw,54px);border-radius:50%;' +
+        'border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.08);color:#fff;font-size:19px;line-height:1;' +
+        'display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;touch-action:manipulation}' +
+      '.bk-view{flex:1;position:relative;overflow:hidden;perspective:1400px;touch-action:pan-y}' +
+      '.bk-page{position:absolute;left:2.5vw;right:2.5vw;top:2dvh;bottom:2dvh;display:none;touch-action:pan-y}' +
+      '.bk-page.cur{display:block}' +
+      '.bk-view.flipping .bk-page{pointer-events:none}' +
+      '.bk-slot{position:absolute;inset:0}' +
+      '.bk-scroll{height:100%;overflow-y:auto}' +
+      '.bk-status{font:800 13px "Manrope",sans-serif;color:#ffe9a8;margin:2px 2px 12px}' +
+      '.bk-map-cur{font:700 14px "Manrope",sans-serif;margin:4px 2px 12px}' +
+      '.bk-map-note{font:600 12px/1.5 "Manrope",sans-serif;color:rgba(255,255,255,.7);margin:10px 2px}' +
+      '.bk-pocket{position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 45%,rgba(0,0,0,.5),rgba(0,0,0,.12) 70%);opacity:0;pointer-events:none;z-index:4}' +
+      '.bk-leaf{position:absolute;left:2.5vw;right:2.5vw;top:2dvh;bottom:2dvh;display:none;z-index:6;pointer-events:none;transform-style:preserve-3d;will-change:transform}' +
+      '.bk-face{position:absolute;inset:0;overflow:hidden;border-radius:10px;backface-visibility:hidden;-webkit-backface-visibility:hidden;' +
+        'background:linear-gradient(180deg,#43301b,#2b1c0d);border:1.5px solid #54381f}' +
+      '.bk-face.back{transform:rotateY(180deg)}' +
+      '.bk-clone{position:absolute;inset:0}' +
+      '.bk-shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.5),rgba(0,0,0,0) 60%);opacity:0;pointer-events:none}' +
+      '.bk-face.back .bk-shade{background:linear-gradient(270deg,rgba(0,0,0,.5),rgba(0,0,0,0) 60%)}' +
+      /* booked presentation: a hosted window fills its page; the
+         frame X is the only close, so per-window closes hide.
+         Desktop rules are untouched - none of this can match
+         outside a coarse-pointer session with the book open. */
+      '.skill-tree.espil-booked{position:static!important;inset:auto!important;width:100%!important;height:100%!important;' +
+        'background:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;z-index:auto!important}' +
+      '.skill-tree.espil-booked[aria-hidden="false"]{display:block!important}' +
+      '#settings-panel.espil-booked{position:static!important;inset:auto!important;width:100%!important;height:100%!important;background:none!important;z-index:auto!important}' +
+      '#settings-panel.espil-booked.open{display:block!important}' +
+      '#espil-cash-window.espil-booked{position:static!important;inset:auto!important;width:100%!important;height:100%!important;background:none!important;z-index:auto!important}' +
+      '#espil-cash-window.espil-booked.open{display:block!important}' +
+      '.espil-booked .st-card{width:100%!important;max-width:none!important;height:100%;max-height:none!important;transform:none!important;overflow-y:auto!important}' +
+      '.espil-booked .set-card{width:100%!important;max-width:none!important;height:100%;max-height:none!important}' +
+      '.espil-booked .ecw-card{width:100%!important;max-width:none!important;height:100%;max-height:none!important}' +
+      '.espil-booked .st-close,.espil-booked .ecw-close{display:none!important}' +
+      '.espil-booked .st-grid{overflow-y:auto!important}' +
+      '#skill-tree.espil-booked .st-treeview{height:44dvh;flex:none}' +
+      /* flex:none matters: game-ui makes .st-card a column
+         flex box, and the treeview's automatic minimum is 0
+         (its nodes are absolutely positioned), so on short
+         screens it shrinks to a 2px strip and its nodes
+         become unhittable. Unshrunk, the card's own
+         overflow-y:auto scrolls the rest of the page. */
+      '#skill-tree.espil-booked .st-desc{min-height:0}' +
+    '}' +
+    /* landscape: the ledger form - height-led sizing, rail in dvh */
+    '@media (pointer:coarse) and (orientation:landscape){' +
+      '.bk-frame{height:92dvh;width:min(96vw,150dvh)}' +
+      '.bk-rail{height:13dvh;gap:2.5dvh;padding:0 2.5dvh}' +
+      '.bk-close{width:clamp(44px,12dvh,54px);height:clamp(44px,12dvh,54px)}' +
+      '.bk-page{left:2.5dvh;right:2.5dvh}' +
+      '.bk-leaf{left:2.5dvh;right:2.5dvh}' +
+      /* the tree's node rows are positioned in % of the
+         treeview, so at the portrait-led 44dvh on a 390px-tall
+         screen the layout compresses ~2.6x and sibling nodes
+         overlap each other's centres (measured). Landscape
+         restores the tree's natural 440px design height
+         (112dvh at 390px); the booked card scrolls to it. */
+      '#skill-tree.espil-booked .st-treeview{height:112dvh}' +
     '}';
   var styleEl = document.createElement('style');
   styleEl.id = 'espil-hud2-style';
@@ -1031,6 +1112,9 @@
     sheet.setAttribute('aria-hidden', 'true');
   }
   (function buildSheet() {
+    /* coarse pointers get the flip book instead (Han 2026-11-16);
+       the sheet element itself stays, empty and safe to query. */
+    if (coarse()) return;
     var card = mk('div', null);
     card.className = 'h2-sheet-card';
     var title = mk('div', null, '<span>Menu</span>');
@@ -1068,9 +1152,494 @@
   menuBtn.textContent = '☰';
   menuBtn.addEventListener('pointerdown', function (e) {
     e.preventDefault();
-    if (sheetOpen()) closeSheet(); else openSheet();
+    if (coarse()) { if (bkIsOpen()) bkCloseBook(); else bkOpenBook(); }
+    else if (sheetOpen()) closeSheet(); else openSheet();
   });
   menu.appendChild(menuBtn);
+
+  /* ---- FLIP BOOK MENU (Han 2026-11-16) -------------------------
+     Nine pages: Index, Skill, Items, Bag, Map, Stall, Friends /
+     Party, Settings, Cash Shop (Han's scope decision 2026-11-16).
+     A page that wraps an existing window MOVES that window's node
+     into the page slot while the page is current and returns it
+     when the page is left; opening and closing always go through
+     the window's own existing routes, so its state (aria-hidden
+     or class), its stores and its side effects never fork. The
+     frame rail carries the book's only close button. Coarse
+     pointers only - under fine pointers none of this is built. */
+  var BK_PAGES = [
+    { id: 'index', title: 'Menu' },
+    { id: 'skill', title: 'Skill tree', panelId: 'skill-tree', closeId: 'st-close',
+      open: function () {
+        if (window.__espilSkills && window.__espilSkills.tree) window.__espilSkills.tree();
+        else sendKey('k', 'KeyK');
+      } },
+    { id: 'items', title: 'Items', panelId: 'character-panel', closeId: 'char-close',
+      open: function () {
+        if (window.__espilOpenSelfProfile) window.__espilOpenSelfProfile();
+        else sendKey('p', 'KeyP');
+      } },
+    { id: 'bag', title: 'Bag', panelId: 'inventory-panel', closeId: 'inv-close',
+      open: function () {
+        if (window.__espilGearWindow && window.__espilGearWindow.openBag) window.__espilGearWindow.openBag();
+        else sendKey('i', 'KeyI');
+      } },
+    { id: 'map', title: 'Map' },
+    { id: 'stall', title: 'Stall', panelId: 'stall-panel', closeId: 'stall-close',
+      open: function () { sendKey('y', 'KeyY'); } },
+    { id: 'friends', title: 'Friends / Party', panelId: 'friends-panel', closeId: 'friends-close',
+      open: function () { sendKey('o', 'KeyO'); } },
+    { id: 'settings', title: 'Settings', nodeId: 'settings-panel', closeId: 'set-close',
+      open: function () { var g = el('city-settings'); if (g) g.click(); },
+      isOpen: function () { var n = el('settings-panel'); return !!(n && n.classList.contains('open')); } },
+    { id: 'cash', title: 'Cash Shop', nodeId: 'espil-cash-window',
+      open: function () { if (window.__espilCash) window.__espilCash.open(); },
+      close: function () { if (window.__espilCash) window.__espilCash.close(); },
+      isOpen: function () { var n = el('espil-cash-window'); return !!(n && n.classList.contains('open')); } }
+  ];
+  BK_PAGES.forEach(function (p) {
+    p.hosted = false;
+    p._home = null;
+    p.node = function () { return el(p.panelId || p.nodeId || ''); };
+    if (p.panelId && !p.isOpen) p.isOpen = function () {
+      var n = p.node(); return !!(n && n.getAttribute('aria-hidden') === 'false');
+    };
+    if (!p.close) p.close = function () {
+      var b = p.closeId ? el(p.closeId) : null; if (b) b.click();
+    };
+  });
+  var book = null, bkFrame, bkView, bkLeaf, bkLeafFront, bkLeafBack, bkShadeF, bkShadeB,
+      bkPocket, bkRailTitle, bkRailPos, bkPrevBtn, bkNextBtn, bkCloseBtn;
+  var bkCur = 0, bkOpenState = false, bkFlipping = false,
+      bkLeafDir = 1, bkDrag = null, bkFlipFrom = null, bkFlipToIdx = -1;
+  function bkIsOpen() { return bkOpenState; }
+  function bkHost(p) {
+    var n = p.node();
+    if (!n || p.hosted) return;
+    p._home = { parent: n.parentNode, next: n.nextSibling };
+    p.slot.appendChild(n);
+    n.classList.add('espil-booked');
+    p.hosted = true;
+  }
+  function bkUnhost(p) {
+    var n = p.node();
+    if (!n || !p.hosted) return;
+    n.classList.remove('espil-booked');
+    var h = p._home;
+    if (h && h.parent) {
+      if (h.next && h.next.parentNode === h.parent) h.parent.insertBefore(n, h.next);
+      else h.parent.appendChild(n);
+    } else if (document.body) document.body.appendChild(n);
+    p.hosted = false;
+    p._home = null;
+  }
+  /* host the page's window and open it through its own route;
+     a window already open (e.g. reached from the game world) is
+     hosted as-is and never toggled shut by the book. */
+  function bkEnterPrep(p) {
+    if (!p.panelId && !p.nodeId) return;
+    if (!p.node() && p.open) { try { p.open(); } catch (e) {} }
+    bkHost(p);
+    if (p.isOpen && !p.isOpen()) { try { p.open(); } catch (e) {} }
+  }
+  /* leaving a page: the window's own close route, then unhost -
+     exactly the side effects of its own X button today. */
+  function bkLeave(p) {
+    if (!p.panelId && !p.nodeId) return;
+    if (p.isOpen && p.isOpen()) { try { p.close(); } catch (e) {} }
+    bkUnhost(p);
+  }
+  /* an aborted gesture must leave no trace: if the target window
+     was already open before the gesture, only unhost it. */
+  function bkRestorePre(p, wasOpen) {
+    if (!p.panelId && !p.nodeId) return;
+    if (wasOpen) bkUnhost(p); else bkLeave(p);
+  }
+  function bkPaintStatus() {
+    var s = el('bk-status');
+    if (!s) return;
+    var leo = coin.querySelector('.h2-num');
+    var lv = bars.querySelector('.h2-lv');
+    s.textContent = (lv && lv.textContent ? lv.textContent + ' · ' : '') +
+      'Leo ' + (leo && leo.textContent ? leo.textContent : '');
+  }
+  function bkPaintMapStage() {
+    var s = el('bk-map-stage');
+    if (!s) return;
+    var w = el('minimap-wrap');
+    s.textContent = (w && w.getAttribute('data-stage')) || '1';
+  }
+  function bkPaintRail() {
+    if (!bkRailTitle) return;
+    bkRailTitle.textContent = BK_PAGES[bkCur].title;
+    bkRailPos.textContent = (bkCur + 1) + ' / ' + BK_PAGES.length;
+    bkPrevBtn.disabled = bkCur <= 0;
+    bkNextBtn.disabled = bkCur >= BK_PAGES.length - 1;
+  }
+  function bkFaceFill(face, slot) {
+    var old = face.querySelector('.bk-clone');
+    if (old) old.remove();
+    var c = slot.cloneNode(true);
+    c.classList.add('bk-clone');
+    c.removeAttribute('id');
+    var withId = c.querySelectorAll('[id]');
+    for (var k = 0; k < withId.length; k++) withId[k].removeAttribute('id');
+    var si = slot.querySelectorAll('input,select,textarea');
+    var ci = c.querySelectorAll('input,select,textarea');
+    for (var i = 0; i < si.length && i < ci.length; i++) {
+      if (si[i].type === 'checkbox' || si[i].type === 'radio') ci[i].checked = si[i].checked;
+      else ci[i].value = si[i].value;
+    }
+    var sc = slot.querySelectorAll('canvas');
+    var cc = c.querySelectorAll('canvas');
+    for (var j = 0; j < sc.length && j < cc.length; j++) {
+      try {
+        var x = cc[j].getContext('2d');
+        if (x) { cc[j].width = sc[j].width; cc[j].height = sc[j].height; x.drawImage(sc[j], 0, 0); }
+      } catch (e) {}
+    }
+    face.insertBefore(c, face.firstChild);
+  }
+  function bkLeafTransform(deg) {
+    bkLeaf.style.transform = 'rotateY(' + (bkLeafDir > 0 ? -deg : deg) + 'deg)';
+  }
+  function bkSetAngle(deg) {
+    /* drag-time direct control: the leaf follows the finger. */
+    var s = Math.sin(deg * Math.PI / 180);
+    bkLeafTransform(deg);
+    bkShadeF.style.opacity = (s * 0.8).toFixed(3);
+    bkShadeB.style.opacity = (s * 0.8).toFixed(3);
+    bkPocket.style.opacity = (s * 0.35).toFixed(3);
+  }
+  function bkSetLeaf(dir, fromP, toP) {
+    bkLeafDir = dir;
+    bkLeaf.style.transition = 'none';
+    bkLeaf.style.transformOrigin = dir > 0 ? 'left center' : 'right center';
+    bkFaceFill(bkLeafFront, fromP.slot);
+    bkFaceFill(bkLeafBack, toP.slot);
+    bkLeaf.style.display = 'block';
+    bkSetAngle(0);
+  }
+  function bkHideLeaf() {
+    bkLeaf.style.display = 'none';
+    bkPocket.style.opacity = '0';
+    /* drop the face clones: they are visual-only copies that
+       inherit aria-hidden="false" from their source panels -
+       left in the DOM they read as open dialogs to any
+       [role="dialog"] query (the cash pill's companion check
+       among them). Faces are repainted on every bkSetLeaf. */
+    [bkLeafFront, bkLeafBack].forEach(function (f) {
+      var c = f.querySelector('.bk-clone');
+      if (c) c.remove();
+    });
+  }
+  /* Programmatic turns run on CSS transitions, not rAF: the
+     compositor keeps wall-clock time even when the game's main
+     thread is saturated and frames are sparse, so a turn always
+     completes in its duration. The shade peaks mid-turn via a
+     half-time opacity step; completion is a timer (dur + slack),
+     token-guarded so a superseded turn never finishes twice. */
+  var bkAnimTimers = [], bkAnimToken = 0;
+  function bkAnimateTo(a1, dur, done) {
+    var token = ++bkAnimToken;
+    bkAnimTimers.forEach(clearTimeout);
+    bkAnimTimers = [];
+    var half = Math.max(1, Math.round(dur / 2));
+    bkLeaf.style.transition = 'transform ' + dur + 'ms cubic-bezier(.42,0,.58,1)';
+    bkShadeF.style.transition = 'opacity ' + half + 'ms linear';
+    bkShadeB.style.transition = 'opacity ' + half + 'ms linear';
+    bkPocket.style.transition = 'opacity ' + half + 'ms linear';
+    bkLeafTransform(a1);
+    bkShadeF.style.opacity = '0.55';
+    bkShadeB.style.opacity = '0.55';
+    bkPocket.style.opacity = '0.3';
+    bkAnimTimers.push(setTimeout(function () {
+      if (token !== bkAnimToken) return;
+      bkShadeF.style.opacity = '0';
+      bkShadeB.style.opacity = '0';
+      bkPocket.style.opacity = '0';
+    }, half));
+    bkAnimTimers.push(setTimeout(function () {
+      if (token !== bkAnimToken) return;
+      bkLeaf.style.transition = 'none';
+      bkShadeF.style.transition = 'none';
+      bkShadeB.style.transition = 'none';
+      bkPocket.style.transition = 'none';
+      bkAnimTimers = [];
+      if (done) done();
+    }, dur + 80));
+  }
+  function bkAnimateCancel() {
+    bkAnimToken++;
+    bkAnimTimers.forEach(clearTimeout);
+    bkAnimTimers = [];
+  }
+  function bkFinishFlip() {
+    var fromP = bkFlipFrom, toP = BK_PAGES[bkFlipToIdx];
+    bkLeave(fromP);
+    fromP.el.classList.remove('cur');
+    fromP.el.style.zIndex = '';
+    toP.el.style.zIndex = '';
+    bkHideLeaf();
+    bkView.classList.remove('flipping');
+    bkCur = bkFlipToIdx;
+    bkFlipping = false;
+    bkFlipFrom = null;
+    bkFlipToIdx = -1;
+    bkPaintRail();
+  }
+  function bkFlipTo(idx, dir) {
+    var fromP = BK_PAGES[bkCur], toP = BK_PAGES[idx];
+    bkFlipping = true;
+    bkFlipFrom = fromP;
+    bkFlipToIdx = idx;
+    bkEnterPrep(toP);
+    toP.el.classList.add('cur');
+    toP.el.style.zIndex = '2';
+    fromP.el.style.zIndex = '1';
+    bkView.classList.add('flipping');
+    if (toP.id === 'map') bkPaintMapStage();
+    bkSetLeaf(dir, fromP, toP);
+    void bkLeaf.offsetWidth; /* settle the start angle before the transition */
+    bkAnimateTo(180, 520, bkFinishFlip);
+  }
+  function bkGoTo(idx) {
+    if (!bkOpenState || bkFlipping || bkDrag) return;
+    if (idx === bkCur || idx < 0 || idx >= BK_PAGES.length) return;
+    bkFlipTo(idx, idx > bkCur ? 1 : -1);
+  }
+  /* edge drag: a press in the view's outer 18vw on either side
+     arms a page turn in that direction; the press itself is left
+     alone, so a plain tap still reaches the control under the
+     finger. Past 10px of travel the leaf takes over; release
+     past 45% of the view width completes the turn. */
+  function bkDragArm(e) {
+    if (!bkOpenState || bkFlipping || bkDrag) return;
+    var r = bkView.getBoundingClientRect();
+    var x = e.clientX - r.left;
+    var zone = window.innerWidth * 0.18;
+    var dir = 0;
+    if (x <= zone && bkCur > 0) dir = -1;
+    else if (x >= r.width - zone && bkCur < BK_PAGES.length - 1) dir = 1;
+    if (!dir) return;
+    var toP = BK_PAGES[bkCur + dir];
+    bkDrag = { dir: dir, x0: e.clientX, w: r.width, target: bkCur + dir,
+               leafReady: false, moved: false, prog: 0,
+               preOpen: (toP.isOpen ? !!toP.isOpen() : false) };
+    bkEnterPrep(toP);
+    toP.el.classList.add('cur');
+    toP.el.style.zIndex = '2';
+    BK_PAGES[bkCur].el.style.zIndex = '1';
+    if (toP.id === 'map') bkPaintMapStage();
+    document.addEventListener('pointermove', bkDragMove);
+    document.addEventListener('pointerup', bkDragUp);
+    document.addEventListener('pointercancel', bkDragUp);
+  }
+  function bkDragMove(e) {
+    if (!bkDrag) return;
+    var prog = -bkDrag.dir * (e.clientX - bkDrag.x0) / bkDrag.w;
+    if (!bkDrag.leafReady && Math.abs(e.clientX - bkDrag.x0) > 10) {
+      bkDrag.leafReady = true;
+      bkView.classList.add('flipping');
+      bkSetLeaf(bkDrag.dir, BK_PAGES[bkCur], BK_PAGES[bkDrag.target]);
+    }
+    if (bkDrag.leafReady) {
+      bkDrag.moved = true;
+      bkDrag.prog = Math.max(0, Math.min(1, prog));
+      bkSetAngle(bkDrag.prog * 180);
+    }
+  }
+  function bkDragUp() {
+    document.removeEventListener('pointermove', bkDragMove);
+    document.removeEventListener('pointerup', bkDragUp);
+    document.removeEventListener('pointercancel', bkDragUp);
+    if (!bkDrag) return;
+    var d = bkDrag;
+    bkDrag = null;
+    var toP = BK_PAGES[d.target], fromP = BK_PAGES[bkCur];
+    if (!d.leafReady) {
+      /* a tap, not a turn: undo the arming, keep the tap's own
+         click (it was never intercepted) as the only effect. */
+      bkRestorePre(toP, d.preOpen);
+      toP.el.classList.remove('cur');
+      toP.el.style.zIndex = '';
+      fromP.el.style.zIndex = '';
+      return;
+    }
+    /* the press that started this drag may still deliver a click
+       to the control under the finger - swallow exactly that one. */
+    var sup = function (ev) { ev.stopPropagation(); ev.preventDefault(); };
+    document.addEventListener('click', sup, true);
+    /* the stray click is delivered with the pointerup, so a
+       short window suffices - and it MUST expire before the
+       settle animation finishes (+280ms), or it would swallow
+       the outgoing panel's own close-route click in bkLeave. */
+    setTimeout(function () { document.removeEventListener('click', sup, true); }, 120);
+    bkFlipping = true;
+    bkFlipFrom = fromP;
+    bkFlipToIdx = d.target;
+    if (d.prog > 0.45) {
+      bkAnimateTo(180, 200, bkFinishFlip);
+    } else {
+      bkAnimateTo(0, 200, function () {
+        bkRestorePre(toP, d.preOpen);
+        toP.el.classList.remove('cur');
+        toP.el.style.zIndex = '';
+        fromP.el.style.zIndex = '';
+        bkHideLeaf();
+        bkView.classList.remove('flipping');
+        bkFlipping = false;
+        bkFlipFrom = null;
+        bkFlipToIdx = -1;
+      });
+    }
+  }
+  function bkOpenBook() {
+    if (!book) buildBook();
+    if (bkOpenState) return;
+    bkOpenState = true;
+    book.classList.add('open');
+    book.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('espil-book-open');
+    bkPaintStatus();
+    bkPaintRail();
+  }
+  function bkCloseBook() {
+    if (!bkOpenState) return;
+    if (bkDrag) { bkDragUp(); }
+    if (bkFlipping && bkFlipFrom) {
+      bkAnimateCancel();
+      bkFinishFlip();
+    }
+    bkLeave(BK_PAGES[bkCur]);
+    BK_PAGES.forEach(function (p, i) {
+      p.el.classList.toggle('cur', i === 0);
+      p.el.style.zIndex = '';
+    });
+    bkCur = 0;
+    bkHideLeaf();
+    bkOpenState = false;
+    book.classList.remove('open');
+    book.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('espil-book-open');
+    bkPaintRail();
+  }
+  function buildBook() {
+    if (book) return;
+    book = mk('div', 'espil-hud2-book');
+    book.setAttribute('role', 'dialog');
+    book.setAttribute('aria-hidden', 'true');
+    book.setAttribute('aria-label', 'Menu book');
+    bkFrame = mk('div', null);
+    bkFrame.className = 'bk-frame';
+    var rail = mk('div', null);
+    rail.className = 'bk-rail';
+    bkPrevBtn = document.createElement('button');
+    bkPrevBtn.type = 'button';
+    bkPrevBtn.className = 'bk-nav bk-prev';
+    bkPrevBtn.setAttribute('aria-label', 'Previous page');
+    bkPrevBtn.textContent = '‹';
+    bkRailTitle = mk('div', null);
+    bkRailTitle.className = 'bk-title';
+    bkRailPos = mk('div', null);
+    bkRailPos.className = 'bk-pos';
+    bkNextBtn = document.createElement('button');
+    bkNextBtn.type = 'button';
+    bkNextBtn.className = 'bk-nav bk-next';
+    bkNextBtn.setAttribute('aria-label', 'Next page');
+    bkNextBtn.textContent = '›';
+    bkCloseBtn = document.createElement('button');
+    bkCloseBtn.type = 'button';
+    bkCloseBtn.className = 'bk-close';
+    bkCloseBtn.setAttribute('aria-label', 'Close book');
+    bkCloseBtn.textContent = '✕';
+    rail.appendChild(bkPrevBtn);
+    rail.appendChild(bkRailTitle);
+    rail.appendChild(bkRailPos);
+    rail.appendChild(bkNextBtn);
+    rail.appendChild(bkCloseBtn);
+    bkView = mk('div', null);
+    bkView.className = 'bk-view';
+    BK_PAGES.forEach(function (p, i) {
+      var pg = mk('div', null);
+      pg.className = 'bk-page' + (i === 0 ? ' cur' : '');
+      pg.setAttribute('data-book-page', p.id);
+      var slot = mk('div', null);
+      slot.className = 'bk-slot';
+      pg.appendChild(slot);
+      p.el = pg;
+      p.slot = slot;
+      bkView.appendChild(pg);
+    });
+    bkPocket = mk('div', null);
+    bkPocket.className = 'bk-pocket';
+    bkLeaf = mk('div', null);
+    bkLeaf.className = 'bk-leaf';
+    bkLeafFront = mk('div', null);
+    bkLeafFront.className = 'bk-face front';
+    bkLeafBack = mk('div', null);
+    bkLeafBack.className = 'bk-face back';
+    bkShadeF = mk('div', null);
+    bkShadeF.className = 'bk-shade';
+    bkShadeB = mk('div', null);
+    bkShadeB.className = 'bk-shade';
+    bkLeafFront.appendChild(bkShadeF);
+    bkLeafBack.appendChild(bkShadeB);
+    bkLeaf.appendChild(bkLeafFront);
+    bkLeaf.appendChild(bkLeafBack);
+    bkView.appendChild(bkPocket);
+    bkView.appendChild(bkLeaf);
+    bkFrame.appendChild(rail);
+    bkFrame.appendChild(bkView);
+    book.appendChild(bkFrame);
+    /* page 0 - the index: the sheet's five rows lead to their
+       pages; the three scope-added windows get rows of their own. */
+    var idxWrap = mk('div', null);
+    idxWrap.className = 'bk-scroll';
+    var status = mk('div', 'bk-status');
+    status.className = 'bk-status';
+    idxWrap.appendChild(status);
+    var rowMeta = {
+      skill: SHEET[0], items: SHEET[1], bag: SHEET[2], map: SHEET[3], stall: SHEET[4],
+      friends: { icon: '👥', key: 'O' }, settings: { icon: '⚙️', key: '' }, cash: { icon: '💰', key: '' }
+    };
+    BK_PAGES.forEach(function (p, i) {
+      if (i === 0) return;
+      var meta = rowMeta[p.id];
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'h2-sheet-row';
+      b.setAttribute('data-book-go', p.id);
+      b.setAttribute('aria-label', p.title);
+      b.innerHTML = '<span class="si">' + meta.icon + '</span><span>' + p.title + '</span>' +
+        (meta.key ? '<span class="sk">' + meta.key + '</span>' : '');
+      b.addEventListener('click', function () { bkGoTo(i); });
+      idxWrap.appendChild(b);
+    });
+    BK_PAGES[0].slot.appendChild(idxWrap);
+    /* page 4 - the map control page: the minimap has no window
+       of its own; the page names its stage cycle and fires the
+       same M-key route the sheet uses today. */
+    var mapWrap = mk('div', null);
+    mapWrap.className = 'bk-scroll';
+    mapWrap.innerHTML =
+      '<p class="bk-map-cur">Map size: <b id="bk-map-stage">1</b> / 3</p>' +
+      '<button type="button" class="h2-sheet-row" id="bk-map-cycle">' +
+      '<span class="si">🗺️</span><span>Change map size</span><span class="sk">M</span></button>' +
+      '<p class="bk-map-note">Cycles the minimap through its three sizes, exactly as the M key does.</p>';
+    BK_PAGES[4].slot.appendChild(mapWrap);
+    mapWrap.querySelector('#bk-map-cycle').addEventListener('click', function () {
+      sendKey('m', 'KeyM');
+      setTimeout(bkPaintMapStage, 60);
+    });
+    bkPrevBtn.addEventListener('click', function () { bkGoTo(bkCur - 1); });
+    bkNextBtn.addEventListener('click', function () { bkGoTo(bkCur + 1); });
+    bkCloseBtn.addEventListener('click', function () { bkCloseBook(); });
+    bkView.addEventListener('pointerdown', bkDragArm);
+    if (document.body && !book.parentNode) document.body.appendChild(book);
+    bkPaintRail();
+  }
+  if (coarse()) buildBook();
 
   /* action cluster (Han 2026-11-11 form): a two-row grid inside
      the box - the quick bar (4 assignable skill slots) on the top
@@ -1331,8 +1900,8 @@
   var mounted = false;
   function mount() {
     if (!document.body) return;
-    [coin, score, timefps, menu, bars, chars, chatBtn, actions, sheet, assignSheet].forEach(function (n) {
-      if (!n.parentNode) document.body.appendChild(n);
+    [coin, score, timefps, menu, bars, chars, chatBtn, actions, sheet, assignSheet, book].forEach(function (n) {
+      if (n && !n.parentNode) document.body.appendChild(n);
     });
     var wrap = el('minimap-wrap');
     if (wrap && !el('espil-hud2-mmlayer')) {
@@ -1599,6 +2168,9 @@
     s.menuButtons = menu.querySelectorAll('button').length;
     s.sheetOpen = sheetOpen();
     s.assignOpen = assignOpen();
+    /* flip book (Han 2026-11-16): null on fine pointers, where
+       the book is never built. */
+    s.book = book ? { open: bkIsOpen(), page: bkCur, pages: BK_PAGES.length } : null;
     return s;
   };
 })();
