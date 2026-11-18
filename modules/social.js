@@ -596,8 +596,36 @@
     try { if (window.__espilLoginBypass && window.__espilLoginBypass()) return; } catch (_) {}
     var m = $('signin-modal'); if (m) m.setAttribute('aria-hidden', 'true');
   }
+  /* Finding A-2 (2026-11-17): the login-moment writers below
+     (startSession / holdSession / finishClaim) used to write
+     {id, at, server} fresh - the same whole-record replacement
+     Finding A removed from serverSessionSync - and the
+     Finding A verification's G2c leg caught a uid-less record
+     reappearing from one of these writes, leaving the
+     home-space identity key on the mutable account name until
+     a sync next ran. They now share the sync's
+     merge-preserving shape through this one write: start
+     from the existing record so fields the writer does not
+     own survive, then overlay the authoritative fields from
+     THIS response - id, uid (the register, login and name
+     responses all carry user.id), at, server. A response
+     without an id leaves a uid a sync already landed in
+     place instead of erasing it; a response with one
+     replaces it, so an account switch cannot inherit the
+     previous account's uid. */
+  function writeLoginSession(id, uid) {
+    try {
+      var prevSes = session();
+      var nextSes = (prevSes && typeof prevSes === 'object') ? prevSes : {};
+      nextSes.id = id;
+      if (uid) nextSes.uid = uid;
+      nextSes.at = Date.now();
+      nextSes.server = true;
+      localStorage.setItem(LS_SESSION, JSON.stringify(nextSes));
+    } catch (_) {}
+  }
   function startSession(rec, msg) {
-    try { localStorage.setItem(LS_SESSION, JSON.stringify({ id: rec.name, at: Date.now(), server: true })); } catch (_) {}
+    writeLoginSession(rec.name, rec.uid);
     try { localStorage.setItem('espil_username', rec.name); } catch (_) {}
     authMsg(msg, true); paintAuth();
     setTimeout(completeGate, 350);
@@ -620,14 +648,14 @@
   function readName() { var el = $('auth-name'); return el ? el.value.trim() : ''; }
   function setClaimBackVisible(v) { var b = $('auth-back'); if (b) b.hidden = !v; }
   function holdSession(rec) {
-    try { localStorage.setItem(LS_SESSION, JSON.stringify({ id: rec.name, at: Date.now(), server: true })); } catch (_) {}
+    writeLoginSession(rec.name, rec.uid);
     try { localStorage.setItem('espil_username', rec.name); } catch (_) {}
     paintAuth();
   }
-  function finishClaim(name) {
+  function finishClaim(name, uid) {
     nameClaimState = 'idle';
     setClaimBackVisible(false);
-    try { localStorage.setItem(LS_SESSION, JSON.stringify({ id: name, at: Date.now(), server: true })); } catch (_) {}
+    writeLoginSession(name, uid);
     try { localStorage.setItem('espil_username', name); } catch (_) {}
     authMsg('Account created. Welcome, ' + name + '.', true);
     paintAuth();
@@ -651,7 +679,7 @@
     }).then(function (r) {
       return r.json().then(function (b) { return { status: r.status, body: b }; });
     }).then(function (res) {
-      if (res.status === 200 && res.body && res.body.user) finishClaim(res.body.user.name);
+      if (res.status === 200 && res.body && res.body.user) finishClaim(res.body.user.name, res.body.user.id);
       else failClaim(res.body && res.body.error);
     }).catch(function () { failClaim(null); });
   }
@@ -724,10 +752,10 @@
           if (wantName) {
             /* Session first (derived name), then the name claim;
                the gate completes only when the claim resolves. */
-            holdSession({ name: res.body.user.name });
+            holdSession({ name: res.body.user.name, uid: res.body.user.id });
             claimName(wantName);
           } else {
-            startSession({ name: res.body.user.name }, 'Account created. Welcome, ' + res.body.user.name + '.');
+            startSession({ name: res.body.user.name, uid: res.body.user.id }, 'Account created. Welcome, ' + res.body.user.name + '.');
           }
         } else if (res.body && res.body.error === 'email_taken') {
           authMsg('That email is already registered. Sign in instead.');
@@ -775,7 +803,7 @@
       return r.json().then(function (b) { return { status: r.status, body: b }; });
     }).then(function (res) {
       if (res.status === 200 && res.body && res.body.user) {
-        startSession({ name: res.body.user.name }, 'Welcome back, ' + res.body.user.name + '.');
+        startSession({ name: res.body.user.name, uid: res.body.user.id }, 'Welcome back, ' + res.body.user.name + '.');
       } else if (res.status === 401) {
         authMsg('Email or password is incorrect.');
       } else if (res.status === 429) {
@@ -811,7 +839,7 @@
     }).then(function (res) {
       if (!res) return;
       if (res.status === 200 && res.body && res.body.user) {
-        startSession({ name: res.body.user.name }, 'Welcome back, ' + res.body.user.name + '.');
+        startSession({ name: res.body.user.name, uid: res.body.user.id }, 'Welcome back, ' + res.body.user.name + '.');
       } else if (res.status === 401) {
         authMsg('Name or password is incorrect.');
       } else if (res.status === 429) {
