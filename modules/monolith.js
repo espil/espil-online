@@ -794,7 +794,7 @@
       var r=espilCharRecord();
       return !!(r&&r.setupDone===true);
     }
-    function espilBodyName(c){ return c==='master'?'Master':'Style '+(c||'style1').slice(-1); }
+    function espilBodyName(c){ if(c==='lunaris')return 'Lunaris'; return c==='master'?'Master':'Style '+(c||'style1').slice(-1); }
     /* Change tickets live in the cash ledger (espil_cash_v1).
        This gate renders BEFORE the arrival bundle loads
        cashshop.js, so the count is read from the ledger store
@@ -856,6 +856,13 @@
        next session sync re-adopts or retries (§3.4). */
     function espilCharServerSync(prev,gender,bodyChoice){
       if(espilGuestNow())return;
+      /* Owner-only designated body (Han 2026-11-17): the
+         designated account makes NO setup/change writes from
+         this gate - the server designation is the account's
+         body record, and an inert setup row written here would
+         only wait to contradict it if the designation were
+         ever lifted by a future ship step. */
+      if(espilDesignatedBody())return;
       var wasSet=!!(prev&&prev.setupDone===true);
       if(!wasSet){
         espilCharPost('/auth/character/setup',{gender:gender,bodyChoice:bodyChoice}).then(function(res){
@@ -899,6 +906,26 @@
           +'#char-custom .char-body-note{margin-top:6px;color:#8a6a3b;font:600 11px Manrope,sans-serif;}'
           +'#char-custom .char-body-badge{margin:0 0 6px;padding:6px 10px;border-radius:10px;background:linear-gradient(180deg,#ffe9b8,#ffd98c);border:2px solid #b57708;color:#5a4020;font:700 12px Manrope,sans-serif;}';
         (document.head||document.documentElement).appendChild(st);
+      }
+      /* Owner-only designated body (Han 2026-11-17): the
+         designated account's gate shows the designation as the
+         lock line - no body cards and no ticket branch (a
+         change ticket cannot change what the server
+         designated; the designation supersedes the setup
+         record and the ticket path for this account). Rendered
+         before the options computation so the presentation is
+         the same under every guest-body mode. */
+      if(espilDesignatedBody()==='lunaris'){
+        espilGateLocked=true;
+        bodyRowActive=false; chosenBody=null;
+        row.hidden=false;
+        row.innerHTML='';
+        var dlab=document.createElement('div'); dlab.className='char-body-label'; dlab.textContent='BODY';
+        row.appendChild(dlab);
+        var dlock=document.createElement('div'); dlock.className='char-body-lock';
+        dlock.textContent='Lunaris · 이 계정의 지정 캐릭터입니다';
+        row.appendChild(dlock);
+        return;
       }
       var opts=null;
       if(espilGuestBodyMode()==='chibi'){
@@ -954,6 +981,25 @@
         row.appendChild(hint);
       }
     }
+    /* Gate re-render on session sync (2026-11-18, Lunaris
+       defect 1): gateCharacter renders the BODY row once at
+       panel open, from whatever the session record holds at
+       that moment. entry-flow's serverSessionSync can land
+       AFTER the panel opened (the sync is a fetch; the panel
+       opens on the entry path's own timing), and the row then
+       kept the pre-sync snapshot for the whole gate session -
+       the designated owner was shown five editable cards and
+       no lock line even though the record already carried the
+       designation by the time the map built the Lunaris body.
+       entry-flow dispatches 'espil-session-sync' after every
+       sync write; while the panel is open, re-render the row
+       from the fresh record. The render is idempotent and
+       preserves chosenBody, so a non-designated account's row
+       comes out exactly as the open-time render left it. */
+    window.addEventListener('espil-session-sync',function(){
+      var panel=document.getElementById('char-custom');
+      if(panel&&panel.getAttribute('aria-hidden')==='false')espilRenderBodyRow();
+    });
     function confirmCharacter(gender){
       var __prev=espilCharRecord(); /* first-setup lock: the pre-write record decides setup vs change below */
       try{var __rec={gender:gender,ts:Date.now()}; try{var __lk=window.__espilPendingLook?window.__espilPendingLook():null; if(__lk)__rec.look=__lk;}catch(_){} var __bc=(bodyRowActive&&chosenBody)?chosenBody:espilBodyChoiceSaved(); if(__bc)__rec.bodyChoice=__bc; if(__prev&&__prev.setupDone===true)__rec.setupDone=true; if(__prev&&__prev.setupPending===true)__rec.setupPending=true; window.localStorage.setItem('espil_character',JSON.stringify(__rec));}catch(e){} /* customizer look rides the character record (Han 2026-10-28); bodyChoice rides it the same way (Han 2026-11-16); the setup mirror flags ride it too so a confirm never erases them (Han 2026-11-16) */
@@ -3822,6 +3868,27 @@
       var m=/^style([1-4])$/.exec(choice||'');
       return m?+m[1]:1;
     }
+    /* Owner-only designated body (Han 2026-11-16, restated
+       2026-11-17): the server designates ONE account's body -
+       Lunaris for the owner's account - in its
+       account_designations table; GET /auth/session carries it
+       as designatedBody and entry-flow's sync mirrors it onto
+       the server-marked session record read here. It is NOT a
+       bodyChoice: it sits in no allowlist, no gate list, no
+       store path, and the character endpoints reject it; the
+       espil_character record never carries it. When present it
+       supersedes bodyChoice for this account everywhere the
+       body is built, keyed, or reported. The session record is
+       rewritten from the server response at every sync, so a
+       hand-planted mark in storage does not survive a reload,
+       and the presence room independently requires the
+       designated account's own handshake before it relays the
+       value to anyone. */
+    function espilDesignatedBody(){
+      try{var s=JSON.parse(window.localStorage.getItem('espil_session_v1')||'null');
+        if(s&&s.server===true&&s.designatedBody==='lunaris')return 'lunaris';}catch(e){}
+      return null;
+    }
     /* The body key buildPlayerAvatar would stamp for this gender
        right now - espilApplyAvatarGender rebuilds when the live
        avatar's key differs (a body change at the gate with the
@@ -3829,6 +3896,7 @@
        guest-body revert modes the chibi choice is inert: guests
        render the single revert body, signed-in users the master. */
     function espilAvatarBodyKey(gender){
+      if(espilDesignatedBody()==='lunaris')return 'lunaris';
       var mode=espilGuestBodyMode();
       if(espilGuestNow()){
         if(mode==='chibi')return 'chibi:'+espilBodyChoice();
@@ -4059,7 +4127,7 @@
         var p=(typeof walkPlayer!=='undefined')?walkPlayer:null;
         if(p&&p.av){
           var av=p.av, ca=av.actions[av.curAnim];
-          out.local={family:av.__chibi?'chibi':(av.__kaykit?'kaykit':'master'),gender:av.__gender||null,anim:av.curAnim,
+          out.local={family:av.__lunaris?'lunaris':(av.__chibi?'chibi':(av.__kaykit?'kaykit':'master')),gender:av.__gender||null,anim:av.curAnim,
             walkStride:(typeof av.__strideWalk==='number')?av.__strideWalk:null,
             runStride:(typeof av.__strideRun==='number')?av.__strideRun:null,
             currentTimeScale:ca?ca.timeScale:null,
@@ -4070,7 +4138,7 @@
             var R=__espilRemotes[id];
             if(!R)continue;
             var ra=R.actions[R.curAnim];
-            out.remotes.push({id:id,family:R.__chibi?'chibi':(R.__kaykit?'kaykit':'master'),anim:R.curAnim,speed:R.speed,
+            out.remotes.push({id:id,family:R.__lunaris?'lunaris':(R.__chibi?'chibi':(R.__kaykit?'kaykit':'master')),anim:R.curAnim,speed:R.speed,
               walkStride:(typeof R.__strideWalk==='number')?R.__strideWalk:null,
               runStride:(typeof R.__strideRun==='number')?R.__strideRun:null,
               currentTimeScale:ra?ra.timeScale:null});
@@ -9032,6 +9100,16 @@
          body - the swap's synthetic rig calls passed the full
          word, so its remote leg never saw it). */
       gender=(gender==='f'||gender==='female')?'female':'male';
+      /* Owner-only designated body (Han 2026-11-17): the room
+         relays body:'lunaris' only for the designated account's
+         handshake-authenticated sockets, so a roster record
+         carrying it is server-vouched - render the Lunaris
+         template whatever the viewer's population or guest-body
+         mode. The value is not in ESPIL_BODY_CHOICES, so without
+         this branch it would fall through to the default body;
+         a forged frame never reaches here at all (the room
+         drops it to null before relaying). */
+      if(info&&info.body==='lunaris')return __espilBuildLunarisRemote(gender);
       /* Batch 6 Item D: peers are guests too (accounts disabled),
          so remotes take the same guest renderer as the local player.
          Guest body (Han 2026-11-16): the Chibi pack dummy by
@@ -10537,7 +10615,13 @@
          stamped with its body key so espilApplyAvatarGender can
          tell a body change from a no-op. */
       var av=null;
-      if(espilGuestNow()){
+      if(espilDesignatedBody()==='lunaris'){
+        /* Owner-only designated body (Han 2026-11-17): the
+           designated account builds Lunaris whatever its saved
+           bodyChoice or the guest-body mode says - the
+           designation is server-side truth, not a selection. */
+        av=buildLunarisAvatar(gender);
+      }else if(espilGuestNow()){
         var mode=espilGuestBodyMode();
         if(mode==='chibi')av=buildChibiAvatar(gender,espilCbStyleNum(espilBodyChoice()));
         else if(mode==='kaykit')av=buildKaykitAvatar(gender);
@@ -11338,7 +11422,7 @@
       var L=ESPIL_CB_LOCAL;
       return {mode:espilGuestBodyMode(),files:ESPIL_CB_FILES,filesAll:espilCbFilesAll(),targetH:ESPIL_CB_TARGET_H,
         bodyChoice:(typeof espilBodyChoice==='function')?espilBodyChoice():null,
-        local:L?{ready:!!L.ready,anim:L.curAnim||null,acts:Object.keys(L.actions||{}),dead:!!L.__cbDead,gender:L.__gender||null,style:L.__cbStyle||null,bodyKey:L.__bodyKey||null}:null,
+        local:L?{ready:!!L.ready,anim:L.curAnim||null,acts:Object.keys(L.actions||{}),dead:!!L.__cbDead,gender:L.__gender||null,style:L.__cbStyle||null,bodyKey:L.__bodyKey||null,lunaris:!!L.__lunaris}:null,
         remotesBuilt:ESPIL_CB_REMOTES_BUILT,
         kaykitOn:espilKaykitPlaceholderOn()};
     };
@@ -11686,6 +11770,220 @@
       __espilEnsureChibi(gender,style,function(T){
         if(R.gone||!T||!T.scene)return;
         try{ espilCbSetup(R,__espilCloneModel(T),T.clips,T); }catch(e){}
+      });
+      return R;
+    }
+    /* ---- Lunaris player body (Han 2026-11-16, restated
+       2026-11-17): the owner account's designated body, built on
+       the Chibi pattern beside it. The file is the Auckland Time
+       Stone NPC's serving copy (assets/zealandia/lunaris.glb,
+       1,171,248 B, md5 f418db32) loaded through this SEPARATE
+       player-body path - espilBuildLunaris (the NPC) is
+       untouched and keeps its own load and behaviour; the two
+       paths simply fetch the same bytes. Measured in the lab
+       (lunaris/lab/measure-lunaris.mjs, the selection lab's
+       verbatim harness): the skin span is exactly 1.7000 m with
+       the feet at 0, so the player scale is 1 and the ground
+       offset is 0 (espilLunarisMeasure still derives both from
+       the file at load, the Chibi measure's shape with the
+       direct calibration - the Chibi constant ESPIL_CB_NATIVE_
+       SPAN belongs to that pack's files and is NOT reused);
+       authored facing is +z (ankle->toe horizontal dot with +Z
+       0.998), so the model takes the same PI counter-rotation
+       as the masters and the Chibi bodies; the locomotion
+       contract is Idle / WalkBasic / RunBasic (the file's full
+       Walk, TimeCast and Wave clips ride along unused - attack,
+       jump, swim, hit and death follow the standing fallback
+       contract, exactly as on the Chibi bodies). ---- */
+    var ESPIL_LUNARIS_FILE='assets/zealandia/lunaris.glb';
+    var ESPIL_LUNARIS_TARGET_H=1.7;
+    var ESPIL_LUNARIS_CLIPS={idle:'Idle',walk:'WalkBasic',run:'RunBasic'};
+    /* RUN PLAYBACK CORRECTION (measured 2026-11-17, the runfix
+       method): RunBasic has a flight phase (tight-band contact
+       fraction 0.42-0.46), so the stride estimator's wide
+       contact set dilutes the stance mean and the registered
+       stride reads low - lab: game estimate 1.5626 against the
+       tight band's 1.9987, ratio 1.2791. The registration is
+       scaled by the measured ratio, 1.28, once per shared
+       template clip, exactly like ESPIL_CB_RUN_STRIDE_F. Walk
+       is NOT corrected: WalkBasic's tight/game ratio is 0.93
+       (no dilution), and the wide set is the standing walk
+       method on every body. */
+    var ESPIL_LUNARIS_RUN_STRIDE_F=1.28;
+    var __espilLunarisTemplate={state:0,scene:null,clips:null,waiters:[],s:1,groundOff:0};
+    function espilLunarisMeasure(model){
+      var out={s:1,groundOff:0};
+      var sk=null;
+      model.traverse(function(o){ if(o.isSkinnedMesh&&!sk)sk=o; });
+      if(!sk||!sk.geometry||!sk.geometry.attributes||!sk.geometry.attributes.position)return out;
+      try{
+        model.updateMatrixWorld(true);
+        if(sk.skeleton)sk.skeleton.update();
+        var posA=sk.geometry.attributes.position;
+        var idxA=sk.geometry.attributes.skinIndex;
+        var wgtA=sk.geometry.attributes.skinWeight;
+        if(!idxA||!wgtA||!sk.skeleton||!sk.skeleton.boneMatrices)return out;
+        /* Quantized-attribute discipline (fix 2026-11-18): this
+           file stores position and skinWeight as NORMALIZED
+           integer attributes (KHR_mesh_quantization). The
+           game's three (r128) attribute getters return the RAW
+           integers for such attributes - and SkinnedMesh.
+           boneTransform reads the attributes itself, so a
+           boneTransform span here read ~8.4 million times too
+           large (position x32767, weights x255) and the scale
+           below collapsed to ~1.2e-07: the body rendered
+           microscopic, and the stride estimator's base-scale
+           conversion fell out of its valid range so no stride
+           ever registered. Newer three denormalizes in the
+           getter, which is why the lab measured the true
+           1.7000 span with the original code. Sample manually
+           instead: raw array reads denormalized by type, then
+           the same bind-matrix + weighted bone-matrix sum
+           boneTransform performs - real units under either
+           getter behaviour. */
+        function denormDiv(attr){
+          if(!attr||!attr.normalized)return 1;
+          var a=attr.array;
+          if(a instanceof Int16Array)return 32767;
+          if(a instanceof Uint16Array)return 65535;
+          if(a instanceof Int8Array)return 127;
+          if(a instanceof Uint8Array)return 255;
+          return 1;
+        }
+        var pDiv=denormDiv(posA), wDiv=denormDiv(wgtA);
+        var pArr=posA.array, iArr=idxA.array, wArr=wgtA.array;
+        var boneMats=sk.skeleton.boneMatrices;
+        var v=new THREE.Vector3(), acc=new THREE.Vector3(), wv=new THREE.Vector3();
+        var bm=new THREE.Matrix4();
+        var mnY=Infinity,mxY=-Infinity;
+        for(var i=0;i<posA.count;i++){
+          v.set(pArr[i*3]/pDiv,pArr[i*3+1]/pDiv,pArr[i*3+2]/pDiv);
+          v.applyMatrix4(sk.bindMatrix);
+          acc.set(0,0,0);
+          for(var k=0;k<4;k++){
+            var w=wArr[i*4+k]/wDiv;
+            if(!w)continue;
+            bm.fromArray(boneMats,iArr[i*4+k]*16);
+            wv.copy(v).applyMatrix4(bm);
+            acc.addScaledVector(wv,w);
+          }
+          acc.applyMatrix4(sk.matrixWorld);
+          if(acc.y<mnY)mnY=acc.y;
+          if(acc.y>mxY)mxY=acc.y;
+        }
+        var h=mxY-mnY;
+        if(h>0.2&&isFinite(h)){
+          out.s=ESPIL_LUNARIS_TARGET_H/h;
+          out.groundOff=-mnY*out.s;
+        }
+      }catch(e){}
+      return out;
+    }
+    function __espilEnsureLunaris(cb){
+      var T=__espilLunarisTemplate;
+      if(T.state===2){ cb(T); return; }
+      T.waiters.push(cb);
+      if(T.state===1)return;
+      T.state=1;
+      function fail(){
+        T.state=0;
+        var ws=T.waiters; T.waiters=[];
+        for(var i=0;i<ws.length;i++){ try{ ws[i](null); }catch(_){} }
+      }
+      try{
+        if(typeof THREE.GLTFLoader==='undefined')throw new Error('no GLTFLoader');
+        espilCbBasis().then(function(basisMod){
+          espilCbLoader(basisMod).load(ESPIL_LUNARIS_FILE,function(gltf){
+            T.scene=gltf.scene;
+            T.clips=(gltf.animations||[]).map(espilCbStripRoot);
+            /* Globe View material tag, same as the Chibi loader. */
+            T.scene.traverse(function(o){ if(o&&o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(function(mm){ mm.userData=mm.userData||{}; mm.userData.espilAvatarMat=true; }); } });
+            var meas=espilLunarisMeasure(T.scene);
+            T.s=meas.s; T.groundOff=meas.groundOff;
+            T.state=2;
+            var ws=T.waiters; T.waiters=[];
+            for(var i=0;i<ws.length;i++){ try{ ws[i](T); }catch(_){} }
+          },undefined,fail);
+        }).catch(fail);
+      }catch(e){ fail(); }
+    }
+    function espilLunarisRunStrideFix(av){
+      var act=av&&av.actions&&av.actions.run;
+      if(!act)return;
+      var clip=act.getClip();
+      if(!clip||typeof clip.__espilStride!=='number')return;
+      if(!clip.__espilLunarisRunFixed){
+        clip.__espilStride*=ESPIL_LUNARIS_RUN_STRIDE_F;
+        clip.__espilLunarisRunFixed=true;
+      }
+      act.__espilStride=clip.__espilStride;
+      av.__strideRun=clip.__espilStride;
+    }
+    function espilLunarisSetup(av,model,clips,T){
+      /* Authored facing +z (lab-measured) against the facing
+         law's -z front: the PI counter-rotation, on the model,
+         never the group - the masters' and Chibi bodies' same
+         treatment. */
+      model.rotation.y=Math.PI;
+      model.traverse(function(o){ if(o.isMesh)o.castShadow=true; });
+      model.scale.setScalar(T.s||1);
+      model.position.y+=(T.groundOff||0);
+      av.__visualRoot=model;
+      model.userData.__avBaseScale=T.s||1;
+      model.userData.__avBaseY=model.position.y;
+      av.group.add(model);
+      var mixer=new THREE.AnimationMixer(model);
+      av.mixer=mixer;
+      function findClip(name){ for(var i=0;i<clips.length;i++){ if(clips[i].name===name)return clips[i]; } return null; }
+      for(var key in ESPIL_LUNARIS_CLIPS){
+        var clip=findClip(ESPIL_LUNARIS_CLIPS[key]);
+        if(!clip)continue;
+        av.actions[key]=mixer.clipAction(clip);
+      }
+      espilStrideRegister(av,model,'walk'); /* FOOT-SLIDE SYNC: strides cached on the shared template clips */
+      espilStrideRegister(av,model,'run');
+      espilLunarisRunStrideFix(av); /* RUN PLAYBACK CORRECTION: see ESPIL_LUNARIS_RUN_STRIDE_F above */
+      try{ mixer.update(0); }catch(_){}
+      av.ready=true;
+      av.playAnim('idle');
+    }
+    function buildLunarisAvatar(gender){
+      gender=(gender==='female')?'female':'male';
+      var g=new THREE.Group();
+      var shadow=new THREE.Mesh(new THREE.CircleGeometry(.55,20),
+        new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.26,depthWrite:false}));
+      shadow.rotation.x=-Math.PI/2;
+      var av={group:g,shadow:shadow,ready:false,mixer:null,actions:{},curAnim:null,__gender:gender,__lunaris:true};
+      av.playAnim=function(name){ espilCbPlayAnim(av,name); };
+      av.playOneShot=function(name,durMs){ return espilCbPlayOneShot(av,name,durMs); };
+      av.playJump=function(isDouble){ return espilCbPlayJump(av,isDouble); };
+      av.__espilSetState=function(s){ espilCbSetState(av,s); };
+      ESPIL_CB_LOCAL=av;
+      __espilEnsureLunaris(function(T){
+        if(!T||!T.scene){ if(window.__espilToast)window.__espilToast('Character failed to load'); return; }
+        try{ espilLunarisSetup(av,__espilCloneModel(T),T.clips,T); }
+        catch(e){ if(window.__espilToast)window.__espilToast('Character failed to load'); }
+      });
+      return av;
+    }
+    function __espilBuildLunarisRemote(gender){
+      gender=(gender==='female')?'female':'male';
+      var g=new THREE.Group();
+      var shadow=new THREE.Mesh(new THREE.CircleGeometry(.55,20),
+        new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.26,depthWrite:false}));
+      shadow.rotation.x=-Math.PI/2;
+      /* Same field contract as the Chibi remote: the remote
+         tick drives playAnim + mixer.update; visual stays null
+         (the model carries its own measured scale). */
+      var R={group:g,shadow:shadow,mixer:null,actions:{},curAnim:null,ready:false,visual:null,baseY:0,
+             cur:{x:0,y:0,z:0},tgt:{x:0,y:0,z:0,a:0},faceY:0,speed:0,fixSpeed:0,fixAt:0,lastAt:0,plate:null,
+             phase:(__espilPhaseSeq++)%7,acc:0,gone:false,bubble:null,bubbleCv:null,bubbleTex:null,bubbleUntil:0,
+             __lunaris:true,__gender:gender};
+      R.playAnim=function(name){ espilCbPlayAnim(R,name); };
+      ESPIL_CB_REMOTES_BUILT++;
+      __espilEnsureLunaris(function(T){
+        if(R.gone||!T||!T.scene)return;
+        try{ espilLunarisSetup(R,__espilCloneModel(T),T.clips,T); }catch(e){}
       });
       return R;
     }

@@ -151,7 +151,20 @@
       return r.status === 200 ? r.json() : null;
     }).then(function (body) {
       if (body && body.signedIn && body.user && body.user.name) {
-        try { localStorage.setItem(LS_SESSION, JSON.stringify({ id: body.user.name, uid: body.user.id, at: Date.now(), server: true })); } catch (_) {}
+        try {
+          var sesRec = { id: body.user.name, uid: body.user.id, at: Date.now(), server: true };
+          /* Owner-only designated body (Han 2026-11-17): the
+             server designates the account's body (Lunaris for
+             the owner's account) and carries it as
+             designatedBody; mirror it onto the session record
+             so the avatar builders and the presence join can
+             read it. It is written ONLY from this server
+             response, into a fresh object every sync - a mark
+             the server no longer sends disappears here, and the
+             espil_character record never carries it. */
+          if (body.designatedBody === 'lunaris') sesRec.designatedBody = 'lunaris';
+          localStorage.setItem(LS_SESSION, JSON.stringify(sesRec));
+        } catch (_) {}
         try { localStorage.setItem('espil_username', body.user.name); } catch (_) {}
         try { localStorage.removeItem(LS_SESSION_PARK); } catch (_) {}
         try { espilCharacterAdopt(body.character || null); } catch (_) {}
@@ -164,6 +177,15 @@
            an expired session can never be resurrected from it. */
         try { localStorage.removeItem(LS_SESSION_PARK); } catch (_) {}
       }
+      /* Gate re-render notice (2026-11-18, Lunaris defect 1):
+         the record written above is the gate's designation and
+         setup source, but the gate BODY row renders once when
+         the panel opens - when this sync lands after the panel
+         opened, the row keeps showing the pre-sync snapshot
+         (the designated owner saw five editable cards and no
+         lock line). Notify so an open gate re-renders from the
+         fresh record; a closed gate renders at open anyway. */
+      try { window.dispatchEvent(new CustomEvent('espil-session-sync')); } catch (_) {}
     }).catch(function () {});
   }
   /* S0 GAP-1 fix (2026-11-10): hand a parked session record back

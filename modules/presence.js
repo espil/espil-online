@@ -15,6 +15,7 @@
 
   var ENDPOINT = window.__espilChatEndpoint || 'wss://api.espil.online/ws';
   var ws = null, room = null, myId = null, users = {}, joined = false;
+  var joinedBody = null; /* body carried by the latest join frame */
   var backoff = 1000, retryTimer = null, posTimer = null, pingTimer = null, sendWindow = [];
   var seenChats = {}, everJoined = false, localNoticeShown = false;
   var NAME_PH = { en: 'Your name', ko: '이름을 입력하세요', fr: 'Votre nom', zh: '你的名字' };
@@ -58,6 +59,17 @@
     return null;
   }
   function myBody(){
+    /* Owner-only designated body (Han 2026-11-17): when the
+       server-marked session record carries the designation
+       (Lunaris for the owner's account), it supersedes the
+       picked body on the join frame. The Worker relays
+       'lunaris' only for sockets whose handshake session IS the
+       designated account, so this value from any other account
+       is dropped at the room and never reaches a peer. */
+    try {
+      var ses = JSON.parse(localStorage.getItem('espil_session_v1') || 'null');
+      if (ses && ses.server && ses.designatedBody === 'lunaris') return 'lunaris';
+    } catch(_){}
     /* The chosen body rides the join frame (Han 2026-11-16:
        character selection fully open). The Worker sanitizes it to
        'master' or 'style1'..'style4' and relays it on the roster,
@@ -159,13 +171,32 @@
         var inp = $('char-name');
         if (inp && inp.value.trim()) localStorage.setItem('espil_username', nm);
       } catch(_){}
-      try { ws.send(JSON.stringify({ t: 'join', name: nm, gender: myGender(), look: myLook(), body: myBody() })); } catch(_){}
+      try { joinedBody = myBody(); ws.send(JSON.stringify({ t: 'join', name: nm, gender: myGender(), look: myLook(), body: joinedBody })); } catch(_){}
     };
     ws.onmessage = function(ev){
       var m; try { m = JSON.parse(ev.data); } catch(_){ return; }
       if (!m || !m.t) return;
       if (m.t === 'welcome') {
         myId = m.id; users = {}; joined = true; everJoined = true;
+        /* Join-refresh recheck (fix 2026-11-18): the sync that
+           lands the designation on the local record can complete
+           after this socket joined - through any of the session
+           writers, not only the canonical sync the event listener
+           below hangs on - so for the first 30 s after a welcome,
+           poll the joined body against the record every 2 s and
+           reconnect on a mismatch. The poll stops at the first
+           match, and a reconnect's own welcome restarts it with
+           the fresh joinedBody, so a settled session polls out
+           and never reconnects again. */
+        var bodyPollTries = 0;
+        var bodyPoll = setInterval(function(){
+          bodyPollTries++;
+          try {
+            if (!ws || !joined || !room || !joinedBody || bodyPollTries > 15) { clearInterval(bodyPoll); return; }
+            var b = myBody();
+            if (b && b !== joinedBody) { clearInterval(bodyPoll); connect(room); }
+          } catch(_){ clearInterval(bodyPoll); }
+        }, 2000);
         (m.users || []).forEach(function(u){ users[u.id] = u; });
         try { if (window.__espilMinimapClear) window.__espilMinimapClear(); } catch(_){}
         try { if (window.__espilAvatarClear) window.__espilAvatarClear(); } catch(_){}
@@ -210,7 +241,7 @@
         else if (m.code === 'rate_limited') { sysLine('Slow down a little.'); }
         else if (m.code === 'dm_target_gone') { onDmTargetGone(m); }
         else if (m.code === 'not_joined' && ws) {
-          try { ws.send(JSON.stringify({ t: 'join', name: myName(), gender: myGender(), look: myLook(), body: myBody() })); } catch(_){}
+          try { joinedBody = myBody(); ws.send(JSON.stringify({ t: 'join', name: myName(), gender: myGender(), look: myLook(), body: joinedBody })); } catch(_){}
         }
       }
     };
@@ -254,6 +285,27 @@
   window.addEventListener('espil-arrival', function(e){
     var city = e && e.detail && e.detail.city;
     if (city) { lastArrivalAt = Date.now(); connect(String(city).toLowerCase()); }
+  });
+
+  /* Designated-body join refresh (fix 2026-11-18): the join frame
+     carries myBody() at arrival, but the server session sync that
+     mirrors the account designation onto the local record can
+     land AFTER the arrival on a fresh profile (the record is
+     re-read on the game page), leaving the socket joined with the
+     fallback body for the whole session - peers then render the
+     default body instead of the designated one. entry-flow
+     dispatches 'espil-session-sync' after every sync write; when
+     the joined body no longer matches the record, reconnect so
+     the join replays with the current body (the room rejects a
+     second join on one socket, so a fresh socket is the replay
+     path). A stable record never triggers this: the comparison
+     only fires on an actual change. */
+  window.addEventListener('espil-session-sync', function(){
+    try {
+      if (!ws || !room || !joinedBody) return;
+      var b = myBody();
+      if (b && b !== joinedBody) connect(room);
+    } catch(_){}
   });
 
   /* UI-room delta: do not haunt the room from the globe. While joined,

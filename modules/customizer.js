@@ -126,6 +126,15 @@
              setupDone: setupDone, bodyChanges: held, locked: setupDone && held <= 0 };
   }
   function standingBodyLabel(st) {
+    /* Owner-only designated body (Han 2026-11-17): the standing
+       record names the designation when the server-marked
+       session record carries it - the label reads the session
+       record, never espil_character (which never carries the
+       reserved value). */
+    try {
+      var ses = JSON.parse(localStorage.getItem('espil_session_v1') || 'null');
+      if (ses && ses.server === true && ses.designatedBody === 'lunaris') return 'Lunaris';
+    } catch (e) {}
     var rec = st.rec || {};
     var gender = (rec.gender === 'female' || rec.gender === 'male') ? rec.gender : selectedCardGender();
     var bc = (typeof rec.bodyChoice === 'string' && /^(master|style[1-4])$/.test(rec.bodyChoice))
