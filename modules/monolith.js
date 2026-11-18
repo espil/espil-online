@@ -743,7 +743,18 @@
           return;
         }
       }catch(e){}
-      if(saved){ espilApplyAvatarGender(espilSavedGender()); } /* Han 2026-10-30 #2: the character screen opens after EVERY login, guests included - a returning traveler's saved gender and look come pre-selected below, so ENTER simply continues. */
+      if(saved){ espilApplyAvatarGender(espilSavedGender()); } /* Han 2026-10-30 #2, narrowed by Han 2026-11-17: the saved gender still applies up front, but the screen itself no longer opens for a traveller who already HAS a character - espilGateEnterDirect below decides. When the panel does present (a first setup, a held change ticket, an untrusted saved choice), the saved values come pre-selected and ENTER simply continues. */
+      if(espilGateEnterDirect(saved)){ return; }
+      espilGateShowPanel();
+    }
+    /* The gate panel presentation, extracted unchanged from
+       gateCharacter (entry re-ask fix, Han 2026-11-17): whether
+       the panel presents at all is now decided in
+       espilGateEnterDirect; this stays the one place it is
+       ever shown. */
+    function espilGateShowPanel(){
+      var saved=null;
+      try{saved=window.localStorage.getItem('espil_character');}catch(e){}
       var panel=document.getElementById('char-custom');
       var note=document.getElementById('char-bypass');
       var csub=panel?panel.querySelector('.char-sub'):null;
@@ -753,8 +764,9 @@
       if(note)note.hidden=true; /* no auto-entry note in the production flow */
       if(panel)panel.setAttribute('aria-hidden','false');
       if(window.EspilAudio&&window.EspilAudio.pop)window.EspilAudio.pop();
-      /* Production flow (Han 2026-10-18): the player CHOOSES male or
-         female and presses ENTER - no timed auto-confirm. */
+      /* Production flow (Han 2026-10-18): when the panel DOES
+         present, the player CHOOSES male or female and presses
+         ENTER - no timed auto-confirm. */
     }
     function setChosen(g){
       chosenGender=g;
@@ -854,6 +866,111 @@
        server character is re-adopted and re-applied, and the
        player is told. Failures stay quiet and pending - the
        next session sync re-adopts or retries (§3.4). */
+    /* ---- entry re-ask fix (Han 2026-11-17) ----
+       A traveller who already HAS a character is not asked
+       again at this gate: for a signed-in user the server
+       setup record is the standing character (its device
+       mirror is espil_character.setupDone, written by the
+       entry-flow adoption and by the confirm path), for a
+       guest the device record itself. gateCharacter consults
+       espilGateEnterDirect first; the panel presents only
+       for a first setup, for a held appearance-change ticket
+       (customizer-once \u00a72.3, untouched), or when the saved
+       record cannot be trusted (an out-of-allowlist choice
+       keeps the old drop-and-fallback presentation). */
+    function espilGateRecordComplete(rec){
+      if(!rec||typeof rec!=='object')return false;
+      if(rec.gender!=='male'&&rec.gender!=='female')return false;
+      var bc=rec.bodyChoice;
+      if(bc==null||bc==='')return true; /* a pre-selection-era record: the designed defaults (espilBodyChoice) apply */
+      return ESPIL_BODY_CHOICES.indexOf(bc)>=0;
+    }
+    function espilGateDesignated(){
+      /* The owner-designation build (Lunaris) mirrors its mark
+         onto the session record; read-only here. In bytes
+         without that build the mark never exists and this
+         branch never fires. */
+      try{ var s=JSON.parse(window.localStorage.getItem('espil_session_v1')||'null');
+        return !!(s&&typeof s.designatedBody==='string'&&s.designatedBody); }catch(e){ return false; }
+    }
+    function espilGateAutoConfirm(){
+      var g=espilSavedGender();
+      setChosen(g); /* the confirm's default look reads the selected card's gender, exactly as a presented gate would have set it */
+      espilApplyAvatarGender(g);
+      confirmCharacter(g);
+    }
+    function espilGateDesignatedEnter(){
+      /* The designation IS this account's character record:
+         no panel, and no setup/change write of any kind -
+         proceed with a confirm's tail, minus the write. */
+      espilApplyAvatarGender(espilSavedGender());
+      var panel=document.getElementById('char-custom');
+      var note=document.getElementById('char-bypass');
+      if(note)note.hidden=true;
+      if(panel)panel.setAttribute('aria-hidden','true');
+      if(window.__espilEntryLocationGate){ window.__espilEntryLocationGate(function(){ enterWalkMap(); }); } else { enterWalkMap(); }
+    }
+    function espilGateAdoptThenDecide(){
+      /* The mirror has not landed on this page yet: the
+         account's record may already exist server-side (the
+         page-init adoption is still in flight, or this device
+         has no record at all). Ask the server once - the same
+         /auth/session read both session syncs run - and decide
+         from its answer. Any failure, timeout or malformed
+         answer presents the panel exactly as before this fix:
+         the check can only ever remove a question, never trap
+         an entry. */
+      var settled=false;
+      var present=function(){ if(settled)return; settled=true; espilGateShowPanel(); };
+      var timer=setTimeout(present,4000);
+      var settle=function(fn){ if(settled)return; settled=true; clearTimeout(timer); fn(); };
+      if(!window.fetch){ present(); return; }
+      fetch(ESPIL_CHAR_API+'/auth/session',{credentials:'include'}).then(function(r){
+        return r.status===200?r.json():null;
+      }).then(function(body){
+        if(body&&body.signedIn&&body.user){
+          settle(function(){
+            if(body.character)espilCharMirror(body.character);
+            if(body.character||espilGateRecordComplete(espilCharRecord())){
+              /* The server record was adopted, or the device
+                 record stands as the one-time setup (\u00a75.1) -
+                 the auto-confirm's own sync posts it, and a
+                 409 there re-adopts instead. */
+              espilGateAutoConfirm();
+            }else{
+              espilGateShowPanel();
+            }
+          });
+        }else if(body){
+          /* The server says this arrival is signed out: prune
+             the stale local record (the same prune both
+             session syncs run) and re-decide as a guest. */
+          settle(function(){
+            try{ window.localStorage.removeItem('espil_session_v1'); }catch(e){}
+            if(espilGateRecordComplete(espilCharRecord()))espilGateAutoConfirm();
+            else espilGateShowPanel();
+          });
+        }else{
+          present();
+        }
+      }).catch(function(){ present(); });
+    }
+    function espilGateEnterDirect(saved){
+      if(espilGateDesignated()){ espilGateDesignatedEnter(); return true; }
+      var rec=espilCharRecord();
+      if(espilGuestNow()){
+        if(saved&&espilGateRecordComplete(rec)){ espilGateAutoConfirm(); return true; }
+        return false;
+      }
+      /* Signed-in: a held appearance-change ticket reopens
+         this gate for its one change (\u00a72.3) - untouched, so
+         a held ticket always presents the panel. */
+      if(espilBodyChangesHeld()>0)return false;
+      if(saved&&espilGateRecordComplete(rec)&&espilSetupDone()){ espilGateAutoConfirm(); return true; }
+      if(saved&&!espilGateRecordComplete(rec))return false;
+      espilGateAdoptThenDecide();
+      return true;
+    }
     function espilCharServerSync(prev,gender,bodyChoice){
       if(espilGuestNow())return;
       /* Owner-only designated body (Han 2026-11-17): the
@@ -1619,8 +1736,8 @@
     function espilOccludeTick(){
       var on=false, cx=0, cy=0, rad=0, cz=1;
       try{
-        if(espilOccludeMaster && !window.__espilInside && typeof walkPlayer!=='undefined' && walkPlayer && walkPlayer.pos &&
-           typeof mapCamera!=='undefined' && mapCamera && typeof renderer!=='undefined' && renderer){
+        if(espilOccludeMaster && !window.__espilInside && !(typeof espilZoomFpv!=='undefined'&&espilZoomFpv&&(espilZoomFpv.applied||espilZoomFpv.blend>0)) && typeof walkPlayer!=='undefined' && walkPlayer && walkPlayer.pos &&
+           typeof mapCamera!=='undefined' && mapCamera && typeof renderer!=='undefined' && renderer){ /* ZOOM-FPV (Han 2026-11-17): while the zoom source applies there is nothing to occlude at the eye, and the marched segment is a boom the view no longer uses - both dither paths stand down until blend is back to 0 */
           var grp=(walkPlayer.av&&walkPlayer.av.group)?walkPlayer.av.group:null;
           if(grp)grp.getWorldPosition(_espilOccFeet); else _espilOccFeet.copy(walkPlayer.pos);
           _espilOccHead.set(_espilOccFeet.x,_espilOccFeet.y+ESPIL_OCCLUDE_CHAR_H,_espilOccFeet.z);
@@ -1717,7 +1834,7 @@
       var live=false, ids=[];
       try{
         if(espilOccludeMaster&&typeof ESPIL_P1!=='undefined'&&ESPIL_P1&&espilP1.layerLive&&!espilP1.failed&&espilP1.buildingsAdded&&espilP1.map&&
-           !window.__espilInside&&!window.__espilStorePaused&&typeof walkPlayer!=='undefined'&&walkPlayer&&walkPlayer.pos&&!walkPlayer._espilArrive&&!walkPlayer._espilLanding&&
+           !window.__espilInside&&!window.__espilStorePaused&&!(typeof espilZoomFpv!=='undefined'&&espilZoomFpv&&(espilZoomFpv.applied||espilZoomFpv.blend>0))&&typeof walkPlayer!=='undefined'&&walkPlayer&&walkPlayer.pos&&!walkPlayer._espilArrive&&!walkPlayer._espilLanding&&
            typeof espilPolyHash!=='undefined'&&espilPolyHash&&typeof espilCamPos!=='undefined'&&espilCamPos){
           var fmap=espilDitherFeatMap();
           if(fmap){
@@ -3088,6 +3205,36 @@
        so with the paint law fixed visible == collision holds. */
     var espilPaintMeta=null, espilPaintMetaCache=null;
     var espilPaintAnchor=new THREE.Vector2(0,0); /* player anchor for the paint pass; the walker tick keeps it current */
+    /* Nearest-point Globe drop for one footprint ring (flat
+       [x,z,...] world coords): 0 when the anchor is inside the
+       ring, else espilGlobeDrop at the nearest ring-segment
+       point - the nearest-point law of the design comment above,
+       evaluated with the ONE shared Globe View law (Han
+       2026-10-27: k = 0.0006, cap 260) so the extrusions sink in
+       exact agreement with everything the THREE-material sweep
+       bends (Han 2026-10-15: one shared displacement keeps
+       tiles, buildings and characters aligned). */
+    function espilGlobeNearestDrop(ring,px,pz){
+      if(!ring||ring.length<4)return 0;
+      var n=ring.length/2, inside=false, bd=Infinity, bnx=px, bnz=pz;
+      for(var j=0;j<n;j++){
+        var ax=ring[2*j], az=ring[2*j+1];
+        var bx2=ring[2*((j+1)%n)], bz2=ring[2*((j+1)%n)+1];
+        if((az>pz)!==(bz2>pz)){
+          var xi=ax+(pz-az)*(bx2-ax)/(bz2-az);
+          if(px<xi)inside=!inside;
+        }
+        var ex=bx2-ax, ez=bz2-az;
+        var L2=ex*ex+ez*ez;
+        var t=L2>0?((px-ax)*ex+(pz-az)*ez)/L2:0;
+        if(t<0)t=0; else if(t>1)t=1;
+        var qx=ax+ex*t, qz=az+ez*t;
+        var dx=px-qx, dz=pz-qz, d2=dx*dx+dz*dz;
+        if(d2<bd){ bd=d2; bnx=qx; bnz=qz; }
+      }
+      if(inside)return 0;
+      return espilGlobeDrop(bnx,bnz);
+    }
     function espilPaintMetaFor(){
       var cache=espilP1BldCache; if(!cache)return null;
       if(espilPaintMetaCache===cache&&espilPaintMeta)return espilPaintMeta;
@@ -3116,7 +3263,7 @@
         if(bx*bx+bz*bz>820*820&&!m.lod)continue;
         scanned++;
         var h=prop.h;
-        var hv=h; /* flat world (Han 2026-10-20 cleanup): the visual height is the record height, except the zoom LOD below */
+        var hv=h-espilGlobeNearestDrop(rings[i],px,pz); if(hv<0)hv=0; /* Globe View on the extrusion (restored 2026-11-17): the 2026-10-19 nearest-point law of the design comment above - removed by the 2026-10-20 flat cleanup before it ever shipped, and missed by the 2026-10-27 restoration, which only re-added the THREE-material sweep. Replaces the flat hv=h of the cleanup; the zoom LOD below may still flatten hv entirely. */
         /* Zoom LOD (perf, Han 2026-10-20): at overview zooms,
            small distant buildings flatten to their footprint -
            at the widest view roughly half the prisms Mapbox
@@ -3468,7 +3615,14 @@
            (espilP1.zoom / zoomT) is never rewritten. */
         if(typeof espilCamDEff==='number'&&espilCamDEff<espilP1DistFromZoom(zoom)-0.05)
           zoom=espilP1ZoomFromDist(Math.max(2.2,espilCamDEff));
-        try{ espilP1.map.jumpTo({center:ll,bearing:brg,pitch:kbFpv?ESPIL_KB_P1_PITCH:52,zoom:zoom}); }catch(e){}
+        /* ZOOM-FPV (Han 2026-11-17): the pitch is the one P1
+           framing term the zoom source touches - 52 + 33 x blend,
+           reaching the interior's 85 only as the blend completes.
+           The interior term stays the constant 85 (its entry is a
+           fade; no blend is mixed into it), and the zoom source
+           never writes espilP1.zoomT here or anywhere - the user's
+           23 survives the whole first-person stay. */
+        try{ espilP1.map.jumpTo({center:ll,bearing:brg,pitch:kbFpv?ESPIL_KB_P1_PITCH:52+33*((typeof espilZoomFpv!=='undefined'&&espilZoomFpv)?espilZoomFpv.blend:0),zoom:zoom}); }catch(e){}
         if(espilP1.layerLive){ try{ espilP1.map.triggerRepaint(); }catch(e){} } /* the map's render pass draws the game scene via the custom layer */
         /* AVATAR SCALE (Han 2026-10-17; SIZE HELD 2026-11-05): in
            layer mode the avatar draws at true map scale - about 11 px
@@ -5667,6 +5821,11 @@
         walkPlayer.pos.y+sp0*walkCamDist+1.2,
         walkPlayer.pos.z+Math.cos(walkCamYaw)*cp0*walkCamDist);
       mapCamera.lookAt(walkPlayer.pos.x,walkPlayer.pos.y+1.7,walkPlayer.pos.z);
+      /* ZOOM-FPV (Han 2026-11-17): entry folds the zoom-FPV state
+         flat with the camera reset - a dive always starts from the
+         third-person default framing, exactly as zoom itself
+         resets to 7.0 here; nothing about the state is persisted. */
+      if(typeof espilZoomFpv!=='undefined'&&espilZoomFpv)espilZoomFpvFold();
     }
     function enterWalkMap(){
       if(cityPhaseActive)return;
@@ -7621,7 +7780,16 @@
        panel Enter click and keyboard entry alike open the
        standalone store page in a popup via the store-page-link
        module, and espilEnterInside refuses the record outright.
-       Every other building keeps the routed interior below. */
+       Every other building keeps the routed interior below.
+       PLACE EXPANSION (Han 2026-11-17): the routed interior below
+       is now the REMAINDER path, not the rule - every building
+       that owns its address slug opens its own place space in a
+       popup instead (espilOpenPlacePopup in espilEnterBuilding,
+       resolved by store-page-link against the baked places
+       dataset). Buildings with no place of their own (the
+       design remainder: shadowed or addressless records) still
+       reach the interior below, until the address-grammar
+       question is decided. */
     function espilIsKonbiniyaRec(rec){
       if(!rec)return false;
       var nm=rec.name||rec.title||'';
@@ -7726,6 +7894,60 @@
         else if(tries>=20){ clearInterval(espilKbPopupWait); espilKbPopupWait=null; if(window.__espilToast)window.__espilToast('The store page is still loading - try Enter again in a moment.'); }
       },150);
     }
+    /* PLACE EXPANSION (Han 2026-11-17): every OTHER building that
+       owns its address slug opens its own place space in a popup,
+       through the same store-page-link contract as the Konbiniya
+       seam above - the module resolves the panel record against
+       the baked places dataset (the AABB fingerprint of the
+       record's ring, or its centre). The press is consumed while
+       the dataset is still loading (150 ms poll, up to ~3 s): a
+       building whose place may exist never falls through to the
+       shared interior on a load race. A resolve of false means
+       the building honestly has no place of its own, or the
+       expansion flags are off - either way the press keeps the
+       routed interior below, unchanged. If the link module
+       never arrives the press ends
+       at a toast, on the Konbiniya seam's rule. */
+    var espilPlacePopupWait=null;
+    function espilPlacePointOf(rec){
+      var pt={x:rec.cx,z:rec.cz};
+      if(rec.ring&&rec.ring.length>2){
+        var mnx=1e18,mxx=-1e18,mnz=1e18,mxz=-1e18;
+        for(var ri=0;ri<rec.ring.length;ri++){ var rp=rec.ring[ri]; if(rp[0]<mnx)mnx=rp[0]; if(rp[0]>mxx)mxx=rp[0]; if(rp[1]<mnz)mnz=rp[1]; if(rp[1]>mxz)mxz=rp[1]; }
+        pt.x=(mnx+mxx)/2; pt.z=(mnz+mxz)/2; pt.w=mxx-mnx; pt.d=mxz-mnz;
+      }
+      return pt;
+    }
+    function espilOpenPlacePopup(rec){
+      var link=window.__espilStorePageLink;
+      if(link&&link.tryPlace){
+        if(espilPlacePopupWait){clearInterval(espilPlacePopupWait);espilPlacePopupWait=null;}
+        var r=link.tryPlace(espilPlacePointOf(rec));
+        if(r===true)return true;
+        if(r===false)return false;
+        /* 'pending' falls into the wait below */
+      }
+      if(espilPlacePopupWait)return true;   /* a wait is already running: the press is consumed */
+      var tries=0;
+      espilPlacePopupWait=setInterval(function(){
+        tries++;
+        var l2=window.__espilStorePageLink;
+        var done=false, opened=false, timedOut=false;
+        if(l2&&l2.tryPlace){
+          var r2=l2.tryPlace(espilPlacePointOf(rec));
+          if(r2===true){done=true;opened=true;}
+          else if(r2===false){done=true;}
+        }
+        if(!done&&tries>=20){ done=true; timedOut=true; if(window.__espilToast)window.__espilToast('The building spaces are still loading - try Enter again in a moment.'); }
+        if(done){
+          clearInterval(espilPlacePopupWait); espilPlacePopupWait=null;
+          /* resolved false: no place of its own - the routed interior, as before.
+             timed out: the press ends at the toast, never at an interior. */
+          if(!opened&&!timedOut){ closeBuildingPanel(); espilEnterInside(rec); }
+        }
+      },150);
+      return true;
+    }
     function espilEnterBuilding(){
       var p=walkPlayer; if(!p||!espilBldgPanelRec)return;
       var rec=espilBldgPanelRec;
@@ -7738,6 +7960,12 @@
          never closes it either); the world pauses while the popup
          is open and resumes when it closes. */
       if(espilIsKonbiniyaRec(rec)){ espilOpenKonbiniyaPopup(rec); return; }
+      /* PLACE EXPANSION (Han 2026-11-17): a building that owns its
+         address slug opens its own place space instead of the
+         shared interior - the panel is left as it stands, exactly
+         as on the Konbiniya path. Only a building with no place of
+         its own reaches the routed interior below. */
+      if(espilOpenPlacePopup(rec))return;
       closeBuildingPanel();
       espilEnterInside(rec);
     }
@@ -7800,6 +8028,177 @@
         yaw:(typeof walkCamYaw==='number')?Math.round(walkCamYaw*1000)/1000:null,
         pitch:(typeof walkCamPitch==='number')?Math.round(walkCamPitch*1000)/1000:null,
         routedFrom:window.__espilInside?window.__espilInside.routedFrom:undefined };
+    };
+    /* ZOOM-FPV (Han 2026-11-17): zooming the third-person camera
+       ALL the way in switches to first person; zooming back out
+       returns to third person. The zoom source is a NEW activation
+       source beside the interior one above, and the two never share
+       input law - the split is the design's core rule:
+         - INPUT law (A/D turn in updateWalkMap, the doMove block,
+           the skill-row block) reads ONLY espilKbFpvActive() (the
+           interior predicate). On the street A/D stay the skill
+           keys (Dash / Wave) and attacks/skills stay live at full
+           zoom; camera turning is drag-look's job, as outdoors.
+         - CAMERA law (the eye framing in updateWalkMap, the P1
+           pitch in espilP1Tick) reads the COMPOSITE predicate
+           espilCamFpvActive() = interior OR zoom, with the two
+           sources applied differently (interior = the copy branch
+           above, unchanged; zoom = the 220 ms blend below).
+       Engage/disengage are judged on accumulated wheel/pinch PUSH
+       (mapZoom feeds it), never on zoomT: while the interior FPV
+       is active the P1 tick overwrites zoomT every frame, so zoomT
+       motion cannot carry the decision. The zoom source NEVER
+       writes zoomT while engaged (the interior source does - that
+       asymmetry is deliberate). State is page-memory only, like
+       zoom itself: nothing is persisted, and entry resets it. */
+    var espilZoomFpv={on:false,blend:0,push:0,applied:false};
+    function espilZoomFpvActive(){ return espilZoomFpv.on; }
+    function espilCamFpvActive(){ return espilKbFpvActive()||espilZoomFpvActive(); }
+    /* The zoom source's own avatar ownership: 'applied' means the
+       ZOOM source hid the avatar group + contact shadow (the
+       interior source's flag is espilFpvApplied - never mixed).
+       Restore defers to the vehicles module while it owns the hide
+       (driving): boarding during zoom-FPV folds the zoom state in
+       the same tick, and un-hiding there would put the rider back
+       inside the car. */
+    function espilZoomFpvSetApplied(b){
+      var p=(typeof walkPlayer!=='undefined')?walkPlayer:null;
+      if(b){
+        if(p&&p.av&&p.av.group)p.av.group.visible=false;
+        if(p&&p.av&&p.av.shadow)p.av.shadow.visible=false;
+        espilZoomFpv.applied=true;
+      }else{
+        var vOwn=false;
+        try{ vOwn=!!(window.__espilVehicles&&window.__espilVehicles.state&&window.__espilVehicles.state().avatarHidden); }catch(e){}
+        if(!vOwn){
+          if(p&&p.av&&p.av.group)p.av.group.visible=true;
+          if(p&&p.av&&p.av.shadow)p.av.shadow.visible=true;
+        }
+        espilZoomFpv.applied=false;
+      }
+    }
+    function espilZoomFpvFold(){
+      espilZoomFpv.on=false; espilZoomFpv.blend=0; espilZoomFpv.push=0;
+      if(espilZoomFpv.applied)espilZoomFpvSetApplied(false);
+    }
+    /* Force-off set: while any of these holds, the zoom state is
+       folded flat the same tick (the interior takes the camera
+       over - its entry is a fade teleport, so the snap is masked;
+       flight and driving own their cameras). The HOME is NOT in
+       this set: Han decided Q1 = ALLOW on 2026-11-17 (17:05, via
+       COO), reversing the design's recommended default - the
+       home's default camera stays third-person, but a deliberate
+       full zoom-in may engage the zoom source there too, and the
+       release blend returns to the home-contained boom point
+       (espilCamClampUpdate's home branch caps the tracked point
+       the blend falls back to). The interior predicate's own
+       home exclusion (espilKbFpvActive) is a separate law and
+       is untouched by this. */
+    function espilZoomFpvForcedOff(){
+      if(espilKbFpvActive())return 'interior';
+      var p=(typeof walkPlayer!=='undefined')?walkPlayer:null;
+      if(p&&p.flying)return 'flying';
+      try{ if(window.__espilVehicles&&window.__espilVehicles.state&&window.__espilVehicles.state().driving)return 'driving'; }catch(e){}
+      if(typeof cityPhaseActive!=='undefined'&&!cityPhaseActive)return 'no-city';
+      return null;
+    }
+    /* Engage-block set: the force-off set plus the states whose
+       steps own the body/camera (arrival envelope, landing, climb)
+       and the store pause (the parent world is frozen). Push
+       banked while blocked decays to 0, so a blocked build-up can
+       never fire the frame the block lifts. */
+    function espilZoomFpvBlocked(){
+      if(espilZoomFpvForcedOff())return true;
+      var p=(typeof walkPlayer!=='undefined')?walkPlayer:null;
+      if(p&&(p._espilArrive||p._espilLanding||p._espilClimb))return true;
+      if(window.__espilStorePaused)return true;
+      return false;
+    }
+    function espilZoomFpvTick(dt){
+      var Z=espilZoomFpv;
+      if(espilZoomFpvForcedOff()){
+        if(Z.on||Z.blend>0||Z.applied)espilZoomFpvFold();
+        Z.push=0;
+        return;
+      }
+      if(!Z.on){
+        if(espilZoomFpvBlocked()){
+          Z.push=Z.push>0?Math.max(0,Z.push-dt*4):Math.min(0,Z.push+dt*4);
+        }else{
+          /* Engage: half a notch of push PAST the zoom cap, while
+             at the cap (layer: zoomT >= 22.99; fallback: the
+             outdoor distance floor 1.8, with the same 0.01 slack). */
+          var atCap=false;
+          if(typeof ESPIL_P1!=='undefined'&&ESPIL_P1&&typeof espilP1!=='undefined'&&espilP1&&espilP1.map&&espilP1.ready&&!espilP1.failed){
+            atCap=(espilP1.zoomT!==null&&espilP1.zoomT>=22.99);
+          }else{
+            atCap=(typeof walkCamDist==='number'&&walkCamDist<=1.81);
+          }
+          if(atCap&&Z.push>=0.5){ Z.on=true; Z.push=0; /* the disengage count starts from 0: one net notch out releases */ }
+        }
+      }else if(Z.push<=-1.0){
+        /* Release: one net notch out. The restore point is FIXED
+           (layer zoomT 22.60 / fallback 2.30 m) - the gap between
+           the engage point (23.0 / 1.8) and the restore point is
+           the hysteresis dead zone, so alternating +/-1 notch at
+           the boundary toggles only on input, never on its own. */
+        Z.on=false; Z.push=0;
+        if(typeof ESPIL_P1!=='undefined'&&ESPIL_P1&&typeof espilP1!=='undefined'&&espilP1&&espilP1.map&&espilP1.ready&&!espilP1.failed){
+          espilP1.zoomT=22.60;
+        }else if(typeof walkCamDist==='number'){
+          walkCamDist=2.30;
+        }
+      }
+      /* The blend is dt-based (220 ms - the interior fade's 210 ms
+         family), so it runs the same wall time at any frame rate.
+         A world hit stop hands this tick dt = 0: the blend simply
+         holds its value and resumes after - no catch-up, no jump. */
+      if(Z.on)Z.blend=Math.min(1,Z.blend+dt/0.220);
+      else Z.blend=Math.max(0,Z.blend-dt/0.220);
+      /* Avatar timing: hide at blend >= 0.2, restore below it. The
+         design's first draft hid at 0.5, but its own seam
+         criterion (the avatar must already be hidden in every
+         frame whose horizontal camera-player distance is under
+         0.9 m) measures earlier: at the default pitch the tracked
+         camera crosses 0.9 m horizontal at about a third of the
+         approach covered, which the compounding lerp passes while
+         blend is still near 0.23-0.45 depending on frame rate -
+         0.2 is the threshold that precedes the crossing at both
+         real and rig frame times (build report, deviation 1). */
+      if(Z.blend>=0.2&&!Z.applied)espilZoomFpvSetApplied(true);
+      else if(Z.blend<0.2&&Z.applied){
+        /* The restore additionally waits until the camera is back
+           outside the 0.9 m horizontal ring: on release the blend
+           falls faster than the tracking lerp retreats the camera,
+           so a blend-only restore pops the avatar back into view
+           while the camera is still inside the ring (measured on
+           the rig, probe L3: one release frame at 0.68 m with the
+           avatar visible). The distance is last frame's, which is
+           conservative on a retreating camera. The fold path above
+           restores immediately - folds are teleports or hand-overs
+           (interior, flight, driving, entry reset), never a
+           blend-out, so they are not held by this condition. */
+        var _zrOk=true;
+        var _zp=(typeof walkPlayer!=='undefined')?walkPlayer:null;
+        var _zc=(typeof mapCamera!=='undefined'&&mapCamera)?mapCamera.position:null;
+        if(_zp&&_zp.pos&&_zc){
+          var _zdx=_zc.x-_zp.pos.x, _zdz=_zc.z-_zp.pos.z;
+          _zrOk=(_zdx*_zdx+_zdz*_zdz)>=0.81;
+        }
+        if(_zrOk)espilZoomFpvSetApplied(false);
+      }
+    }
+    window.__espilZoomFpvState=function(){
+      var cam=(typeof mapCamera!=='undefined'&&mapCamera&&mapCamera.position)?mapCamera.position:null;
+      var p=(typeof walkPlayer!=='undefined'&&walkPlayer)?walkPlayer:null;
+      return { on:espilZoomFpv.on, blend:Math.round(espilZoomFpv.blend*1000)/1000,
+        push:Math.round(espilZoomFpv.push*100)/100, applied:espilZoomFpv.applied,
+        interiorFpv:espilKbFpvActive(),
+        camPos:cam?{x:Math.round(cam.x*100)/100,y:Math.round(cam.y*100)/100,z:Math.round(cam.z*100)/100}:null,
+        avatarVisible:(p&&p.av&&p.av.group)?!!p.av.group.visible:null,
+        shadowVisible:(p&&p.av&&p.av.shadow)?!!p.av.shadow.visible:null,
+        zoomT:(typeof espilP1!=='undefined'&&espilP1)?espilP1.zoomT:null,
+        walkCamDist:(typeof walkCamDist==='number')?Math.round(walkCamDist*100)/100:null };
     };
     function espilEnterInside(rec){
       var p=walkPlayer; if(!p||!rec)return;
@@ -12263,11 +12662,37 @@
          distance behaviour is unchanged. */
       if(ESPIL_P1&&typeof espilP1!=='undefined'&&espilP1&&espilP1.map&&espilP1.ready&&!espilP1.failed){
         if(espilP1.zoomT===null)espilP1.zoomT=19.95;
-        espilP1.zoomT=Math.max(16,Math.min(23,espilP1.zoomT-d*0.28));
+        /* ZOOM-FPV push (Han 2026-11-17): the part of a zoom-in
+           input the 23 cap absorbs is banked as push (in notch
+           units - overshoot zoom / 0.28); a zoom-out input bleeds
+           the bank back, signed. Wheel and pinch both land here,
+           so both surfaces feed the same accumulator. While the
+           zoom-FPV is on, further zoom-in is ignored (the bank
+           stays 0 from the engage reset) and one net notch out
+           counts to the release at push <= -1.0. The bank is
+           capped at +/-2.0 so a trackpad burst cannot bury the
+           release. The zoomT clamp itself is unchanged. */
+        var _ztWanted=espilP1.zoomT-d*0.28;
+        if(typeof espilZoomFpv!=='undefined'&&espilZoomFpv){
+          if(_ztWanted>23){ if(!espilZoomFpv.on)espilZoomFpv.push+=(_ztWanted-23)/0.28; }
+          else if(d>0&&(espilZoomFpv.on||espilZoomFpv.push>0)){ espilZoomFpv.push-=d; }
+          espilZoomFpv.push=Math.max(-2,Math.min(2,espilZoomFpv.push));
+        }
+        espilP1.zoomT=Math.max(16,Math.min(23,_ztWanted));
         espilP1.zoomDrive=true; /* a wheel during descent takes the zoom over from the envelope */
         return;
       }
-      walkCamDist=Math.max(window.__espilInside?0.4:1.8,Math.min(16,walkCamDist+d)); /* floor 1.8 (was 3) since 2026-11-08 so the default (7.0 since the 2026-11-10 zoom-out) sits inside the wheel range; the inside-store 0.4 floor is unchanged */
+      /* ZOOM-FPV push, fallback branch (Han 2026-11-17): the same
+         accounting in metres (the legacy d IS metres) against the
+         outdoor floor 1.8. Inside (floor 0.4) nothing is banked -
+         an interior is already first-person. */
+      var _wdFloor=window.__espilInside?0.4:1.8, _wdWanted=walkCamDist+d;
+      if(typeof espilZoomFpv!=='undefined'&&espilZoomFpv&&!window.__espilInside){
+        if(_wdWanted<_wdFloor){ if(!espilZoomFpv.on)espilZoomFpv.push+=(_wdFloor-_wdWanted); }
+        else if(d>0&&(espilZoomFpv.on||espilZoomFpv.push>0)){ espilZoomFpv.push-=d; }
+        espilZoomFpv.push=Math.max(-2,Math.min(2,espilZoomFpv.push));
+      }
+      walkCamDist=Math.max(_wdFloor,Math.min(16,_wdWanted)); /* floor 1.8 (was 3) since 2026-11-08 so the default (7.0 since the 2026-11-10 zoom-out) sits inside the wheel range; the inside-store 0.4 floor is unchanged */
     }
     /* Keyboard: tracked only while the map is open (globe keeps its own bindings). */
     document.addEventListener('keydown',function(e){
@@ -12620,6 +13045,7 @@
       var p=walkPlayer;
       if(!p)return;
       espilCamClampUpdate(dt); /* Batch 5 item 8: occlusion-capped camera distance for this frame */
+      espilZoomFpvTick(dt); /* ZOOM-FPV (Han 2026-11-17): the state machine runs before EVERY camera path in this function, the flight branch included - its force-off for flight/driving/interior can only bite if it runs before those branches take the frame (the home is deliberately NOT a force-off - Han Q1 = ALLOW, 2026-11-17) */
       /* Fly/ride mode (Batch G): the flight update owns movement;
          the follow camera below uses the ground tail's own math (the
          updateWalkCamera this branch used to call never existed). */
@@ -12872,11 +13298,46 @@
              the original floor returns unchanged. */
           want.y=p.pos.y+sp*espilCamDEff*.38-.38+Math.sin(espilWater.t*.85)*.22;
           if(want.y<-1.1)want.y=-1.1;
+          /* ZOOM-FPV (Han 2026-11-17): zoom-FPV HOLDS in water -
+             the surface dip is reverted in proportion to blend,
+             so at blend 1 the eye (pos + 1.6, above the surface)
+             wins outright and the submersion tint stays off, the
+             honest read of a head-above-water first person. */
+          if(espilZoomFpv.blend>0){
+            var _zwY=p.pos.y+sp*espilCamDEff+1.2; if(_zwY<1.4)_zwY=1.4;
+            want.y+=(_zwY-want.y)*espilZoomFpv.blend;
+          }
         }
         else if(want.y<1.4)want.y=1.4;
         var k=Math.min(1,dt*7);
         mapCamera.position.lerp(want,k);
-        mapCamera.lookAt(p.pos.x,p.pos.y+1.7,p.pos.z);
+        /* ZOOM-FPV (Han 2026-11-17): with blend > 0 the tracked
+           camera is blended to the player's own eye - position
+           toward the eye point (pos + ESPIL_KB_EYE), look target
+           from the third-person point (pos + 1.7) toward the FPV
+           forward point (the interior branch's own formula, so at
+           blend 1 the framing coincides with the interior's
+           numerically). The interior branch above is byte-untouched
+           and this branch is reached only when it is off.
+           HIT STOP interplay (hit-feel batch, 2026-11-17): a world
+           hit stop hands this function dt = 0. The position step is
+           then skipped outright (the tracking lerp above already
+           moves nothing at k = 0), so the camera freezes
+           mid-blend; the blend value itself is frozen by the state
+           machine, and on release the blend resumes from the same
+           value - the first resumed frame is an ordinary blend
+           frame, never a catch-up jump. The look target below is
+           recomputed from the same frozen inputs, so it holds
+           still through the stop as well. */
+        var _zTgt=new THREE.Vector3(p.pos.x,p.pos.y+1.7,p.pos.z);
+        if(espilZoomFpv.blend>0){
+          var zEye=new THREE.Vector3(p.pos.x,p.pos.y+ESPIL_KB_EYE,p.pos.z);
+          var zLp=Math.max(-1.2,Math.min(1.2,.84-walkCamPitch)), zCp=Math.cos(zLp);
+          var zFwd=new THREE.Vector3(zEye.x-Math.sin(walkCamYaw)*zCp, zEye.y+Math.sin(zLp), zEye.z-Math.cos(walkCamYaw)*zCp);
+          if(dt>0)mapCamera.position.lerp(zEye,espilZoomFpv.blend);
+          _zTgt.lerp(zFwd,espilZoomFpv.blend);
+        }
+        mapCamera.lookAt(_zTgt);
       }
       espilWaterFxTick(dt); /* WATER-ENTRY FEEL: pools, tint, muffle, shake */
       if(typeof espilOwnerChipTick==='function')espilOwnerChipTick(false);

@@ -24,7 +24,14 @@
       OR when the child window handle polls closed, whichever first.
       The player never entered the in-world interior (the click was
       intercepted first), so resume restores the exact pre-entry
-      state: nothing to roll back but the pause flag and the overlay. */
+      state: nothing to roll back but the pause flag and the overlay.
+
+   PLACE EXPANSION (Han 2026-11-17): the same contract now carries
+   every building that owns its address slug - the monolith's
+   espilEnterBuilding resolves the panel record through this
+   module's tryPlace() and the building's own place space opens in
+   the popup (the PLACE EXPANSION block below). The Konbiniya
+   interception above is unchanged. */
 (function () {
   'use strict';
   if (window.__espilStorePageLink) return;
@@ -44,6 +51,114 @@
     var base = window.__espilStorePageBase || '/vancouver/';
     return base + store.slug + (PLACE_SPACE_DEST ? '/' : '/sample.html');
   }
+
+  /* ===== PLACE EXPANSION (Han 2026-11-17): every enterable
+     building opens its OWN place space at its own address =====
+     The Konbiniya above stays the special case it already was
+     (its sample.html revert target exists). Every OTHER building
+     is resolved against the game's own baked places dataset -
+     the same file the Worker answers from, fetched once per
+     session into memory only (nothing is stored; the dataset is
+     the source, answers are still composed by the API inside the
+     space). A building resolves only when its address produces a
+     slug AND that slug is the building's own: the Worker index
+     answers the FIRST record of a shared slug, so a building
+     shadowed by an earlier record with the same address string,
+     and a building with no address at all, do NOT resolve here -
+     presenting another building's space as theirs would be a
+     false answer. Those buildings keep the pair's routed
+     interior until the address-grammar question is decided
+     (the design remainder, place-expansion/AUDIT.md (a)).
+     PLACE_ALL_DEST is the expansion's revert switch, beside
+     PLACE_SPACE_DEST: OFF restores today's entry behaviour
+     exactly (Konbiniya popup + routed interiors). */
+  var PLACE_ALL_DEST = true;
+  var placeData = null;          /* {records, firstIdx} once ready */
+  var placeDataState = 'idle';   /* idle | loading | ready | absent */
+  function placeCityKey() {
+    try { return window.__espilCityKey || 'vancouver'; }
+    catch (e) { return 'vancouver'; }
+  }
+  /* The slug rule - the Worker's twin (placeSlugOf): lowercase,
+     fold every run of non-alphanumerics to one '-', trim '-'. */
+  function placeSlugOf(addr) {
+    if (typeof addr !== 'string') return null;
+    var s = addr.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return s || null;
+  }
+  function loadPlaceData() {
+    if (placeDataState === 'loading' || placeDataState === 'ready') return;
+    placeDataState = 'loading';
+    fetch('assets/osm/' + placeCityKey() + '_places.json')
+      .then(function (r) { if (!r.ok) throw new Error('no bake'); return r.json(); })
+      .then(function (doc) {
+        var recs = (doc && Array.isArray(doc.b)) ? doc.b : [];
+        var firstIdx = {};
+        for (var i = 0; i < recs.length; i++) {
+          var s = placeSlugOf(recs[i] && recs[i][5]);
+          if (s && !(s in firstIdx)) firstIdx[s] = i;
+        }
+        placeData = { records: recs, firstIdx: firstIdx };
+        placeDataState = 'ready';
+      })
+      .catch(function () { placeDataState = 'absent'; });
+  }
+  /* The record match - modules/baked-places.js's scoring, run
+     over the raw records: an AABB fingerprint when the caller
+     knows the footprint size, else the record the point sits
+     deepest in, else the nearest centre within 15 m. */
+  function matchPlaceRecord(pt) {
+    if (!placeData) return null;
+    var recs = placeData.records, best = null, bestScore = 1e9;
+    for (var i = 0; i < recs.length; i++) {
+      var rec = recs[i]; if (!rec) continue;
+      var dx = pt.x - rec[0], dz = pt.z - rec[1];
+      var dist = Math.sqrt(dx * dx + dz * dz);
+      var score = -1;
+      if (pt.w && pt.d && Math.abs(dx) <= 3 && Math.abs(dz) <= 3 &&
+          Math.abs(pt.w - rec[2]) <= 5 && Math.abs(pt.d - rec[3]) <= 5) {
+        score = dist;                    /* AABB fingerprint */
+      } else if (Math.abs(dx) <= rec[2] / 2 + 3 && Math.abs(dz) <= rec[3] / 2 + 3) {
+        var mx = rec[2] / 2 + 3 - Math.abs(dx);
+        var mz = rec[3] / 2 + 3 - Math.abs(dz);
+        score = 100 - Math.min(mx, mz) + dist * 0.001;
+      } else if (dist <= 15) {
+        score = 200 + dist;              /* nearest centre */
+      }
+      if (score >= 0 && score < bestScore) { bestScore = score; best = rec; }
+    }
+    return best;
+  }
+  /* Resolve a street point (a panel record's centre / AABB, or a
+     facing wall point) to a place: {slug, name} when the building
+     owns its slug, null when it honestly has none, 'pending'
+     while the dataset is still loading. */
+  function resolvePlace(pt) {
+    if (!PLACE_ALL_DEST || !PLACE_SPACE_DEST) return null;
+    if (!pt || typeof pt.x !== 'number' || typeof pt.z !== 'number') return null;
+    if (placeDataState === 'idle') { loadPlaceData(); return 'pending'; }
+    if (placeDataState === 'loading') return 'pending';
+    if (placeDataState !== 'ready') return null;
+    var rec = matchPlaceRecord(pt);
+    if (!rec) return null;
+    var slug = placeSlugOf(rec[5]);
+    if (!slug) return null;                          /* no address */
+    if (placeData.firstIdx[slug] !== placeData.records.indexOf(rec)) return null;
+    return { slug: slug, name: rec[4] || rec[5] || slug };
+  }
+  function openPlace(place) {
+    return openStore({ slug: place.slug, name: place.name });
+  }
+  /* Warm the dataset the moment a building panel opens, so the
+     Enter press that follows resolves synchronously. */
+  (function watchPanel() {
+    var panel = document.getElementById('bldg-panel');
+    if (!panel) { setTimeout(watchPanel, 1000); return; }
+    if (!window.MutationObserver) return;
+    new MutationObserver(function () {
+      if (panel.classList.contains('open')) loadPlaceData();
+    }).observe(panel, { attributes: true, attributeFilter: ['class'] });
+  })();
 
   /* ---------------- pause core: hold rAF while paused ---------------- */
   var origRAF = window.requestAnimationFrame.bind(window);
@@ -143,10 +258,17 @@
     try { rec = window.__espilFacingBuilding ? window.__espilFacingBuilding() : null; } catch (err) {}
     var nameEl = document.getElementById('bldg-name');
     var store = matchStore(rec, nameEl ? nameEl.textContent : '');
-    if (!store) return;                       /* not a store building: let the pair enter as usual */
+    if (!store) return;                       /* not the Konbiniya: let the pair enter as usual */
     e.preventDefault(); e.stopImmediatePropagation();
     openStore(store);
   }, true);
+  /* PLACE EXPANSION note: non-Konbiniya buildings are deliberately
+     NOT intercepted here. The pair's own Enter handler
+     (espilEnterBuilding, for the button and the keyboard alike)
+     owns their routing and resolves the PANEL record - the
+     authoritative building - through tryPlace below; a click
+     interception would have to resolve the FACING record instead,
+     which can be a different building than the panel's. */
 
   window.__espilStorePageLink = {
     open: function (slug) {
@@ -159,9 +281,24 @@
       if (s) { openStore(s); return true; }
       return false;
     },
+    /* PLACE EXPANSION: resolve + open a non-Konbiniya building's
+       own place space. Returns true when the space opened, false
+       when the building honestly has no place of its own (the
+       caller then keeps the routed interior), 'pending' while
+       the dataset is still loading (the caller polls, on the
+       Konbiniya seam's pattern). */
+    tryPlace: function (pt) {
+      var place = resolvePlace(pt);
+      if (place === 'pending') return 'pending';
+      if (!place) return false;
+      openPlace(place);   /* an already-open child is focused, a blocked popup toasts - either way the press is the place's */
+      return true;
+    },
+    resolvePlace: function (pt) { return resolvePlace(pt); },
     resume: function () { resume('api'); },
     state: function () {
-      return { paused: paused, heldCallbacks: held.size, childOpen: !!(childWin && !childWin.closed), acked: acked, store: activeStore ? activeStore.slug : null };
+      return { paused: paused, heldCallbacks: held.size, childOpen: !!(childWin && !childWin.closed), acked: acked, store: activeStore ? activeStore.slug : null,
+               placeAll: PLACE_ALL_DEST, placeData: placeDataState };
     }
   };
 })();

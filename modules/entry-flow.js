@@ -662,11 +662,21 @@
     var about = el('div', 'espil-about-panel', 'espil-flow-view');
     about.setAttribute('role', 'dialog');
     about.setAttribute('aria-label', 'About Espil Online');
+    /* Data sources (Han 2026-11-17): the About panel states the
+       real-world data stack this replica is composed from. */
     about.innerHTML =
       '<div class="espil-flow-title">About Espil Online</div>' +
       '<p class="espil-flow-copy">Espil Online is a digital replica of this world, based on the real world in real time - ' +
       'the sky, the weather and the alignment of the stars move with the real world. Vancouver is the first city; ' +
       'the destination is a map of the whole world, with the city chosen by where you are.</p>' +
+      '<p class="espil-flow-copy">데이터 출처 - 이 세계는 실제 세계의 데이터를 실시간으로 조합해 만들어집니다.<br>' +
+      'Mapbox - 지도<br>' +
+      'TomTom - 실시간 교통<br>' +
+      'Open-Meteo - 날씨<br>' +
+      'TransLink - 대중교통<br>' +
+      'Overture Maps + OpenStreetMap - 장소 데이터 (사전 구축)<br>' +
+      'Nominatim - 장소 검색<br>' +
+      'Overpass - 보조 조회</p>' +
       '<div class="espil-flow-reel">' +
       flowItem('espil-about-back', 'Back', false) +
       '</div>';
@@ -1154,7 +1164,13 @@
     var goGuest = document.getElementById('auth-go-guest');
     if (goLogin) goLogin.addEventListener('click', function () { presentAuthStep('login'); });
     if (goSignup) goSignup.addEventListener('click', function () { presentAuthStep('signup'); });
-    if (goGuest) goGuest.addEventListener('click', function () { presentAuthStep('guest'); });
+    if (goGuest) goGuest.addEventListener('click', function () {
+      /* Returning guest (Han 2026-11-17): a saved character AND
+         name on this device enter directly - the guest step is
+         the first-run completion path, not a per-visit form. */
+      if (espilReturningGuestEnter()) return;
+      presentAuthStep('guest');
+    });
     var toBack = document.getElementById('auth-toback');
     if (toBack) toBack.addEventListener('click', function () { presentAuthStep('choice'); });
     var guestBack = document.getElementById('guest-back');
@@ -1179,6 +1195,32 @@
         if (msg) msg.textContent = (pn === 'apple' ? 'Apple' : 'Facebook') + ' sign-in is not available yet.';
       }
     }, true);
+    /* Returning guest fast path (Han 2026-11-17): the records
+       guestGo itself writes - espil_username (the name) and
+       espil_character (gender + style) - are the guest's saved
+       character and name. When both stand complete on this
+       device, the Guest entry re-issues this tab's named stamp
+       (the game page's name-once pass keys off it, exactly as
+       after a form submit) and drives the EXISTING #guest-enter
+       path, so the park + step completion semantics stay
+       identical. The character record is NOT rewritten here:
+       the form's wholesale overwrite dropped the record's
+       other fields and could flip a returning guest's saved
+       gender to the form's male default on a click-through. */
+    function espilReturningGuestEnter() {
+      var name = '', rec = null;
+      try { name = (localStorage.getItem('espil_username') || '').trim(); } catch (e) {}
+      try { rec = JSON.parse(localStorage.getItem('espil_character') || 'null'); } catch (e) {}
+      if (!name) return false;
+      if (!rec || (rec.gender !== 'male' && rec.gender !== 'female')) return false;
+      var bc = rec.bodyChoice;
+      if (bc != null && bc !== '' && !/^style[1-4]$/.test(bc)) return false;
+      try { sessionStorage.setItem('espil_guest_named_v1', name); } catch (e) {}
+      var ge = document.getElementById('guest-enter');
+      if (!ge) return false;
+      ge.click();
+      return true;
+    }
     /* Guest step: name (session-local only) + character choice.
        The reserved list mirrors the Worker's account-name rule as
        a display sanity; nothing here writes to any account store. */

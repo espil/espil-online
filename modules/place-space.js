@@ -213,9 +213,31 @@
   window.addEventListener('resize', function () { if (state.book.open) renderBook(); });
 
   /* ---------------- geometry (the building's own record) -------- */
+  /* PLACE EXPANSION (Han 2026-11-17): the address catch-all means
+     a well-formed but unknown slug also lands in this module. If
+     NEITHER the game's baked data nor the API knows the slug,
+     there is no building to summon anyone into: clear the mark
+     and return to the city page as a plain street visit, instead
+     of stranding the visitor in a spaceless child session (the
+     mark would otherwise hold the window in the place-child
+     allowlist with no space and no door). A KNOWN building whose
+     API is merely unreachable never bails: its geometry resolves
+     from the bake and the retry board shows, exactly as before.
+     A known building missing from a stale bake still enters on
+     the API's geometry. */
+  var bakeChecked = false;
+  var bailedOut = false;
+  function maybeBailUnknown() {
+    if (bailedOut || state.entered) return;
+    if (state.api !== 'error' || !bakeChecked || state.geom) return;
+    bailedOut = true;
+    try { sessionStorage.removeItem('espil_store_space_v1'); } catch (e) {}
+    location.replace('/' + CITY + '.html');
+  }
   function resolveGeomFromBake() {
     fetch('assets/osm/' + CITY + '_places.json').then(function (r) { return r.ok ? r.json() : null; }).then(function (doc) {
-      if (state.geom || !doc || !Array.isArray(doc.b)) return;
+      bakeChecked = true;
+      if (state.geom || !doc || !Array.isArray(doc.b)) { maybeBailUnknown(); return; }
       for (var i = 0; i < doc.b.length; i++) {
         var rec = doc.b[i];
         if (rec && slugOf(rec[5]) === SLUG) {
@@ -224,7 +246,8 @@
           return;
         }
       }
-    }).catch(function () {});
+      maybeBailUnknown();
+    }).catch(function () { bakeChecked = true; maybeBailUnknown(); });
   }
 
   /* ---------------- the API (the only store/goods source) -------- */
@@ -244,6 +267,7 @@
       buildBays(); paintBoard();
     }, function () {
       state.api = 'error'; paintBoard();
+      maybeBailUnknown();   /* PLACE EXPANSION: an unknown slug bails to the street (see resolveGeomFromBake) */
     });
   }
   function loadItems(store, done) {
