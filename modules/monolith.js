@@ -3390,6 +3390,85 @@
       }catch(e){}
       espilP1HideStyle3D();
     }
+    /* ==== NIGHT GLOW (Mapbox layer paint) - BEGIN ====
+       Building-glow revival (COO-delegated decision 2026-11-18;
+       design: daynight/GLOW-DESIGN.md). The original glow
+       (time-of-day.js) lerps THREE wall-material emissive toward
+       amber 0xffb45e by the night factor - but the field's buildings
+       are THIS Mapbox fill-extrusion layer, not THREE walls, so the
+       collector finds 0 materials outdoors and the glow is dead in
+       the field (diagnosis 2026-11-17). This block applies the same
+       visual law to the surface the buildings are actually drawn
+       on: the 'espil-buildings-3d' paint (and its dither twin's
+       colour, so an occluding building stipples in the same tone).
+       Driver: window.__espilNightState().factor ONLY - the existing
+       day/night state (hemisphere-derived, forced to 0 indoors,
+       driven by __espilNightForce). No second clock, no new state.
+       Day: at f=0 the colour is the literal creation value
+       '#c9c4bb' and the pattern is removed, so the day appearance
+       is exactly the pre-glow one. Cost: one 1 s interval; paint
+       writes only on a >=0.02 factor move, a map/layer identity
+       change (style reload self-heal), or a pattern flip - zero
+       paint writes and zero per-frame work at day steady state.
+       The hv height law (espilP1PaintApply), the dither filters
+       (espilDitherLayerTick) and espilP1Hide are untouched. */
+    var ESPIL_NIGHTGLOW_DAY='#c9c4bb', ESPIL_NIGHTGLOW_MIX=0.6;
+    var ESPIL_NIGHTGLOW_PAT_ON=0.45, ESPIL_NIGHTGLOW_PAT_OFF=0.30;
+    var espilNightGlow={f:-1,color:null,pattern:false,applies:0,map:null,layer:null,dLayer:null,imgDone:false};
+    function espilNightGlowColor(f){
+      var t=f*ESPIL_NIGHTGLOW_MIX;
+      if(t<=0)return ESPIL_NIGHTGLOW_DAY;
+      var r=Math.round(0xc9+(0xff-0xc9)*t), g=Math.round(0xc4+(0xb4-0xc4)*t), b=Math.round(0xbb+(0x5e-0xbb)*t);
+      return 'rgb('+r+','+g+','+b+')';
+    }
+    function espilNightGlowEnsureImage(map){
+      var G=espilNightGlow;
+      if(G.imgDone)return;
+      G.imgDone=true; /* one attempt ever; a failed image leaves the colour law alone */
+      try{
+        if(map.hasImage('espil-night-windows'))return;
+        var cv=document.createElement('canvas'); cv.width=cv.height=96;
+        var cx2=cv.getContext('2d');
+        cx2.fillStyle='rgb(84,84,88)'; cx2.fillRect(0,0,96,96); /* facade: paint colour darkened to ~33% */
+        /* Deterministic lit pattern: of each 4x4 window cells, 9 lit
+           (white = full paint colour), 3 dim, 4 dark (facade). */
+        var lit=[1,1,0,1, 0,1,1,2, 1,0,1,1, 2,1,0,1];
+        for(var gy=0;gy<4;gy++)for(var gx=0;gx<4;gx++){
+          var v=lit[gy*4+gx]; if(!v)continue;
+          cx2.fillStyle=v===1?'rgb(255,255,255)':'rgb(120,120,118)';
+          cx2.fillRect(gx*24+5,gy*24+6,14,10);
+        }
+        map.addImage('espil-night-windows',cx2.getImageData(0,0,96,96));
+      }catch(e){}
+    }
+    function espilNightGlowTick(){
+      var st=null;
+      try{ st=window.__espilNightState?window.__espilNightState():null; }catch(e){}
+      if(!st||typeof st.factor!=='number')return;
+      var f=st.factor; if(f<0)f=0; if(f>1)f=1;
+      var map=null;
+      try{ map=(typeof espilP1!=='undefined'&&espilP1)?espilP1.map:null; }catch(e){}
+      if(!map)return;
+      var layer=null, dLayer=null;
+      try{ layer=map.getLayer('espil-buildings-3d'); dLayer=map.getLayer('espil-buildings-dither'); }catch(e){}
+      if(!layer)return;
+      var G=espilNightGlow;
+      var wantPat=G.pattern?(f>ESPIL_NIGHTGLOW_PAT_OFF):(f>=ESPIL_NIGHTGLOW_PAT_ON);
+      var color=espilNightGlowColor(f);
+      if(map===G.map&&layer===G.layer&&dLayer===G.dLayer&&Math.abs(f-G.f)<0.02&&wantPat===G.pattern&&color===G.color)return;
+      try{
+        map.setPaintProperty('espil-buildings-3d','fill-extrusion-color',color);
+        if(dLayer)map.setPaintProperty('espil-buildings-dither','fill-extrusion-color',color);
+        if(wantPat!==G.pattern){
+          if(wantPat){ espilNightGlowEnsureImage(map); map.setPaintProperty('espil-buildings-3d','fill-extrusion-pattern','espil-night-windows'); }
+          else map.setPaintProperty('espil-buildings-3d','fill-extrusion-pattern',null);
+        }
+        G.f=f; G.color=color; G.pattern=wantPat; G.map=map; G.layer=layer; G.dLayer=dLayer; G.applies++;
+      }catch(e){}
+    }
+    window.__espilNightGlowState=function(){ var G=espilNightGlow; return {f:G.f,color:G.color,pattern:G.pattern,applies:G.applies}; };
+    setInterval(espilNightGlowTick,1000);
+    /* ==== NIGHT GLOW (Mapbox layer paint) - END ==== */
     /* ============ CUSTOM-LAYER INTEGRATION (CarInMap method, Han
        2026-10-17) ============
        The game scene renders INSIDE the map's own WebGL context as a
