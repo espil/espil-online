@@ -45,6 +45,25 @@
    Phase B move of that body into __espilDealDamage's monster
    delegate unchanged. An evaded hit gains NONE of it (a whiff is
    not a hit): no squash, no slide, no sparks, no stop.
+   BACK VIEW (Han 2026-11-17): the walk cycle is DIRECTIONAL.
+   The delivered walk_back / walk_left / walk_right sets are wired
+   (KINDS frames walkBack / walkLeft / walkRight), and the group
+   presented is chosen by the quadrant of the signed angle between
+   the monster's HEADING and the monster->player direction: front
+   near 0, back near PI, the monster's own left/right sides in
+   between, with DIR_HYST radians of hysteresis on the quadrant
+   boundaries so a boundary orbit does not flicker groups. The
+   heading is the movement facing the tick already tracks in
+   m.faceY: it turns toward the step direction while the monster
+   displaces, a stationary monster keeps its last heading, the
+   knockback slide never writes it, and a chasing monster's
+   heading is its target - so approaching a wandering monster
+   from behind shows its back, and a monster charging the player
+   shows its front. The FIX-7 plane law is unchanged (the upright
+   plane still yaws to the player; only the frame GROUP is
+   directional). Directional sets exist ONLY for walk - idle /
+   aggro / attack / hit / stun / death were delivered frontal-only
+   and keep today's presentation.
    Death dispatches espil-guide {type:'monster-drop', kind, grade,
    parts:[...], items:[{name, line, grade, count}]} - drops OPEN
    (Batch 6) on three separated lines for S5 crafting.
@@ -184,6 +203,12 @@
   var SPARK_LIFE = 0.3;                /* s */
   var SPARK_GRAV = 6;                  /* m/s^2 downward pull */
 
+  /* ---- Direction (BACK VIEW, Han 2026-11-17) ----
+     Hysteresis on the walk-direction quadrant boundaries: the
+     current group holds until the heading->player angle leaves
+     its quadrant widened by this many radians on both sides. */
+  var DIR_HYST = 0.15;                 /* rad (~8.6 deg) */
+
   /* ---- Grades: Zealandia 8-colour ladder ---- */
   var GRADE_COLOUR = {
     white: 0xe8e8e8, yellow: 0xf2d54b, green: 0x58c96b, blue: 0x4f9cf2,
@@ -213,6 +238,9 @@
       sprite: { base: 'assets/monsters/rat-plushy/', fps: 8, w: 1.2, h: 1.1, frames: {
         idle: ['idle_1.webp','idle_2.webp','idle_3.webp','idle_4.webp'],
         walk: ['walk_front_1.webp','walk_front_2.webp','walk_front_3.webp','walk_front_4.webp'],
+        walkBack: ['walk_back_1.webp','walk_back_2.webp','walk_back_3.webp','walk_back_4.webp'],
+        walkLeft: ['walk_left_1.webp','walk_left_2.webp','walk_left_3.webp','walk_left_4.webp'],
+        walkRight: ['walk_right_1.webp','walk_right_2.webp','walk_right_3.webp','walk_right_4.webp'],
         aggro: ['aggro_1.webp','aggro_2.webp','aggro_3.webp','aggro_4.webp'],
         attack: ['attack_1.webp','attack_2.webp','attack_3.webp','attack_4.webp'],
         hit: ['hit_1.webp','hit_2.webp','hit_3.webp','hit_4.webp'],
@@ -224,6 +252,9 @@
       sprite: { base: 'assets/monsters/stray-plushy/', fps: 8, w: 1.05, h: 1.1, frames: {
         idle: ['idle_1.webp','idle_2.webp','idle_3.webp','idle_4.webp'],
         walk: ['walk_front_1.webp','walk_front_2.webp','walk_front_3.webp','walk_front_4.webp'],
+        walkBack: ['walk_back_1.webp','walk_back_2.webp','walk_back_3.webp','walk_back_4.webp'],
+        walkLeft: ['walk_left_1.webp','walk_left_2.webp','walk_left_3.webp','walk_left_4.webp','walk_left_5.webp','walk_left_6.webp'],
+        walkRight: ['walk_right_1.webp','walk_right_2.webp','walk_right_3.webp','walk_right_4.webp','walk_right_5.webp','walk_right_6.webp'],
         aggro: ['aggro_1.webp','aggro_2.webp','aggro_3.webp','aggro_4.webp'],
         attack: ['attack_1.webp','attack_2.webp','attack_3.webp','attack_4.webp'],
         hit: ['hit_1.webp','hit_2.webp','hit_3.webp','hit_4.webp'],
@@ -235,6 +266,9 @@
       sprite: { base: 'assets/monsters/shambler-plushy/', fps: 8, w: 1.96, h: 2.1, frames: {
         idle: ['idle_1.webp','idle_2.webp','idle_3.webp','idle_4.webp','idle_5.webp','idle_6.webp'],
         walk: ['walk_front_1.webp','walk_front_2.webp','walk_front_3.webp','walk_front_4.webp','walk_front_5.webp','walk_front_6.webp'],
+        walkBack: ['walk_back_1.webp','walk_back_2.webp','walk_back_3.webp','walk_back_4.webp','walk_back_5.webp','walk_back_6.webp'],
+        walkLeft: ['walk_left_1.webp','walk_left_2.webp','walk_left_3.webp','walk_left_4.webp','walk_left_5.webp','walk_left_6.webp','walk_left_7.webp'],
+        walkRight: ['walk_right_1.webp','walk_right_2.webp','walk_right_3.webp','walk_right_4.webp','walk_right_5.webp','walk_right_6.webp','walk_right_7.webp'],
         aggro: ['aggro_1.webp','aggro_2.webp','aggro_3.webp','aggro_4.webp','aggro_5.webp','aggro_6.webp'],
         attack: ['attack_1.webp','attack_2.webp','attack_3.webp','attack_4.webp','attack_5.webp','attack_6.webp'],
         hit: ['hit_1.webp','hit_2.webp','hit_3.webp','hit_4.webp','hit_5.webp'],
@@ -246,6 +280,9 @@
       sprite: { base: 'assets/monsters/brute-plushy/', fps: 6, w: 3.25, h: 2.7, frames: {
         idle: ['idle_1.webp','idle_2.webp','idle_3.webp','idle_4.webp','idle_5.webp'],
         walk: ['walk_front_1.webp','walk_front_2.webp','walk_front_3.webp','walk_front_4.webp','walk_front_5.webp','walk_front_6.webp'],
+        walkBack: ['walk_back_1.webp','walk_back_2.webp','walk_back_3.webp','walk_back_4.webp','walk_back_5.webp','walk_back_6.webp'],
+        walkLeft: ['walk_left_1.webp','walk_left_2.webp','walk_left_3.webp','walk_left_4.webp','walk_left_5.webp','walk_left_6.webp','walk_left_7.webp','walk_left_8.webp','walk_left_9.webp','walk_left_10.webp','walk_left_11.webp'],
+        walkRight: ['walk_right_1.webp','walk_right_2.webp','walk_right_3.webp','walk_right_4.webp','walk_right_5.webp','walk_right_6.webp','walk_right_7.webp','walk_right_8.webp','walk_right_9.webp','walk_right_10.webp','walk_right_11.webp'],
         aggro: ['aggro_1.webp','aggro_2.webp','aggro_3.webp','aggro_4.webp'],
         attack: ['attack_1.webp','attack_2.webp','attack_3.webp','attack_4.webp'],
         hit: ['hit_1.webp','hit_2.webp','hit_3.webp','hit_4.webp'],
@@ -257,6 +294,9 @@
       sprite: { base: 'assets/monsters/wraith-plushy/', fps: 8, w: 1.96, h: 2.1, frames: {
         idle: ['idle_1.webp','idle_2.webp','idle_3.webp','idle_4.webp','idle_5.webp','idle_6.webp'],
         walk: ['walk_front_1.webp','walk_front_2.webp','walk_front_3.webp','walk_front_4.webp','walk_front_5.webp','walk_front_6.webp'],
+        walkBack: ['walk_back_1.webp','walk_back_2.webp','walk_back_3.webp','walk_back_4.webp','walk_back_5.webp','walk_back_6.webp'],
+        walkLeft: ['walk_left_1.webp','walk_left_2.webp','walk_left_3.webp','walk_left_4.webp','walk_left_5.webp','walk_left_6.webp','walk_left_7.webp'],
+        walkRight: ['walk_right_1.webp','walk_right_2.webp','walk_right_3.webp','walk_right_4.webp','walk_right_5.webp','walk_right_6.webp','walk_right_7.webp'],
         aggro: ['aggro_1.webp','aggro_2.webp','aggro_3.webp','aggro_4.webp','aggro_5.webp','aggro_6.webp'],
         attack: ['attack_1.webp','attack_2.webp','attack_3.webp','attack_4.webp','attack_5.webp','attack_6.webp'],
         hit: ['hit_1.webp','hit_2.webp','hit_3.webp','hit_4.webp','hit_5.webp'],
@@ -268,6 +308,9 @@
       sprite: { base: 'assets/monsters/hound-plushy/', fps: 8, w: 1.2, h: 1.1, frames: {
         idle: ['idle_1.webp','idle_2.webp','idle_3.webp','idle_4.webp'],
         walk: ['walk_front_1.webp','walk_front_2.webp','walk_front_3.webp','walk_front_4.webp'],
+        walkBack: ['walk_back_1.webp','walk_back_2.webp','walk_back_3.webp','walk_back_4.webp'],
+        walkLeft: ['walk_left_1.webp','walk_left_2.webp','walk_left_3.webp','walk_left_4.webp'],
+        walkRight: ['walk_right_1.webp','walk_right_2.webp','walk_right_3.webp','walk_right_4.webp'],
         aggro: ['aggro_1.webp','aggro_2.webp','aggro_3.webp','aggro_4.webp'],
         attack: ['attack_1.webp','attack_2.webp','attack_3.webp','attack_4.webp'],
         hit: ['hit_1.webp','hit_2.webp','hit_3.webp','hit_4.webp'],
@@ -279,6 +322,9 @@
       sprite: { base: 'assets/monsters/titan-plushy/', fps: 6, w: 3.25, h: 2.7, frames: {
         idle: ['idle_1.webp','idle_2.webp','idle_3.webp','idle_4.webp','idle_5.webp'],
         walk: ['walk_front_1.webp','walk_front_2.webp','walk_front_3.webp','walk_front_4.webp','walk_front_5.webp','walk_front_6.webp'],
+        walkBack: ['walk_back_1.webp','walk_back_2.webp','walk_back_3.webp','walk_back_4.webp','walk_back_5.webp','walk_back_6.webp'],
+        walkLeft: ['walk_left_1.webp','walk_left_2.webp','walk_left_3.webp','walk_left_4.webp','walk_left_5.webp','walk_left_6.webp','walk_left_7.webp','walk_left_8.webp','walk_left_9.webp','walk_left_10.webp','walk_left_11.webp'],
+        walkRight: ['walk_right_1.webp','walk_right_2.webp','walk_right_3.webp','walk_right_4.webp','walk_right_5.webp','walk_right_6.webp','walk_right_7.webp','walk_right_8.webp','walk_right_9.webp','walk_right_10.webp','walk_right_11.webp'],
         aggro: ['aggro_1.webp','aggro_2.webp','aggro_3.webp','aggro_4.webp'],
         attack: ['attack_1.webp','attack_2.webp','attack_3.webp','attack_4.webp'],
         hit: ['hit_1.webp','hit_2.webp','hit_3.webp','hit_4.webp'],
@@ -383,9 +429,11 @@
      aspect matched to each canvas via sprite.w/h): rat = boar,
      stray = strayer, hound = boar elite, shambler = spitter,
      wraith = spitter elite, brute = brute, titan = brute elite.
-     The walk left/right/back frames are delivered and copied
-     but not in the billboard cycle (the sprite faces the camera;
-     the front set is the readable cycle). WISP HAS NO PLUSHY
+     The walk left/right/back frames are delivered and copied;
+     since the BACK VIEW wiring (Han 2026-11-17) they ARE in the
+     walk cycle, selected by heading-vs-player quadrant (the
+     sprite plane still faces the camera; the GROUP is what is
+     directional). WISP HAS NO PLUSHY
      COUNTERPART ANYWHERE - it is a documented GAP and keeps the
      shambler-class canvas placeholder, which does not properly
      cover it. Plushy canvases run 312-437 px, so at the final
@@ -420,8 +468,16 @@
     } catch (e) {}
     return kind.sprite || null;
   }
-  function spriteFrames(cfg, key) {
+  function spriteFrames(cfg, key, dir) {
     if (!cfg || !cfg.frames) return null;
+    /* BACK VIEW: the walk cycle is directional. A missing
+       directional set (an override map without one) falls back
+       to the front walk set - frames are never fabricated. */
+    if (key === 'walk' && dir && dir !== 'front') {
+      var dk = dir === 'back' ? 'walkBack' : (dir === 'left' ? 'walkLeft' : 'walkRight');
+      var df = cfg.frames[dk];
+      if (df && df.length) return df;
+    }
     var f = cfg.frames[key];
     if (f && f.length) return f;
     if (key === 'aggro') return cfg.frames.walk || cfg.frames.idle || null;
@@ -429,22 +485,67 @@
     if (key === 'hit' || key === 'stun' || key === 'death') return cfg.frames.idle || null;
     return cfg.frames.idle || null;
   }
+  /* ---- Direction (BACK VIEW): which walk group the player sees.
+     phi is the signed angle from the monster's heading to the
+     monster->player direction: |phi| ~ 0 the monster faces the
+     player (front), |phi| ~ PI it faces away (back), phi > 0 the
+     player stands on the monster's own left side. The current
+     group holds while phi stays inside its quadrant widened by
+     DIR_HYST on both sides (centre-distance form, wrap-safe);
+     outside, the nearest quadrant centre wins. The heading comes
+     from m.faceY, which stores the yaw of the BACK direction
+     (the tick integrates atan2 of the negated step vector), so
+     the heading vector is its negation. pp is the player pose -
+     the module's only viewpoint; the camera orbits the player,
+     so the player-relative quadrant is the presented one. */
+  var DIR_CENTRES = { front: 0, left: Math.PI / 2, back: Math.PI, right: -Math.PI / 2 };
+  function angDiff(a, b) {
+    var d = a - b;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    return d;
+  }
+  function dirGroupFor(m, pp) {
+    var cur = m.dirGroup || 'front';
+    if (!pp) return cur;
+    var dx = pp.x - m.x, dz = pp.z - m.z;
+    var dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist < 0.05) return cur;
+    var hx = -Math.sin(m.faceY), hz = -Math.cos(m.faceY);
+    var cx = dx / dist, cz = dz / dist;
+    var phi = Math.atan2(hz * cx - hx * cz, hx * cx + hz * cz);
+    if (Math.abs(angDiff(phi, DIR_CENTRES[cur])) < Math.PI / 4 + DIR_HYST) return cur;
+    var best = 'front', bd = 1e12;
+    for (var g in DIR_CENTRES) {
+      var d = Math.abs(angDiff(phi, DIR_CENTRES[g]));
+      if (d < bd) { bd = d; best = g; }
+    }
+    return best;
+  }
+
   /* advance the billboard's frame for the monster's current state.
      Falls back silently to whatever texture is already on the body
-     (the canvas placeholder) until a frame image has loaded. */
+     (the canvas placeholder) until a frame image has loaded. The
+     applied key carries the walk direction (walk@back etc.) so a
+     direction switch re-applies the texture even when the frame
+     index coincides; the state key itself stays the plain state
+     name, and the frame cycle phase-continues across a switch
+     (the index is taken modulo the new group's length). */
   function stepSprite(m, dt, key) {
     if (!m.sprite) return;
-    var frames = spriteFrames(m.sprite, key);
+    var dir = (key === 'walk') ? (m.dirGroup || 'front') : null;
+    var frames = spriteFrames(m.sprite, key, dir);
     if (!frames) return;
     var fps = m.sprite.fps || 6;
     if (m.frameKey !== key) { m.frameKey = key; m.frameT = 0; }
     m.frameT += dt;
     var idx = Math.floor(m.frameT * fps) % frames.length;
-    if (idx === m.frameIdx && m.frameKey === m.frameApplied) return;
+    var aKey = dir ? (key + '@' + dir) : key;
+    if (idx === m.frameIdx && aKey === m.frameApplied) return;
     var tex = frameTexture((m.sprite.base || '') + frames[idx]);
     if (tex && tex.image && tex.image.width) {
       if (m.body.material.map !== tex) m.body.material.map = tex;
-      m.frameIdx = idx; m.frameApplied = m.frameKey;
+      m.frameIdx = idx; m.frameApplied = aKey;
     }
   }
 
@@ -1006,7 +1107,8 @@
       speed: kind.speed, atkT: 0, flashT: 0, dieT: 0, fadeT: 0,
       wanderT: 0, tx: x, tz: z, stuckT: 0, anchorX: x, anchorZ: z,
       stuckClock: 0, phase: S.seq % 5, bob: Math.random() * Math.PI * 2,
-      sprite: spriteCfgFor(kind), frameT: 0, frameKey: '', frameApplied: '', frameIdx: -1
+      sprite: spriteCfgFor(kind), frameT: 0, frameKey: '', frameApplied: '', frameIdx: -1,
+      dirGroup: 'front'
     };
     if (m.sprite && m.sprite.frames) {
       /* warm the texture cache so the first frames do not pop in */
@@ -1217,7 +1319,12 @@
        attack group through the wind-up, walk while it moves, the
        aggro group while it chases on the spot, idle otherwise.
        Sets without a group fall back (attack -> aggro -> idle,
-       aggro -> walk -> idle), and single-frame groups simply hold. */
+       aggro -> walk -> idle), and single-frame groups simply hold.
+       BACK VIEW: the presented direction is refreshed every tick
+       (a player orbiting a stationary monster crosses quadrants
+       without the monster moving); only the walk group consumes
+       it, the other groups are frontal-only as delivered. */
+    m.dirGroup = dirGroupFor(m, pp);
     if (m.sprite) {
       var sKey = 'idle';
       if (m.flashT > 0) sKey = 'hit';
@@ -1583,6 +1690,8 @@
           kbRemain: m.kbActive ? Math.round((m.kbDist - m.kbApplied) * 1000) / 1000 : 0,
           sprite: m.sprite ? (m.sprite.base || 'kind') : null,
           frame: m.sprite ? (m.frameKey + ':' + m.frameIdx) : null,
+          dir: m.dirGroup || 'front',
+          faceY: Math.round(m.faceY * 1000) / 1000,
           windupDmg: Math.round(m.windupDmg * 10) / 10,
           barFrac: Math.round((m.barHp / (m.maxHp || 1)) * 1000) / 1000,
           ghostFrac: Math.round((m.ghostHp / (m.maxHp || 1)) * 1000) / 1000
