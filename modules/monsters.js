@@ -101,12 +101,36 @@
   var R_TUTORIAL = 250, R_LOW = 600, R_MID = 1200;
   var ZONES = ['tutorial', 'low', 'mid', 'high'];
   var ZONE_LEVEL = { tutorial: 1, low: 4, mid: 9, high: 16 };
-  var ZONE_TARGET = { tutorial: 2, low: 4, mid: 6, high: 8 };
-  var CAP = 40;                        /* hard cap, all zones together */
+  var ZONE_TARGET = { tutorial: 4, low: 10, mid: 14, high: 18 };
+                                          /* DRAFT (Han screen verdict,
+                                          monster-random DESIGN 2.3):
+                                          world-spread placement targets.
+                                          Was 2/4/6/8 while spawns
+                                          clustered around the player */
+  var CAP = 48;                        /* DRAFT: hard cap, all zones
+                                          together (was 40) */
   var ZONE_EVAL_MS = 1000;             /* player-zone re-check cadence */
   var SPAWN_RATE = 0.5;                /* spawns per second per zone;
                                           the same fill refills a zone
                                           after a death (zone respawn) */
+  var SPAWN_RATE_INITIAL = 2;          /* DRAFT (Han screen verdict,
+                                          DESIGN 2.4): per-zone fill rate
+                                          until the zone first reaches
+                                          its target in the current
+                                          activation, then SPAWN_RATE */
+  var R_HIGH_CAP = 2050;               /* outer edge of the high ring:
+                                          the baked district boundary */
+  var ZONE_RING = {                    /* placement sampling rings
+                                          [rIn, rOut) around the
+                                          gallery anchor */
+    tutorial: [0, R_TUTORIAL], low: [R_TUTORIAL, R_LOW],
+    mid: [R_LOW, R_MID], high: [R_MID, R_HIGH_CAP]
+  };
+  var PLACE_MIN_PLAYER_DIST = 25;      /* a placement never lands
+                                          closer than this to the
+                                          player (DESIGN 2.2) */
+  var PLACE_TRIES = 60;                /* rejection draws per
+                                          placement attempt (DESIGN 2.2) */
 
   /* ---- Hit feel tuning (FEEL.md) ----
      Batch 6 (Han 2026-11-07): attack cycle x0.75 duration - the
@@ -438,7 +462,10 @@
 
   var S = {
     monsters: [], seq: 0, playerZone: null, forcedZone: null,
-    activeZones: {}, zoneEvalAt: 0, spawnAcc: {}, gates: [], gatesBuilt: false,
+    activeZones: {}, zoneEvalAt: 0, spawnAcc: {}, zoneFilled: {},
+    place: { draws: 0, placed: 0, rejWalk: 0, rejSafe: 0, rejZone: 0,
+             rejPlayer: 0, rejSep: 0 },
+    gates: [], gatesBuilt: false,
     gateTryAt: 0, sepAt: 0, tickN: 0, outMapSince: 0, booted: false,
     feel: { hits: 0, crits: 0, cancels: 0, numbers: 0, flashes: 0, evades: 0,
             squashes: 0, kbs: 0, sparks: 0 }, dmgSeq: 0
@@ -869,26 +896,62 @@
     }
     return list[0];
   }
-  function spawnPoint(zone, px, pz) {
-    /* a walkable point inside the target zone, 18-45 m from the
-       player, so summons appear at a distance (never on top of the
-       player and never a mid-screen pop-in) */
-    for (var t = 0; t < 14; t++) {
+  /* World-anchored random placement (Han 2026-11-18: monsters are
+     placed randomly in the WORLD, not summoned around the player -
+     monster-random DESIGN 2). The candidate is drawn area-uniformly
+     over the zone's whole ring around the gallery anchor: angle
+     uniform, radius sqrt-corrected so equal areas carry equal
+     probability. Rejection sampling applies the standing safety
+     law: walkable ground only (no water, building footprints or
+     roof cells), never inside the safe zone, never in another zone
+     (ring-boundary rounding), never within PLACE_MIN_PLAYER_DIST
+     of the player, and never on top of a field body already placed
+     in the zone (the step-time separation distance, reused at
+     placement). Line of sight is NOT required - monsters also
+     stand behind buildings and around corners; the 25 m floor and
+     the 0.9 s fade-in are the only anti-pop-in devices. A failed
+     draw returns null and the fill loop retries on a later tick:
+     there is deliberately NO player-ring fallback (that was the
+     old law, and keeping it would keep player-following summons
+     alive). Placement statistics land in S.place for the state
+     hook and the verification legs. */
+  function spawnPoint(zone, px, pz, kind) {
+    var ring = ZONE_RING[zone];
+    if (!ring) return null;
+    var rIn2 = ring[0] * ring[0];
+    var span2 = ring[1] * ring[1] - rIn2;
+    var minPD2 = PLACE_MIN_PLAYER_DIST * PLACE_MIN_PLAYER_DIST;
+    for (var t = 0; t < PLACE_TRIES; t++) {
       var a = Math.random() * Math.PI * 2;
-      var d = 18 + Math.random() * 27;
-      var x = px + Math.cos(a) * d, z = pz + Math.sin(a) * d;
-      if (!walkable(x, z)) continue;
-      if (inSafeZone(x, z)) continue;   /* safe zone: never summoned inside */
-      if (zoneAt(x, z).zone !== zone) continue;
+      var r = Math.sqrt(rIn2 + Math.random() * span2);
+      var x = GALLERY.x + Math.cos(a) * r;
+      var z = GALLERY.z + Math.sin(a) * r;
+      S.place.draws++;
+      if (!walkable(x, z)) { S.place.rejWalk++; continue; }
+      if (inSafeZone(x, z)) { S.place.rejSafe++; continue; }
+      if (zoneAt(x, z).zone !== zone) { S.place.rejZone++; continue; }
+      var pdx = x - px, pdz = z - pz;
+      if (pdx * pdx + pdz * pdz < minPD2) { S.place.rejPlayer++; continue; }
+      if (!placementSeparated(x, z, zone, kind)) { S.place.rejSep++; continue; }
+      S.place.placed++;
       return { x: x, z: z };
     }
-    for (var u = 0; u < 14; u++) {
-      var a2 = Math.random() * Math.PI * 2;
-      var d2 = 12 + Math.random() * 48;
-      var x2 = px + Math.cos(a2) * d2, z2 = pz + Math.sin(a2) * d2;
-      if (walkable(x2, z2) && !inSafeZone(x2, z2) && zoneAt(x2, z2).zone === zone) return { x: x2, z: z2 };
-    }
     return null;
+  }
+  /* placement-time separation: the candidate must clear the
+     step-time separation distance (0.55 x the two body scales,
+     stepMonster's own formula) against every live field body
+     already placed in the same zone */
+  function placementSeparated(x, z, zone, kind) {
+    for (var i = 0; i < S.monsters.length; i++) {
+      var m = S.monsters[i];
+      if (m.gone || m.instance || m.zone !== zone) continue;
+      if (m.state === 'dying' || m.state === 'leaving') continue;
+      var minD = 0.55 * (kind.scale + m.kind.scale);
+      var dx = x - m.x, dz = z - m.z;
+      if (dx * dx + dz * dz < minD * minD) return false;
+    }
+    return true;
   }
   function addMonster(kind, x, z, scene) {
     var base = BASES[kind.base];
@@ -985,9 +1048,12 @@
     if (fieldCount() >= CAP) return;
     var scene = sceneRoot();
     if (!scene) return;
-    var pt = spawnPoint(zone, px, pz);
-    if (!pt) return;
+    /* the kind is drawn first now: the placement sampler needs its
+       scale for the placement-time separation check. Kind mix and
+       the elite weighting are pickKind's, unchanged */
     var kind = pickKind(zone);
+    var pt = spawnPoint(zone, px, pz, kind);
+    if (!pt) return;
     try {
       var m = addMonster(kind, pt.x, pt.z, scene);
       /* fade in from transparent so the summon reads as an arrival */
@@ -1471,6 +1537,17 @@
       playerZone: S.playerZone,
       forced: S.forcedZone,
       cap: CAP,
+      placement: {
+        draws: S.place.draws, placed: S.place.placed,
+        rejected: { walkable: S.place.rejWalk, safeZone: S.place.rejSafe,
+                    zone: S.place.rejZone, player: S.place.rejPlayer,
+                    separation: S.place.rejSep },
+        targets: { tutorial: ZONE_TARGET.tutorial, low: ZONE_TARGET.low,
+                   mid: ZONE_TARGET.mid, high: ZONE_TARGET.high },
+        rate: SPAWN_RATE, initialRate: SPAWN_RATE_INITIAL,
+        filled: { tutorial: !!S.zoneFilled.tutorial, low: !!S.zoneFilled.low,
+                  mid: !!S.zoneFilled.mid, high: !!S.zoneFilled.high }
+      },
       gates: S.gates.length,
       gateList: S.gates.map(function (g) {
         return { x: Math.round(g.x * 10) / 10, z: Math.round(g.z * 10) / 10, ring: g.ring, beyond: g.beyond };
@@ -1496,7 +1573,8 @@
       monsters: S.monsters.map(function (m) {
         return {
           id: m.id, kind: m.kind.id, x: Math.round(m.x * 100) / 100,
-          z: Math.round(m.z * 100) / 100, hp: m.hp, maxHp: m.maxHp,
+          z: Math.round(m.z * 100) / 100, ax: Math.round(m.spawnX * 100) / 100,
+          az: Math.round(m.spawnZ * 100) / 100, hp: m.hp, maxHp: m.maxHp,
           level: m.level, zone: m.zone, state: m.state, instance: !!m.instance,
           flash: m.flashT > 0, winding: m.windupT > 0,
           scaleX: m.body ? Math.round((m.body.scale.x / (m.w || 1)) * 1000) / 1000 : 1,
@@ -1781,10 +1859,18 @@
                 m.state = 'leaving'; m.fadeT = 0.9;
               }
             });
+            /* a zone that left the active set also forgets its
+               filled mark: when it reactivates it fills fast again
+               and re-places from scratch - a remembered layout
+               would be a fixed spawn map (DESIGN 2.5) */
+            ZONES.forEach(function (z) { if (!S.activeZones[z]) S.zoneFilled[z] = false; });
           }
         }
       }
-      /* per-zone population: fill active zones at ~0.5/s each.
+      /* per-zone population: a zone fills at the initial rate
+         until it first reaches its target in this activation,
+         then at ~0.5/s; a death refill lands on a fresh random
+         point - the death spot holds no priority (DESIGN 2.4).
          Field summoning pauses while the player is inside an
          interior (monolith's no-summoning-indoors rule) - this
          also keeps field bodies out of the arena space once the
@@ -1793,8 +1879,9 @@
         var counts = countByZone();
         ZONES.forEach(function (z) {
           if (!S.activeZones[z]) return;
-          if (counts[z] >= ZONE_TARGET[z]) return;
-          S.spawnAcc[z] = (S.spawnAcc[z] || 0) + dt * SPAWN_RATE;
+          if (counts[z] >= ZONE_TARGET[z]) { S.zoneFilled[z] = true; return; }
+          var rate = S.zoneFilled[z] ? SPAWN_RATE : SPAWN_RATE_INITIAL;
+          S.spawnAcc[z] = (S.spawnAcc[z] || 0) + dt * rate;
           while (S.spawnAcc[z] >= 1 && counts[z] < ZONE_TARGET[z] && fieldCount() < CAP) {
             S.spawnAcc[z] -= 1;
             spawnMonster(z, pp.x, pp.z);
