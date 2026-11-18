@@ -807,7 +807,13 @@
       'body.in-map #espil-hud2-bars{left:50%;transform:translateX(-50%);bottom:14px;width:min(210px,32vw)}' +
       'body.in-map #espil-hud2-actions{right:8px;bottom:8px;width:236px;height:132px}' +
       'body.in-map #espil-hud2-chars{display:none!important}' +
-      'body.in-map #espil-hud2-chat{display:none!important}' +
+      /* chat toggle (Han 2026-11-17): landscape gains the chat
+         open/close button too - the coin column ends ~59px down
+         (top:10 + 30px medal + 3px gap + the number line), so a
+         44px button at top:62 clears it and stops 2px above the
+         chat window's own top edge (108). Portrait keeps its
+         bottom-left spot (see the portrait block). */
+      'body.in-map #espil-hud2-chat{display:flex;position:fixed;z-index:36;left:12px;top:62px;width:44px;height:44px;font-size:19px}' +
     '}' +
     /* ---- PORTRAIT arrangement (reference 2) ---- */
     '@media (pointer:coarse) and (orientation:portrait){' +
@@ -858,6 +864,26 @@
       '#espil-tut{background:rgba(18,22,28,.55)!important;color:#fff!important;border:1px solid rgba(255,255,255,.35)!important;' +
         'box-shadow:0 4px 12px rgba(0,0,0,.3)!important;text-shadow:none!important}' +
       '#espil-tut .kb{background:rgba(255,255,255,.16)!important;border:1px solid rgba(255,255,255,.4)!important;color:#fff!important;box-shadow:none!important}' +
+    '}' +
+    /* ---- MINIMAP EXPAND COUNTER-PIN + CHAT OFF (Han 2026-11-17) ---
+       The two orientation blocks above pin the stage-1 wrap size
+       with !important (118px landscape / 92px portrait), and
+       pair.css's .mm-big rule carries no !important - so the
+       2026-11-06 tap handler's class landed but the wrap never
+       grew, and the tap read as dead on phones. This counter-pin
+       (same body.in-map + attribute ladder plus the .mm-big class,
+       later in this sheet) restores pair.css's expanded size while
+       .mm-big is on; the resting pins are untouched when it is off.
+       .chat-off is the chat toggle's hidden state: display:none on
+       the window only - the node, its log and its scroll survive. */
+    '@media (pointer:coarse){' +
+      'body.in-map #minimap-wrap[data-stage="1"].mm-big{width:min(78vw,78dvh,calc(100dvh - 136px))!important;height:min(78vw,78dvh,calc(100dvh - 136px))!important}' +
+      '.chat-window.chat-off{display:none!important}' +
+      '#espil-hud2-chat{position:fixed}' +
+      '#espil-hud2-chat .h2-chat-badge{position:absolute;top:-5px;right:-5px;min-width:19px;height:19px;padding:0 5px;' +
+        'border-radius:10px;background:#e5484d;border:1.5px solid #fff;color:#fff;font:800 10px/16px "Manrope",sans-serif;' +
+        'display:none;align-items:center;justify-content:center;pointer-events:none;box-sizing:border-box}' +
+      '#espil-hud2-chat.has-unread .h2-chat-badge{display:flex}' +
     '}' +
     /* ---- QUICK SLOTS + MENU SHEET (Han 2026-11-11) ----------------
        The 4-slot quick bar lives inside the action box as a flex
@@ -1067,16 +1093,71 @@
   var chatBtn = mk('button', 'espil-hud2-chat', '💬');
   chatBtn.type = 'button';
   chatBtn.setAttribute('aria-label', 'Chat');
+  /* ---- chat open/close toggle (Han 2026-11-17) -------------------
+     This button used to toggle the window's .is-expanded size; the
+     2026-11-17 order makes it the chat window's open/close toggle
+     (the window covered too much of the map on phones). Closing
+     only adds .chat-off (display:none) - the window node, its log,
+     its scroll position and its .is-expanded state all survive,
+     and the monolith keeps appending incoming lines while it is
+     hidden, so reopening restores the same window as it was.
+     Lines that arrive while it is closed are counted on the
+     button's unread badge; opening clears the count. Expanding
+     itself is untouched: the window tap and #chat-expand still
+     toggle .is-expanded exactly as before. The window starts
+     open, exactly as it did before this toggle existed. */
+  var chatBadge = mk('span', null, '0');
+  chatBadge.className = 'h2-chat-badge';
+  chatBtn.appendChild(chatBadge);
+  var chatUnread = 0, chatOff = false, chatObs = null;
+  function chatWin() { return document.querySelector('.chat-window'); }
+  function chatPaintBadge() {
+    chatBadge.textContent = chatUnread > 9 ? '9+' : String(chatUnread);
+    chatBtn.classList.toggle('has-unread', chatOff && chatUnread > 0);
+    chatBtn.setAttribute('aria-expanded', chatOff ? 'false' : 'true');
+  }
+  function chatSetOff(off) {
+    var w = chatWin(); if (!w) return;
+    chatOff = !!off;
+    w.classList.toggle('chat-off', chatOff);
+    if (chatOff) {
+      /* a hidden input must not keep the keyboard/focus hostage */
+      var inp = el('chat-input');
+      if (inp && document.activeElement === inp) { try { inp.blur(); } catch (err) {} }
+    } else {
+      chatUnread = 0;
+    }
+    chatPaintBadge();
+  }
   chatBtn.addEventListener('pointerdown', function (e) {
     e.preventDefault();
-    var w = document.querySelector('.chat-window');
-    if (!w) return;
-    w.classList.toggle('is-expanded');
-    if (w.classList.contains('is-expanded')) {
-      var inp = el('chat-input');
-      if (inp) { try { inp.focus(); } catch (err) {} }
-    }
+    chatSetOff(!chatOff);
   });
+  /* Count lines appended while the window is closed. The log node
+     (#chat-log, the monolith's) is pair-page DOM, present by the
+     time this module runs; retry briefly in case of load order. */
+  (function chatWatch() {
+    var log = el('chat-log');
+    if (!log) { setTimeout(chatWatch, 600); return; }
+    if (chatObs) return;
+    chatObs = new MutationObserver(function (muts) {
+      if (!chatOff) return;
+      var n = 0;
+      muts.forEach(function (m) { n += m.addedNodes.length; });
+      if (n > 0) { chatUnread += n; chatPaintBadge(); }
+    });
+    chatObs.observe(log, { childList: true });
+  })();
+  window.__espilHud2ChatState = function () {
+    var w = chatWin();
+    return {
+      off: chatOff,
+      unread: chatUnread,
+      windowDisplay: w ? getComputedStyle(w).display : null,
+      expanded: w ? w.classList.contains('is-expanded') : null,
+      logChildren: (el('chat-log') || {}).children ? el('chat-log').children.length : 0
+    };
+  };
 
   /* ---- menu: ONE icon + a sheet (Han 2026-11-11) -----------------
      The fixed shortcuts (skill tree, items, bag - plus the map and
