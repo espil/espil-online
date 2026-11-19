@@ -71,6 +71,41 @@
     var s = addr.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
     return s || null;
   }
+  /* PLACE EXPANSION REMAINDER (2026-11-18): canonical bake lookup.
+     The visit's SLUG is the building's CANONICAL slug (the
+     Worker's placeCanonicalSlugs, Han 2026-11-18): an address
+     slug claimed bare by its first record and suffixed for the
+     records it shadows, a name slug for an addressless building,
+     a "place-<index>" token for a building with neither string.
+     The bake holds raw records, so this building's geometry is
+     the record whose canonical slug equals SLUG - an address
+     match alone would hand a shadowed building the FIRST
+     record's geometry, and a suffixed or stringless building no
+     geometry at all (it would then read as "unknown" and bail
+     whenever the API is unreachable, breaking the known-building
+     guarantee below). Identical algorithm, identical file. */
+  function canonicalSlugsOf(recs) {
+    var assigned = {};
+    var out = new Array(recs.length);
+    for (var i = 0; i < recs.length; i++) out[i] = null;
+    for (var pass = 0; pass < 3; pass++) {
+      for (var j = 0; j < recs.length; j++) {
+        if (out[j] !== null) continue;
+        var rec = recs[j];
+        var base = null;
+        if (pass === 0) base = slugOf(rec && rec[5]);
+        else if (pass === 1) base = slugOf(rec && rec[4]);
+        else base = 'place-' + j;
+        if (!base) continue;
+        var slug = base, n = 1;
+        while (assigned[slug]) { n += 1; slug = base + '-' + n; }
+        assigned[slug] = true;
+        out[j] = slug;
+      }
+    }
+    return out;
+  }
+  /* end PLACE EXPANSION REMAINDER canonical bake lookup */
   function fnv1a(str) {
     var h = 2166136261;
     for (var i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619);
@@ -238,9 +273,10 @@
     fetch('assets/osm/' + CITY + '_places.json').then(function (r) { return r.ok ? r.json() : null; }).then(function (doc) {
       bakeChecked = true;
       if (state.geom || !doc || !Array.isArray(doc.b)) { maybeBailUnknown(); return; }
+      var canon = canonicalSlugsOf(doc.b);   /* PLACE EXPANSION REMAINDER: match by canonical slug, not address */
       for (var i = 0; i < doc.b.length; i++) {
         var rec = doc.b[i];
-        if (rec && slugOf(rec[5]) === SLUG) {
+        if (rec && canon[i] === SLUG) {
           state.geom = { cx: rec[0], cz: rec[1], w: rec[2], d: rec[3], name: rec[4] || null, addr: rec[5] || null };
           maybeEnter();
           return;

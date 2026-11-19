@@ -60,20 +60,22 @@
      the same file the Worker answers from, fetched once per
      session into memory only (nothing is stored; the dataset is
      the source, answers are still composed by the API inside the
-     space). A building resolves only when its address produces a
-     slug AND that slug is the building's own: the Worker index
-     answers the FIRST record of a shared slug, so a building
-     shadowed by an earlier record with the same address string,
-     and a building with no address at all, do NOT resolve here -
-     presenting another building's space as theirs would be a
-     false answer. Those buildings keep the pair's routed
-     interior until the address-grammar question is decided
-     (the design remainder, place-expansion/AUDIT.md (a)).
+     space). A building resolves only under its OWN canonical
+     slug - the derivation below, the Worker's twin: the address
+     slug, claimed bare by the first record of a shared address
+     string and suffixed (-2, -3, ...) for the records it
+     shadows; the name slug for a building with no address; and
+     a "place-<index>" token, from the record's dataset ordinal,
+     for a building with neither string (Han 2026-11-18: the
+     remainder grammar - every record is placed, and no building
+     is ever presented with another building's space). A point
+     that matches NO record still resolves null and keeps the
+     pair's routed interior.
      PLACE_ALL_DEST is the expansion's revert switch, beside
      PLACE_SPACE_DEST: OFF restores today's entry behaviour
      exactly (Konbiniya popup + routed interiors). */
   var PLACE_ALL_DEST = true;
-  var placeData = null;          /* {records, firstIdx} once ready */
+  var placeData = null;          /* {records, slugByIdx} once ready */
   var placeDataState = 'idle';   /* idle | loading | ready | absent */
   function placeCityKey() {
     try { return window.__espilCityKey || 'vancouver'; }
@@ -86,6 +88,37 @@
     var s = addr.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
     return s || null;
   }
+  /* The canonical slug of EVERY record - the Worker's twin
+     (placeCanonicalSlugs, Han 2026-11-18): three passes over the
+     dataset, dataset order inside each pass - the address slug;
+     then, for records still unplaced, the name slug; then, for
+     records with neither string, "place-<index>" from the
+     record's dataset ordinal (its stable id - both sides read
+     the same file bytes). The first claim of a base slug stays
+     bare; a later claim takes the first free "-2", "-3", ...
+     suffix. Pass 1 reproduces the old first-wins assignment
+     exactly, so no previously resolving slug ever moves. */
+  function placeCanonicalSlugs(recs) {
+    var assigned = {};
+    var out = new Array(recs.length);
+    for (var i = 0; i < recs.length; i++) out[i] = null;
+    for (var pass = 0; pass < 3; pass++) {
+      for (var j = 0; j < recs.length; j++) {
+        if (out[j] !== null) continue;
+        var rec = recs[j];
+        var base = null;
+        if (pass === 0) base = placeSlugOf(rec && rec[5]);
+        else if (pass === 1) base = placeSlugOf(rec && rec[4]);
+        else base = 'place-' + j;
+        if (!base) continue;
+        var slug = base, n = 1;
+        while (assigned[slug]) { n += 1; slug = base + '-' + n; }
+        assigned[slug] = true;
+        out[j] = slug;
+      }
+    }
+    return out;
+  }
   function loadPlaceData() {
     if (placeDataState === 'loading' || placeDataState === 'ready') return;
     placeDataState = 'loading';
@@ -93,12 +126,7 @@
       .then(function (r) { if (!r.ok) throw new Error('no bake'); return r.json(); })
       .then(function (doc) {
         var recs = (doc && Array.isArray(doc.b)) ? doc.b : [];
-        var firstIdx = {};
-        for (var i = 0; i < recs.length; i++) {
-          var s = placeSlugOf(recs[i] && recs[i][5]);
-          if (s && !(s in firstIdx)) firstIdx[s] = i;
-        }
-        placeData = { records: recs, firstIdx: firstIdx };
+        placeData = { records: recs, slugByIdx: placeCanonicalSlugs(recs) };
         placeDataState = 'ready';
       })
       .catch(function () { placeDataState = 'absent'; });
@@ -130,9 +158,10 @@
     return best;
   }
   /* Resolve a street point (a panel record's centre / AABB, or a
-     facing wall point) to a place: {slug, name} when the building
-     owns its slug, null when it honestly has none, 'pending'
-     while the dataset is still loading. */
+     facing wall point) to a place: {slug, name} under the matched
+     record's OWN canonical slug, null when the point matches no
+     record at all, 'pending' while the dataset is still
+     loading. */
   function resolvePlace(pt) {
     if (!PLACE_ALL_DEST || !PLACE_SPACE_DEST) return null;
     if (!pt || typeof pt.x !== 'number' || typeof pt.z !== 'number') return null;
@@ -141,9 +170,9 @@
     if (placeDataState !== 'ready') return null;
     var rec = matchPlaceRecord(pt);
     if (!rec) return null;
-    var slug = placeSlugOf(rec[5]);
-    if (!slug) return null;                          /* no address */
-    if (placeData.firstIdx[slug] !== placeData.records.indexOf(rec)) return null;
+    var ri = placeData.records.indexOf(rec);
+    var slug = ri >= 0 ? placeData.slugByIdx[ri] : null;
+    if (!slug) return null;
     return { slug: slug, name: rec[4] || rec[5] || slug };
   }
   function openPlace(place) {

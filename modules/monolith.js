@@ -7865,10 +7865,13 @@
        that owns its address slug opens its own place space in a
        popup instead (espilOpenPlacePopup in espilEnterBuilding,
        resolved by store-page-link against the baked places
-       dataset). Buildings with no place of their own (the
-       design remainder: shadowed or addressless records) still
-       reach the interior below, until the address-grammar
-       question is decided. */
+       dataset). PLACE EXPANSION REMAINDER (Han 2026-11-18): the
+       grammar is complete - every record owns a canonical slug
+       (suffixed for shadowed records, name-derived for
+       addressless ones, an ordinal token for stringless ones),
+       so the interior below is reached only when the link module
+       is switched off (PLACE_ALL_DEST) or a point matches no
+       record at all. */
     function espilIsKonbiniyaRec(rec){
       if(!rec)return false;
       var nm=rec.name||rec.title||'';
@@ -7981,11 +7984,12 @@
        record's ring, or its centre). The press is consumed while
        the dataset is still loading (150 ms poll, up to ~3 s): a
        building whose place may exist never falls through to the
-       shared interior on a load race. A resolve of false means
-       the building honestly has no place of its own, or the
-       expansion flags are off - either way the press keeps the
-       routed interior below, unchanged. If the link module
-       never arrives the press ends
+       shared interior on a load race. Since the remainder
+       grammar landed (Han 2026-11-18) every record resolves
+       under its canonical slug; a resolve of false now means the
+       point matched no record, or the expansion flags are off -
+       either way the press keeps the routed interior below,
+       unchanged. If the link module never arrives the press ends
        at a toast, on the Konbiniya seam's rule. */
     var espilPlacePopupWait=null;
     function espilPlacePointOf(rec){
