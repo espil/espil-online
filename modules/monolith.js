@@ -11116,6 +11116,44 @@
       av.__bodyKey=espilAvatarBodyKey(gender);
       return av;
     }
+    /* ---- gate preview avatar service (Han 2026-11-17: the
+       character must be VISIBLE in the customizer gate) ----
+       The gate's live preview (modules/customizer.js,
+       __espilCustPreview v1) builds its chibi and KayKit display
+       bodies through here, so the chibi template cache and the
+       KayKit loader stay shared with the game instead of being
+       forked into a second copy. The builders stamp their
+       local-player slot (ESPIL_CB_LOCAL / ESPIL_KK_LOCAL) as a
+       side effect; the slot is saved and restored around the
+       call - a preview build never takes the local player's
+       place (the slots feed only the guest-body state hook, but
+       the preview does not move state it does not own).
+       'master' and 'lunaris' return null ON PURPOSE: the
+       preview loads those two itself. buildWalkerAvatar starts
+       the entry-descent clip loads whose completion flips
+       window.__espilDescentClipsReady - a gate preview must not
+       fire entry machinery - and the Lunaris player builder
+       belongs to the designation build, which the preview does
+       not depend on (it reads the session record's server mark
+       and loads the serving GLB directly). */
+    window.__espilBuildGateAvatar=function(gender,bodyKey){
+      try{
+        if(bodyKey==='kaykit'){
+          var keepKk=ESPIL_KK_LOCAL;
+          var kav=buildKaykitAvatar(gender);
+          ESPIL_KK_LOCAL=keepKk;
+          return kav;
+        }
+        var cbm=/^style([1-4])$/.exec(bodyKey||'');
+        if(cbm){
+          var keepCb=ESPIL_CB_LOCAL;
+          var cav=buildChibiAvatar(gender,+cbm[1]);
+          ESPIL_CB_LOCAL=keepCb;
+          return cav;
+        }
+      }catch(e){}
+      return null;
+    }
 
     /* ---------------- Item C: the three gear trees ----------------
        The character tree above spends Knowledge. The gear trees
