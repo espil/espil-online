@@ -705,7 +705,7 @@
 
   var css =
     '#espil-hud2-coin,#espil-hud2-score,#espil-hud2-timefps,#espil-hud2-menu,' +
-    '#espil-hud2-bars,#espil-hud2-actions,#espil-hud2-chars,#espil-hud2-chat{display:none}' +
+    '#espil-hud2-bars,#espil-hud2-actions,#espil-hud2-chars,#espil-hud2-chat,#espil-hud2-chat-tab{display:none}' +
     '@media (pointer:coarse){' +
       /* the superseded mobile scheme retires on touch screens */
       '#espil-mmo-combat{display:none!important}' +
@@ -814,6 +814,9 @@
          chat window's own top edge (108). Portrait keeps its
          bottom-left spot (see the portrait block). */
       'body.in-map #espil-hud2-chat{display:flex;position:fixed;z-index:36;left:12px;top:62px;width:44px;height:44px;font-size:19px}' +
+      /* __espilChatSwipe v1: the restore tab rests at the chat
+         zone's top edge (zone top 108 + 12) while it is hidden. */
+      '#espil-hud2-chat-tab{top:120px}' +
     '}' +
     /* ---- PORTRAIT arrangement (reference 2) ---- */
     '@media (pointer:coarse) and (orientation:portrait){' +
@@ -831,6 +834,9 @@
       'body.in-map #espil-hud2-bars{left:50%;transform:translateX(-50%);bottom:12px;width:172px}' +
       'body.in-map #espil-hud2-actions{right:6px;bottom:64px;width:238px;height:132px}' +
       'body.in-map #espil-hud2-chat{display:flex;position:fixed;z-index:36;left:8px;bottom:6px;width:44px;height:44px;font-size:19px}' +
+      /* __espilChatSwipe v1: the restore tab rests at the chat
+         zone's top edge (zone top 200 + 12) while it is hidden. */
+      '#espil-hud2-chat-tab{top:212px}' +
       /* Genshin separation (Han 2026-11-09): portrait drops every
          inherited piece of the PC log skin - thin light rings, flat
          translucent glass, white glyphs, a flat green HP fill, plain
@@ -853,6 +859,7 @@
       '#espil-hud2-actions button.h2-util{background:rgba(18,22,28,.5);border-color:rgba(255,255,255,.55)}' +
       '#espil-hud2-actions button[data-fly]{background:rgba(18,22,28,.5);border-color:rgba(255,255,255,.55)}' +
       '#espil-hud2-chat{background:rgba(18,22,28,.45);border:1px solid rgba(255,255,255,.4)}' +
+      '#espil-hud2-chat-tab{background:rgba(18,22,28,.55);border-color:rgba(255,255,255,.4)}' +
       '.chat-window{background:rgba(14,17,22,.8);border:1px solid rgba(255,255,255,.3);color:#fff;' +
         'box-shadow:0 8px 18px rgba(0,0,0,.35)}' +
       '.chat-window .chat-log{color:#fff;text-shadow:none}' +
@@ -879,6 +886,21 @@
     '@media (pointer:coarse){' +
       'body.in-map #minimap-wrap[data-stage="1"].mm-big{width:min(78vw,78dvh,calc(100dvh - 136px))!important;height:min(78vw,78dvh,calc(100dvh - 136px))!important}' +
       '.chat-window.chat-off{display:none!important}' +
+      /* __espilChatSwipe v1 (Han 2026-11-19): the chat window takes
+         vertical pans natively (the log scrolls) while horizontal
+         drags reach the swipe recogniser below; the drag classes
+         carry the finger-follow and the snap-back. The "채팅" tab
+         is display:none unless .chat-tab-on (the swipe-hidden
+         state) - its per-orientation top offsets live in the two
+         orientation blocks, at the chat zone's own top edge. */
+      '.chat-window{touch-action:pan-y}' +
+      '.chat-window.chat-drag{transition:none!important}' +
+      '.chat-window.chat-snap{transition:transform .18s ease-out!important}' +
+      '#espil-hud2-chat-tab{display:none;position:fixed;left:0;z-index:36;height:48px;min-width:60px;' +
+        'padding:0 16px 0 12px;border-radius:0 24px 24px 0;border:1.5px solid rgba(255,255,255,.5);border-left:none;' +
+        'background:rgba(16,20,26,.82);color:#fff;font:700 14px "Manrope",sans-serif;align-items:center;' +
+        'justify-content:center;cursor:pointer;touch-action:manipulation;box-shadow:2px 2px 9px rgba(0,0,0,.4)}' +
+      '#espil-hud2-chat-tab.chat-tab-on{display:flex}' +
       '#espil-hud2-chat{position:fixed}' +
       '#espil-hud2-chat .h2-chat-badge{position:absolute;top:-5px;right:-5px;min-width:19px;height:19px;padding:0 5px;' +
         'border-radius:10px;background:#e5484d;border:1.5px solid #fff;color:#fff;font:800 10px/16px "Manrope",sans-serif;' +
@@ -1110,16 +1132,24 @@
   chatBadge.className = 'h2-chat-badge';
   chatBtn.appendChild(chatBadge);
   var chatUnread = 0, chatOff = false, chatObs = null;
+  /* __espilChatSwipe v1: provenance of the current hidden state -
+     'swipe' | 'toggle' | null. chatOff stays the ONE visibility
+     boolean; this flag only decides whether the "채팅" restore
+     tab shows (it belongs to the swipe interaction, Han
+     2026-11-19). Session-only, like chatOff itself. */
+  var chatHiddenBy = null;
   function chatWin() { return document.querySelector('.chat-window'); }
   function chatPaintBadge() {
     chatBadge.textContent = chatUnread > 9 ? '9+' : String(chatUnread);
     chatBtn.classList.toggle('has-unread', chatOff && chatUnread > 0);
     chatBtn.setAttribute('aria-expanded', chatOff ? 'false' : 'true');
   }
-  function chatSetOff(off) {
+  function chatSetOff(off, src) {
     var w = chatWin(); if (!w) return;
     chatOff = !!off;
+    chatHiddenBy = chatOff ? (src || 'toggle') : null;
     w.classList.toggle('chat-off', chatOff);
+    chatPaintTab();
     if (chatOff) {
       /* a hidden input must not keep the keyboard/focus hostage */
       var inp = el('chat-input');
@@ -1131,7 +1161,7 @@
   }
   chatBtn.addEventListener('pointerdown', function (e) {
     e.preventDefault();
-    chatSetOff(!chatOff);
+    chatSetOff(!chatOff, 'toggle');
   });
   /* Count lines appended while the window is closed. The log node
      (#chat-log, the monolith's) is pair-page DOM, present by the
@@ -1150,12 +1180,126 @@
   })();
   window.__espilHud2ChatState = function () {
     var w = chatWin();
+    var tb = el('espil-hud2-chat-tab');
     return {
       off: chatOff,
       unread: chatUnread,
+      hiddenBy: chatHiddenBy,
+      tabVisible: !!(tb && tb.classList.contains('chat-tab-on')
+        && getComputedStyle(tb).display !== 'none'),
       windowDisplay: w ? getComputedStyle(w).display : null,
       expanded: w ? w.classList.contains('is-expanded') : null,
       logChildren: (el('chat-log') || {}).children ? el('chat-log').children.length : 0
+    };
+  };
+
+  /* ---- chat swipe-to-hide + "채팅" restore tab (__espilChatSwipe
+     v1, Han 2026-11-19) ---------------------------------------------
+     One state machine: this block owns NO visibility state of its
+     own. A committed left swipe calls the toggle's own
+     chatSetOff(true, 'swipe'); the tab and the 💬 button both call
+     chatSetOff(false). chatOff stays the single boolean; the tab
+     shows only for the swipe-hidden state (chatHiddenBy), while a
+     toggle-hidden window keeps the pre-2026-11-19 screen exactly -
+     the 💬 button alone, badge and all. Session-only, like the
+     toggle: nothing is persisted.
+     The gesture: a horizontal-dominant drag on the window follows
+     the finger leftward (the window's own touch-action:pan-y keeps
+     vertical pans native, so a log scroll never arms the swipe);
+     release past the threshold (72px or 30% of the window width,
+     whichever is smaller) commits the hide, anything less snaps
+     back. A drag past 12px swallows the click it would otherwise
+     end with, so the window's tap-to-expand never fires mid-swipe.
+     Starts on the input, a channel chip or any button are not
+     swipe starts - those keep their own gestures. Coarse pointers
+     and the in-map page only; place-space / arena child windows
+     never arm this (their chat rules are untouched). */
+  var chatTab = mk('button', 'espil-hud2-chat-tab', '채팅');
+  chatTab.type = 'button';
+  chatTab.setAttribute('aria-label', '채팅 열기');
+  function chatPaintTab() {
+    if (!chatTab) return;
+    chatTab.classList.toggle('chat-tab-on', !!(chatOff && chatHiddenBy === 'swipe'));
+  }
+  chatTab.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    chatSetOff(false, 'tab');
+    /* The tap's own click lands AFTER pointerdown - by then the
+       tab is gone and the restored window sits under the same
+       point, so the click would toggle the window's tap-to-expand.
+       Swallow that one click (the drag path uses the same flag). */
+    chatSwallowClick = true;
+    setTimeout(function () { chatSwallowClick = false; }, 400);
+  });
+  var chatSwipe = null, chatSwallowClick = false;
+  function chatSwipeSnapBack(w) {
+    w.classList.remove('chat-drag');
+    w.classList.add('chat-snap');
+    w.style.transform = 'translateX(0px)';
+    setTimeout(function () {
+      w.classList.remove('chat-snap');
+      w.style.transform = '';
+    }, 220);
+  }
+  document.addEventListener('touchstart', function (e) {
+    chatSwipe = null;
+    if (chatOff || !coarse()) return;
+    if (!document.body || !document.body.classList.contains('in-map')) return;
+    if (!e.touches || e.touches.length !== 1) return;
+    var w = chatWin();
+    if (!w) return;
+    var t = e.target;
+    if (!t || !t.closest || !w.contains(t)) return;
+    if (t.closest('#chat-input, button, a, select, textarea, .chat-channel')) return;
+    chatSwipe = { w: w, x0: e.touches[0].clientX, y0: e.touches[0].clientY, dx: 0, mode: null };
+  }, { passive: true });
+  document.addEventListener('touchmove', function (e) {
+    if (!chatSwipe || !e.touches || e.touches.length !== 1) return;
+    var dx = e.touches[0].clientX - chatSwipe.x0;
+    var dy = e.touches[0].clientY - chatSwipe.y0;
+    if (!chatSwipe.mode) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { chatSwipe = null; return; }
+      if (Math.abs(dx) > 10 && Math.abs(dx) >= Math.abs(dy)) {
+        chatSwipe.mode = 'drag';
+        chatSwipe.w.classList.add('chat-drag');
+      } else return;
+    }
+    chatSwipe.dx = dx;
+    var off = Math.max(Math.min(dx, 0), -chatSwipe.w.offsetWidth);
+    chatSwipe.w.style.transform = 'translateX(' + off + 'px)';
+  }, { passive: true });
+  function chatSwipeEnd(commit) {
+    if (!chatSwipe) return;
+    var s = chatSwipe; chatSwipe = null;
+    if (s.mode !== 'drag') return;
+    if (Math.abs(s.dx) > 12) {
+      chatSwallowClick = true;
+      setTimeout(function () { chatSwallowClick = false; }, 400);
+    }
+    var thr = Math.min(72, Math.round(s.w.offsetWidth * 0.3));
+    if (commit && s.dx <= -thr) {
+      s.w.classList.remove('chat-drag');
+      s.w.style.transform = '';
+      chatSetOff(true, 'swipe');
+    } else {
+      chatSwipeSnapBack(s.w);
+    }
+  }
+  document.addEventListener('touchend', function () { chatSwipeEnd(true); }, { passive: true });
+  document.addEventListener('touchcancel', function () { chatSwipeEnd(false); }, { passive: true });
+  document.addEventListener('click', function (e) {
+    if (!chatSwallowClick) return;
+    chatSwallowClick = false;
+    if (e.target && e.target.closest && e.target.closest('.chat-window')) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
+  window.__espilChatSwipeState = function () {
+    return {
+      hiddenBy: chatHiddenBy,
+      tabOn: !!(chatTab && chatTab.classList.contains('chat-tab-on')),
+      dragging: !!(chatSwipe && chatSwipe.mode === 'drag')
     };
   };
 
@@ -1981,7 +2125,7 @@
   var mounted = false;
   function mount() {
     if (!document.body) return;
-    [coin, score, timefps, menu, bars, chars, chatBtn, actions, sheet, assignSheet, book].forEach(function (n) {
+    [coin, score, timefps, menu, bars, chars, chatBtn, chatTab, actions, sheet, assignSheet, book].forEach(function (n) {
       if (n && !n.parentNode) document.body.appendChild(n);
     });
     var wrap = el('minimap-wrap');
