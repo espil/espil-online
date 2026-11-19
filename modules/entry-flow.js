@@ -11,12 +11,18 @@
        entry order: the Worker assigns "Guest N" at join and this
        module adopts that name from the roster (with a client-side
        count as fallback until the Worker update deploys).
-   (2) window.__espilEntryLocationGate - formerly the arrival
-       picker the character gate detoured through. Batch D3 (Han
-       2026-11-03): entry no longer asks for a location - the gate
-       hands espilEntryStart a fixed first spawn in front of the
-       Art Gallery as window.__espilSpawnPick; other cities enter
-       directly. The picker implementation below is dormant. */
+   (2) window.__espilEntryLocationGate - the arrival decision
+       the character gate detours through. Batch D3 (Han
+       2026-11-03) stopped the asking: the gate handed
+       espilEntryStart a fixed first spawn in front of the Art
+       Gallery as window.__espilSpawnPick; other cities entered
+       directly. Location summon (Han 2026-11-18) restores the
+       question in this chain - see the LOCATION SUMMON block at
+       the gate: an unset device preference asks (fresh and
+       returning users alike), 'always' receives silently,
+       'never' is exactly the D3 judgement, which survives
+       verbatim below as espilGateUsual. The Batch D3 spot
+       picker implementation stays dormant. */
 (function () {
   'use strict';
   if (window.__espilEntryFlow) return;
@@ -52,6 +58,18 @@
     locating: { en: 'Finding your location...', ko: '위치를 확인하는 중입니다...', fr: 'Localisation en cours...', zh: '正在定位...' },
     outside: { en: 'That is outside the playable area - arriving at the Art Gallery instead.', ko: '플레이 가능 지역 밖이라 아트갤러리 앞에 도착합니다.', fr: "Hors de la zone jouable - arrivée devant la galerie d'art.", zh: '超出可游玩区域，将在美术馆前抵达。' },
     noGeo: { en: 'Location is unavailable - pick a place instead.', ko: '위치를 확인할 수 없습니다. 장소를 골라 주세요.', fr: 'Position indisponible - choisissez un lieu.', zh: '无法定位，请选择一个地点。' },
+    geoAskTitle: { en: 'Start where you really are?', ko: '실제 계신 곳에서 시작하시겠습니까?', fr: 'Commencer l\u00e0 o\u00f9 vous \u00eates vraiment ?', zh: '从您实际所在的地方开始吗？' },
+    geoAskSub: { en: 'Your location is checked on this device only, so you arrive at the matching place in the world. It is never sent to the server and never stored.', ko: '이 기기에서만 위치를 확인해 실제 위치와 같은 자리에 도착합니다. 위치는 서버로 보내지 않고 저장하지 않습니다.', fr: "Votre position est v\u00e9rifi\u00e9e sur cet appareil uniquement, pour arriver \u00e0 l'endroit correspondant dans le monde. Elle n'est jamais envoy\u00e9e au serveur ni conserv\u00e9e.", zh: '仅在此设备上确认您的位置，让您抵达世界中对应的地点。位置绝不会发送到服务器，也不会被保存。' },
+    geoMine: { en: 'Start at my location', ko: '내 위치에서 시작', fr: 'Commencer \u00e0 ma position', zh: '从我的位置开始' },
+    geoUsual: { en: 'Start at the usual place', ko: '평소 위치에서 시작', fr: "Commencer \u00e0 l'endroit habituel", zh: '从平常的位置开始' },
+    geoDontAsk: { en: "Don't ask again", ko: '다음부터 묻지 않기', fr: 'Ne plus demander', zh: '下次不再询问' },
+    geoBack: { en: 'Back', ko: '뒤로', fr: 'Retour', zh: '返回' },
+    geoFail: { en: 'Your location could not be confirmed - starting at the usual place.', ko: '위치를 확인할 수 없어 평소 위치에서 시작합니다.', fr: "Votre position n'a pas pu \u00eatre confirm\u00e9e - d\u00e9part \u00e0 l'endroit habituel.", zh: '无法确认您的位置，将从平常的位置开始。' },
+    geoInaccurate: { en: 'That fix was too rough to trust - starting at the usual place.', ko: '위치 정확도가 낮아 평소 위치에서 시작합니다.', fr: "Cette position \u00e9tait trop impr\u00e9cise - d\u00e9part \u00e0 l'endroit habituel.", zh: '位置精度太低，将从平常的位置开始。' },
+    geoClamped: { en: 'That is just outside the playable area - arriving at its nearest edge.', ko: '플레이 가능 지역 바로 밖이라 가장 가까운 경계에 도착합니다.', fr: "C'est juste hors de la zone jouable - arriv\u00e9e au bord le plus proche.", zh: '那里刚好在可游玩区域之外，将抵达最近的边界。' },
+    geoOtherCity: { en: 'You are in {city} - this dive still enters {here}. Starting at the usual place.', ko: '{city}에 계십니다. 이번 다이브는 {here}로 들어가 평소 위치에서 시작합니다.', fr: 'Vous \u00eates \u00e0 {city} - cette plong\u00e9e entre quand m\u00eame \u00e0 {here}. D\u00e9part \u00e0 l\'endroit habituel.', zh: '您在{city}。本次进入仍前往{here}，将从平常的位置开始。' },
+    geoFar: { en: 'That is far from {here} - starting at the usual place.', ko: '{here}에서 먼 곳이라 평소 위치에서 시작합니다.', fr: "C'est loin de {here} - d\u00e9part \u00e0 l'endroit habituel.", zh: '那里离{here}很远，将从平常的位置开始。' },
+    geoDeniedNote: { en: 'Location permission is off in this browser - enter at the usual place, or allow location and pick the first row.', ko: '이 브라우저에서 위치 권한이 꺼져 있습니다. 평소 위치로 들어가시거나, 위치를 허용하고 첫 행을 골라 주세요.', fr: "L'autorisation de localisation est d\u00e9sactiv\u00e9e dans ce navigateur - entrez par l'endroit habituel, ou autorisez la position et choisissez la premi\u00e8re ligne.", zh: '此浏览器中位置权限已关闭。请从平常的位置进入，或允许定位后选择第一行。' },
     guestOnly: { en: 'Accounts live on our server now. Sign in with Google, or register with your email and password - your character and progress save to your account.', ko: '계정은 이제 서버에서 운영됩니다. Google로 로그인하거나 이메일과 비밀번호로 가입해 주십시오. 캐릭터와 진행 상황은 계정에 저장됩니다.', fr: 'La connexion par compte est en pause. Les comptes migrent vers notre serveur, avec les personnages enregistrés côté serveur et une vérification par e-mail. En attendant, l\'entrée est réservée aux invités.', zh: '账户登录已暂停。账户正在迁移到我们的服务器，角色数据将保存在服务器端并引入邮箱验证。在此之前，仅限访客进入。' }
   };
   function lang() { try { return window.__espilLang() || 'en'; } catch (e) { return 'en'; } }
@@ -82,7 +100,19 @@
     '.locpick-btn{padding:13px 10px;border-radius:12px;border:2px solid #cfa96f;background:linear-gradient(180deg,#fffdf6,#ffeecd);color:#6b4a1f;font:700 .82rem/1.25 "Manrope",sans-serif;cursor:pointer;text-align:center;box-shadow:inset 0 -3px 0 rgba(207,169,111,.35)}' +
     '.locpick-btn:hover,.locpick-btn:focus-visible{border-color:#b57708;background:linear-gradient(180deg,#ffe9b8,#ffd98c);outline:none}' +
     '.locpick-btn.wide{grid-column:1/-1;background:linear-gradient(180deg,#ffb84d,#f08c1a);border-color:#d97f10;color:#fff;text-shadow:0 1px 2px rgba(120,60,0,.5)}' +
-    '.locpick-msg{min-height:18px;margin:10px 0 0;font-size:.78rem;color:#c2571b;text-align:center}';
+    '.locpick-msg{min-height:18px;margin:10px 0 0;font-size:.78rem;color:#c2571b;text-align:center}' +
+    '#espil-locsummon{position:fixed;inset:0;z-index:62;display:none;align-items:center;justify-content:center;background:rgba(4,12,14,.8);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}' +
+    '#espil-locsummon[aria-hidden="false"]{display:flex}' +
+    '.locsummon-card{width:min(430px,92vw);border-radius:18px;padding:22px 22px 16px;background:linear-gradient(180deg,#fffbf0,#fff3dc);border:2px solid #d9b380;box-shadow:0 24px 60px rgba(90,60,20,.35);color:#5a4020;font-family:"Manrope",sans-serif}' +
+    '.locsummon-card h3{margin:0 0 4px;font-size:1.05rem;letter-spacing:.02em}' +
+    '.locsummon-card p{margin:0 0 14px;font-size:.8rem;opacity:.75}' +
+    '.locsummon-list{display:flex;flex-direction:column;gap:9px}' +
+    '.locsummon-row{padding:13px 10px;border-radius:12px;border:2px solid #cfa96f;background:linear-gradient(180deg,#fffdf6,#ffeecd);color:#6b4a1f;font:700 .82rem/1.25 "Manrope",sans-serif;cursor:pointer;text-align:center;box-shadow:inset 0 -3px 0 rgba(207,169,111,.35)}' +
+    '.locsummon-row:hover,.locsummon-row:focus-visible{border-color:#b57708;background:linear-gradient(180deg,#ffe9b8,#ffd98c);outline:none}' +
+    '.locsummon-row.primary{background:linear-gradient(180deg,#ffb84d,#f08c1a);border-color:#d97f10;color:#fff;text-shadow:0 1px 2px rgba(120,60,0,.5)}' +
+    '.locsummon-row.dim{opacity:.55}' +
+    '.locsummon-toggle{display:flex;align-items:center;gap:8px;padding:4px 2px;font:600 .8rem/1.3 "Manrope",sans-serif;color:#6b4a1f;cursor:pointer}' +
+    '.locsummon-msg{min-height:18px;margin:10px 0 0;font-size:.78rem;color:#c2571b;text-align:center}';
   document.head.appendChild(css);
 
   /* ---------------- accounts (same store as the social module) --- */
@@ -424,7 +454,14 @@
     var n = pendingNext; pendingNext = null;
     if (typeof n === 'function') n(); /* the world's own continuation enters the map */
   }
-  window.__espilEntryLocationGate = function (next) {
+  /* The Batch D3 gate judgement, kept verbatim as the
+     USUAL-PLACE path of the location summon gate further below:
+     a logged-in direct game-page visit with a valid saved
+     position resumes; every other entry takes the gallery pick.
+     The location summon wrapper decides whether this judgement
+     runs directly (preference 'never', a refusal, any receive
+     failure) or whether a location pick pre-empts it. */
+  function espilGateUsual(next) {
     var key = '';
     try { var k = window.__espilCityKey; key = String(typeof k === 'function' ? k() : (k || '')).toLowerCase(); } catch (_) {}
     if (key && key.indexOf('vancouver') < 0) { if (typeof next === 'function') next(); return; }
@@ -499,10 +536,218 @@
     }
     pendingNext = typeof next === 'function' ? next : null;
     finishPick(snapWalkable(3, 33));
+  }
+
+  /* ---------------- location summon (Han 2026-11-18) ------------
+     __espilLocSummonGate v1 - the location question sits HERE, in
+     the entry chain between the character confirm and the loading
+     sequence (the seat the 2026-10-28 seam always named), never
+     during the fall: the monolith's mid-dive prompt is retired
+     with this build, so the question can never double. Device
+     preference espil_loc_summon_v1 in {'always','never'} (absent
+     = unset): unset asks on EVERY dive, fresh and returning users
+     alike (Han's decision, DESIGN.md appendix); 'always'
+     receives silently; 'never' runs espilGateUsual untouched.
+     Only the preference is ever stored - never a coordinate
+     (design 3.6). The raw fix is judged only by the monolith
+     seam window.__espilGeoJudge; this module never converts
+     coordinates itself. */
+  var LS_LOC_PREF = 'espil_loc_summon_v1';
+  function locPref() {
+    try { var v = localStorage.getItem(LS_LOC_PREF); return (v === 'always' || v === 'never') ? v : null; } catch (_) { return null; }
+  }
+  function setLocPref(v) {
+    try { if (v) localStorage.setItem(LS_LOC_PREF, v); else localStorage.removeItem(LS_LOC_PREF); } catch (_) {}
+  }
+  /* Was the character panel ever PRESENTED on this page? (The
+     direct-entry path never shows it.) Watched the same way
+     init() watches the sign-in modal. It decides what the ask's
+     Back row means (design 2.1): presented -> return to the
+     panel; never presented -> Back IS the usual-place row. */
+  var locPanelSeen = false, locPanelWatch = false;
+  function locWatchPanel() {
+    if (locPanelWatch) return;
+    var panel = document.getElementById('char-custom');
+    if (!panel) return;
+    locPanelWatch = true;
+    if (panel.getAttribute('aria-hidden') === 'false') locPanelSeen = true;
+    try {
+      new MutationObserver(function () {
+        if (panel.getAttribute('aria-hidden') === 'false') locPanelSeen = true;
+      }).observe(panel, { attributes: true, attributeFilter: ['aria-hidden'] });
+    } catch (_) {}
+  }
+  function locToast(msg) { try { if (typeof window.__espilToast === 'function') window.__espilToast(msg); } catch (_) {} }
+  var LOC_CITY_NAMES = { vancouver: 'Vancouver', auckland: 'Auckland', tokyo: 'Tokyo', newyork: 'New York', paris: 'Paris', london: 'London' };
+  function locCityName() {
+    var k = '';
+    try { var kk = window.__espilCityKey; k = String(typeof kk === 'function' ? kk() : (kk || '')).toLowerCase(); } catch (_) {}
+    for (var key in LOC_CITY_NAMES) { if (k.indexOf(key) >= 0) return LOC_CITY_NAMES[key]; }
+    return 'Vancouver';
+  }
+  /* One receive attempt, judged by the monolith seam. cb gets
+     {ok:true, point, kind:'inside'|'clamped'} or {ok:false, why}
+     with why in denied|timeout|error|unsupported|inaccurate|
+     other-city|outside. Every failure shape lands the caller on
+     the usual-place path - entry is never blocked (design 2.3).
+     The fix is requested only here, at selection time. */
+  function locSummonTry(cb) {
+    if (!navigator.geolocation) { cb({ ok: false, why: 'unsupported' }); return; }
+    var settled = false;
+    function once(r) { if (settled) return; settled = true; cb(r); }
+    try {
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        var c = pos && pos.coords;
+        if (!c || typeof c.latitude !== 'number' || typeof c.longitude !== 'number' || !isFinite(c.latitude) || !isFinite(c.longitude)) { once({ ok: false, why: 'error' }); return; }
+        var maxAcc = (typeof window.__espilGeoMaxAccuracyM === 'number') ? window.__espilGeoMaxAccuracyM : 5000;
+        if (typeof c.accuracy === 'number' && c.accuracy > maxAcc) { once({ ok: false, why: 'inaccurate' }); return; }
+        var j = null;
+        try { j = window.__espilGeoJudge(c.latitude, c.longitude); } catch (_) {}
+        if (!j) { once({ ok: false, why: 'error' }); return; }
+        if (j.kind === 'inside' || j.kind === 'clamped') once({ ok: true, point: j.point, kind: j.kind });
+        else if (j.kind === 'other-city') once({ ok: false, why: 'other-city', city: j.city });
+        else once({ ok: false, why: 'outside' });
+      }, function (err) {
+        once({ ok: false, why: (err && err.code === 1) ? 'denied' : (err && err.code === 3) ? 'timeout' : 'error' });
+      }, { timeout: 10000, maximumAge: 60000 });
+    } catch (_) { once({ ok: false, why: 'error' }); }
+  }
+  function locFailNotice(why, city) {
+    if (why === 'inaccurate') return t('geoInaccurate');
+    if (why === 'other-city') return t('geoOtherCity', { city: LOC_CITY_NAMES[city] || city || '', here: locCityName() });
+    if (why === 'outside') return t('geoFar', { here: locCityName() });
+    return t('geoFail');
+  }
+  function locFinishPick(p, next) {
+    /* The gate's final snap (design 3.5 step 4): the collision
+       probe keeps the pick off buildings and water, exactly as
+       the gallery pick has always been snapped. */
+    var s = snapWalkable(p.x, p.z);
+    window.__espilSpawnPick = { x: s.x, z: s.z };
+    if (typeof next === 'function') next();
+  }
+  var locAskEl = null;
+  function hideLocAsk() { if (locAskEl) locAskEl.setAttribute('aria-hidden', 'true'); }
+  function locAskMsg(m) { var el = $('locsummon-msg'); if (el) el.textContent = m || ''; }
+  function buildLocAsk(next) {
+    hideLocAsk();
+    /* One ask element only: a re-ask after Back must not leave
+       a hidden same-id element ahead of the live one. */
+    var stale = document.getElementById('espil-locsummon');
+    if (stale && stale.parentNode) stale.parentNode.removeChild(stale);
+    locAskEl = null;
+    var el = document.createElement('div');
+    el.id = 'espil-locsummon';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-hidden', 'false');
+    el.innerHTML =
+      '<div class="locsummon-card"><h3>' + esc(t('geoAskTitle')) + '</h3><p>' +
+      esc(t('geoAskSub')) + '</p><div class="locsummon-list">' +
+      '<button type="button" class="locsummon-row primary" data-act="mine">' + esc(t('geoMine')) + '</button>' +
+      '<button type="button" class="locsummon-row" data-act="usual">' + esc(t('geoUsual')) + '</button>' +
+      '<label class="locsummon-toggle"><input type="checkbox" id="locsummon-dontask"> ' + esc(t('geoDontAsk')) + '</label>' +
+      '<button type="button" class="locsummon-row" data-act="back">' + esc(t('geoBack')) + '</button>' +
+      '</div><p class="locsummon-msg" id="locsummon-msg"></p></div>';
+    document.body.appendChild(el);
+    locAskEl = el;
+    /* Permission pre-check (design 2.3): where the browser can
+       say the permission is already denied, note it at the ask
+       instead of letting the first row fail without a word. */
+    try {
+      if (navigator.permissions && navigator.permissions.query) {
+        navigator.permissions.query({ name: 'geolocation' }).then(function (st) {
+          if (st && st.state === 'denied') {
+            locAskMsg(t('geoDeniedNote'));
+            var b = el.querySelector('[data-act="mine"]');
+            if (b) b.classList.add('dim');
+          }
+        }).catch(function () {});
+      }
+    } catch (_) {}
+    el.querySelectorAll('.locsummon-row').forEach(function (b) {
+      b.addEventListener('click', function () { locAskChoose(b.getAttribute('data-act'), next); });
+    });
+  }
+  function locAskChoose(act, next) {
+    var dontAsk = false;
+    var cbEl = $('locsummon-dontask');
+    if (cbEl) dontAsk = !!cbEl.checked;
+    if (act === 'back' && locPanelSeen) {
+      /* Back to the character gate: the panel WAS presented on
+         this page and confirmCharacter only hid it - re-show it
+         exactly as the gate left it. No answer was given, so no
+         preference is written. */
+      hideLocAsk();
+      var panel = document.getElementById('char-custom');
+      if (panel) panel.setAttribute('aria-hidden', 'false');
+      return;
+    }
+    if (act === 'back' || act === 'usual') {
+      /* Back on the direct-entry path (the panel never
+         presented) is this same row, per design 2.1. */
+      if (dontAsk) setLocPref('never');
+      hideLocAsk();
+      espilGateUsual(next);
+      return;
+    }
+    if (act === 'mine') {
+      locAskMsg(t('locating'));
+      locSummonTry(function (r) {
+        if (r.ok) {
+          if (dontAsk) setLocPref('always');
+          hideLocAsk();
+          if (r.kind === 'clamped') locToast(t('geoClamped'));
+          locFinishPick(r.point, next);
+          return;
+        }
+        /* The stated intent was "my location": it becomes the
+           'always' preference EXCEPT on a denied permission,
+           where the choice cannot work at all - then nothing is
+           written and a later dive asks honestly (design 3.7). */
+        if (r.why === 'denied') setLocPref(null);
+        else if (dontAsk) setLocPref('always');
+        hideLocAsk();
+        locToast(locFailNotice(r.why, r.city));
+        espilGateUsual(next);
+      });
+    }
+  }
+  window.__espilEntryLocationGate = function (next) {
+    var n = typeof next === 'function' ? next : function () {};
+    locWatchPanel();
+    /* Place-space child window (design L9): the visit's place
+       mark sits in this window's sessionStorage and the entry is
+       the building's own space - the ask never appears there;
+       the usual judgement runs exactly as before this build. */
+    var placeMark = null;
+    try { placeMark = JSON.parse(sessionStorage.getItem('espil_store_space_v1') || 'null'); } catch (_) {}
+    if (placeMark && placeMark.city && placeMark.slug) { espilGateUsual(n); return; }
+    var pref = locPref();
+    if (pref === 'never') { espilGateUsual(n); return; }
+    if (pref === 'always') {
+      locSummonTry(function (r) {
+        if (r.ok) {
+          if (r.kind === 'clamped') locToast(t('geoClamped'));
+          locFinishPick(r.point, n);
+          return;
+        }
+        if (r.why === 'denied') setLocPref(null); /* permission revoked since the choice: unset, so the next dive asks honestly (design 3.7) */
+        else locToast(locFailNotice(r.why, r.city));
+        espilGateUsual(n);
+      });
+      return;
+    }
+    /* Unset: ask - unless the question could never resolve (no
+       seam in the monolith, or no geolocation in the browser),
+       in which case the usual judgement stands alone. */
+    if (typeof window.__espilGeoJudge !== 'function' || !navigator.geolocation) { espilGateUsual(n); return; }
+    buildLocAsk(n);
   };
+
 
   /* claim the auth zone now, and re-claim it whenever the modal opens */
   function init() {
+    locWatchPanel();
     buildAuthZone();
     restoreParkedSession();
     serverSessionSync();

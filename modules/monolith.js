@@ -1998,10 +1998,23 @@
           if(!isWaterAt(nx,nz))return {x:nx,z:nz};
         }
       }
-      return {x:3,z:31};
+      var spFb=espilCityCfg().spawn; return {x:spFb.x,z:spFb.z}; /* city spawn (location summon generalization, 2026-11-18: was the Vancouver literal {x:3,z:31}, which IS Vancouver's cfg.spawn) */
     }
     function espilResolveSpawn(geo){
-      if(!espilCityCfg().core){ var sp=espilCityCfg().spawn; return {x:sp.x,z:sp.z}; } /* offset city: every fresh entry starts at its entry point (phase 1) */
+      if(!espilCityCfg().core){
+        /* Offset city (generalized 2026-11-18, location summon):
+           WITH a point, resolve it to the nearest land point
+           inside this city's own bounds - the Vancouver law
+           below, generalized; the out-of-bounds saved-position
+           judgement that also calls this function stays
+           consistent with it. WITHOUT a point, the phase-1 law
+           stands: every fresh entry starts at the entry point. */
+        var cfgO=espilCityCfg();
+        if(!geo||!cfgO.bounds)return {x:cfgO.spawn.x,z:cfgO.spawn.z};
+        var bO=cfgO.bounds;
+        var cxO=Math.max(bO.x0,Math.min(bO.x1,geo.x)), czO=Math.max(bO.z0,Math.min(bO.z1,geo.z));
+        return espilNudgeToLand(cxO,czO);
+      }
       if(!geo)return {x:3,z:31};
       if(espilInBoundary(geo.x,geo.z,1))return espilNudgeToLand(geo.x,geo.z);
       /* nearest point on the boundary polygon edges */
@@ -2018,38 +2031,83 @@
       if(!best)best={x:3,z:31};
       return espilNudgeToLand(best.x,best.z);
     }
-    /* --- geolocation pre-prompt (fresh entries only, during the fall) --- */
-    var espilGeoEl=null;
-    function espilHideGeoPrompt(){ if(espilGeoEl){espilGeoEl.style.display='none';} }
-    function espilShowGeoPrompt(){
-      if(espilGeoEl){espilGeoEl.style.display='block';return;}
-      var d=document.createElement('div');
-      d.style.cssText='position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:65;display:block;background:rgba(10,14,20,.9);color:#e8eef4;padding:12px 16px;border-radius:12px;font:500 .85rem "Manrope",sans-serif;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.45);';
-      d.innerHTML='<div style="margin-bottom:9px;">Start from your real location?</div>';
-      var b1=document.createElement('button');
-      b1.textContent='\uD83D\uDCCD Use my location';
-      b1.style.cssText='margin-right:8px;padding:7px 12px;border-radius:8px;border:0;background:#e8b34a;color:#14100a;font:600 .82rem "Manrope",sans-serif;cursor:pointer;';
-      var b2=document.createElement('button');
-      b2.textContent='Start downtown';
-      b2.style.cssText='padding:7px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.35);background:transparent;color:#e8eef4;font:600 .82rem "Manrope",sans-serif;cursor:pointer;';
-      b1.onclick=function(){
-        espilHideGeoPrompt();
-        if(!navigator.geolocation)return;
-        navigator.geolocation.getCurrentPosition(function(pos){
-          var p=walkPlayer; if(!p||!p._espilArrive)return; /* arrival over - too late to retarget */
-          var gx=(pos.coords.longitude+123.1207)*111320*Math.cos(49.2827*Math.PI/180);
-          var gz=-(pos.coords.latitude-49.2827)*111320;
-          var pt=espilResolveSpawn({x:gx,z:gz});
-          p.pos.x=pt.x; p.pos.z=pt.z;
-          if(p._espilArrive)p._espilArrive.surf=null; /* re-probe at the new target */
-        },function(){}, {timeout:8000,maximumAge:60000});
-      };
-      b2.onclick=function(){ espilHideGeoPrompt(); };
-      d.appendChild(b1); d.appendChild(b2);
-      document.body.appendChild(d);
-      espilGeoEl=d;
-      setTimeout(espilHideGeoPrompt,25000);
+    /* === LOCATION SUMMON SEAM __espilLocSummonSeam v1 (Han
+       2026-11-18, location-summon/DESIGN.md sections 3.4-3.5) ===
+       The entry gate (entry-flow) asks the location question
+       BEFORE the dive and calls only this seam. The inverse of
+       espilP1LngLat lives here so the conversion has exactly
+       one home. Raw coordinates enter; a world point (or a
+       judgement) leaves; nothing is stored and nothing leaves
+       the device. */
+    var ESPIL_GEO_MAX_ACCURACY_M=5000; /* a fix coarser than this is not a precise fix (design 2.3) */
+    var ESPIL_GEO_CLAMP_MAX_M=25000; /* boundary clamp reach: the same living area, not another continent (design 3.4) */
+    window.__espilGeoMaxAccuracyM=ESPIL_GEO_MAX_ACCURACY_M;
+    function espilGeoCityPoint(key,lat,lng){
+      var cfg=ESPIL_CITIES[key], a=ESPIL_P1_ANCHORS[key];
+      if(!cfg||!a)return null;
+      var lx=(lng-a.lng)*111320*Math.cos(a.lat*Math.PI/180);
+      var lz=-(lat-a.lat)*111320;
+      return {x:lx+(cfg.ox||0), z:lz+(cfg.oz||0)};
     }
+    function espilGeoDistToBounds(b,x,z){
+      if(!b)return null;
+      var dx=0,dz=0;
+      if(x<b.x0)dx=b.x0-x; else if(x>b.x1)dx=x-b.x1;
+      if(z<b.z0)dz=b.z0-z; else if(z>b.z1)dz=z-b.z1;
+      return Math.sqrt(dx*dx+dz*dz);
+    }
+    /* Judge a fix for the CURRENT city. Returns one of:
+       {kind:'inside', point} - inside the selected city's
+         playable extent; the point already went through the
+         validity chain (edge rule, then water nudge).
+       {kind:'clamped', point, distM} - outside but within
+         ESPIL_GEO_CLAMP_MAX_M of the bounds; the point is
+         resolved by espilResolveSpawn (the boundary law).
+       {kind:'other-city', city} - inside another built
+         city's extent; the dive still enters the selected
+         city (city choice belongs to the landing).
+       {kind:'far'} - unrelated to every built city. */
+    window.__espilGeoJudge=function(lat,lng){
+      try{
+        if(typeof lat!=='number'||typeof lng!=='number'||!isFinite(lat)||!isFinite(lng))return {kind:'far'};
+        var cur=espilCityKey(), cfg=espilCityCfg();
+        var pt=espilGeoCityPoint(cur,lat,lng);
+        if(!pt)return {kind:'far'};
+        var b=cfg.bounds;
+        var inside=b?(pt.x>=b.x0&&pt.x<=b.x1&&pt.z>=b.z0&&pt.z<=b.z1):espilInBoundary(pt.x,pt.z,1);
+        if(inside){
+          var ep=espilResumeEdgePoint(pt.x,pt.z);
+          var q=ep||pt;
+          return {kind:'inside', point:espilNudgeToLand(q.x,q.z)};
+        }
+        for(var k in ESPIL_CITIES){
+          if(k===cur)continue;
+          var b2=ESPIL_CITIES[k].bounds; if(!b2)continue;
+          var p2=espilGeoCityPoint(k,lat,lng);
+          if(p2&&p2.x>=b2.x0&&p2.x<=b2.x1&&p2.z>=b2.z0&&p2.z<=b2.z1)return {kind:'other-city', city:k};
+        }
+        var d=espilGeoDistToBounds(b,pt.x,pt.z);
+        if(d!==null&&d<=ESPIL_GEO_CLAMP_MAX_M){
+          var rp=espilResolveSpawn({x:pt.x,z:pt.z});
+          var ep2=espilResumeEdgePoint(rp.x,rp.z);
+          if(ep2)rp=espilNudgeToLand(ep2.x,ep2.z);
+          return {kind:'clamped', point:rp, distM:Math.round(d)};
+        }
+        return {kind:'far'};
+      }catch(e){ return {kind:'far'}; }
+    };
+    window.__espilGeoSpawn=function(lat,lng){
+      var j=window.__espilGeoJudge(lat,lng);
+      return (j&&j.point)?j.point:null;
+    };
+    /* === END LOCATION SUMMON SEAM === */
+    /* --- geolocation pre-prompt RETIRED (2026-11-18, location
+       summon): the mid-dive prompt, its mid-fall retarget and
+       its hide hooks are gone. The location question now sits
+       in the entry chain (entry-flow's __espilEntryLocationGate)
+       BEFORE the dive, with a device preference; asking again
+       here would double the question. The seam the gate calls
+       is __espilGeoJudge (location summon seam, above). --- */
     /* --- UI rise (production standard): panels start lowered + faded
        during the fall, then rise bottom -> top once the landing lands. --- */
     var espilStyleDone=false;
@@ -2099,7 +2157,6 @@
       walkCamDist=60;
       if(typeof espilP1!=='undefined'&&espilP1)espilP1.zoomDrive=false;
       if(typeof walkAvatar!=='undefined'&&walkAvatar&&walkAvatar.playDive)walkAvatar.playDive();
-      espilShowGeoPrompt();
       espilUiRise();
       window.__espilLastDive={city:espilCityKey(),at:Date.now()};
       window.__espilLastArrival={city:espilCityKey(),at:Date.now()};
@@ -2119,7 +2176,6 @@
       p._espilArrive={surf:base,probeAt:0,startedAt:performance.now(),dur:1900};
       walkCamDist=60; /* wide sky framing; the step eases it to 7.0 */
       if(typeof espilP1!=='undefined'&&espilP1)espilP1.zoomDrive=false; /* the arrival envelope leads the map zoom for this entry */
-      espilShowGeoPrompt();
     }
     function espilArrivalStep(p,dt){
       var a=p._espilArrive; if(!a)return;
@@ -2132,7 +2188,7 @@
         }
         var td=Math.max(0,Math.min(1,(nowD-a.startedAt)/a.dur));
         var fd=1-td; walkCamDist=7.0+53.0*fd*fd;
-        if(td>=1){ p._espilArrive=null; walkCamDist=7.0; espilHideGeoPrompt(); }
+        if(td>=1){ p._espilArrive=null; walkCamDist=7.0; }
         return;
       }
       var now=performance.now();
@@ -2143,7 +2199,6 @@
       if(t>=1){
         p._espilArrive=null;
         walkCamDist=7.0;
-        espilHideGeoPrompt();
         espilUiRise();
         /* GUIDE HOOKS (joint guide project, 2026-10-21): the guide
            layer watches ACTIONS, not clicks, so the build reports the
