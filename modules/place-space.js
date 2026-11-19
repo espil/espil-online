@@ -51,7 +51,22 @@
    - Exit: the door closes this window and the parent resumes
      under the store-page-link contract; with no opener (a direct
      address visit) the door returns the player to the street in
-     this same window. */
+     this same window.
+   - Store entry video (Han 2026-11-17, store-video-ads DESIGN):
+     selecting a store first asks the API whether that store has
+     a registered entry video. If it does - and this visit has
+     not shown it yet - a DOM video panel plays the store's own
+     promo BEFORE the book: a platform-attached 광고 badge and
+     store name stay on for the whole playback, the skip control
+     exists only from 3.0 s, an X close (from 0 s) returns to the
+     lobby without opening the book, and the end or a skip hands
+     over to the book. Playback beacons count aggregate plays /
+     completions / skips to the Worker (one word per transition,
+     no identity of any kind). A store with no registered video -
+     and any video lookup failure - opens the book directly,
+     exactly as before: no placeholder, no other store's video,
+     no network ad, ever. Frequency is once per store per visit
+     (a sessionStorage seen-set; nothing reaches localStorage). */
 (function () {
   'use strict';
   if (window.__espilPlaceSpace) return;
@@ -93,6 +108,9 @@
   var CITY = String(mark.city), SLUG = String(mark.slug);
   var STOCK_KEY = 'espil_shop_stock_v1';
   var PURCHASE_KEY = 'espil_store_purchase_v1';
+  var VIDEO_SEEN_KEY = 'espil_place_video_seen_v1';
+  var VIDEO_SKIP_AT = 3.0;      /* the skip control exists from 3.0 s (Profit 확정, 고정) */
+  var VIDEO_LOAD_MS = 8000;     /* draft: abandon to the book if playback has not begun (the place API timeout's constant) */
 
   /* ---------------- helpers (the pair's own idioms) ---------------- */
   function toast(m) { if (window.__espilToast) window.__espilToast(m); }
@@ -186,11 +204,13 @@
     api: 'idle',             /* idle | loading | ok | error */
     overflow: 0,
     aimed: null,
-    book: { open: false, store: null, data: null, spread: 0, pageIdx: 0, failed: false }
+    book: { open: false, store: null, data: null, spread: 0, pageIdx: 0, failed: false },
+    video: { open: false, store: null, info: null, started: false, settled: false, skipShown: false, fetchSeq: 0, loadTimer: null }
   };
   var lobby = null;          /* {group, W, D} */
   var bays = [];             /* {store, ax, ay, az, el} */
   var itemsCache = {};       /* store id -> items answer (this visit only) */
+  var videoCache = {};       /* store id -> video answer (this visit only; failures are not cached) */
   var preSummon = null;
 
   /* ---------------- styling ---------------- */
@@ -248,6 +268,26 @@
       'background:rgba(44,36,23,.10);color:#2c2417;font-size:26px;border-radius:8px;}' +
     '.ps-prev{left:6px;}.ps-next{right:6px;}' +
     '.ps-pageno{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:12px;color:#8a6d2f;font-weight:700;}' +
+    '#ps-video{position:fixed;inset:0;z-index:11500;display:none;align-items:center;justify-content:center;' +
+      'background:rgba(4,8,11,.55);font-family:"Avenir Next","Segoe UI",Manrope,sans-serif;}' +
+    '#ps-video.open{display:flex;}' +
+    '.psv-frame{position:relative;width:min(88vw,860px);background:#0b1116;border-radius:10px;' +
+      'box-shadow:0 24px 70px rgba(0,0,0,.65);overflow:hidden;color:#eaf6ff;}' +
+    '.psv-frame video{display:block;width:100%;height:auto;max-height:68vh;background:#000;}' +
+    '.psv-badge{position:absolute;top:10px;left:10px;z-index:3;display:flex;align-items:center;gap:8px;pointer-events:none;}' +
+    '.psv-badge .psv-ad{background:#f2b63c;color:#0b1116;font-weight:800;font-size:13px;letter-spacing:.06em;' +
+      'border-radius:6px;padding:4px 9px;}' +
+    '.psv-badge .psv-store{font-weight:700;font-size:13.5px;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.9);}' +
+    '.psv-loading{position:absolute;inset:0;display:none;align-items:center;justify-content:center;z-index:2;' +
+      'font-size:14px;font-weight:600;color:#cfe3ef;background:rgba(0,0,0,.35);}' +
+    '.psv-loading.on{display:flex;}' +
+    '.psv-x{position:absolute;top:8px;right:10px;z-index:3;width:36px;height:36px;border-radius:50%;border:0;cursor:pointer;' +
+      'background:rgba(9,16,22,.65);color:#eaf6ff;font-size:20px;line-height:1;}' +
+    '.psv-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;}' +
+    '.psv-caption{flex:1 1 auto;font-size:13px;font-weight:600;color:#cfe3ef;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
+    '.psv-btn{cursor:pointer;font:600 12.5px inherit;color:#0b1116;background:#8ef7e8;border:0;border-radius:999px;padding:6px 14px;}' +
+    '.psv-btn.ghost{background:rgba(234,246,255,.14);color:#eaf6ff;}' +
+    '@media (max-width:680px){ .psv-frame{width:94vw;} .psv-bar{flex-wrap:wrap;} }' +
     '@media (max-width:680px){ .ps-frame{width:94vw;height:82vh;} .ps-page{padding:20px 18px;} ' +
       '.ps-frame[data-show="intro"] .ps-right{display:none;} .ps-frame[data-show="items"] .ps-left{display:none;} }';
   document.head.appendChild(css);
@@ -305,9 +345,76 @@
     frameEl.addEventListener('pointercancel', function () { pid = null; });
   })();
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && state.book.open) { e.preventDefault(); e.stopPropagation(); closeBook(); }
+    if (e.key !== 'Escape') return;
+    if (state.video.open) { e.preventDefault(); e.stopPropagation(); closeVideoToLobby(); return; }
+    if (state.book.open) { e.preventDefault(); e.stopPropagation(); closeBook(); }
   }, true);
   window.addEventListener('resize', function () { if (state.book.open) renderBook(); });
+
+  /* ---------------- the entry-video panel scaffolding ------------ */
+  var videoEl = document.createElement('div');
+  videoEl.id = 'ps-video'; videoEl.setAttribute('aria-hidden', 'true');
+  videoEl.innerHTML =
+    '<div class="psv-frame">' +
+      '<video muted playsinline preload="metadata"></video>' +
+      '<div class="psv-badge"><span class="psv-ad">&#44305;&#44256;</span><span class="psv-store"></span></div>' +
+      '<div class="psv-loading"></div>' +
+      '<button type="button" class="psv-x" aria-label="Close">&times;</button>' +
+      '<div class="psv-bar">' +
+        '<div class="psv-caption"></div>' +
+        '<button type="button" class="psv-btn ghost psv-sound"></button>' +
+        '<button type="button" class="psv-btn ghost psv-pause"></button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(videoEl);
+  var vidEl = videoEl.querySelector('video');
+  var vidStoreEl = videoEl.querySelector('.psv-store');
+  var vidCaptionEl = videoEl.querySelector('.psv-caption');
+  var vidLoadingEl = videoEl.querySelector('.psv-loading');
+  var vidSoundBtn = videoEl.querySelector('.psv-sound');
+  var vidPauseBtn = videoEl.querySelector('.psv-pause');
+  var vidBarEl = videoEl.querySelector('.psv-bar');
+  /* The skip control is created DETACHED: before 3.0 s it is not
+     in the DOM at all (the design's honest wait), and it is
+     appended the first time playback passes the mark. */
+  var vidSkipBtn = document.createElement('button');
+  vidSkipBtn.type = 'button'; vidSkipBtn.className = 'psv-btn psv-skip';
+  videoEl.querySelector('.psv-x').addEventListener('click', function () { closeVideoToLobby(); });
+  vidSkipBtn.addEventListener('click', function () { settleVideoToBook('skip'); });
+  vidSoundBtn.addEventListener('click', function () {
+    vidEl.muted = !vidEl.muted;
+    paintVideoControls();
+  });
+  vidPauseBtn.addEventListener('click', function () {
+    if (vidEl.paused) { var p = vidEl.play(); if (p && p.catch) p.catch(function () {}); }
+    else vidEl.pause();
+    paintVideoControls();
+  });
+  vidEl.addEventListener('playing', function () {
+    if (!state.video.open || state.video.started) return;
+    state.video.started = true;
+    if (state.video.loadTimer) { clearTimeout(state.video.loadTimer); state.video.loadTimer = null; }
+    vidLoadingEl.classList.remove('on');
+    videoBeacon(state.video.store, 'start');
+  });
+  vidEl.addEventListener('timeupdate', function () {
+    if (!state.video.open || state.video.skipShown) return;
+    if (vidEl.currentTime >= VIDEO_SKIP_AT) {
+      state.video.skipShown = true;
+      vidBarEl.appendChild(vidSkipBtn);
+    }
+  });
+  vidEl.addEventListener('ended', function () { settleVideoToBook('complete'); });
+  vidEl.addEventListener('error', function () {
+    /* A failed source never holds the book hostage: before
+       playback it is the load-abandon path (no counter moves);
+       mid-playback it settles silently to the book the same way. */
+    if (!state.video.open || state.video.settled) return;
+    state.video.settled = true;
+    var store = state.video.store;
+    closeVideoPanel();
+    if (store) openBook(store);
+  }, true);
 
   /* ---------------- geometry (the building's own record) -------- */
   /* PLACE EXPANSION (Han 2026-11-17): the address catch-all means
@@ -541,6 +648,136 @@
     }
   }
 
+  /* ---------------- the entry video ------------------------------- */
+  /* Frequency: once per store per visit. The seen-set lives in
+     sessionStorage - it dies with this child window, which IS the
+     visit - and never reaches localStorage, so no stale record
+     follows the player into the next visit. */
+  function videoSeenSet() {
+    try {
+      var a = JSON.parse(sessionStorage.getItem(VIDEO_SEEN_KEY) || '[]');
+      return Array.isArray(a) ? a : [];
+    } catch (e) { return []; }
+  }
+  function videoSeen(id) { return videoSeenSet().indexOf(id) >= 0; }
+  function videoMarkSeen(id) {
+    try {
+      var a = videoSeenSet();
+      if (a.indexOf(id) < 0) { a.push(id); sessionStorage.setItem(VIDEO_SEEN_KEY, JSON.stringify(a)); }
+    } catch (e) {}
+  }
+  /* The counting beacon (DESIGN §8): the body is exactly one word,
+     {event}. It carries the store's identity in the path (city /
+     slug / store id - the same public identifiers the read routes
+     use) and NOTHING about the player: no user id, no session id,
+     no guest identifier, no coordinates, no timestamp (the server
+     files it under its own receive month). Sent as a text/plain
+     blob so the beacon stays a simple request; fire-and-forget -
+     a failed count never touches playback or purchase. */
+  function videoBeacon(store, event) {
+    if (!store) return;
+    try {
+      var url = API_BASE + '/places/' + encodeURIComponent(CITY) + '/' + encodeURIComponent(SLUG) +
+        '/stores/' + encodeURIComponent(store.id) + '/video-events';
+      var body = JSON.stringify({ event: event });
+      var sent = false;
+      if (navigator.sendBeacon) {
+        try { sent = navigator.sendBeacon(url, new Blob([body], { type: 'text/plain;charset=UTF-8' })); } catch (e) {}
+      }
+      if (!sent) {
+        fetch(url, { method: 'POST', body: body, headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, keepalive: true })
+          .catch(function () {});
+      }
+    } catch (e) {}
+  }
+  /* BGM ducking while the panel is open, through the landing
+     audio machine the water build already uses (EspilAudio.
+     setMuffle: a lowpass settle, or a volume duck where the
+     graph is unavailable). The panel's minutes belong to the
+     store; closing the panel - by any path - restores. Guarded:
+     no audio machine, no duck, no error. */
+  function videoDuck(on) {
+    try { if (window.EspilAudio && window.EspilAudio.setMuffle) window.EspilAudio.setMuffle(!!on); } catch (e) {}
+  }
+  function videoStrings() {
+    return (lang() === 'ko')
+      ? { captionSuffix: ' \uD64D\uBCF4 \uC601\uC0C1', loading: '\uC601\uC0C1\uC744 \uBD88\uB7EC\uC624\uB294 \uC911\u2026',
+          skip: '\uAC74\uB108\uB6F0\uAE30', soundOn: '\uC18C\uB9AC \uCF1C\uAE30', soundOff: '\uC18C\uB9AC \uB044\uAE30',
+          pause: '\uC77C\uC2DC\uC815\uC9C0', play: '\uC7AC\uC0DD' }
+      : { captionSuffix: ' promotional video', loading: 'Loading the video\u2026',
+          skip: 'Skip', soundOn: 'Sound on', soundOff: 'Sound off', pause: 'Pause', play: 'Play' };
+  }
+  function paintVideoControls() {
+    var s = videoStrings();
+    vidSoundBtn.textContent = vidEl.muted ? s.soundOn : s.soundOff;
+    vidPauseBtn.textContent = vidEl.paused ? s.play : s.pause;
+    vidSkipBtn.textContent = s.skip;
+  }
+  function loadVideo(store, done) {
+    if (videoCache[store.id]) { done(videoCache[store.id]); return; }
+    fetchJson(API_BASE + '/places/' + encodeURIComponent(CITY) + '/' + encodeURIComponent(SLUG) +
+      '/stores/' + encodeURIComponent(store.id) + '/video').then(function (d) {
+      videoCache[store.id] = d; done(d);
+    }, function () { done(null); });
+  }
+  function openVideoPanel(store, video) {
+    state.video.open = true; state.video.store = store; state.video.info = video;
+    state.video.started = false; state.video.settled = false; state.video.skipShown = false;
+    videoMarkSeen(store.id);
+    var s = videoStrings();
+    vidStoreEl.textContent = store.name;
+    vidCaptionEl.textContent = store.name + s.captionSuffix;
+    vidLoadingEl.textContent = s.loading;
+    vidLoadingEl.classList.add('on');
+    if (vidSkipBtn.parentNode) vidSkipBtn.parentNode.removeChild(vidSkipBtn);
+    vidEl.muted = true;
+    if (video.posterUrl) vidEl.setAttribute('poster', video.posterUrl); else vidEl.removeAttribute('poster');
+    vidEl.src = video.url;
+    paintVideoControls();
+    layer.style.display = 'none'; cross.style.display = 'none';
+    videoEl.classList.add('open'); videoEl.setAttribute('aria-hidden', 'false');
+    videoDuck(true);
+    /* If playback has not begun within the draft window, the
+       video is abandoned and the book opens - a slow or missing
+       file never holds the purchase hostage. Nothing is counted:
+       'start' fires only on the 'playing' event. */
+    state.video.loadTimer = setTimeout(function () {
+      if (!state.video.open || state.video.started || state.video.settled) return;
+      state.video.settled = true;
+      closeVideoPanel();
+      openBook(store);
+    }, VIDEO_LOAD_MS);
+    var p = vidEl.play();
+    if (p && p.catch) p.catch(function () {});
+  }
+  function closeVideoPanel() {
+    if (state.video.loadTimer) { clearTimeout(state.video.loadTimer); state.video.loadTimer = null; }
+    state.video.open = false; state.video.store = null; state.video.info = null;
+    try { vidEl.pause(); vidEl.removeAttribute('src'); vidEl.load(); } catch (e) {}
+    videoEl.classList.remove('open'); videoEl.setAttribute('aria-hidden', 'true');
+    videoDuck(false);
+  }
+  /* X close (and Esc): the panel closes to the LOBBY - the book
+     does NOT follow - and the instance counts as neither a
+     completion nor a skip (mid-play abandonment). */
+  function closeVideoToLobby() {
+    if (!state.video.open) return;
+    state.video.settled = true;
+    closeVideoPanel();
+    if (state.phase === 'in') { layer.style.display = ''; cross.style.display = ''; }
+  }
+  /* The end of the video, or the skip control: exactly one of
+     complete / skip is beaconed (and only if playback actually
+     started), then the book opens. */
+  function settleVideoToBook(kind) {
+    if (!state.video.open || state.video.settled) return;
+    state.video.settled = true;
+    var store = state.video.store;
+    if (state.video.started && (kind === 'complete' || kind === 'skip')) videoBeacon(store, kind);
+    closeVideoPanel();
+    if (store) openBook(store);
+  }
+
   /* ---------------- the storybook -------------------------------- */
   function typeLabel(t) {
     var map = {
@@ -582,8 +819,7 @@
     return (typeof s[item.name] === 'number') ? s[item.name] : item.initialStock;
   }
 
-  function selectStore(store) {
-    if (state.phase !== 'in') return;
+  function openBook(store) {
     state.book.open = true; state.book.store = store; state.book.data = null;
     state.book.spread = 0; state.book.pageIdx = 0; state.book.failed = false;
     bookEl.classList.add('open'); bookEl.setAttribute('aria-hidden', 'false');
@@ -593,6 +829,24 @@
       if (!state.book.open || state.book.store !== store) return;
       if (!d) { state.book.failed = true; renderBook(); return; }
       state.book.data = d; renderBook();
+    });
+  }
+  /* Selecting a store asks about its entry video first (DESIGN
+     §1-3): a registered video this visit has not shown plays in
+     the panel, and the book follows its end or skip. No video -
+     or a failed video lookup, which is treated as no video so
+     the lookup never gates the purchase path - and a store this
+     visit already showed go straight to the book, exactly the
+     pre-video behaviour. */
+  function selectStore(store) {
+    if (state.phase !== 'in' || state.book.open || state.video.open) return;
+    if (videoSeen(store.id)) { openBook(store); return; }
+    var seq = ++state.video.fetchSeq;
+    loadVideo(store, function (d) {
+      if (seq !== state.video.fetchSeq) return;
+      if (state.phase !== 'in' || state.book.open || state.video.open) return;
+      if (d && d.videoState === 'registered' && d.video && d.video.url) openVideoPanel(store, d.video);
+      else openBook(store);
     });
   }
   function closeBook() {
@@ -776,6 +1030,7 @@
   }
   function exitToStreet() {
     state.phase = 'exited';
+    if (state.video.open) { state.video.settled = true; closeVideoPanel(); }
     closeBook();
     layer.style.display = 'none'; cross.style.display = 'none';
     if (lobby && lobby.group && lobby.group.parent) lobby.group.parent.remove(lobby.group);
@@ -801,7 +1056,7 @@
   /* hooks the monolith's interact path calls (door + Use key) */
   window.__espilPlaceSpaceExit = exitSpace;
   window.__espilPlaceSpaceUse = function () {
-    if (state.phase !== 'in' || state.book.open) return;
+    if (state.phase !== 'in' || state.book.open || state.video.open) return;
     if (state.aimed) selectStore(state.aimed);
     else toast('Look at a store, then press Space - or click its name in the store list.');
   };
@@ -816,6 +1071,10 @@
         bays: bays.length, overflow: state.overflow,
         bookOpen: state.book.open,
         bookStore: state.book.store ? state.book.store.name : null,
+        videoOpen: state.video.open,
+        videoStore: state.video.store ? state.video.store.name : null,
+        videoStarted: state.video.started,
+        videoSeen: state.stores.filter(function (s) { return videoSeen(s.id); }).map(function (s) { return s.name; }),
         aimed: state.aimed ? state.aimed.name : null,
         inside: !!(window.__espilInside && window.__espilInside.placeSpace),
         fpv: window.__espilKbFpvState ? window.__espilKbFpvState() : null
