@@ -59,6 +59,36 @@
   try { mark = JSON.parse(sessionStorage.getItem('espil_store_space_v1') || 'null'); } catch (e) {}
   if (!mark || !mark.city || !mark.slug) return;
 
+  /* ===== CHILD MUSIC SILENCE (Han 2026-11-18) =====
+     No song plays in a building window. The child loads the same
+     game page as the street, and that page's landing-auth module
+     starts its BGM set (the one <audio id="bgm"> element) on the
+     first pointer/key gesture in the window - which, in here, is
+     the visitor's first click on a sign or Use press. This module
+     runs ONLY in a place-space child (the mark check above), so
+     the guard is child-only by construction and the street page
+     is never touched:
+       1. pause the element NOW - if the entry handoff's gestures
+          already started the set before this module armed, it
+          stops here;
+       2. block play() on THIS ELEMENT INSTANCE for the life of
+          the window - landing-auth's unlock, its track rotation
+          and the music toggle can never restart it in here.
+     Music only: the block sits on the single #bgm element.
+     Every sound-effect path is a different object - the UI
+     pop/tick WebAudio synths, the movement SFX elements, the
+     water bus - and none of them is touched. */
+  (function silenceBgm() {
+    var a = document.getElementById('bgm');
+    if (!a) return;
+    try { a.pause(); } catch (e) {}
+    if (!a.__espilChildSilenced) {
+      a.__espilChildSilenced = true;
+      a.play = function () { return Promise.resolve(); };
+    }
+  })();
+  /* ===== end CHILD MUSIC SILENCE ===== */
+
   var API_BASE = (typeof window.__espilPlacesApiBase === 'string' && window.__espilPlacesApiBase) || 'https://api.espil.online';
   var CITY = String(mark.city), SLUG = String(mark.slug);
   var STOCK_KEY = 'espil_shop_stock_v1';
