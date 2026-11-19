@@ -235,6 +235,143 @@
         paintToggle();paintBgmCard();
       }
     };
+    /* ===== BGM HANDOFF - music continuity (Han 2026-11-19) =====
+       The landing and the game are two documents: entering a city
+       navigates (monolith: location.href = 'vancouver.html' after
+       the 2.6 s globe dive), which destroys this page's one
+       <audio id="bgm"> element - the song cut dead mid-play - and
+       the game page's fresh element then restarted the set from
+       Green at 0:00 after the next gesture, losing both the track
+       the rotation had reached and the position inside it. The set
+       is one continuous programme (Han 2026-10-26: one set on the
+       landing screen and in the map alike), so this block hands
+       the playback state across the navigation in sessionStorage:
+       writers keep a record fresh while the set plays, and the
+       receiving page restores the same track at the position it
+       would have reached by now (saved position + the seconds the
+       navigation took), with the user's mute / pause state intact.
+       If the browser refuses sound at load (autoplay policy), the
+       element stays cued at that position and the existing
+       first-gesture unlock resumes it there - never Green 0:00.
+       Place-space child windows (the espil_store_space_v1 mark -
+       store and arena windows) neither write nor read the record:
+       their silence block owns their element exactly as landed
+       (Han 2026-11-18) and this block never arms there. */
+    var BGM_HANDOFF_KEY='espil_bgm_handoff_v1';
+    var BGM_HANDOFF_MAX_AGE_MS=60000;
+    var bgmIsChild=false;
+    try{ bgmIsChild=!!sessionStorage.getItem('espil_store_space_v1'); }catch(e){}
+    var bgmHandoffLastWrite=0, bgmHandoffRestoring=false;
+    function bgmHandoffWrite(){
+      if(bgmIsChild||bgmHandoffRestoring||!audio)return;
+      bgmHandoffLastWrite=Date.now();
+      try{
+        sessionStorage.setItem(BGM_HANDOFF_KEY,JSON.stringify({
+          src:currentTheme.src, t:audio.currentTime||0, at:bgmHandoffLastWrite,
+          playing:!!(started&&!muted&&!userPaused&&!audio.paused),
+          muted:!!muted, userPaused:!!userPaused, started:!!started }));
+      }catch(e){}
+    }
+    function bgmHandoffWriteThrottled(){
+      if(Date.now()-bgmHandoffLastWrite>=1000)bgmHandoffWrite();
+    }
+    if(audio&&!bgmIsChild){
+      audio.addEventListener('timeupdate',bgmHandoffWriteThrottled);
+      audio.addEventListener('playing',bgmHandoffWrite);
+      audio.addEventListener('pause',bgmHandoffWrite);
+      window.addEventListener('pagehide',bgmHandoffWrite);
+    }
+    (function bgmHandoffRestore(){
+      if(bgmIsChild||!audio)return;
+      var rec=null;
+      try{ rec=JSON.parse(sessionStorage.getItem(BGM_HANDOFF_KEY)||'null'); }catch(e){}
+      if(!rec||!rec.src)return;
+      if(Date.now()-(rec.at||0)>BGM_HANDOFF_MAX_AGE_MS)return;
+      var theme=null,i;
+      for(i=0;i<BGM_SET.length;i++)if(BGM_SET[i].src===rec.src)theme=BGM_SET[i];
+      if(!theme)return;
+      if(!rec.started&&!rec.playing&&!rec.muted&&!rec.userPaused)return;
+      /* The set never started on the other page: nothing to hand
+         over - the fresh behaviour stands. */
+      bgmHandoffRestoring=true;
+      setTimeout(function(){ bgmHandoffRestoring=false; },8000);
+      currentTheme=theme; paintBgmCard();
+      muted=!!rec.muted; userPaused=!!rec.userPaused;
+      if((audio.getAttribute('src')||'')!==theme.src){ try{ audio.src=theme.src; }catch(e){} }
+      var target=(rec.t||0)+(rec.playing?Math.max(0,(Date.now()-(rec.at||0))/1000):0);
+      /* Wait until the element can actually play the handed-off
+         track before cueing (readyState >= 3 with that track as
+         currentSrc; the poll covers event-ordering races, and
+         after ~20 s it cues anyway - sound at any position beats
+         silence). */
+      function bgmWhenPlayable(srcWanted,fn){
+        var done=false,tries=0,iv=null;
+        function ok(){ var cur=''; try{ cur=audio.currentSrc||''; }catch(e){}
+          return audio.readyState>=3&&cur.slice(-srcWanted.length)===srcWanted; }
+        function fire(){ if(done)return; done=true; if(iv)clearInterval(iv); fn(); }
+        iv=setInterval(function(){ tries++; if(ok()||tries>100)fire(); },200);
+        if(ok())fire();
+      }
+      /* Position the element at target BEFORE any play():
+         measured on this build's verify runs, a seek issued in
+         the same tick as play() (or after it) makes the media
+         stack restart the stream and the song then plays from
+         ~0, while a seek left to settle on the paused element -
+         'seeked' awaited - lands exactly. So the cue seeks on
+         the paused element, verifies where it settled, re-applies
+         up to 3 times while still paused, and only then does
+         go() start playback. */
+      var seekTries=0;
+      function seekToTarget(done){
+        seekTries++;
+        var finished=false;
+        function finish(){ if(finished)return; finished=true; if(done)done(); }
+        function verify(){
+          if(audio.seeking){ setTimeout(verify,1200); return; }
+          if(Math.abs(audio.currentTime-target)>2&&seekTries<3)seekToTarget(done);
+          else finish();
+        }
+        var onSeeked=function(){ audio.removeEventListener('seeked',onSeeked); setTimeout(verify,60); };
+        audio.addEventListener('seeked',onSeeked);
+        setTimeout(function(){ audio.removeEventListener('seeked',onSeeked); verify(); },6000);
+        try{ audio.currentTime=target; }catch(e){ verify(); }
+      }
+      function go(){
+        if(rec.playing){
+          seekToTarget(function(){
+            started=true;
+            try{ audio.volume=0; }catch(e){}
+            var p=audio.play();
+            var settle=function(ok){
+              bgmHandoffRestoring=false;
+              if(ok)fadeTo(bgmVol(),null,1200);
+              else{ started=false; try{ audio.volume=bgmVol(); }catch(e){} }
+            };
+            if(p&&p.then)p.then(function(){ settle(true); },function(){ settle(false); });
+            else settle(!audio.paused);
+          });
+        } else {
+          bgmHandoffRestoring=false;
+          try{ audio.volume=bgmVol(); }catch(e){}
+          seekToTarget(null);
+        }
+      }
+      bgmWhenPlayable(theme.src,function cue(){
+        if(isFinite(audio.duration)&&audio.duration>0&&target>=audio.duration){
+          /* The song would have ended while the pages changed:
+             the set rotates - take the next track at the overflow,
+             where the programme would be by now. */
+          var over=target-audio.duration;
+          var next=pickNextTrack(null);
+          currentTheme=next; paintBgmCard();
+          target=over;
+          try{ audio.src=next.src; }catch(e){}
+          bgmWhenPlayable(next.src,function(){
+            target=Math.min(over,Math.max(0,audio.duration-1)); go(); });
+        } else go();
+      });
+    })();
+    /* ===== end BGM HANDOFF ===== */
     if(toggle)toggle.addEventListener('click',function(e){e.stopPropagation();window.EspilAudio.toggle();});
     paintToggle();paintBgmCard();
     /* Hover/focus card: song info in a Genshin-styled caption box (2026-10-06 QA #2). */
