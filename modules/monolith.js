@@ -13048,6 +13048,17 @@
        while the store page pauses the world. */
     var espilCamEff=99, espilCamDEff=99, espilCamAllowed=null, espilCamBlockedAt=null, espilCamChecks=0, espilCamSegClear=true;
     var ESPIL_CAM_MIN=2.2, ESPIL_CAM_MARGIN=0.7;
+    /* ROOF MANTLE tunables (Han 2026-11-18, roof-climb line): the
+       mantle in the vertical section below lets an airborne jumper
+       claim a low roof at its wall. MAX_H bounds it to the 1-storey
+       band (the data's lowest building height is 4.0 m; the next
+       band starts at 5.0 m) even if jump skills later raise the
+       jump. REACH covers the double-jump shortfall at every physics
+       rate: the continuous apex is 3.17 m, the apex at the dt cap
+       (0.05 s steps, measured on the rig) is 2.72 m, and the claim
+       floor h-REACH = 2.5 m sits below both - while a single jump
+       (apex 1.39-1.61 m) still cannot reach it at any rate. */
+    var ESPIL_ROOF_MANTLE_MAX_H=4.5, ESPIL_ROOF_MANTLE_REACH=1.5;
     /* march A->B (B at distance dist along the ray): the first
        point inside a baked record's footprint BELOW its roof
        (rec.h + margin) blocks; returns that distance or null.
@@ -13307,6 +13318,36 @@
             if(rrec.h>p.pos.y+.55&&espilPolyProbe(rrec,p.pos.x,p.pos.z).inside){support=rrec.h;supportCar=null;break;}
           }
         }
+        /* === ROOF MANTLE BEGIN (Han 2026-11-18) ===
+           A jump pressed against a 1-storey wall could never claim
+           the roof: the lowest building band in the data is h=4.0,
+           the claim gate above needs the feet at h-0.55 = 3.45, and
+           a perfect double jump tops out at 3.17 in continuous
+           physics (jumpV/djumpV 9, gravity 26, street support 0.05)
+           and at 2.72 under the dt cap's discrete steps (measured)
+           - short of the gate at every frame rate. So when an
+           airborne jumper (p.jumps>0, so walking or falling past a
+           wall never triggers it) is at a low roof's wall (centre
+           within the climb attach window's outer edge, PLAYER_R+.45)
+           with the feet inside the mantle reach below its top, the
+           support law takes that roof and the landing step places
+           the centre just inside the edge - the grab the jump was
+           already reaching for. Height-bounded twice: the roof must
+           be at most ESPIL_ROOF_MANTLE_MAX_H (the 1-storey band) and
+           within ESPIL_ROOF_MANTLE_REACH below the pre-fall feet
+           height, so every taller building keeps its exact old
+           behaviour. */
+        if(support<=.05&&p.jumps>0&&!p.onGround&&!p._espilClimb&&!p._espilArrive&&!window.__espilInside&&spb){
+          for(var smi=0;smi<spb.length;smi++){
+            var mrec=spb[smi];
+            if(mrec.h>ESPIL_ROOF_MANTLE_MAX_H||mrec.h<=yBeforeFall+.55||mrec.h-yBeforeFall>ESPIL_ROOF_MANTLE_REACH)continue;
+            var mpr=espilPolyProbe(mrec,p.pos.x,p.pos.z);
+            if(mpr.d>PLAYER_R+.45||mpr.d<=-PLAYER_R)continue;
+            p.pos.x=mpr.cx-mpr.nx*.3; p.pos.z=mpr.cz-mpr.nz*.3;
+            support=mrec.h; supportCar=null; break;
+          }
+        }
+        /* === ROOF MANTLE END === */
       }
       if(p.pos.y<=support){
         /* Batch G: a fly/ride release fall is charged HERE, at impact,
