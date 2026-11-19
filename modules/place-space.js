@@ -25,11 +25,19 @@
      (The building's own geometry - centre and footprint - is read
      from the game's baked data by slug, or from the API answer;
      store lists and goods come from the API alone.)
-   - Store signage is a wall-fixed DOM label per bay, in the
-     in-game building-label grammar (fixed to the wall, constant
-     pixel size). A store is selected by clicking its sign or by
-     aiming (the FPV crosshair) and pressing the Use key - both
-     paths run the one select function.
+   - The lobby's store list is a button-style panel in the
+     landing city-list form (Han 2026-11-18): one row per bay in
+     a text container, rows in normal flow so they can never
+     overlap, a long name ellipsised inside its own row (the full
+     name rides the row's title attribute and the book's left
+     page). It replaces the wall-fixed projected DOM label per
+     bay, whose constant-pixel signs piled onto each other under
+     perspective - side-wall anchors converge toward the
+     vanishing point while the text keeps its size, and a long
+     name overflowed its bay outright. A store is selected by
+     clicking its row or by aiming (the FPV crosshair) at its
+     bay and pressing the Use key - both paths run the one
+     select function, and the aim highlight lights the row.
    - The storybook: left page the store (name, type, a one-line
      intro, the player's Leo balance), right page its goods as
      cards, six to a spread. A purchase completes inside the book
@@ -159,10 +167,22 @@
   var css = document.createElement('style');
   css.textContent =
     '#ps-layer{position:fixed;inset:0;z-index:11000;pointer-events:none;overflow:hidden;}' +
-    '.ps-sign{position:absolute;transform:translate(-50%,-50%);pointer-events:auto;cursor:pointer;' +
-      'font:600 15px "Avenir Next","Segoe UI",Manrope,sans-serif;color:#eaf6ff;white-space:nowrap;' +
-      'background:rgba(9,16,22,.85);border:1px solid rgba(142,247,232,.55);border-radius:8px;padding:5px 11px;height:28px;}' +
-    '.ps-sign.aimed{border-color:#f2b63c;color:#ffe9a8;background:rgba(30,24,8,.9);}' +
+    '#ps-list{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:min(300px,80vw);' +
+      'max-height:72vh;display:none;flex-direction:column;pointer-events:auto;overflow:hidden;' +
+      'background:rgba(9,16,22,.88);border:1px solid rgba(142,247,232,.4);border-radius:10px;' +
+      'font-family:"Avenir Next","Segoe UI",Manrope,sans-serif;color:#eaf6ff;}' +
+    '#ps-list.show{display:flex;}' +
+    '.ps-list-head{padding:10px 14px 8px;font-size:12px;font-weight:700;letter-spacing:.14em;' +
+      'text-transform:uppercase;color:#8ef7e8;border-bottom:1px solid rgba(142,247,232,.25);' +
+      'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
+    '#ps-list-rows{overflow-y:auto;overflow-x:hidden;padding:6px;display:flex;flex-direction:column;gap:4px;}' +
+    '.ps-row{display:flex;align-items:center;width:100%;min-height:38px;padding:7px 10px;cursor:pointer;' +
+      'background:rgba(255,255,255,.05);border:1px solid rgba(142,247,232,.22);border-radius:8px;' +
+      'color:#eaf6ff;font:600 14px "Avenir Next","Segoe UI",Manrope,sans-serif;text-align:left;}' +
+    '.ps-row:hover{background:rgba(142,247,232,.14);}' +
+    '.ps-row.aimed{border-color:#f2b63c;color:#ffe9a8;background:rgba(30,24,8,.9);}' +
+    '.ps-row-name{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
+    '@media (max-width:680px){ #ps-list{left:8px;right:8px;width:auto;top:auto;bottom:10px;transform:none;max-height:42vh;} }' +
     '#ps-board{position:absolute;transform:translate(-50%,-50%);pointer-events:none;text-align:center;' +
       'font:600 15px "Avenir Next","Segoe UI",Manrope,sans-serif;color:#eaf6ff;white-space:pre-line;' +
       'background:rgba(9,16,22,.85);border:1px solid rgba(142,247,232,.4);border-radius:10px;padding:10px 16px;max-width:70vw;}' +
@@ -209,6 +229,18 @@
   var boardEl = document.createElement('div');
   boardEl.id = 'ps-board'; boardEl.style.display = 'none';
   layer.appendChild(boardEl);
+  /* the lobby store list (Han 2026-11-18): a city-list-form
+     panel inside the layer - it hides with the layer while the
+     book is open and returns with it, like the signs did. */
+  var listEl = document.createElement('div');
+  listEl.id = 'ps-list';
+  var listHead = document.createElement('div');
+  listHead.className = 'ps-list-head';
+  listEl.appendChild(listHead);
+  var listRows = document.createElement('div');
+  listRows.id = 'ps-list-rows';
+  listEl.appendChild(listRows);
+  layer.appendChild(listEl);
   var cross = document.createElement('div');
   cross.id = 'ps-cross'; cross.style.display = 'none';
   document.body.appendChild(cross);
@@ -355,8 +387,9 @@
 
   /* Bays: the API's stores, in answer order, along the north, east
      and west walls. A bay is a counter + frame on the wall; its
-     sign is the DOM label. Stores that cannot fit the wall
-     perimeter are cut in order and counted on the board. */
+     entry in the lobby store list is one .ps-row (same order).
+     Stores that cannot fit the wall perimeter are cut in order
+     and counted on the board. */
   function buildBays() {
     if (!lobby || state.api !== 'ok' || bays.length) return;
     var W = lobby.W, D = lobby.D;
@@ -396,13 +429,19 @@
         else { bg.rotation.y = Math.PI / 2; bg.position.set(-W / 2 + 0.25, 0, off); ax = anchor.x - W / 2 + 0.22; az = anchor.z + off; }
         lobby.group.add(bg);
         var el = document.createElement('button');
-        el.type = 'button'; el.className = 'ps-sign'; el.textContent = store.name;
+        el.type = 'button'; el.className = 'ps-row';
         el.setAttribute('data-store-id', store.id);
+        el.setAttribute('data-store-name', store.name);
+        var nm = document.createElement('span');
+        nm.className = 'ps-row-name'; nm.textContent = store.name;
+        nm.setAttribute('title', store.name);
+        el.appendChild(nm);
         el.addEventListener('click', function () { selectStore(store); });
-        layer.appendChild(el);
+        listRows.appendChild(el);
         bays.push({ store: store, ax: ax, ay: 2.55, az: az, el: el });
       });
     });
+    if (bays.length) listEl.classList.add('show');
     paintBoard();
   }
 
@@ -424,13 +463,15 @@
     } else {
       var title = (state.place && (state.place.name || state.place.address)) ||
                   (state.geom && (state.geom.name || state.geom.addr)) || 'Building';
+      listHead.textContent = title;
+      listHead.setAttribute('title', title);
       var line = title + '\n' + state.stores.length + (state.stores.length === 1 ? ' store' : ' stores');
       if (state.overflow > 0) line += ' \u00B7 +' + state.overflow + ' more';
       boardEl.textContent = line;
     }
   }
 
-  /* ---------------- signage projection + aim --------------------- */
+  /* ---------------- board projection + aim ---------------------- */
   var _v = null;
   function project(el, ax, ay, az, cam) {
     if (!_v) _v = new THREE.Vector3();
@@ -447,9 +488,9 @@
     if (state.book.open) return;
     var cam = window.__espilMapCameraObj ? window.__espilMapCameraObj() : null;
     if (!cam || typeof THREE === 'undefined') return;
-    for (var i = 0; i < bays.length; i++) project(bays[i].el, bays[i].ax, bays[i].ay, bays[i].az, cam);
     if (lobby) project(boardEl, anchor.x, 3.1, anchor.z - lobby.D / 2 + 0.22, cam);
-    /* aim: the bay whose sign sits closest to the view centre line */
+    /* aim: the bay closest to the view centre line; its list
+       row carries the highlight (the .aimed toggle below). */
     var fpv = window.__espilKbFpvState ? window.__espilKbFpvState() : null;
     var pose = window.__espilPlayerPose ? window.__espilPlayerPose() : null;
     var best = null, bestAng = 0.22;
@@ -732,7 +773,7 @@
   window.__espilPlaceSpaceUse = function () {
     if (state.phase !== 'in' || state.book.open) return;
     if (state.aimed) selectStore(state.aimed);
-    else toast('Look at a store sign, then press Space - or click the sign.');
+    else toast('Look at a store, then press Space - or click its name in the store list.');
   };
   window.__espilPlaceSpace = {
     state: function () {
