@@ -23,6 +23,10 @@
      found by probe_stall2 on the freeze candidate and fixed
      here; the bundle still lands after entry, so panels stays
      out of the entry-critical set.
+   - billboard-video: arrival bundle + in-map backstop - building-
+     wall video ads arm once the world (mapScene + walkPlayer)
+     exists; the module self-gates on the in-map state and fails
+     dark without its server config.
    - social (auth half): the sign-in modal opening - the login
      gate (game page) and the landing flow's login step present
      social.js's sign-in form BEFORE any arrival can fire, so
@@ -165,7 +169,7 @@
   window.addEventListener('espil-dive-start', function () { load('tutorial.js'); });
   window.addEventListener('espil-guide', function (e) {
     var d = e && e.detail; if (!d) return;
-    if (d.type === 'arrival') { socialBundle(); load('npcs.js'); load('monsters.js'); load('tiles3d.js'); load('cashshop.js'); load('arena.js'); load('story.js'); load('vehicles.js'); }
+    if (d.type === 'arrival') { socialBundle(); load('npcs.js'); load('monsters.js'); load('tiles3d.js'); load('cashshop.js'); load('arena.js'); load('story.js'); load('vehicles.js'); load('billboard-video.js'); }
     if (d.type === 'interior') { storePair(); load('panels.js'); }
   });
   window.addEventListener('espil-party-frame', socialBundle);
@@ -233,7 +237,7 @@
      interception must be resident before the Enter click. 600 ms,
      and each arm is a no-op once loaded. */
   setInterval(function () {
-    if (document.body && document.body.classList.contains('in-map')) { socialBundle(); load('npcs.js'); load('monsters.js'); load('tiles3d.js'); load('cashshop.js'); load('arena.js'); load('story.js'); load('vehicles.js'); }
+    if (document.body && document.body.classList.contains('in-map')) { socialBundle(); load('npcs.js'); load('monsters.js'); load('tiles3d.js'); load('cashshop.js'); load('arena.js'); load('story.js'); load('vehicles.js'); load('billboard-video.js'); }
     if (window.__espilInside) storePair();
     var bp = document.getElementById('bldg-panel');
     if (bp && bp.getAttribute('aria-hidden') === 'false') load('store-page-link.js');
