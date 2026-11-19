@@ -79,7 +79,7 @@ var BOUNDARY_URL = 'tiles/downtown-boundary.json'; /* in-tree canonical */
 
 var state = {
   started: false, on: false, failed: false, layerLive: false, mapHook: false,
-  tilesetLoaded: false, firstTileAtMs: null, error: null,
+  tilesetLoaded: null, firstTileAtMs: null, error: null,
   gate: null,              /* 'boundary' | 'radius' | null */
   inside: false, altOk: false,
   suppression: 'off',      /* off | on | no-hook | error */
@@ -367,7 +367,7 @@ export function start(sess, opts) {
   tiles.registerPlugin(new GLTFExtensionsPlugin({ dracoLoader: draco, ktxLoader: ktx2 }));
   tiles.errorTarget = Math.max(SSE_DEFAULT, SSE_FLOOR);
   tiles.setCamera(lodCam);
-  tiles.addEventListener('load-tile-set', function () {
+  tiles.addEventListener('load-tileset', function () {
     state.tilesetLoaded = true;
     if (state.on) { applySuppression(); buildAttribution(); }
   });

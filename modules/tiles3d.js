@@ -5,17 +5,26 @@
    import() at the in-map arrival seam (the npcs/monsters family). It
    carries NO renderer bytes. Its whole job:
      1. Fire the ONE session decision fetch, GET /api/tiles-session,
-        under a 2.5 s budget (AbortController). Entry/dive NEVER wait
+        under a 10 s budget (AbortController). Entry/dive NEVER wait
         for it - this module itself only loads after arrival, and the
-        fetch resolves in parallel with play.
+        fetch resolves in parallel with play. (Budget raised from
+        2.5 s on 2026-11-18: the endpoint's KV meter round trip alone
+        takes 0.5-1.5 s, and the old budget silently discarded good
+        answers under post-dive main-thread load - tiles-diag.)
      2. tilesEnabled:true -> dynamic-import the heavy core
         (./tiles3d-core.js). That import is the ONLY path by which the
         renderer/decoders/vendor bytes can load, so a denied, errored,
         timed-out or device-gated session downloads 0 tile-renderer
         bytes (gate: landing/off baseline stays untouched).
      3. Anything else -> record the decision and stop. Fail-closed:
-        no local token, no direct-ion path, no retry. The base map is
-        already running and simply continues.
+        no local token, no direct-ion path. A timeout or transport
+        failure gets ONE retry under a fresh budget (a timed-out
+        attempt may still have incremented the server meter - the
+        function runs to completion - so the cost is at most one
+        extra count per page load); a definitive answer
+        (tilesEnabled true/false, monthly_root_quota) is NEVER
+        retried. The base map is already running and simply
+        continues.
    Session decision is made ONCE, here; a running session is never
    revisited (prototype-proven semantics, kept).
    Device/network gate (prototype behaviour, scope section A): tiles
@@ -29,7 +38,8 @@
   'use strict';
   if (window.__espilTilesState) return; /* once per page */
 
-  var DECISION_BUDGET_MS = 2500;
+  var DECISION_BUDGET_MS = 10000;
+  var DECISION_RETRY_DELAY_MS = 3000; /* one retry, timeouts only */
   var state = {
     phase: 'idle',          /* idle|deciding|off|gated|loading-core|core|error */
     decision: null,         /* 'on' | 'off' */
@@ -108,6 +118,14 @@
       return;
     }
     state.phase = 'deciding';
+    attemptDecision(0);
+  }
+
+  /* One decision attempt under a fresh budget. A received answer -
+     enabled, disabled or quota - is definitive and final. Only a
+     timeout or transport failure (no answer at all) earns the single
+     retry; the decision still resolves exactly once per page load. */
+  function attemptDecision(attempt) {
     var t0 = (window.performance && performance.now) ? performance.now() : Date.now();
     var ctl = ('AbortController' in window) ? new AbortController() : null;
     var timedOut = false;
@@ -145,6 +163,13 @@
     }).catch(function () {
       clearTimeout(timer);
       state.decisionMs = Math.round(((window.performance && performance.now) ? performance.now() : Date.now()) - t0);
+      if (attempt < 1) {
+        /* No answer arrived (timeout or transport failure): retry
+           ONCE under a fresh budget. Phase stays 'deciding' and no
+           decision is recorded until the retry resolves. */
+        setTimeout(function () { attemptDecision(attempt + 1); }, DECISION_RETRY_DELAY_MS);
+        return;
+      }
       state.decision = 'off';
       state.phase = 'off';
       state.reason = timedOut ? 'timeout' : 'handshake_failed';
