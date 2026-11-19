@@ -36,9 +36,28 @@
    the compass owns the 5 m radius, hides itself, and fires the
    world's own 'espil-guide' event {type:'nav-arrived', name}
    (unflagged, so existing listeners consume it as before). In follow
-   mode arrive stays false - the world's nav tick owns arrival. */
+   mode arrive stays false - the world's nav tick owns arrival.
+
+   QUEST COMPASS REMOVED (Han 2026-11-18, play-test directive):
+   the compass no longer guides quests. The two quest paths are
+   gated off below by QUEST_COMPASS_OFF - the landing
+   auto-navigation (the Konbiniya target raised by itself on every
+   Vancouver landing) and the follow-mode mirror of world-posted
+   targets (__espilNavToKonbiniya / the tutorial nav step). The
+   explicit show() stays live: the user-invoked place-search
+   compass (map-search.js) is a separate feature Han ruled to
+   KEEP, and it raises the chip itself. The world's nav state,
+   its arrival events and this module's state() shape are
+   unchanged; flipping the gate back restores the old behaviour. */
 (function () {
   'use strict';
+
+  /* QUEST COMPASS OFF (Han 2026-11-18): gates the landing
+     auto-navigation and the follow-mode mirror below - the
+     quest-guidance paths. Explicit show() calls (the place-search
+     compass) are NOT gated. Same gate shape as story.js's
+     GUIDES_OFF. */
+  var QUEST_COMPASS_OFF = true;
 
   var CSS = [
     /* Batch A7 (Han 2026-11-02 #7): the overhead indicator - a chip
@@ -202,7 +221,7 @@
      city's landing retires the watcher untouched. */
   var landingAutoNav = false;
   var landingAutoNavTries = 0;
-  var landingAutoNavTimer = setInterval(function () {
+  var landingAutoNavTimer = QUEST_COMPASS_OFF ? null : setInterval(function () {
     if (landingAutoNav) { clearInterval(landingAutoNavTimer); return; }
     if (!window.__ESPIL_GAME_PAGE) return;
     if (!document.body.classList.contains('in-map')) return;
@@ -226,7 +245,7 @@
     /* Follow mode: the world posted a target itself (minimap pins
        and the like) - mirror it until the world clears it. An
        explicit show() always wins over the mirror. */
-    if (!cmpTarget && window.__espilNavActive && window.__espilNavTarget) {
+    if (!QUEST_COMPASS_OFF && !cmpTarget && window.__espilNavActive && window.__espilNavTarget) {
       var wt = window.__espilNavTarget;
       if (typeof wt.x === 'number' && typeof wt.z === 'number') cmpShow(wt, { arrive: false, owner: 'follow' });
     }
