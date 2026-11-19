@@ -110,14 +110,26 @@
   var LEO_KEY = 'espil_leo_balance';
   var CAR = { id: 'cielo', name: '씨엘로', en: 'Cielo', price: 3000, topSpeed: 54, glb: 'assets/vehicles/sedan.glb' };
   var CAR_LENGTH_M = 3.7;          /* in-world length after scale-up (asset is ~2.55 m) */
+  /* SCALE-UP (Han, 2026-11-17): the car read small beside the
+     1.7 m avatar, so the whole car scales up by CAR_SCALE_F.
+     This is the SINGLE adjustment point: CAR_LENGTH_M is the
+     effective length every size-derived value below reads
+     (the model scale in makeCarGroup, the nose probe reach,
+     the summon clearance, the boarding range), so changing
+     CAR_SCALE_F alone re-sizes the car coherently. */
+  var CAR_SCALE_F = 1.25;
+  CAR_LENGTH_M = CAR_LENGTH_M * CAR_SCALE_F;   /* 3.7 -> 4.625 */
+  var CAR_HALF_LEN_M = CAR_LENGTH_M / 2;       /* 2.3125 */
+  var NOSE_PROBE_M = CAR_HALF_LEN_M + 0.45;    /* building-stop nose probe reach (was 2.3 = 1.85 + 0.45 at the old size) */
+  var SUMMON_CLEAR_M = CAR_HALF_LEN_M - 0.15;  /* summon-spot clearance probes (was 1.7 = 1.85 - 0.15 at the old size) */
   var ACCEL = 16;                  /* m/s^2 - a few seconds to top speed (design draft) */
   var DECEL = 26;                  /* m/s^2 coast-down when the input is released */
   var TURN_RATE = 3.4;             /* rad/s - the car's smoothed rotation feel */
   var DEALER = { x: 3, z: 78 };    /* open lot south of the Art Gallery plaza (collision-probed clear, +-6 m grid) */
   var DEALER_DISPLAY = { x: 9.5, z: 78, face: -Math.PI / 2 };
   var DEALER_PARK = { x: -3.5, z: 78, face: Math.PI / 2 };
-  var PANEL_RANGE = 4.5;
-  var BOARD_RANGE = 4.2;
+  var PANEL_RANGE = 4.5;           /* to the dealership MARKER point - not car-derived, unchanged by the scale-up */
+  var BOARD_RANGE = CAR_HALF_LEN_M + 2.35;   /* player-to-centre boarding range: the old 4.2 = 1.85 half-length + a 2.35 m gap to the car's edge; the gap is kept, the half-length follows the scale */
   var SUMMON_RADII = [5, 6.5, 8, 10];
 
   /* ================= small helpers (story/cashshop pattern) == */
@@ -532,7 +544,7 @@
         var a = ai * Math.PI / 6;
         var x = p.x + Math.sin(a) * r, z = p.z + Math.cos(a) * r;
         if (blocked(x, z) || swimmable(x, z)) continue;
-        if (blocked(x + 1.7, z) || blocked(x - 1.7, z) || blocked(x, z + 1.7) || blocked(x, z - 1.7)) continue;
+        if (blocked(x + SUMMON_CLEAR_M, z) || blocked(x - SUMMON_CLEAR_M, z) || blocked(x, z + SUMMON_CLEAR_M) || blocked(x, z - SUMMON_CLEAR_M)) continue;
         return { x: x, z: z };
       }
     }
@@ -758,7 +770,7 @@
        do not always coincide, so the stall is the robust path) */
     blockedByBuilding = false;
     if (speed > 0) {
-      var nx = p.x + hv.x * 2.3, nz = p.z + hv.z * 2.3;
+      var nx = p.x + hv.x * NOSE_PROBE_M, nz = p.z + hv.z * NOSE_PROBE_M;
       if (blocked(nx, nz) && measured < 1.0) { blockedByBuilding = true; speed = 0; }
     }
     if (!blockedByBuilding && manual && speed > 3 && measured < 0.8) {
@@ -841,6 +853,8 @@
         blockedByBuilding: blockedByBuilding,
         avatarHidden: avatarHidden,
         driving: mode === 'driving',
+        carScaleF: CAR_SCALE_F,
+        carLengthM: CAR_LENGTH_M,
         player: p ? { x: p.x, y: p.y, z: p.z } : null,
         carPos: carGroup && carGroup.visible ? { x: carGroup.position.x, y: carGroup.position.y, z: carGroup.position.z } : null,
         carReady: !!(carGroup && carGroup.userData.ready),
