@@ -950,10 +950,9 @@
     if (!cards.length) return;
     ensureStyle();
     var gender = domGender();
-    for (var i = 0; i < cards.length; i++) {
-      var card = cards[i];
+    function visitCard(card) {
       var body = card.getAttribute('data-body');
-      if (!body) continue;
+      if (!body) return;
       var holder = null;
       for (var j = 0; j < card.childNodes.length; j++) {
         var n = card.childNodes[j];
@@ -972,6 +971,24 @@
       if (holder.getAttribute('data-so-body') !== body) holder.setAttribute('data-so-body', body);
       if (holder.getAttribute('data-so-gender') !== gender) holder.setAttribute('data-so-gender', gender);
       if (!rec || rec.status === 'failed') want(gender, body);
+    }
+    /* Queue order (defect fix, 2026-11-19): the portrait queue
+       is serial, and the signed-in row leads with the Master
+       card - whose body file is ~16 MB - so at first login
+       EVERY style sample waited behind the single heaviest
+       load and the row read as "no samples" until it landed
+       (measured on production: first paint 65 s, full row
+       235 s on the rig; the guest row, which has no Master
+       card, paints its first sample after one small file).
+       The style portraits are the samples a first-time user
+       compares, so they are queued FIRST and the Master
+       portrait last. Painting and holder injection are
+       unchanged; only the want() queueing order differs. */
+    for (var i = 0; i < cards.length; i++) {
+      if (cards[i].getAttribute('data-body') !== 'master') visitCard(cards[i]);
+    }
+    for (var i = 0; i < cards.length; i++) {
+      if (cards[i].getAttribute('data-body') === 'master') visitCard(cards[i]);
     }
   }
   function queueInject() {
