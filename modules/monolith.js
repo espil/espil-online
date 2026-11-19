@@ -2100,6 +2100,36 @@
       var j=window.__espilGeoJudge(lat,lng);
       return (j&&j.point)?j.point:null;
     };
+    /* Three start options (Han 2026-11-19): the gate's centre
+       row asks for the CURRENT city's centre anchor. For the
+       core city that anchor is the Art Gallery front pick
+       (3, 33) the entry gate has used since Batch D3 - NOT
+       cfg.spawn (3, 31), which is the world's cold-start
+       point; for every offset city it is cfg.spawn, the
+       anchor plaza espilEntryStart itself defaults to when
+       no pick and no save exist. City data keeps exactly one
+       home: this seam. */
+    window.__espilCityCentre=function(){
+      try{
+        var cfg=espilCityCfg();
+        if(cfg&&cfg.core)return {x:3,z:33};
+        if(cfg&&cfg.spawn)return {x:cfg.spawn.x,z:cfg.spawn.z};
+      }catch(e){}
+      return {x:3,z:33};
+    };
+    /* The saved spot the world itself would resume at:
+       loadLastPos's own verdict (the record parses, its city
+       matches the active city, and it lies inside the active
+       city's bounds with the same 50 m margin), as a point -
+       or null when no acceptable save exists. The gate's
+       last-place row shows only when this returns a point,
+       and choosing it sets no pick: espilEntryStart's resume
+       law (in-bounds dive at the spot with the footprint-
+       edge rule; an out-of-bounds save resolves to the
+       boundary) does the rest, exactly as it does today. */
+    window.__espilSavedSpot=function(){
+      try{ var d=loadLastPos(); return d?{x:d.x,z:d.z}:null; }catch(e){ return null; }
+    };
     /* === END LOCATION SUMMON SEAM === */
     /* --- geolocation pre-prompt RETIRED (2026-11-18, location
        summon): the mid-dive prompt, its mid-fall retarget and

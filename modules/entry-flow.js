@@ -62,6 +62,8 @@
     geoAskSub: { en: 'Your location is checked on this device only, so you arrive at the matching place in the world. It is never sent to the server and never stored.', ko: '이 기기에서만 위치를 확인해 실제 위치와 같은 자리에 도착합니다. 위치는 서버로 보내지 않고 저장하지 않습니다.', fr: "Votre position est v\u00e9rifi\u00e9e sur cet appareil uniquement, pour arriver \u00e0 l'endroit correspondant dans le monde. Elle n'est jamais envoy\u00e9e au serveur ni conserv\u00e9e.", zh: '仅在此设备上确认您的位置，让您抵达世界中对应的地点。位置绝不会发送到服务器，也不会被保存。' },
     geoMine: { en: 'Start at my location', ko: '내 위치에서 시작', fr: 'Commencer \u00e0 ma position', zh: '从我的位置开始' },
     geoUsual: { en: 'Start at the usual place', ko: '평소 위치에서 시작', fr: "Commencer \u00e0 l'endroit habituel", zh: '从平常的位置开始' },
+    geoCentre: { en: 'Start at the city centre', ko: '도시 중심에서 시작', fr: 'Commencer au centre-ville', zh: '从市中心开始' },
+    geoLast: { en: 'Start at my last place', ko: '마지막 장소에서 시작', fr: 'Commencer \u00e0 mon dernier endroit', zh: '从上次的地点开始' },
     geoDontAsk: { en: "Don't ask again", ko: '다음부터 묻지 않기', fr: 'Ne plus demander', zh: '下次不再询问' },
     geoBack: { en: 'Back', ko: '뒤로', fr: 'Retour', zh: '返回' },
     geoFail: { en: 'Your location could not be confirmed - starting at the usual place.', ko: '위치를 확인할 수 없어 평소 위치에서 시작합니다.', fr: "Votre position n'a pas pu \u00eatre confirm\u00e9e - d\u00e9part \u00e0 l'endroit habituel.", zh: '无法确认您的位置，将从平常的位置开始。' },
@@ -551,13 +553,46 @@
      Only the preference is ever stored - never a coordinate
      (design 3.6). The raw fix is judged only by the monolith
      seam window.__espilGeoJudge; this module never converts
-     coordinates itself. */
+     coordinates itself.
+     REVISION (Han 2026-11-19 - the dive choice is THREE start
+     options): the ask's rows are now [my location] /
+     [city centre] / [last place] / [back]. The old
+     [usual place] row and the [don't ask again] toggle are
+     gone, and choosing a row no longer writes the preference
+     - the three options ARE the dive choice. The last-place
+     row shows only for a signed-in session with a saved spot
+     the world itself accepts (locSavedSpot below); guests
+     hold no saved position by law (Han 2026-11-06), so they
+     never see it. The preference machinery survives as the
+     two no-ask paths in the wrapper below: 'always' still
+     receives silently, 'never' still runs espilGateUsual -
+     the exact judgement those users confirmed - and a legacy
+     preference is never rewritten by the ask. */
   var LS_LOC_PREF = 'espil_loc_summon_v1';
   function locPref() {
     try { var v = localStorage.getItem(LS_LOC_PREF); return (v === 'always' || v === 'never') ? v : null; } catch (_) { return null; }
   }
   function setLocPref(v) {
     try { if (v) localStorage.setItem(LS_LOC_PREF, v); else localStorage.removeItem(LS_LOC_PREF); } catch (_) {}
+  }
+  /* The last-place row's two conditions (Han 2026-11-19): a
+     signed-in session - the same signal espilGateUsual's
+     resume branch uses (a server session record) - AND a
+     saved spot the world itself accepts, asked of the
+     monolith seam (loadLastPos's verdict, per-city bounds
+     included) so the row never promises a resume the world
+     would refuse. */
+  function locIsLoggedIn() {
+    var ses = session();
+    return !!(ses && ses.server === true && ses.id);
+  }
+  function locSavedSpot() {
+    if (!locIsLoggedIn()) return null;
+    if (typeof window.__espilSavedSpot !== 'function') return null;
+    try {
+      var p = window.__espilSavedSpot();
+      return (p && typeof p.x === 'number' && isFinite(p.x) && typeof p.z === 'number' && isFinite(p.z)) ? p : null;
+    } catch (_) { return null; }
   }
   /* Was the character panel ever PRESENTED on this page? (The
      direct-entry path never shows it.) Watched the same way
@@ -644,8 +679,8 @@
       '<div class="locsummon-card"><h3>' + esc(t('geoAskTitle')) + '</h3><p>' +
       esc(t('geoAskSub')) + '</p><div class="locsummon-list">' +
       '<button type="button" class="locsummon-row primary" data-act="mine">' + esc(t('geoMine')) + '</button>' +
-      '<button type="button" class="locsummon-row" data-act="usual">' + esc(t('geoUsual')) + '</button>' +
-      '<label class="locsummon-toggle"><input type="checkbox" id="locsummon-dontask"> ' + esc(t('geoDontAsk')) + '</label>' +
+      '<button type="button" class="locsummon-row" data-act="centre">' + esc(t('geoCentre')) + '</button>' +
+      (locSavedSpot() ? '<button type="button" class="locsummon-row" data-act="last">' + esc(t('geoLast')) + '</button>' : '') +
       '<button type="button" class="locsummon-row" data-act="back">' + esc(t('geoBack')) + '</button>' +
       '</div><p class="locsummon-msg" id="locsummon-msg"></p></div>';
     document.body.appendChild(el);
@@ -669,24 +704,55 @@
     });
   }
   function locAskChoose(act, next) {
-    var dontAsk = false;
-    var cbEl = $('locsummon-dontask');
-    if (cbEl) dontAsk = !!cbEl.checked;
     if (act === 'back' && locPanelSeen) {
       /* Back to the character gate: the panel WAS presented on
          this page and confirmCharacter only hid it - re-show it
-         exactly as the gate left it. No answer was given, so no
-         preference is written. */
+         exactly as the gate left it. No answer was given. */
       hideLocAsk();
       var panel = document.getElementById('char-custom');
       if (panel) panel.setAttribute('aria-hidden', 'false');
       return;
     }
-    if (act === 'back' || act === 'usual') {
+    if (act === 'back') {
       /* Back on the direct-entry path (the panel never
-         presented) is this same row, per design 2.1. */
-      if (dontAsk) setLocPref('never');
+         presented) DECLINES the question: the pre-revision
+         judgement runs (espilGateUsual), exactly as it did
+         when Back shared the old usual row's branch
+         (design 2.1). */
       hideLocAsk();
+      espilGateUsual(next);
+      return;
+    }
+    if (act === 'centre') {
+      /* The city centre: the monolith seam names the current
+         city's centre anchor; the gate's final snap keeps the
+         pick off buildings and water, as every pick here. */
+      hideLocAsk();
+      var c = null;
+      try { if (typeof window.__espilCityCentre === 'function') c = window.__espilCityCentre(); } catch (_) {}
+      if (c && typeof c.x === 'number' && isFinite(c.x) && typeof c.z === 'number' && isFinite(c.z)) {
+        locFinishPick(c, next);
+        return;
+      }
+      espilGateUsual(next);
+      return;
+    }
+    if (act === 'last') {
+      /* The last place: NO pick is set - espilEntryStart's
+         own resume law delivers the saved spot (in-bounds:
+         the dive lands on it, footprint-edge rule included;
+         out-of-bounds: it resolves to the boundary), on the
+         landing path too, which the old usual judgement
+         could not promise there. The spot is re-checked at
+         click time; if it vanished since the ask was built,
+         the usual judgement stands. Any stale pick is
+         cleared first so nothing can outrank the resume. */
+      hideLocAsk();
+      if (locSavedSpot()) {
+        try { window.__espilSpawnPick = null; } catch (_) {}
+        if (typeof next === 'function') next();
+        return;
+      }
       espilGateUsual(next);
       return;
     }
@@ -694,18 +760,18 @@
       locAskMsg(t('locating'));
       locSummonTry(function (r) {
         if (r.ok) {
-          if (dontAsk) setLocPref('always');
           hideLocAsk();
           if (r.kind === 'clamped') locToast(t('geoClamped'));
           locFinishPick(r.point, next);
           return;
         }
-        /* The stated intent was "my location": it becomes the
-           'always' preference EXCEPT on a denied permission,
-           where the choice cannot work at all - then nothing is
-           written and a later dive asks honestly (design 3.7). */
-        if (r.why === 'denied') setLocPref(null);
-        else if (dontAsk) setLocPref('always');
+        /* Every failure shape lands on the usual judgement
+           with its notice - entry is never blocked
+           (design 2.3). No preference is written: the ask
+           only ever runs while the preference is unset, and
+           the revision's rows carry no don't-ask toggle.
+           The denied-resets-the-preference rule survives in
+           the wrapper's 'always' path, untouched. */
         hideLocAsk();
         locToast(locFailNotice(r.why, r.city));
         espilGateUsual(next);
