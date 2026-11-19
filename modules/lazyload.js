@@ -127,15 +127,34 @@
      monsters/npcs, store + store-page-link (no re-entry from
      inside), tiles3d (the child's map load must not spend the
      tiles quota). No seam below this branch runs in such a
-     window. */
-  var placeChild = false;
-  try { placeChild = !!sessionStorage.getItem('espil_store_space_v1'); } catch (e) {}
+     window.
+     ARENA PLACE split (Han 2026-11-18): the same mark with slug
+     'arena' is NOT a store child - it is the arena's own place
+     space, and its allowlist is the combat set: arena-space.js
+     (the space driver), monsters.js (the instance director the
+     run spawns through), arena.js (child mode: the run machine
+     itself), panels.js (the bag - the item grant path) and
+     cashshop.js (the cash revive path). place-space.js does NOT
+     arm for this slug, and the store set stays down exactly as
+     above: no social (formation and chat stay in the street
+     window), no story (the parent is the sole story author), no
+     store pair, no vehicles, no npcs, no tiles3d. presence.js is
+     an eager tag, not a lazy module - its arena-room exception
+     lives in its own connect() lock. */
+  var placeMark = null;
+  try { placeMark = JSON.parse(sessionStorage.getItem('espil_store_space_v1') || 'null'); } catch (e) {}
+  var placeChild = !!placeMark;
+  var arenaChild = !!(placeMark && placeMark.slug === 'arena');
   if (placeChild) {
-    load('place-space.js'); load('panels.js'); load('story.js');
+    if (arenaChild) {
+      load('arena-space.js'); load('monsters.js'); load('arena.js'); load('panels.js'); load('cashshop.js');
+    } else {
+      load('place-space.js'); load('panels.js'); load('story.js');
+    }
     window.__espilLazyState = function () {
       var out = {};
       Object.keys(loaded).forEach(function (k) { out[k] = true; });
-      return { loaded: out, loading: Object.keys(loading).filter(function (k) { return !loaded[k]; }), placeChild: true };
+      return { loaded: out, loading: Object.keys(loading).filter(function (k) { return !loaded[k]; }), placeChild: true, arenaChild: arenaChild };
     };
     return;
   }

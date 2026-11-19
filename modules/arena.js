@@ -101,6 +101,23 @@
   var LS_KEY = 'espil_arena_best_v1';
   var LEO_KEY = 'espil_leo_balance';
 
+  /* ================= ARENA PLACE (Han 2026-11-18) =================
+     This module now lives in two documents. On the STREET it owns
+     the portal, the forming panel and the records board, and its
+     enter button hands the party to the arena's own place space
+     (/vancouver/arena, a new window) instead of starting the run
+     in-page. In the ARENA CHILD (the boot shell's mark with slug
+     'arena') it owns the run alone: no portal, no forming panel -
+     the party arrives through the handoff record the street
+     window wrote, and finishRun settles into the place-space exit
+     contract (results first, then the parent is told and the
+     window closes) instead of the in-page exit teleport. */
+  var ARENA_MARK = null;
+  try { ARENA_MARK = JSON.parse(sessionStorage.getItem('espil_store_space_v1') || 'null'); } catch (e) {}
+  var ARENA_CHILD = !!(ARENA_MARK && ARENA_MARK.slug === 'arena');
+  var HANDOFF_KEY = 'espil_arena_handoff_v1';
+  var HANDOFF_FRESH_MS = 120000;   /* a handoff older than this reads as a solo direct visit */
+
   /* Prompt pill off (Han 2026-11-13): the portal proximity
      prompt (#espil-arena-prompt) never presents while this flag
      is set - the tick below checks it before toggling the
@@ -154,7 +171,17 @@
   }
   function distTo(x, z) { var p = playerPos(); if (!p) return 1e9; var dx = p.x - x, dz = p.z - z; return Math.sqrt(dx * dx + dz * dz); }
   function signedIn() {
-    try { var a = window.__espilAuthState && window.__espilAuthState(); return !!(a && a.signedIn); } catch (e) { return false; }
+    try { var a = window.__espilAuthState && window.__espilAuthState(); if (a) return !!a.signedIn; } catch (e) {}
+    /* ARENA PLACE: __espilAuthState is provided by social.js,
+       which is lowered in the arena child by design - so in the
+       child the check falls back to entry-flow's own rule for
+       the same record (a server-marked session record, cf.
+       entry-flow's isLoggedIn). Without the fallback the child
+       could never persist arena records for a signed-in player,
+       breaking the design's "records run unchanged in the
+       child". The street path is untouched (social.js answers
+       first whenever it is present). */
+    try { var rec = JSON.parse(localStorage.getItem('espil_session_v1') || 'null'); return !!(rec && rec.id && rec.server === true); } catch (e) { return false; }
   }
   function myName() { try { return localStorage.getItem('espil_username') || 'Guest'; } catch (e) { return 'Guest'; } }
   function dayKey() { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
@@ -191,6 +218,55 @@
 
   /* ================= party ================= */
   var party = { members: [{ id: 'self', name: myName(), self: true }], source: 'solo' };
+  /* ARENA PLACE: the child's party is the street window's party,
+     carried by the handoff record (names only - never record
+     data; a guest's records stay in the guest's own window memory,
+     as designed). A stale or missing handoff is a solo direct
+     visit. refreshPartyFromSocial never overwrites a handoff
+     party: the child has no social module, and its fallback only
+     ever resets a 'social'-sourced party. */
+  function seedPartyFromHandoff() {
+    if (!ARENA_CHILD) return;
+    var h = null;
+    try { h = JSON.parse(localStorage.getItem(HANDOFF_KEY) || 'null'); } catch (e) {}
+    if (!h || !Array.isArray(h.members) || !h.members.length) return;
+    if (typeof h.at !== 'number' || Date.now() - h.at > HANDOFF_FRESH_MS) return;
+    /* Self is carried as a SLOT INDEX, never matched by name: a
+       guest's display name is unstable across windows (the room
+       can uniquify 'Guest' to 'Guest 1' server-side, and the
+       stored username is written by a race), so every name-based
+       match minted a phantom member in testing. The parent marks
+       its own slot structurally; the child trusts the index. */
+    var si = (typeof h.selfIndex === 'number') ? h.selfIndex : -1;
+    var members = h.members.slice(0, PARTY_CAP).map(function (n, i) {
+      return { id: n, name: n, self: i === si };
+    });
+    party = { members: members, source: 'handoff' };
+  }
+  seedPartyFromHandoff();
+  function reconcilePartySelf() {
+    if (!ARENA_CHILD || !party || party.source !== 'handoff') return;
+    var selfName = null;
+    try {
+      var st = window.__espilChatState && window.__espilChatState();
+      if (st && st.users) for (var i = 0; i < st.users.length; i++)
+        if (st.users[i].id === st.myId) { selfName = st.users[i].name; break; }
+    } catch (e) {}
+    var marked = -1;
+    for (var k = 0; k < party.members.length; k++)
+      if (party.members[k].self) { marked = k; break; }
+    if (marked < 0) {
+      /* Malformed handoff (no self slot): fall back to a
+         presence-named self rather than a stored-name guess. */
+      party.members.unshift({ id: selfName || myName(), name: selfName || myName(), self: true });
+    } else if (selfName && party.members[marked].name !== selfName) {
+      /* Keep the record attribution continuous with the name
+         this window actually carries in the arena room. */
+      party.members[marked].name = selfName;
+      party.members[marked].id = selfName;
+    }
+    party.members = party.members.slice(0, PARTY_CAP);
+  }
   function partySize() { return party.members.length; }
   function refreshPartyFromSocial() {
     try {
@@ -308,6 +384,7 @@
     if (entryMode() === 'shop') return { ok: false, why: 'shop-mode' };
     if (queue.active) leaveQueue();
     refreshPartyFromSocial();
+    reconcilePartySelf();
     var space = enterSpace();
     var r = recs();
     run = {
@@ -418,7 +495,11 @@
     try { window.__espilDeathUiHold = false; } catch (e) {}
     if (window.__espilInstanceClear) window.__espilInstanceClear();
     if (window.__espilInstanceSetEnrage) window.__espilInstanceSetEnrage(false);
-    exitSpace();
+    /* ARENA PLACE: in the arena child there is no in-page exit -
+       the player stays standing in the space behind the results
+       panel, and the panel's confirm runs the place-space close
+       contract (modules/arena-space.js). */
+    if (!ARENA_CHILD) exitSpace();
     lastSummary = {
       reason: reason, rounds: run.clearedRounds, kills: run.kills,
       leoEarned: run.leoEarned, recordBonus: recordBonus,
@@ -637,7 +718,14 @@
     '#espil-arena-results .card{background:linear-gradient(160deg,rgba(26,17,8,.97),rgba(12,8,4,.98));border:1px solid rgba(242,182,60,.55);border-radius:16px;padding:22px 26px;width:320px;color:#f5e6c4;text-align:center}',
     '#espil-arena-results h3{margin:0 0 8px;color:#ffd977;font-size:17px}',
     '#espil-arena-results .row{font-size:13px;line-height:1.65;color:#e8d9ae;text-align:left}',
-    '#espil-arena-results button{margin-top:12px;background:linear-gradient(180deg,#8a6420,#6d4d15);border:1px solid #f2b63c;color:#ffeec2;border-radius:10px;padding:8px 18px;cursor:pointer;font-family:inherit}'
+    '#espil-arena-results button{margin-top:12px;background:linear-gradient(180deg,#8a6420,#6d4d15);border:1px solid #f2b63c;color:#ffeec2;border-radius:10px;padding:8px 18px;cursor:pointer;font-family:inherit}',
+    '#espil-arena-ready{position:fixed;inset:0;z-index:9968;background:rgba(6,4,2,.45);display:none;align-items:center;justify-content:center;font-family:inherit}',
+    '#espil-arena-ready.open{display:flex}',
+    '#espil-arena-ready .card{background:linear-gradient(160deg,rgba(26,17,8,.97),rgba(12,8,4,.98));border:1px solid rgba(242,182,60,.55);border-radius:16px;padding:22px 26px;width:320px;color:#f5e6c4;text-align:center}',
+    '#espil-arena-ready h3{margin:0 0 8px;color:#ffd977;font-size:17px}',
+    '#espil-arena-ready .row{font-size:13px;line-height:1.65;color:#e8d9ae;text-align:left}',
+    '#espil-arena-ready button{display:block;width:100%;margin:8px 0 0;background:linear-gradient(180deg,#8a6420,#6d4d15);border:1px solid #f2b63c;color:#ffeec2;border-radius:10px;padding:9px;font-size:13.5px;cursor:pointer;font-family:inherit}',
+    '#espil-arena-ready button.ghost{background:rgba(255,255,255,.06);border-color:rgba(242,182,60,.35)}'
   ].join('\n');
   var domBuilt = false, bannerTimer = null;
   function buildDom() {
@@ -653,6 +741,7 @@
     var bn = document.createElement('div'); bn.id = 'espil-arena-banner'; document.body.appendChild(bn);
     var death = document.createElement('div'); death.id = 'espil-arena-death'; document.body.appendChild(death);
     var res = document.createElement('div'); res.id = 'espil-arena-results'; document.body.appendChild(res);
+    var ready = document.createElement('div'); ready.id = 'espil-arena-ready'; document.body.appendChild(ready);
   }
   function banner(text) {
     buildDom();
@@ -662,6 +751,7 @@
     bannerTimer = setTimeout(function () { bn.classList.remove('open'); }, 2600);
   }
   function portalUse() {
+    if (ARENA_CHILD) return state();   /* ARENA PLACE: no forming panel in the child - formation stayed on the street */
     buildDom();
     if (entryMode() === 'shop') { banner('쇼핑 모드에서는 아레나에 입장할 수 없습니다'); return state(); }
     var p = $('espil-arena-panel');
@@ -674,6 +764,7 @@
     refreshPartyFromSocial();
     var r = recs();
     var near = distTo(PORTAL.x, PORTAL.z) <= PORTAL_RANGE;
+    var childOpen = arenaChildOpen();   /* ARENA PLACE: while the arena window is open the street panel's change buttons lock */
     var html = '<button class="x" data-a="close">✕</button><h3>⚔ 아레나 포탈</h3>';
     if (run) {
       html += '<div class="row">런 진행 중 - 라운드 ' + run.round + ' · 처치 ' + run.kills + ' · Leo +' + run.leoEarned + '</div>'
@@ -686,14 +777,14 @@
       var nearPlayers = nearbyPlayers();
       if (nearPlayers.length) {
         html += '<div class="row dim" style="margin-top:4px">초대할 수 있는 플레이어</div>' + nearPlayers.slice(0, 6).map(function (u) {
-          return '<button class="ghost" data-a="invite" data-id="' + esc(u.id) + '">' + esc(u.name) + ' 초대</button>';
+          return '<button class="ghost" data-a="invite" ' + (childOpen ? 'disabled' : '') + ' data-id="' + esc(u.id) + '">' + esc(u.name) + ' 초대</button>';
         }).join('');
       }
-      if (queue.active) html += '<div class="row" style="margin-top:6px">자동 매칭 대기 중... (' + Math.max(0, Math.round((QUEUE_WAIT_MS - (Date.now() - queue.since)) / 1000)) + '초)</div><button class="ghost" data-a="dequeue">대기 취소</button>';
-      else html += '<div style="margin-top:4px"><button class="ghost" data-a="queue">자동 매칭 대기</button></div>';
-      html += '<button data-a="enter" ' + (near ? '' : 'disabled') + '>아레나 입장</button>'
-        + (near ? '' : '<span class="dim">포탈 근처에서 입장할 수 있습니다</span>')
-        + '<button class="ghost" data-a="cash">캐시상점</button>'
+      if (queue.active) html += '<div class="row" style="margin-top:6px">자동 매칭 대기 중... (' + Math.max(0, Math.round((QUEUE_WAIT_MS - (Date.now() - queue.since)) / 1000)) + '초)</div><button class="ghost" data-a="dequeue" ' + (childOpen ? 'disabled' : '') + '>대기 취소</button>';
+      else html += '<div style="margin-top:4px"><button class="ghost" data-a="queue" ' + (childOpen ? 'disabled' : '') + '>자동 매칭 대기</button></div>';
+      html += '<button data-a="enter" ' + (near && !childOpen ? '' : 'disabled') + '>아레나 입장</button>'
+        + (childOpen ? '<div class="row dim" style="margin-top:4px">아레나 창이 열려 있습니다 - 창을 닫으면 다시 편성할 수 있습니다</div>' : (near ? '' : '<span class="dim">포탈 근처에서 입장할 수 있습니다</span>'))
+        + '<button class="ghost" data-a="cash" ' + (childOpen ? 'disabled' : '') + '>캐시상점</button>'
         + '<div class="row dim" style="margin-top:6px">캐시상점은 포탈과 라운드 사이 휴식 시간에 열 수 있습니다.</div>';
     }
     p.innerHTML = html;
@@ -701,12 +792,12 @@
       b.addEventListener('click', function () {
         var a = b.getAttribute('data-a');
         if (a === 'close') p.classList.remove('open');
-        else if (a === 'enter') { var res = startRun(); if (!res.ok) banner('입장할 수 없습니다: ' + res.why); }
+        else if (a === 'enter') { var res = openArenaWindow(); if (!res.ok) banner('입장할 수 없습니다: ' + res.why); }
         else if (a === 'exit') exitRun();
         else if (a === 'queue') enterQueue();
         else if (a === 'dequeue') leaveQueue();
         else if (a === 'invite') { invite(b.getAttribute('data-id')); banner('파티 초대를 보냈습니다'); }
-        else if (a === 'cash') { if (window.__espilCash) window.__espilCash.open(); }
+        else if (a === 'cash') { if (arenaChildOpen()) banner('아레나 창이 열려 있는 동안은 캐시상점을 열 수 없습니다'); else if (window.__espilCash) window.__espilCash.open(); }
         renderPanel();
       });
     });
@@ -760,9 +851,110 @@
       + (s.spaceReady ? '' : '<br><span style="color:#a68d54">인스턴스 공간 연동(모노리스 심) 전이라 임시 구역에서 진행된 런입니다.</span>')
       + '</div><button id="espil-arena-results-close">닫기</button></div>';
     d.classList.add('open');
-    $('espil-arena-results-close').addEventListener('click', function () { d.classList.remove('open'); });
+    $('espil-arena-results-close').addEventListener('click', function () {
+      d.classList.remove('open');
+      /* ARENA PLACE: in the child, confirming the results IS the
+         exit - arena-space.js notifies the parent and closes the
+         window (or returns a direct visit to the street in this
+         same window). */
+      if (ARENA_CHILD && typeof window.__espilArenaChildConfirmClose === 'function') window.__espilArenaChildConfirmClose();
+    });
     drawBoard();
   }
+
+  /* ================= ARENA PLACE: ready card (child) ================= */
+  var readyShown = false;
+  function showReadyCard() {
+    if (!ARENA_CHILD || run || readyShown) return;
+    readyShown = true;
+    reconcilePartySelf();
+    buildDom();
+    var d = $('espil-arena-ready');
+    if (!d) return;
+    var r = recs();
+    d.innerHTML = '<div class="card"><h3>⚔ 아레나</h3><div class="row">'
+      + '파티 (' + partySize() + '/' + PARTY_CAP + '): ' + party.members.map(function (m) { return esc(m.name); }).join(', ')
+      + '<br>개인 최고 라운드 ' + (r.personal.bestRound || '-') + ' · 한 런 최다 처치 ' + (r.personal.bestKills || '-')
+      + (signedIn() ? '' : '<br>게스트 기록은 이 창에만 남습니다')
+      + '</div>'
+      + '<button data-a="start">런 시작</button>'
+      + '<button class="ghost" data-a="leave">나가기</button></div>';
+    d.classList.add('open');
+    Array.prototype.forEach.call(d.querySelectorAll('button[data-a]'), function (b) {
+      b.addEventListener('click', function () {
+        var a = b.getAttribute('data-a');
+        if (a === 'start') { var res = startRun(); if (res.ok) d.classList.remove('open'); else banner('시작할 수 없습니다: ' + res.why); }
+        else if (a === 'leave') { d.classList.remove('open'); if (typeof window.__espilArenaChildLeave === 'function') window.__espilArenaChildLeave(); }
+      });
+    });
+  }
+
+  /* ================= ARENA PLACE: street window + locks =================
+     The street window opens the arena place space and then locks
+     its own change surfaces while the child is open: the forming
+     panel's buttons (renderPanel reads arenaChildOpen) and the
+     cash shop's entry points. The cash lock is the shared-storage
+     audit's guard (2026-11-18): espil_cash_v1 is a whole-object
+     store cached per document, so while the child writes it
+     (cash revives), this window must not - its floating cash
+     button is cashshop.js's own element, hence the capture-phase
+     guard on it and on the cash window. The child's close (the
+     'espil-arena-close' message, or the handle polling closed)
+     releases every lock. */
+  var arenaChildWin = null;
+  function arenaChildOpen() { return !!(arenaChildWin && !arenaChildWin.closed); }
+  function writeHandoff() {
+    refreshPartyFromSocial();
+    try {
+      localStorage.setItem(HANDOFF_KEY, JSON.stringify({
+        members: party.members.map(function (m) { return m.name; }),
+        selfIndex: party.members.findIndex(function (m) { return !!m.self; }),
+        size: partySize(), at: Date.now()
+      }));
+    } catch (e) {}
+  }
+  function openArenaWindow() {
+    if (ARENA_CHILD) return { ok: false, why: 'child' };
+    if (run) return { ok: false, why: 'running' };
+    if (entryMode() === 'shop') return { ok: false, why: 'shop-mode' };
+    if (arenaChildOpen()) { try { arenaChildWin.focus(); } catch (e) {} return { ok: true, already: true }; }
+    writeHandoff();
+    var w = null;
+    try { w = window.open('/vancouver/arena/', 'espil-arena', 'popup,width=1280,height=820'); } catch (e) {}
+    if (!w) { banner('팝업이 차단되었습니다 - 팝업을 허용하면 아레나 창이 열립니다'); return { ok: false, why: 'popup-blocked' }; }
+    arenaChildWin = w;
+    lastChildOpenState = true;
+    renderPanel();
+    return { ok: true };
+  }
+  var lastChildOpenState = false;
+  function watchArenaChildLock() {
+    var openNow = arenaChildOpen();
+    if (openNow === lastChildOpenState) return;
+    lastChildOpenState = openNow;
+    var p = $('espil-arena-panel');
+    if (p && p.classList.contains('open')) renderPanel();
+  }
+  window.addEventListener('message', function (e) {
+    if (ARENA_CHILD) return;
+    if (e.origin !== location.origin) return;
+    if (!arenaChildWin || e.source !== arenaChildWin) return;
+    var d = e.data || {};
+    if (d.type === 'espil-arena-close') {
+      arenaChildWin = null; lastChildOpenState = false;
+      var p = $('espil-arena-panel');
+      if (p && p.classList.contains('open')) renderPanel();
+    }
+  });
+  document.addEventListener('click', function (e) {
+    if (ARENA_CHILD || !arenaChildOpen()) return;
+    var t = e.target;
+    if (!t || !t.closest) return;
+    if (t.closest('#espil-cash-btn') || t.closest('#espil-cash-window')) {
+      e.preventDefault(); e.stopImmediatePropagation();
+      banner('아레나 창이 열려 있는 동안은 캐시상점을 열 수 없습니다');
+    }
+  }, true);
 
   /* ================= events + tick ================= */
   window.addEventListener('espil-guide', function (e) {
@@ -772,6 +964,7 @@
   });
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'f' && e.key !== 'F') return;
+    if (ARENA_CHILD) return;   /* ARENA PLACE: the portal key does nothing in the child */
     var ae = document.activeElement;
     if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
     if (!inMap() || run) return;
@@ -789,9 +982,17 @@
     }
     if (run) run.outSince = 0;
     buildDom();
-    buildPortal();
+    if (ARENA_CHILD) {
+      /* ARENA PLACE child: no portal stands here; the ready card
+         appears once arena-space has summoned the player into the
+         space (the inside record is the signal). */
+      if (!run && !readyShown && window.__espilInside && window.__espilInside.arena) showReadyCard();
+    } else {
+      buildPortal();
+      watchArenaChildLock();
+    }
     if (portalRing) { var s = 1 + Math.sin(Date.now() / 500) * 0.05; portalRing.scale.set(s, s, s); }
-    var prompt = $('espil-arena-prompt');
+    var prompt = ARENA_CHILD ? null : $('espil-arena-prompt');
     if (prompt) {
       if (PROMPT_OFF) { prompt.classList.remove('open'); }   /* prompt pill off (Han 2026-11-13): never presents */
       else {
@@ -827,6 +1028,7 @@
     var r = recs();
     return {
       version: 1,
+      arenaPlace: { child: ARENA_CHILD, partySource: party.source, childWindowOpen: !ARENA_CHILD && arenaChildOpen() },
       mode: entryMode(),
       portal: { x: PORTAL.x, z: PORTAL.z, range: PORTAL_RANGE, built: !!portalGroup, near: distTo(PORTAL.x, PORTAL.z) <= PORTAL_RANGE },
       safeZone: sz,
@@ -850,6 +1052,8 @@
   window.__espilArena = {
     state: state,
     portalUse: portalUse,
+    openWindow: openArenaWindow,
+    childOpen: function () { return arenaChildOpen(); },
     queue: enterQueue,
     leaveQueue: leaveQueue,
     invite: invite,

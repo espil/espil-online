@@ -18,6 +18,16 @@
   var joinedBody = null; /* body carried by the latest join frame */
   var backoff = 1000, retryTimer = null, posTimer = null, pingTimer = null, sendWindow = [];
   var seenChats = {}, everJoined = false, localNoticeShown = false;
+  /* ARENA PLACE (Han 2026-11-18): in an arena place-space child
+     (the boot shell's mark with slug 'arena') this client connects
+     to the ARENA room only ('<city>-arena'), never the street
+     room, and the chat surfaces stay down - the arena room carries
+     join / leave / position / body only. A store child (any other
+     marked slug) keeps the full connect() lock below: it never
+     connects at all. */
+  var ARENA_MARK = null;
+  try { ARENA_MARK = JSON.parse(sessionStorage.getItem('espil_store_space_v1') || 'null'); } catch(_){}
+  var ARENA_CHILD = !!(ARENA_MARK && ARENA_MARK.slug === 'arena' && ARENA_MARK.city);
   var NAME_PH = { en: 'Your name', ko: '이름을 입력하세요', fr: 'Votre nom', zh: '你的名字' };
 
   function $(id){ return document.getElementById(id); }
@@ -149,7 +159,16 @@
        heartbeat already represents this player standing at the
        street point. The place entry path fires no arrival event,
        so this lock is the second bolt, not the only one. */
-    try { if (sessionStorage.getItem('espil_store_space_v1')) return; } catch(_){}
+    /* ARENA PLACE exception (Han 2026-11-18): the one scoped
+       breach in the lock above - a window whose mark is the
+       arena's may connect, but ONLY to the arena room, whatever
+       room the caller named. The room name passes the Worker's
+       cleanRoom unchanged and its Durable Object is separate, so
+       the street roster and the arena roster never mix, and the
+       account still appears at exactly one coordinate per room.
+       Store children keep the lock exactly as written. */
+    if (ARENA_CHILD) { r = String(ARENA_MARK.city).toLowerCase() + '-arena'; }
+    else { try { if (sessionStorage.getItem('espil_store_space_v1')) return; } catch(_){} }
     room = r;
     clearTimeout(retryTimer);
     if (ws) { try { ws.onclose = null; ws.close(); } catch(_){} ws = null; }
@@ -215,7 +234,7 @@
           try { if (window.__espilMinimapSet) window.__espilMinimapSet(m.id, m.x, m.z, u); } catch(_){}
           try { if (window.__espilAvatarSet) window.__espilAvatarSet(m.id, m.x, m.y, m.z, m.a, u, m.vx, m.vz); } catch(_){}
         }
-      } else if (m.t === 'chat' && m.from) {
+      } else if (m.t === 'chat' && m.from && !ARENA_CHILD) {
         /* UI-room delta: drop an exact re-delivery (same sender session,
            timestamp and text) so a line can never render twice. */
         var key = m.from.id + '|' + m.ts + '|' + m.text;
@@ -226,7 +245,7 @@
         /* overhead speech bubble over the sender's avatar (own bubble
            is the world script's DOM bubble on send) */
         try { if (window.__espilAvatarBubble && m.from.id !== myId) window.__espilAvatarBubble(m.from.id, String(m.text || '')); } catch(_){}
-      } else if (m.t === 'dm' && m.from) {
+      } else if (m.t === 'dm' && m.from && !ARENA_CHILD) {
         onDmFrame(m);
       } else if (m.t === 'stall_update' && m.user) {
         var u3 = users[m.user.id];
@@ -260,6 +279,7 @@
      true when the message went to the server; the server echoes it back
      to everyone including the sender, so no local echo is added. */
   window.__espilChatSend = function(text){
+    if (ARENA_CHILD) return false;   /* ARENA PLACE: the arena room carries no chat (Han 2026-11-18) */
     if (!ws || ws.readyState !== 1 || !joined) { if (room) maybeNotifyLocal(); return false; }
     var now = Date.now();
     sendWindow = sendWindow.filter(function(t){ return now - t < 5000; });
@@ -273,6 +293,7 @@
      (party_invite / party_accept / party_decline / party_leave /
      party_chat, served by the Worker's CityRoom party layer). */
   window.__espilSocialSend = function(obj){
+    if (ARENA_CHILD) return false;   /* ARENA PLACE: no social frames leave an arena child - formation lives in the street window */
     if (!ws || ws.readyState !== 1 || !joined) return false;
     try { ws.send(JSON.stringify(obj)); return true; } catch(_){ return false; }
   };
@@ -286,6 +307,26 @@
     var city = e && e.detail && e.detail.city;
     if (city) { lastArrivalAt = Date.now(); connect(String(city).toLowerCase()); }
   });
+
+  /* ARENA PLACE boot (Han 2026-11-18): the place entry path fires
+     no espil-arrival (the store child's silence relies on exactly
+     that), so an arena child would never connect without its own
+     call. When the mark is the arena's, connect once this window
+     stands in the map with a pose - the readiness the place-space
+     module waits for - and connect()'s exception routes the
+     socket to the arena room. One call; the retry machinery owns
+     every reconnect from there. */
+  if (ARENA_CHILD) {
+    var arenaBootTries = 0;
+    var arenaBootTimer = setInterval(function(){
+      arenaBootTries++;
+      if (room || arenaBootTries > 240) { clearInterval(arenaBootTimer); return; }
+      var inMapNow = document.body && document.body.classList.contains('in-map');
+      var poseNow = null;
+      try { poseNow = window.__espilPlayerPose ? window.__espilPlayerPose() : null; } catch(_){}
+      if (inMapNow && poseNow) { clearInterval(arenaBootTimer); connect(String(ARENA_MARK.city).toLowerCase()); }
+    }, 500);
+  }
 
   /* Designated-body join refresh (fix 2026-11-18): the join frame
      carries myBody() at arrival, but the server session sync that
@@ -489,6 +530,7 @@
     } else p.style.display = 'none';
   }
   setInterval(function(){
+    if (ARENA_CHILD) return;   /* ARENA PLACE: no proximity interact / DM surface in an arena child */
     if (!joined || !document.body || !document.body.classList.contains('in-map')) { if (nearPeer) setNear(null); return; }
     var me = null; try { me = window.__espilPlayerPose ? window.__espilPlayerPose() : null; } catch(_){}
     if (!me) { if (nearPeer) setNear(null); return; }
@@ -656,6 +698,7 @@
     card.style.display = 'block';
   }
   document.addEventListener('keydown', function(e){
+    if (ARENA_CHILD) return;   /* ARENA PLACE: the interact / DM keys stay down in an arena child */
     var ae = document.activeElement;
     var typing = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA');
     if ((e.key === 'f' || e.key === 'F') && nearPeer && !typing && document.body.classList.contains('in-map')) {

@@ -3078,6 +3078,13 @@
        like every other object in the world. */
     var ESPIL_AVATAR_F=4.67*Math.pow(2,-0.5);
     var espilP1={map:null,ready:false,failed:null,hiddenApplied:false,initTried:false,bannerEl:null,mapEl:null,layerAdded:false,layerLive:false,layerRenderer:null,layerCam:null,gameCanvasHidden:false,layerSignaled:false,zoom:null,zoomT:null,zoomDrive:false,style3dOff:false,style3dTries:0};
+    /* ARENA PLACE (Han 2026-11-18): the follow framing's default
+       zoom target, as a variable instead of the 19.95 literal
+       (19.95 = ZoomFromDist(7.0), the street default). The arena
+       place-space child raises its own document's default to the
+       9.5 m draft through __espilSetFollowDist below; the street
+       window never calls it and keeps 19.95 exactly. */
+    var espilFollowZoomT=19.95;
     espilP1.envReady=false;
     (window.__ESPIL_ENV_READY__||Promise.resolve()).then(function(){espilP1.envReady=true;},function(){espilP1.envReady=true;});
     function espilP1Token(){
@@ -3682,7 +3689,7 @@
         }else if(walkPlayer._espilArrive&&!espilP1.zoomDrive){
           espilP1.zoom=espilP1.zoomT=espilP1ZoomFromDist(walkCamDist);
         }else{
-          if(!espilP1.zoomDrive)espilP1.zoomT=19.95; /* until the player takes the wheel, the target is the default framing */
+          if(!espilP1.zoomDrive)espilP1.zoomT=espilFollowZoomT; /* until the player takes the wheel, the target is the default framing (espilFollowZoomT: 19.95 street, raised only inside an arena place child) */
           espilP1.zoom+=(espilP1.zoomT-espilP1.zoom)*0.2;
           if(Math.abs(espilP1.zoomT-espilP1.zoom)<0.001)espilP1.zoom=espilP1.zoomT;
           walkCamDist=espilP1DistFromZoom(espilP1.zoom);
@@ -8282,6 +8289,23 @@
         shadowVisible:(p&&p.av&&p.av.shadow)?!!p.av.shadow.visible:null,
         zoomT:(typeof espilP1!=='undefined'&&espilP1)?espilP1.zoomT:null,
         walkCamDist:(typeof walkCamDist==='number')?Math.round(walkCamDist*100)/100:null };
+    };
+    /* ARENA PLACE follow-distance seam (Han 2026-11-18): set THIS
+       document's default follow distance (fallback path:
+       walkCamDist; Mapbox P1 path: the default zoom target the
+       per-frame pin holds until the player takes the wheel). The
+       arena place-space child calls it once with its 9.5 m draft
+       after the summon; nothing on the street calls it, so the
+       street default (7.0 m / zoom 19.95) is untouched. The
+       player's own wheel zoom overrides the default from the
+       first notch, exactly as on the street. */
+    window.__espilSetFollowDist=function(d){
+      if(typeof d!=='number'||!isFinite(d))return null;
+      d=Math.max(1.8,Math.min(16,d));
+      walkCamDist=d;
+      espilFollowZoomT=espilP1ZoomFromDist(d);
+      if(typeof espilP1!=='undefined'&&espilP1)espilP1.zoomT=espilFollowZoomT;
+      return d;
     };
     function espilEnterInside(rec){
       var p=walkPlayer; if(!p||!rec)return;

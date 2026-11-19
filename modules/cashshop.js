@@ -384,6 +384,18 @@
     });
   }
   function open() {
+    /* ARENA PLACE shared-storage guard (2026-11-18): the ledger
+       is cached in memory from this document's boot, but an arena
+       place-space child window writes the same espil_cash_v1
+       store (cash revives) while this window stands on the
+       street. Re-read the ledger before the window renders or
+       sells anything, so a save from this document can never roll
+       the child's purchases back with a stale copy. (While the
+       arena child is open, the street window's cash entry points
+       are locked by modules/arena.js; this re-read is what makes
+       the first post-run open start from the child's final
+       ledger.) */
+    ledger = loadLedger();
     ensureDom();
     winEl.classList.add('open');
     winEl.setAttribute('aria-hidden', 'false');
