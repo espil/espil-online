@@ -10102,7 +10102,11 @@
       }
       for(i=0;i<hits.length;i++){
         var crit=Math.random()<ESPIL_CRIT_CHANCE;
-        var raw=st.m.dmg*factor*espilTreeDmgMul()*(crit?ESPIL_CRIT_MULT:1);
+        /* SKILL WIRING (menu overhaul step 1): st.dmg is the rank-adjusted
+           value the skill window displays - it already carries the character
+           tree rank (+5%/rank) and espilTreeDmgMul(). The old line used the
+           base st.m.dmg, so rank investment raised only the shown number. */
+        var raw=st.dmg*factor*(crit?ESPIL_CRIT_MULT:1);
         var res=null;
         try{ res=window.__espilMonsterHit(hits[i].id,raw,p.pos.x,p.pos.z,{crit:crit,element:element}); }catch(e){}
         if(res&&res.killed){ espilGrantKillLeo(res); espilTreeOnKill(); }
