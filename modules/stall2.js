@@ -27,21 +27,184 @@
   function owned() { try { var a = JSON.parse(localStorage.getItem('espil_owned_items') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
-  function publicStall(s) {
+  /* ---------- shared listing model - comm-center phase 0 -------
+     __espilListingModel v1. ONE record standard for every stall
+     post, shared by the two surfaces that read and write listings:
+     my stall (the form in this module's care) and the communication
+     center (later phases read the same summary shape).
+     Post: { id, side: 'sell'|'buy', kind: 'item'|'service', title,
+             price (integer Leo; 0 means negotiable), neg (bool,
+             true exactly when price is 0), count (1..999), note,
+             ts, cat (one of LISTING_CATS), mode ('fixed' in v1;
+             the field is reserved so a later bidding phase does
+             not change the record shape), bound (bool; set true by
+             future dungeon-drop sources for legend/signature
+             items - the stall form never sets it) }
+     Summary (what rides the presence relay): { sellerId (account
+     uid, null for guests), sellerName, stallName, city, name
+     (kept: existing readers and the Worker read .name), posts }.
+     Lifetime is unchanged: the original record persists on this
+     device under espil_stall_<city>; the public summary exists
+     only while the owner is joined to that city's room.
+     Legacy posts (string price, no cat/mode/bound, maybe no
+     count) are normalised ON READ through normalisePost; reads
+     never rewrite the stored record. Posts created or edited
+     through the stall form are written in the standard shape at
+     save time (the post-add hook below). */
+  var LISTING_CATS = ['service', 'food', 'furniture', 'clothing', 'equipment', 'books', 'consumables', 'materials', 'misc'];
+  var LISTING_PRICE_MAX = 1000000;
+  function listingDbItem(title) {
+    try {
+      var it = (window.__espilGearWindow && window.__espilGearWindow.itemOf) ? window.__espilGearWindow.itemOf(title) : null;
+      if (!it) return null;
+      /* panels' itemOf synthesises an entry for unknown names; a
+         real DB row is told apart by its material kind (never
+         synthesised) or its Korean name differing from the lookup
+         name (the synthesis copies the lookup name into kr). */
+      if (it.kind === 'mat') return it;
+      if (typeof it.kr === 'string' && it.kr !== String(title)) return it;
+      return null;
+    } catch (e) { return null; }
+  }
+  function listingIsFood(title) {
+    try {
+      var t = String(title).toLowerCase();
+      var keys = Object.keys(window.__espilFoodRestore || {});
+      for (var i = 0; i < keys.length; i++) if (keys[i].toLowerCase() === t) return true;
+    } catch (e) {}
+    return false;
+  }
+  function deriveCat(p) {
+    if (!p) return 'misc';
+    if (p.kind === 'service') return 'service';
+    var title = String(p.title == null ? '' : p.title).trim();
+    if (!title) return 'misc';
+    if (listingIsFood(title)) return 'food';
+    var it = listingDbItem(title);
+    if (it) {
+      if (it.kind === 'mat') return 'materials';
+      if (it.kind === 'use') return 'consumables';
+      var slot = it.slot || null;
+      if (slot === 'weapon') return 'equipment';
+      if (slot === 'head' || slot === 'top' || slot === 'bottom' || slot === 'shoes' || slot === 'glove' || slot === 'cape') return 'clothing';
+      if (slot) return 'equipment'; /* ring/necklace/earring/belt/pet: statted battle gear */
+    }
+    return 'misc';
+  }
+  function normalisePost(p) {
+    p = (p && typeof p === 'object') ? p : {};
+    var price = parseInt(p.price, 10);
+    if (isNaN(price) || price < 0 || price > LISTING_PRICE_MAX) price = 0;
+    var count = parseInt(p.count, 10);
+    if (isNaN(count) || count < 1) count = 1;
+    if (count > 999) count = 999;
+    var out = {
+      id: typeof p.id === 'string' ? p.id.slice(0, 24) : '',
+      side: p.side === 'buy' ? 'buy' : 'sell',
+      kind: p.kind === 'service' ? 'service' : 'item',
+      title: String(p.title == null ? '' : p.title).slice(0, 40),
+      price: price,
+      neg: price === 0,
+      count: count,
+      note: String(p.note == null ? '' : p.note).slice(0, 120),
+      ts: (typeof p.ts === 'number' && isFinite(p.ts)) ? p.ts : 0,
+      cat: LISTING_CATS.indexOf(p.cat) >= 0 ? p.cat : null,
+      mode: 'fixed',
+      bound: !!p.bound
+    };
+    if (!out.cat) out.cat = deriveCat(out);
+    return out;
+  }
+  function validatePost(p) {
+    var errs = [];
+    if (!p || typeof p !== 'object') return ['not-an-object'];
+    if (typeof p.title !== 'string' || !p.title.trim()) errs.push('title-empty');
+    if (typeof p.title === 'string' && p.title.length > 40) errs.push('title-too-long');
+    if (p.side !== 'sell' && p.side !== 'buy') errs.push('side-invalid');
+    if (p.kind !== 'item' && p.kind !== 'service') errs.push('kind-invalid');
+    if (!Number.isInteger(p.price) || p.price < 0 || p.price > LISTING_PRICE_MAX) errs.push('price-invalid');
+    if (p.neg !== (p.price === 0)) errs.push('neg-inconsistent');
+    if (!Number.isInteger(p.count) || p.count < 1 || p.count > 999) errs.push('count-invalid');
+    if (LISTING_CATS.indexOf(p.cat) < 0) errs.push('cat-invalid');
+    if (p.mode !== 'fixed') errs.push('mode-invalid');
+    if (typeof p.bound !== 'boolean') errs.push('bound-invalid');
+    if (typeof p.note === 'string' && p.note.length > 120) errs.push('note-too-long');
+    if (typeof p.id === 'string' && p.id.length > 24) errs.push('id-too-long');
+    return errs;
+  }
+  function createPost(fields) {
+    fields = fields || {};
+    return normalisePost({
+      id: typeof fields.id === 'string' && fields.id ? fields.id : ('p' + Date.now().toString(36) + Math.floor(Math.random() * 999)),
+      side: fields.side, kind: fields.kind, title: fields.title,
+      price: fields.neg ? 0 : fields.price,
+      count: fields.count, note: fields.note,
+      ts: (typeof fields.ts === 'number' && isFinite(fields.ts)) ? fields.ts : Date.now(),
+      cat: fields.cat || null, mode: 'fixed', bound: !!fields.bound
+    });
+  }
+  function mySeller() {
+    var uid = null, name = '';
+    try {
+      var ses = JSON.parse(localStorage.getItem('espil_session_v1') || 'null');
+      if (ses && ses.uid) uid = String(ses.uid);
+      if (ses && ses.name) name = String(ses.name);
+    } catch (e) {}
+    if (!name) {
+      var st = chatState();
+      if (st) { var me = (st.users || []).filter(function (u) { return u && u.id === st.myId; })[0]; if (me && me.name) name = String(me.name); }
+    }
+    if (!name) { try { var ch = JSON.parse(localStorage.getItem('espil_character') || 'null'); if (ch && ch.name) name = String(ch.name); } catch (e) {} }
+    return { id: uid, name: name };
+  }
+  function listingSummary(s) {
     if (!s || !s.posts || !s.posts.length) return null;
+    var seller = mySeller();
+    var st = chatState();
+    var city = (st && st.room) || window.__espilCityKey || 'vancouver';
+    var stallName = s.name || '';
     return {
-      name: s.name || '',
-      posts: s.posts.map(function (p) {
-        return { id: p.id || '', side: p.side === 'buy' ? 'buy' : 'sell', kind: p.kind === 'service' ? 'service' : 'item',
-                 title: p.title || '', price: parseInt(p.price, 10) || 0, count: Math.max(1, parseInt(p.count, 10) || 1), note: p.note || '' };
-      })
+      sellerId: seller.id,
+      sellerName: seller.name,
+      stallName: stallName,
+      city: String(city),
+      name: stallName,
+      posts: s.posts.map(function (p) { return normalisePost(p); })
     };
   }
+  window.__espilListingModel = {
+    version: 1,
+    CATS: LISTING_CATS.slice(),
+    create: createPost,
+    normalise: normalisePost,
+    validate: validatePost,
+    deriveCat: deriveCat,
+    summary: listingSummary
+  };
+
+  function publicStall(s) { return listingSummary(s); }
 
   /* ---------- counts + inventory picker in the stall form ------- */
+  function augmentCatRow() {
+    var form = document.getElementById('stall-form');
+    if (!form || document.getElementById('stall2-cat')) return;
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-top:6px;';
+    var lab = document.createElement('span'); lab.textContent = 'Category'; lab.style.cssText = 'opacity:.7;font-size:12px;';
+    var sel = document.createElement('select');
+    sel.id = 'stall2-cat';
+    sel.style.cssText = 'flex:1;min-width:0;';
+    sel.innerHTML = '<option value="">Auto (by item)</option>' + LISTING_CATS.map(function (c) {
+      return '<option value="' + c + '">' + c + '</option>';
+    }).join('');
+    row.appendChild(lab); row.appendChild(sel);
+    form.appendChild(row);
+  }
   function augmentForm() {
     var form = document.getElementById('stall-form');
-    if (!form || document.getElementById('stall2-count')) return;
+    if (!form) return;
+    augmentCatRow();
+    if (document.getElementById('stall2-count')) return;
     var row = document.createElement('div');
     row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-top:6px;';
     var sel = document.createElement('select');
@@ -78,7 +241,12 @@
     if (e.target && e.target.id === 'stall-add-btn') {
       var t = document.getElementById('stall-title');
       var c = document.getElementById('stall2-count');
-      pendingPost = { title: t ? t.value.trim() : '', count: c ? Math.max(1, Math.min(999, parseInt(c.value, 10) || 1)) : 1, at: Date.now() };
+      var catSel = document.getElementById('stall2-cat');
+      var prevCats = {};
+      var cur = load();
+      if (cur && cur.posts) cur.posts.forEach(function (p) { if (p.id && LISTING_CATS.indexOf(p.cat) >= 0) prevCats[p.id] = p.cat; });
+      pendingPost = { title: t ? t.value.trim() : '', count: c ? Math.max(1, Math.min(999, parseInt(c.value, 10) || 1)) : 1, at: Date.now(),
+                      cat: catSel ? catSel.value : '', prevCats: prevCats };
     }
   }, true);
   document.addEventListener('click', function (e) {
@@ -88,7 +256,20 @@
       var s = load(); if (!s || !s.posts) return;
       var best = null;
       s.posts.forEach(function (p) { if (p.title === pp.title) best = p; });
-      if (best) { best.count = pp.count; save(s); pushStall(true); }
+      if (best) {
+        best.count = pp.count;
+        /* phase 0: the saved post is written in the listing
+           standard shape - the form's category wins, an edit
+           keeps its previously chosen category when the picker
+           is left on Auto, otherwise the category is derived. */
+        var chosen = (pp.cat && LISTING_CATS.indexOf(pp.cat) >= 0) ? pp.cat : null;
+        var keep = (!chosen && best.id && pp.prevCats && LISTING_CATS.indexOf(pp.prevCats[best.id]) >= 0) ? pp.prevCats[best.id] : null;
+        var norm = normalisePost({ id: best.id, side: best.side, kind: best.kind, title: best.title,
+          price: best.price, count: best.count, note: best.note, ts: best.ts,
+          cat: chosen || keep || null, mode: 'fixed', bound: !!best.bound });
+        Object.keys(norm).forEach(function (k) { best[k] = norm[k]; });
+        save(s); pushStall(true);
+      }
     }, 60);
   }, false);
 
@@ -282,6 +463,7 @@
     var st = chatState();
     return {
       myStall: publicStall(load()),
+      listingModel: window.__espilListingModel ? window.__espilListingModel.version : 0,
       pushedSig: pushedSig,
       usersWithStalls: st ? (st.users || []).filter(function (u) { return u && u.stall; }).map(function (u) { return u.name; }) : [],
       boardOpen: !!boardEl,
