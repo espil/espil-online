@@ -1264,9 +1264,15 @@
           var btns = list.querySelectorAll('.espil-city-btn');
           for (var j = 0; j < btns.length; j++) btns[j].classList.toggle('is-centered', btns[j] === b);
           faceFlowCity(c.name); /* item 5: a click centres the city too - face it */
-          if (c.name === 'Vancouver') {
+          if (BUNDLE_CITIES[c.name]) {
+            /* Wave 0 (Han 2026-11-18, all cities open): a bundle
+               city delegates to monolith's own reel button, exactly
+               as Vancouver always has - its button exists because
+               ESPIL_SELECTABLE_CITIES now carries the six bundle
+               cities. A missing button (build race) falls through
+               to the preparation panel, today's behaviour. */
             for (var k = 0; k < orig.length; k++) {
-              if ((orig[k].textContent || '').trim() === 'Vancouver') { orig[k].click(); return; }
+              if ((orig[k].textContent || '').trim() === c.name) { orig[k].click(); return; }
             }
           }
           openPrep(c.name);
@@ -1315,16 +1321,17 @@
       requestAnimationFrame(updateFlowReelCenter);
       setTimeout(updateFlowReelCenter, 350);
     }, 300);
-    /* pin picks for non-Vancouver cities: capture-phase, so
+    /* pin picks for bundle-less cities: capture-phase, so
        monolith's own pin handler (which would refuse them) never
-       runs; Vancouver's pin falls through to the native flow. */
+       runs; a bundle city's pin falls through to the native flow,
+       the same delegation as the list (Wave 0, 2026-11-19). */
     document.addEventListener('click', function (e) {
       if (step !== 'city') return;
       var t = e.target;
       var pin = t && t.closest ? t.closest('.city-pin') : null;
       if (!pin) return;
       var name = (pin.getAttribute('aria-label') || '').split(',')[0].trim();
-      if (!name || name === 'Vancouver') return;
+      if (!name || BUNDLE_CITIES[name]) return;
       e.stopPropagation();
       e.preventDefault();
       openPrep(name);

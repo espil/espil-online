@@ -314,7 +314,7 @@
        Every other city is shown but inactive (grey, not selectable
        by click, pin, Enter, arrows or by name). Selection behaviour
        for the active six is unchanged. */
-    var ESPIL_SELECTABLE_CITIES={'Vancouver':true};
+    var ESPIL_SELECTABLE_CITIES={'Vancouver':true,'Auckland':true,'Tokyo':true,'New York':true,'Paris':true,'London':true};
     var markers=[],markerGroup=new THREE.Group();
     earthSpin.add(markerGroup);
     function latLon(lat,lon,r){var phi=(90-lat)*Math.PI/180,theta=(lon+180)*Math.PI/180;return new THREE.Vector3(-r*Math.sin(phi)*Math.cos(theta),r*Math.cos(phi),r*Math.sin(phi)*Math.sin(theta));}
@@ -14050,7 +14050,7 @@
     /* Production config (Han 2026-10-18): Vancouver is the only city
        that dives; the other five selectable cities show COMING SOON
        with the button disabled. */
-    function espilPlayableCity(name){return name==='Vancouver';} /* Han 2026-11-02: the next deployment opens VANCOUVER ONLY - the other cities stay visible on the globe but do not open (previous six-city activation, 2026-10-18/19, is superseded for this deployment) */
+    function espilPlayableCity(name){return !!ESPIL_CITY_KEYS[name];} /* Wave 0 (Han 2026-11-18, all cities open): the six bundle cities dive; the 30 bundle-less cities stay unselectable (ESPIL_SELECTABLE_CITIES above) and keep the preparation panel. Supersedes the 2026-11-02 Vancouver-only deployment config. */
     function showCityInfo(marker){
       infoShown=true;approachSlow=false;
       var facts=cityFacts[marker.userData.name]||{pop:'—',brands:[],img:''};
