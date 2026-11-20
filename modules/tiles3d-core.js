@@ -58,7 +58,50 @@
    CLONED and real bytes are counted off the clone. Installed only
    while this core runs (off/denied sessions carry no wrap). Read it
    via __espilTilesState().core.streamedBytes.
-   Attribution: shown only while tiles are on (licence boundary). */
+   Attribution: shown only while tiles are on (licence boundary).
+   BASE-MAP TOGGLE (Han 2026-11-19): while the tiles are LIVE in
+   this session (tileset loaded + gate on), the Mapbox base is
+   turned OFF so the Google photorealistic mesh is the visible
+   terrain. Measured structure of the base (tiles-pc line,
+   2026-11-19): the designated style is an empty shell - its only
+   content is ONE imported fragment, 'basemap' (Mapbox Standard),
+   which paints the land, water, roads, greenspace and its own
+   3D buildings/trees visible at spawn; the host style itself
+   carries only the game's added layers. The toggle therefore
+   works in two parts: (1) every host style layer except the
+   backdrop (background type), the game layer, the collision
+   query layer and this core's own layer gets layout visibility
+   'none' (the baked espil buildings and their dither family
+   included); (2) every style import is REMOVED with
+   map.removeImport after its full spec (id/url/config/data,
+   read live from map.getStyle().imports) has been recorded.
+   The moment tiles are not live (gate exit, load error,
+   teardown) everything is put back exactly: imports are
+   re-added from their recorded specs (and the game's standing
+   show3dObjects=false config is re-applied to the basemap
+   import, matching espilP1HideStyle3D's runtime state), and
+   each layer's RECORDED visibility is restored verbatim (the
+   fallback style pre-hides its symbol layers; those stay
+   hidden). Fail-safe: an import whose spec cannot be captured
+   completely (no url) is left in place rather than lost. The
+   map object itself (camera, movement, collision anchoring)
+   is never touched. The building suppression above stays as a
+   second belt: with the layer hidden its filter is visually
+   moot, but it costs nothing and still prevents double
+   buildings inside the boundary if a hide ever misses a layer.
+   State surface: __espilTilesState().core.baseOff / .importOff.
+   LOD RESOLUTION FIX (Han's console evidence, 2026-11-19):
+   setResolutionFromRenderer used to run ONLY when the canvas
+   size changed after this layer's renderer was created; when
+   the renderer starts out already matching the canvas (the
+   normal desktop path) the renderer resolution was NEVER set,
+   the traversal warned 'resolution for camera error
+   calculation is not set' every frame (1,424x in Han's log)
+   and computed screen-space error against a 0 height, so tile
+   refinement never engaged and the mesh never materialised.
+   The call now runs on every render, before tiles.update();
+   it is a no-op when the size is unchanged. State surface:
+   __espilTilesState().core.resolution. */
 
 import * as THREE from 'three';
 import { TilesRenderer } from '3d-tiles-renderer/three';
@@ -84,6 +127,9 @@ var state = {
   inside: false, altOk: false,
   suppression: 'off',      /* off | on | no-hook | error */
   suppressedCount: 0,
+  baseOff: false,          /* base-map toggle (Han 2026-11-19) */
+  importOff: false,        /* style imports removed while live */
+  resolution: null,        /* [w, h] last set on the renderer */
   streamedBytes: 0, streamedMB: 0,
   attributions: []
 };
@@ -167,6 +213,132 @@ function restoreSuppression() {
   if (state.suppression === 'on') state.suppression = 'off';
 }
 
+/* --- base-map toggle (Han 2026-11-19; see header) --- */
+var BASE_KEEP = { 'espil-game-layer': true, 'espil-tiles3d-layer': true, 'espil-buildings-collision': true };
+var baseSaved = null; /* [{id, vis}] while the base is off */
+var importSaved = null; /* [spec] while the imports are off */
+var importRestorePending = null; /* [spec] not yet confirmed back */
+var baseGuardBound = false;
+/* Style loads are asynchronous: an import removed (or a layer
+   hidden) while the style is still loading can be resurrected
+   when the pending load applies the fetched stylesheet, and
+   addImport throws 'Style is not done loading' in that window
+   (both observed on the rig, tiles-pc leg K). While the base is
+   off, a styledata guard re-asserts the off state; while a
+   restore is pending, the same event retries the re-add until
+   the import is registered again (bounded). */
+function onStyleData() {
+  if (!map) return;
+  if (baseSaved || importSaved) {
+    var i, j;
+    if (baseSaved) {
+      for (i = 0; i < baseSaved.length; i++) {
+        try {
+          if (map.getLayoutProperty(baseSaved[i].id, 'visibility') !== 'none') {
+            map.setLayoutProperty(baseSaved[i].id, 'visibility', 'none');
+          }
+        } catch (e) {}
+      }
+    }
+    if (importSaved && importSaved.length) {
+      var present = [];
+      try { present = (map.getStyle().imports || []).map(function (x) { return x.id; }); } catch (e) {}
+      for (j = 0; j < importSaved.length; j++) {
+        if (present.indexOf(importSaved[j].id) >= 0) {
+          try { map.removeImport(importSaved[j].id); } catch (e) {}
+        }
+      }
+    }
+    return;
+  }
+  if (importRestorePending && importRestorePending.length) {
+    var have = [];
+    try { have = (map.getStyle().imports || []).map(function (x) { return x.id; }); } catch (e) {}
+    var still = [];
+    for (var k = 0; k < importRestorePending.length; k++) {
+      var sp = importRestorePending[k];
+      if (have.indexOf(sp.id) >= 0) continue;
+      var ok = false;
+      try { map.addImport(sp); ok = true; } catch (e) { ok = false; }
+      if (ok && sp.id === 'basemap') {
+        try { map.setConfigProperty('basemap', 'show3dObjects', false); } catch (e) {}
+      }
+      if (!ok) still.push(sp);
+    }
+    importRestorePending = still.length ? still : null;
+  }
+}
+function bindBaseGuard() {
+  if (baseGuardBound || !map || !map.on) return;
+  baseGuardBound = true;
+  try { map.on('styledata', onStyleData); } catch (e) {}
+}
+function applyBaseOff() {
+  if (!map || baseSaved) return;
+  var layers = null;
+  try { layers = (map.getStyle() || {}).layers || []; } catch (e) { layers = []; }
+  var saved = [];
+  for (var i = 0; i < layers.length; i++) {
+    var l = layers[i];
+    if (!l || !l.id || BASE_KEEP[l.id] || l.type === 'background') continue;
+    var vis = null;
+    try { vis = map.getLayoutProperty(l.id, 'visibility'); } catch (e) { vis = null; }
+    saved.push({ id: l.id, vis: (typeof vis === 'string') ? vis : 'visible' });
+    try { map.setLayoutProperty(l.id, 'visibility', 'none'); } catch (e) {}
+  }
+  baseSaved = saved;
+  state.baseOff = true;
+  /* imports: capture each spec completely, then remove. An
+     import without a capturable url is left in place. */
+  var imps = null;
+  try { imps = (map.getStyle() || {}).imports || []; } catch (e) { imps = []; }
+  var isaved = [];
+  for (var j = 0; j < imps.length; j++) {
+    var im = imps[j];
+    if (!im || !im.id || !im.url) continue;
+    isaved.push({ id: im.id, url: im.url, config: im.config || undefined, data: im.data || undefined });
+  }
+  importSaved = isaved;
+  importRestorePending = null; /* going off supersedes a restore */
+  for (var k = 0; k < isaved.length; k++) {
+    try { map.removeImport(isaved[k].id); } catch (e) {}
+  }
+  state.importOff = isaved.length > 0;
+  bindBaseGuard(); /* re-assert on styledata while off */
+}
+function restoreBase() {
+  if (!baseSaved && !importSaved) { state.baseOff = false; state.importOff = false; return; }
+  var saved = baseSaved; baseSaved = null;
+  var isaved = importSaved; importSaved = null;
+  state.baseOff = false;
+  state.importOff = false;
+  if (!map) return;
+  if (isaved) {
+    var pending = [];
+    for (var j = 0; j < isaved.length; j++) {
+      var added = false;
+      try { map.addImport(isaved[j]); added = true; } catch (e) { added = false; }
+      /* the game keeps the basemap's 3D objects off at runtime
+         (espilP1HideStyle3D); a re-added import starts from its
+         spec config, so re-apply that one runtime override to
+         restore the exact pre-toggle state. */
+      if (added && isaved[j].id === 'basemap') {
+        try { map.setConfigProperty('basemap', 'show3dObjects', false); } catch (e) {}
+      }
+      if (!added) pending.push(isaved[j]);
+    }
+    /* addImport throws while the style is still loading; park
+       the failures and let the styledata guard retry them. */
+    importRestorePending = pending.length ? pending : null;
+    if (importRestorePending) bindBaseGuard();
+  }
+  if (saved) {
+    for (var i = 0; i < saved.length; i++) {
+      try { map.setLayoutProperty(saved[i].id, 'visibility', saved[i].vis); } catch (e) {}
+    }
+  }
+}
+
 var attribEl = null;
 function setAttributionVisible(vis) {
   if (!attribEl) return;
@@ -225,11 +397,12 @@ function setTilesOn(on, reason) {
   state.on = on;
   if (tiles) tiles.group.visible = on;
   if (on) {
-    if (state.tilesetLoaded) applySuppression();
+    if (state.tilesetLoaded) { applySuppression(); applyBaseOff(); }
     buildAttribution();
     setAttributionVisible(true);
   } else {
     restoreSuppression();           /* immediate restore (refinement 1) */
+    restoreBase();                  /* base map returns with the tiles */
     setAttributionVisible(false);
     if (reason) state.error = state.error || reason;
   }
@@ -300,8 +473,19 @@ function makeLayer() {
       var cv = map.getCanvas();
       if (renderer.domElement.width !== cv.width || renderer.domElement.height !== cv.height) {
         try { renderer.setSize(cv.width, cv.height, false); } catch (e) {}
-        try { tiles.setResolutionFromRenderer(lodCam, renderer); } catch (e) {}
       }
+      /* LOD resolution (fix, 2026-11-19): set EVERY render, not
+         only on a size change - when the renderer starts out
+         already matching the canvas the size-change branch never
+         fires and the traversal runs on a 0 height forever (the
+         'resolution for camera error calculation is not set'
+         warning in Han's console log, 1,424x). The call is a
+         no-op when the size is unchanged. */
+      try {
+        tiles.setResolutionFromRenderer(lodCam, renderer);
+        var rv = new THREE.Vector2();
+        if (tiles.getResolution(lodCam, rv) && rv.x > 0 && rv.y > 0) state.resolution = [rv.x, rv.y];
+      } catch (e) {}
       syncLodCamera(cv);
       evaluateGate();
       if (state.on) {
@@ -312,7 +496,7 @@ function makeLayer() {
       }
       try { renderer.state.reset(); } catch (e) {}
     },
-    onRemove: function () { state.layerLive = false; }
+    onRemove: function () { restoreBase(); state.layerLive = false; }
   };
 }
 
@@ -369,7 +553,7 @@ export function start(sess, opts) {
   tiles.setCamera(lodCam);
   tiles.addEventListener('load-tileset', function () {
     state.tilesetLoaded = true;
-    if (state.on) { applySuppression(); buildAttribution(); }
+    if (state.on) { applySuppression(); applyBaseOff(); buildAttribution(); }
   });
   tiles.addEventListener('tile-visibility-change', function () {
     /* the copyright set changes as tiles stream in and out */
@@ -399,13 +583,32 @@ export function start(sess, opts) {
     var city = null;
     try { city = window.__espilLoadedCityKey || null; } catch (e) { city = null; }
     if (city && city !== 'vancouver') { teardown(); clearInterval(poll); return; }
-    if (map) return;
+    if (map) {
+      /* ATTACH RETRY (fix, 2026-11-19): the first version latched
+         `map` before the layer add, so a single add failure (map
+         captured before its style finished loading) disabled the
+         tiles layer for the whole session - silently: state
+         showed started with layerLive false forever and zero
+         tile requests. Retry the add on the poll while the layer
+         is not live; a successful add stops the retries. (Not
+         Han's defect - his attribution bar proves his layer is
+         live - but observed repeatedly on the rig.) */
+      if (!state.layerLive && !disposed) {
+        if (!layer) { try { layer = makeLayer(); } catch (e) { state.error = 'layer_make_failed'; } }
+        if (layer) {
+          try {
+            if (map.loaded && map.loaded() && !map.getLayer('espil-tiles3d-layer')) map.addLayer(layer);
+          } catch (e) { state.error = 'layer_add_failed'; }
+        }
+      }
+      return;
+    }
     var m = null;
     try { m = window.__espilMapObj ? window.__espilMapObj() : null; } catch (e) { m = null; }
     if (!m || !window.mapboxgl) return;
     map = m;
     state.mapHook = true;
-    layer = makeLayer();
+    try { layer = makeLayer(); } catch (e) { state.error = 'layer_make_failed'; }
     var add = function () {
       try {
         if (!map.getLayer('espil-tiles3d-layer')) map.addLayer(layer);
@@ -419,6 +622,7 @@ export function start(sess, opts) {
 function teardown() {
   disposed = true;
   restoreSuppression();
+  restoreBase();
   setAttributionVisible(false);
   if (attribEl) { try { attribEl.remove(); } catch (e) {} attribEl = null; }
   if (map && layer) { try { map.removeLayer('espil-tiles3d-layer'); } catch (e) {} }
