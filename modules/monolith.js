@@ -5411,6 +5411,22 @@
           }
         }
       }
+      /* TILES SURFACE FOLLOW (combined tiles package section 2,
+         2026-11-19): while the Google tiles are LIVE the ground
+         base reads the tile surface at this column (the core's
+         sampler, __espilTileSurfaceAt) instead of sitting on the
+         baked .05 - the visible terrain stands 5-11.5 m above the
+         baked plane downtown, so a body floored on the records
+         alone sinks that far below what Han sees (his report,
+         2026-11-19 22:23). The tile value can only RAISE the
+         ground base here: record tops (roofs) above it still win,
+         and with tiles off or not live the hook returns null and
+         this function is byte-for-byte the old law. */
+      if(window.__espilTileSurfaceAt){
+        var tileSup=null;
+        try{ tileSup=window.__espilTileSurfaceAt(x,z,refY); }catch(e){ tileSup=null; }
+        if(tileSup!==null&&tileSup>support)support=tileSup;
+      }
       return support;
     }
     /* Batch G ceiling query (best effort, box colliders only): the
@@ -13033,6 +13049,39 @@
       }
       return false;
     }
+    /* EMPTY-SOURCE GUARD (combined tiles package section 1,
+       2026-11-19): the GeoJSON source behind the collision layer
+       is built in-page and Mapbox needs time to tile it, so for a
+       window after entry the layer EXISTS but every query comes
+       back empty - and the axis pass below read that emptiness as
+       "nothing blocks" and returned true, so the record sweep
+       never ran and there were no walls at all (Han's "collision
+       is entirely absent", 2026-11-19 22:20; the window and the
+       hole are both measured in tiles-collision/DIAGNOSIS.md).
+       The guard mirrors the query against the baked records,
+       which are built from the SAME building set with the SAME
+       filter as the GeoJSON (espilPolyBuild vs
+       espilP1BuildingsGeoJSON): a point inside a record footprint
+       past the same height gate is exactly where a loaded source
+       would return a blocking feature. If the records say a wall
+       stands at the point but the rendered query said nothing,
+       the source is not loaded yet - the axis pass returns false
+       and the record sweep judges, exactly as it does whenever
+       the map or the layer is unavailable. Once the source is
+       tiled the rendered query answers first at those points and
+       this check is never reached, so the primary judgment is
+       unchanged. */
+    function espilP1QrfBakedAt(x,z,py){
+      var pb=espilPolyBucketAt(x,z);
+      if(!pb)return false;
+      for(var i=0;i<pb.length;i++){
+        var rec=pb[i];
+        if(rec.h-py<=.55)continue; /* the record law's height gate, same as QrfHit */
+        if(x<rec.x0||x>rec.x1||z<rec.z0||z>rec.z1)continue;
+        if(espilPolyProbe(rec,x,z).d<=0)return true; /* centre inside the footprint */
+      }
+      return false;
+    }
     function espilP1QrfAxis(p,axis,r){
       var qs=window.__espilQrfStats||(window.__espilQrfStats={calls:0,hits:0,fallbacks:0,ms:0});
       if(!espilP1.map||!espilP1.ready||espilP1.failed){ qs.fallbacks++; return false; }
@@ -13042,6 +13091,7 @@
       var endA=(axis==='x'?p.pos.x:p.pos.z), startA=endA-delta;
       var sx=(axis==='x'?startA:p.pos.x), sz=(axis==='z'?startA:p.pos.z);
       try{ if(espilP1QrfHit(sx,sz,p.pos.y)){ qs.fallbacks++; return false; } }catch(e){ qs.fallbacks++; return false; }
+      if(espilP1QrfBakedAt(sx,sz,p.pos.y)){ qs.fallbacks++; return false; } /* empty-source guard: records own the start point */
       var nSub=Math.max(1,Math.min(24,Math.ceil(Math.abs(delta)/0.8)));
       var sgn=delta>0?1:-1;
       for(var sw=1;sw<=nSub;sw++){
@@ -13051,6 +13101,7 @@
         var hit=false, qt0=performance.now();
         try{ hit=espilP1QrfHit(cx,cz,p.pos.y)||espilP1QrfHit(lx,lz,p.pos.y); }catch(e){ qs.fallbacks++; return false; }
         qs.calls++; qs.ms+=performance.now()-qt0;
+        if(!hit&&(espilP1QrfBakedAt(cx,cz,p.pos.y)||espilP1QrfBakedAt(lx,lz,p.pos.y))){ qs.fallbacks++; return false; } /* empty-source guard: the records judge this step */
         if(hit){ qs.hits++;
           var freeA=startA+delta*(sw-1)/nSub;
           if(axis==='x')p.pos.x=freeA; else p.pos.z=freeA;
@@ -13461,6 +13512,27 @@
           }
         }
         /* === ROOF MANTLE END === */
+      }
+      /* TILES SURFACE FOLLOW (combined tiles package section 2,
+         2026-11-19): the ground base of this landing law. While
+         the Google tiles are LIVE, the core's surface sampler
+         (__espilTileSurfaceAt) reports the terrain height of
+         this body's column - the bottom surface of the tile
+         geometry there - and it becomes the floor whenever it
+         stands above the support the records found, so the
+         character walks ON the terrain Han sees instead of
+         5-11.5 m under it (tiles-collision/DIAGNOSIS.md,
+         defect 3). Record supports (roofs, the inside-footprint
+         lift, the mantle) are computed first and are never
+         LOWERED by this - the tile value can only raise the
+         floor (a car support is left alone - the ride follows
+         its own law).
+         Tiles off or not live: the hook is absent or returns
+         null and this section changes nothing. */
+      if(!supportCar&&window.__espilTileSurfaceAt){
+        var tileGround=null;
+        try{ tileGround=window.__espilTileSurfaceAt(p.pos.x,p.pos.z,yBeforeFall); }catch(e){ tileGround=null; }
+        if(tileGround!==null&&tileGround>support)support=tileGround;
       }
       if(p.pos.y<=support){
         /* Batch G: a fly/ride release fall is charged HERE, at impact,

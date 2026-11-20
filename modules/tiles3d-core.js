@@ -28,6 +28,16 @@
      (production occlusion is the camera clamp on baked records;
      joint decision, scope section E). Tiles are DISPLAY ONLY: no
      IDs, no collision, no entry data ever read from them.
+     REVISION (combined tiles package section 2, 2026-11-19, on
+     Han's fit-the-character-to-the-terrain order): ONE read is
+     now taken from the tiles - the surface HEIGHT under the
+     player, sampled from the loaded tile geometry (see
+     sampleSurface below) and consumed by the monolith's support
+     law through window.__espilTileSurfaceAt. Still no IDs, no
+     collision judgment and no entry data: walls and roofs stay
+     with the baked records and the QRF pass, exactly as before;
+     only the ground base follows the visible terrain while the
+     tiles are live.
    GATES (per frame, cheap): downtown boundary polygon from the
    in-tree canonical tiles/downtown-boundary.json (72 vertices, x/z
    in pair world metres) with the prototype's 1.1x hysteresis band,
@@ -113,6 +123,15 @@ import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 var ANCHOR = { lat: 49.2827, lng: -123.1207 }; /* pair anchor (Vancouver) */
 var SSE_DEFAULT = 16;      /* Han's PC reference run: 45 FPS at SSE 16 */
 var SSE_FLOOR = 8;         /* streaming cap: errorTarget never below this */
+var PARSE_QUEUE_MAX_JOBS = 14; /* combined tiles package section 3:
+     the vendored default parse queue runs 5 jobs, which is the
+     4-6-at-a-time appearance batch Han saw (downloads arrive
+     20+ at a time; only parsing is capped). 14 sits mid-band of
+     the diagnosed 12-16: about 3x the appearance batch, still
+     below the download queue's 25 so parsing cannot outrun the
+     network into memory pressure on low-power devices. Set on
+     the renderer's own queue object at creation - the vendored
+     chunks are not forked. */
 var ALT_ON = 800, ALT_OFF = 950;         /* altitude gate hysteresis (m) */
 var RANGE_ON = 1500, RANGE_OFF = 1700;   /* radius fallback (m) */
 var FADE_NEAR = 500, FADE_FAR = 1600;    /* ~1.6 km distance fade */
@@ -130,6 +149,8 @@ var state = {
   baseOff: false,          /* base-map toggle (Han 2026-11-19) */
   importOff: false,        /* style imports removed while live */
   resolution: null,        /* [w, h] last set on the renderer */
+  parseQueueMax: null,     /* section 3: parse queue cap in force */
+  surface: null,           /* section 2: last surface sample {x, z, hs, atMs} */
   streamedBytes: 0, streamedMB: 0,
   attributions: []
 };
@@ -192,6 +213,89 @@ function bridgeMatrix() {
     .multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2));
   /* Vancouver city offset is (0,0); offset cities are out of scope. */
 }
+
+/* --- surface sampler (combined tiles package section 2) ---
+   The character's ground follow reads the photorealistic surface
+   while the tiles are live (see the header revision note). The
+   sampler raycasts ONE vertical column at the player's position
+   against the currently visible tiles' geometry - the tile-local
+   frame IS pair world metres (the bridge above), so a hit's Y is
+   the surface height in the monolith's own coordinates. Cost is
+   bounded three ways: it runs at most once per 1.5 s or per
+   1.5 m of player movement, it only tests the visible tiles'
+   scenes (mesh bounding spheres reject every mesh outside the
+   column before any triangle work), and it stores only the
+   column's distinct heights (deduped at 0.25 m, at most 8). The
+   monolith hook below returns the LOWEST stored height: a
+   column through stacked tile geometry (ground, a tree canopy,
+   a coarse LOD shell of the building behind) has exactly one
+   terrain surface, its bottom one - everything above the
+   ground belongs to the monolith's baked record law (roofs,
+   decks), which outranks this floor whenever it claims the
+   column. An earlier nearest-to-the-body rule demonstrably
+   landed a diving body on a 17.68 m canopy candidate over the
+   spawn plaza instead of its 8.52 m ground (probe-DBG-all);
+   the lowest-candidate rule is the one that fits the character
+   to the terrain. With tiles off, gated or failed the hook
+   returns null and the monolith's baked law runs exactly as
+   before. */
+var surfRay = null, surfSample = null, surfLastAt = 0;
+function sampleSurface() {
+  if (!state.on || !tiles || !tiles.group) return;
+  var pose = null;
+  try { pose = window.__espilPlayerPose ? window.__espilPlayerPose() : null; } catch (e) { pose = null; }
+  if (!pose) return;
+  var now = (window.performance && performance.now) ? performance.now() : Date.now();
+  if (surfSample) {
+    var dx = pose.x - surfSample.x, dz = pose.z - surfSample.z;
+    if (dx * dx + dz * dz < 2.25 && now - surfLastAt < 1500) return;
+  }
+  var scenes = [];
+  try {
+    tiles.visibleTiles.forEach(function (t) {
+      var sc = t && t.engineData && t.engineData.scene;
+      if (sc) scenes.push(sc);
+    });
+  } catch (e) { scenes = []; }
+  if (!scenes.length) return;
+  if (!surfRay) surfRay = new THREE.Raycaster();
+  try { tiles.group.updateMatrixWorld(true); } catch (e) {}
+  surfRay.set(new THREE.Vector3(pose.x, pose.y + 120, pose.z), new THREE.Vector3(0, -1, 0));
+  surfRay.far = 260;
+  var hits = null;
+  try { hits = surfRay.intersectObjects(scenes, true); } catch (e) { hits = null; }
+  if (!hits) return;
+  var hs = [];
+  for (var i = 0; i < hits.length; i++) {
+    var h = Math.round(hits[i].point.y * 100) / 100;
+    if (h < -20 || h > 200) continue;
+    var dup = false;
+    for (var j = 0; j < hs.length; j++) if (Math.abs(hs[j] - h) < 0.25) { dup = true; break; }
+    if (!dup) hs.push(h);
+  }
+  if (!hs.length) return;
+  hs.sort(function (a, b) { return a - b; });
+  if (hs.length > 8) {
+    hs.sort(function (a, b) { return Math.abs(a - pose.y) - Math.abs(b - pose.y); });
+    hs = hs.slice(0, 8);
+    hs.sort(function (a, b) { return a - b; });
+  }
+  surfSample = { x: pose.x, z: pose.z, hs: hs };
+  surfLastAt = now;
+  state.surface = { x: Math.round(pose.x * 10) / 10, z: Math.round(pose.z * 10) / 10, hs: hs, atMs: Math.round(now) };
+}
+window.__espilTileSurfaceAt = function (x, z, refY) {
+  if (!state.on || !surfSample || !surfSample.hs.length) return null;
+  var dx = x - surfSample.x, dz = z - surfSample.z;
+  if (dx * dx + dz * dz > 9) return null; /* the sample column stands within 3 m */
+  var now = (window.performance && performance.now) ? performance.now() : Date.now();
+  if (now - surfLastAt > 4000) return null; /* stale sample: the baked law decides */
+  /* hs is sorted ascending: the terrain is the column's bottom
+     surface (see the sampler note). refY is accepted for the
+     callers' convenience and deliberately not used to pick a
+     higher surface. */
+  return surfSample.hs[0];
+};
 
 function applySuppression() {
   var cents = null;
@@ -488,6 +592,7 @@ function makeLayer() {
       } catch (e) {}
       syncLodCamera(cv);
       evaluateGate();
+      sampleSurface(); /* section 2: throttled surface sampling at the player */
       if (state.on) {
         try { tiles.update(); } catch (e) {}
         renderCam.projectionMatrix.copy(new THREE.Matrix4().fromArray(matrix)).multiply(bridgeMatrix());
@@ -517,6 +622,11 @@ export function start(sess, opts) {
   tiles = new TilesRenderer();
   (function configure(t) {
     t.rootURL = session.tilesetUrl;
+    /* STREAMING (combined tiles package section 3, 2026-11-19):
+       raise the parse queue cap on the renderer's own queue
+       object, here at creation before any tile is queued - see
+       PARSE_QUEUE_MAX_JOBS above for the value's justification. */
+    try { t.parseQueue.maxJobs = PARSE_QUEUE_MAX_JOBS; state.parseQueueMax = t.parseQueue.maxJobs; } catch (e) {}
     /* Direct-Google root URL (root.json?key=...): the plugin takes
        the key from the URL and attaches BOTH key and session to every
        tile.googleapis.com child request - Google's child URIs are

@@ -55,6 +55,25 @@
      moves (>= 0.01) - the 1 s tick below keeps dawn/dusk ramps
      smooth without per-frame work. */
   var dnEl = null, dnOp = -1;
+  /* LANDING EXEMPTION (combined tiles package section 4,
+     2026-11-19): while the entry flow owns the screen - the
+     landing document, before the dive completes onto the game
+     page - the screen writes 0. The landing globe's night face
+     is lit only by the 0.3 hemisphere floor, so at the curve's
+     0.5 night plateau this screen halves an already near-black
+     disc (measured: mean luminance 8.71 of 255, 76.2% of the
+     disc below 10) and the globe reads as gone - Han's report
+     of 2026-11-19 22:18 sits in the middle of the plateau
+     (globe-landing/DIAGNOSIS.md). The game page carries
+     __ESPIL_GAME_PAGE from its inline head script, before any
+     module runs, so from the dive on the curve rules exactly
+     as FIX-7 item 5 specified; the in-game night is untouched. */
+  function entryFlowOwnsScreen() {
+    try {
+      if (window.__ESPIL_GAME_PAGE) return false;
+      return !!window.__espilLandingFlow;
+    } catch (_) { return false; }
+  }
   function dayNightScreen() {
     if (!document.body) return;
     if (!dnEl || !dnEl.isConnected) {
@@ -69,6 +88,7 @@
       dnOp = -1;
     }
     var op = opacityFor(new Date());
+    if (entryFlowOwnsScreen()) op = 0;
     if (Math.abs(op - dnOp) >= 0.01) {
       dnOp = op;
       dnEl.style.opacity = String(op);
