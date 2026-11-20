@@ -44,7 +44,9 @@
           add: 'ADD', namePh: 'Name', you: 'You', idLabel: 'ID', lookLabel: 'Appearance',
           maleLook: 'Male traveller', femaleLook: 'Female traveller', statusLabel: 'Status', here: 'Here now',
           cityLabel: 'City', distLabel: 'Distance', partyNow: 'Party', membersWord: 'members',
-          needPartyForChat: 'Party chat: join a party first (right-click a character, or press O).' },
+          needPartyForChat: 'Party chat: join a party first (right-click a character, or press O).',
+          tabFriends: 'FRIENDS', members: 'Members', autoMatch: 'Auto-match', findParty: 'Find a party', cancelMatch: 'Cancel',
+          waitingMatch: 'Waiting for a match...', matchSoon: 'Auto-match is coming soon.', unconfirmed: 'unverified', inviteOnline: 'Online now' },
     ko: { profile: '프로필', party: '파티 초대', trade: '거래', friend: '친구 등록', soon: 'COMING SOON', close: '닫기',
           invited: '파티 초대를 보냈습니다: ', notConnected: '아직 도시에 연결되지 않았습니다.', declined: '님이 파티 초대를 거절했습니다: ',
           partyFull: '파티가 가득 찼습니다.', gone: '상대방이 나갔습니다.', alreadyMember: '이미 같은 파티입니다.',
@@ -55,7 +57,9 @@
           add: '추가', namePh: '이름', you: '나', idLabel: '아이디', lookLabel: '캐릭터 외형',
           maleLook: '남자 여행자', femaleLook: '여자 여행자', statusLabel: '상태', here: '접속 중',
           cityLabel: '도시', distLabel: '거리', partyNow: '파티', membersWord: '명',
-          needPartyForChat: '파티 대화: 먼저 파티에 들어가세요 (캐릭터 우클릭, 또는 O키).' }
+          needPartyForChat: '파티 대화: 먼저 파티에 들어가세요 (캐릭터 우클릭, 또는 O키).',
+          tabFriends: '친구', members: '파티원', autoMatch: '자동 매칭', findParty: '파티 찾기', cancelMatch: '취소',
+          waitingMatch: '매칭을 기다리는 중입니다.', matchSoon: '자동 매칭은 준비 중입니다.', unconfirmed: '미확정', inviteOnline: '지금 접속 중' }
   };
   function t(k) { var d = T[lang()] || T.en; return d[k] || T.en[k] || k; }
 
@@ -373,18 +377,88 @@
     window.__espilChatSend = wrapped;
   })();
 
-  /* ---------------- P: Party / Friend window -------------------- */
+/* ================================================================
+   FRIENDS / PARTY PANEL - split presentation (UI room, 2026-11-18)
+   Header marker: __espilFriendsSplit v1
+
+   Splice target: modules/social.js - replaces the whole block from
+     /* ---------------- P: Party / Friend window ---------------- * /
+   through the panel setInterval line, i.e. the current buildPanel /
+   renderPanel / togglePanel / keydown / watchPanel / interval run.
+   Everything outside that block is untouched: this section uses only
+   helpers that already exist in social.js scope (party, sendParty,
+   inviteToParty, loadFriends, addFriend, removeFriend, onlineUsers,
+   userById, userByName, myId, myDisplayName, chatState, inMap, t,
+   escT, toast, $).
+
+   What changes (Han 2026-11-18 + AUDIT-DESIGN 5.4):
+   - The two tabs are two separate screens with independent render
+     functions and independent refresh. The PARTY tab is always a
+     party screen: with no party it shows the empty-party state,
+     the auto-match slot and the invitable-users list - it no longer
+     silently BECOMES the invite list.
+   - The FRIENDS tab is always a friends screen: online friends
+     first, offline below, unverified name-only records badged.
+   - The add-friend form is part of the static skeleton, not of the
+     re-rendered list, so a refresh can never erase a half-typed
+     name (the old activeElement workaround is gone by structure).
+   - The 3-second refresh re-renders only the active tab's list.
+   - The auto-match slot reads an optional surface,
+     window.__espilPartyQueue = { state:'idle'|'queued', join(),
+     leave() }. Without the surface it shows a plain "coming soon"
+     line and no button - it never fakes a queue. (State-side queue
+     frames are the espil.online room's work, AUDIT-DESIGN 5.4.)
+
+   Required dictionary additions (social.js var T, en + ko):
+     tabFriends:'FRIENDS', members:'Members', autoMatch:'Auto-match',
+     findParty:'Find a party', cancelMatch:'Cancel',
+     waitingMatch:'Waiting for a match...',
+     matchSoon:'Auto-match is coming soon.',
+     unconfirmed:'unverified', inviteOnline:'Online now'
+     ko: tabFriends:'친구', members:'파티원', autoMatch:'자동 매칭',
+     findParty:'파티 찾기', cancelMatch:'취소',
+     waitingMatch:'매칭을 기다리는 중입니다.',
+     matchSoon:'자동 매칭은 준비 중입니다.',
+     unconfirmed:'미확정', inviteOnline:'지금 접속 중'
+   ================================================================ */
+
+  /* ---------------- O: Party / Friends window (split tabs) ---------------- */
   var activeTab = 'party', panelBuilt = false;
   function panelEl() { return $('friends-panel'); }
+  function queueSurface() {
+    var q = window.__espilPartyQueue;
+    return (q && typeof q.join === 'function' && typeof q.leave === 'function') ? q : null;
+  }
   function buildPanel() {
     var grid = $('friends-grid'); if (!grid || panelBuilt) return;
     panelBuilt = true;
+    if (!document.getElementById('espil-friends-split-css')) {
+      var st = document.createElement('style');
+      st.id = 'espil-friends-split-css';
+      st.textContent =
+        '.espil-fr-sec{font:800 11px Manrope,system-ui,sans-serif;letter-spacing:.08em;color:#8fe8dc;margin:12px 0 6px}' +
+        '.espil-fr-sec:first-child{margin-top:0}' +
+        '.espil-fr-badge{font-size:10px;font-weight:800;color:#ffd97a;border:1px solid rgba(255,217,122,.55);border-radius:99px;padding:1px 7px;margin-left:7px}' +
+        '.espil-fr-queue{border:1px solid rgba(134,238,228,.35);border-radius:10px;padding:10px 12px;margin:10px 0;background:rgba(0,0,0,.25)}' +
+        '.espil-fr-queue .q-lab{font:800 12px Manrope,system-ui,sans-serif;color:#ddfffc;letter-spacing:.05em}' +
+        '.espil-fr-queue .q-state{font-size:12px;color:rgba(221,255,252,.8);margin-left:8px}' +
+        '.espil-fr-queue .pill-btn{float:right}';
+      document.head.appendChild(st);
+    }
     grid.innerHTML =
       '<div style="display:flex;gap:8px;margin-bottom:12px;">' +
         '<button type="button" class="espil-tab-btn" id="espil-tab-party">PARTY</button>' +
-        '<button type="button" class="espil-tab-btn" id="espil-tab-friend">FRIEND</button>' +
+        '<button type="button" class="espil-tab-btn" id="espil-tab-friend">' + escT(t('tabFriends')) + '</button>' +
         '<span class="st-foot" id="espil-social-me" style="margin-left:auto;"></span>' +
-      '</div><div id="espil-social-body"></div>';
+      '</div>' +
+      '<div id="espil-social-party"></div>' +
+      '<div id="espil-social-friends" style="display:none;">' +
+        '<div id="espil-friends-list"></div>' +
+        '<div style="display:flex;gap:8px;margin:10px 0;">' +
+          '<input type="text" id="espil-friend-name" maxlength="16" placeholder="' + escT(t('namePh')) + '" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(134,238,228,.3);background:rgba(0,0,0,.3);color:#ddfffc;" />' +
+          '<button type="button" class="pill-btn" data-pact="add-friend">' + escT(t('add')) + '</button>' +
+        '</div>' +
+      '</div>';
     $('espil-tab-party').addEventListener('click', function () { activeTab = 'party'; renderPanel(); });
     $('espil-tab-friend').addEventListener('click', function () { activeTab = 'friend'; renderPanel(); });
     grid.addEventListener('click', function (e) {
@@ -397,61 +471,100 @@
       else if (act === 'add-friend') {
         var inp = $('espil-friend-name');
         var nm = inp ? inp.value.trim() : '';
-        if (nm) { if (addFriend(nm, 'm')) toast(nm + ' - ' + t('friend') + ' OK'); renderPanel(); }
+        if (nm) { if (addFriend(nm, 'm')) toast(nm + ' - ' + t('friend') + ' OK'); if (inp) inp.value = ''; renderPanel(); }
       }
+      else if (act === 'queue-join') { var q = queueSurface(); if (q) { q.join(); renderPanel(); } }
+      else if (act === 'queue-leave') { var q2 = queueSurface(); if (q2) { q2.leave(); renderPanel(); } }
     });
-    var gridEl = grid;
-    gridEl.addEventListener('keydown', function (e) {
+    grid.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && e.target && e.target.id === 'espil-friend-name') {
         e.preventDefault();
         var nm = e.target.value.trim();
-        if (nm) { addFriend(nm, 'm'); renderPanel(); }
+        if (nm) { addFriend(nm, 'm'); e.target.value = ''; renderPanel(); }
       }
       e.stopPropagation();
     });
+  }
+  function memberIds() {
+    var s = {};
+    if (party && party.members) party.members.forEach(function (m) { s[m.id] = true; });
+    return s;
+  }
+  function renderParty() {
+    var host = $('espil-social-party'); if (!host) return;
+    var mid = myId(), h = '';
+    if (party && party.members && party.members.length) {
+      h += '<div class="espil-fr-sec">PARTY · ' + party.members.length + '</div>';
+      party.members.forEach(function (m) {
+        h += '<div class="espil-social-row"><span class="grow">' + escT(m.name) + (m.id === mid ? ' (' + escT(t('you')) + ')' : '') + '</span><span class="st">' + (m.gender === 'f' ? '♀' : '♂') + '</span></div>';
+      });
+      h += '<button type="button" class="pill-btn" data-pact="leave">' + escT(t('leave')) + '</button>';
+      h += '<p class="st-foot" style="margin-top:10px;">' + escT(t('partyChatHint')) + '</p>';
+    } else {
+      h += '<p class="st-foot">' + escT(t('noParty')) + '</p>';
+      var q = queueSurface();
+      h += '<div class="espil-fr-queue"><span class="q-lab">' + escT(t('autoMatch')) + '</span>';
+      if (!q) {
+        h += '<span class="q-state">' + escT(t('matchSoon')) + '</span>';
+      } else if (q.state === 'queued') {
+        h += '<span class="q-state">' + escT(t('waitingMatch')) + '</span>' +
+             '<button type="button" class="pill-btn" data-pact="queue-leave">' + escT(t('cancelMatch')) + '</button>';
+      } else {
+        h += '<button type="button" class="pill-btn" data-pact="queue-join">' + escT(t('findParty')) + '</button>';
+      }
+      h += '</div>';
+    }
+    var inParty = memberIds();
+    var others = onlineUsers().filter(function (u) { return u.id !== mid && !inParty[u.id]; });
+    if (others.length) {
+      h += '<div class="espil-fr-sec">' + escT(t('inviteOnline')) + '</div>';
+      others.forEach(function (u) {
+        h += '<div class="espil-social-row"><span class="grow">' + escT(u.name || 'Guest') + '</span><span class="st">' + escT(t('online')) + '</span><button type="button" class="pill-btn" data-pact="invite" data-id="' + escT(u.id) + '">' + escT(t('invite')) + '</button></div>';
+      });
+    }
+    host.innerHTML = h;
+  }
+  function renderFriends() {
+    var host = $('espil-friends-list'); if (!host) return;
+    var fr = loadFriends(), h = '';
+    if (!fr.length) {
+      h += '<p class="st-foot">' + escT(t('noFriends')) + '</p>';
+    } else {
+      var on = [], off = [];
+      fr.forEach(function (f) { (userByName(f.name) ? on : off).push(f); });
+      function row(f, isOn) {
+        var unconf = (f.confirmed === false) || (f.uid == null && f.confirmed !== true);
+        return '<div class="espil-social-row"><span class="grow">' + escT(f.name) +
+          (unconf ? '<span class="espil-fr-badge">' + escT(t('unconfirmed')) + '</span>' : '') +
+          '</span><span class="st">' + (isOn ? escT(t('online')) : escT(t('offline'))) + '</span>' +
+          (isOn ? '<button type="button" class="pill-btn" data-pact="invite-name" data-name="' + escT(f.name) + '">' + escT(t('invite')) + '</button>' : '') +
+          '<button type="button" class="pill-btn" data-pact="remove-friend" data-name="' + escT(f.name) + '">' + escT(t('remove')) + '</button></div>';
+      }
+      if (on.length) {
+        h += '<div class="espil-fr-sec">' + escT(t('online')) + ' · ' + on.length + '</div>';
+        on.forEach(function (f) { h += row(f, true); });
+      }
+      if (off.length) {
+        h += '<div class="espil-fr-sec">' + escT(t('offline')) + ' · ' + off.length + '</div>';
+        off.forEach(function (f) { h += row(f, false); });
+      }
+    }
+    host.innerHTML = h;
   }
   function renderPanel() {
     var p = panelEl(); if (!p) return;
     /* The world's own panel refresh can replace #friends-grid wholesale;
        if our skeleton was wiped, rebuild it instead of rendering nowhere. */
-    if (!$('espil-social-body')) panelBuilt = false;
+    if (!$('espil-social-party')) panelBuilt = false;
     buildPanel();
-    var body = $('espil-social-body'); if (!body) return;
     var tp = $('espil-tab-party'), tf = $('espil-tab-friend');
     if (tp) tp.classList.toggle('on', activeTab === 'party');
     if (tf) tf.classList.toggle('on', activeTab === 'friend');
     var me = $('espil-social-me'); if (me) me.textContent = myDisplayName();
-    var mid = myId(), h = '';
-    if (activeTab === 'party') {
-      if (party && party.members.length) {
-        party.members.forEach(function (m) {
-          h += '<div class="espil-social-row"><span class="grow">' + escT(m.name) + (m.id === mid ? ' (' + escT(t('you')) + ')' : '') + '</span><span class="st">' + (m.gender === 'f' ? '♀' : '♂') + '</span></div>';
-        });
-        h += '<button type="button" class="pill-btn" data-pact="leave">' + escT(t('leave')) + '</button>';
-        h += '<p class="st-foot" style="margin-top:10px;">' + escT(t('partyChatHint')) + '</p>';
-      } else {
-        h += '<p class="st-foot">' + escT(t('noParty')) + '</p>';
-        onlineUsers().forEach(function (u) {
-          if (u.id === mid) return;
-          h += '<div class="espil-social-row"><span class="grow">' + escT(u.name || 'Guest') + '</span><span class="st">' + escT(t('online')) + '</span><button type="button" class="pill-btn" data-pact="invite" data-id="' + escT(u.id) + '">' + escT(t('invite')) + '</button></div>';
-        });
-      }
-    } else {
-      var fr = loadFriends();
-      if (!fr.length) h += '<p class="st-foot">' + escT(t('noFriends')) + '</p>';
-      fr.forEach(function (f) {
-        var u = userByName(f.name);
-        h += '<div class="espil-social-row"><span class="grow">' + escT(f.name) + '</span><span class="st">' + (u ? escT(t('online')) : escT(t('offline'))) + '</span>' +
-          (u ? '<button type="button" class="pill-btn" data-pact="invite-name" data-name="' + escT(f.name) + '">' + escT(t('invite')) + '</button>' : '') +
-          '<button type="button" class="pill-btn" data-pact="remove-friend" data-name="' + escT(f.name) + '">' + escT(t('remove')) + '</button></div>';
-      });
-      h += '<div style="display:flex;gap:8px;margin:10px 0;">' +
-        '<input type="text" id="espil-friend-name" maxlength="16" placeholder="' + escT(t('namePh')) + '" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(134,238,228,.3);background:rgba(0,0,0,.3);color:#ddfffc;" />' +
-        '<button type="button" class="pill-btn" data-pact="add-friend">' + escT(t('add')) + '</button></div>';
-    }
-    /* do not clobber a half-typed add-by-name input on refresh */
-    var ae = document.activeElement;
-    if (!(ae && ae.id === 'espil-friend-name')) body.innerHTML = h;
+    var pHost = $('espil-social-party'), fHost = $('espil-social-friends');
+    if (pHost) pHost.style.display = activeTab === 'party' ? '' : 'none';
+    if (fHost) fHost.style.display = activeTab === 'friend' ? '' : 'none';
+    if (activeTab === 'party') renderParty(); else renderFriends();
   }
   function togglePanel(force) {
     var p = panelEl(); if (!p) return;
