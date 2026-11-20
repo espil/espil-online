@@ -2493,6 +2493,47 @@
     function espilCityCfg(){ return ESPIL_CITIES[espilCityKey()]; }
     var ESPIL_CITY_KEYS={'Vancouver':'vancouver','Auckland':'auckland','Tokyo':'tokyo','New York':'newyork','Paris':'paris','London':'london'};
     var ESPIL_CITY_DISPLAY={vancouver:'Vancouver Downtown',auckland:'Auckland',tokyo:'Tokyo',newyork:'New York',paris:'Paris',london:'London'};
+    /* EARLY DISTRICT FETCH (tiles loading package component 3,
+       2026-11-20): the district + collision payloads (about
+       6.7 MB of JSON) are the collision judges' only data -
+       until they land, the record buckets are empty and no
+       wall judgment exists at all (tiles-loading/DIAGNOSIS.md
+       verdict 1, the loading window). Their fetch used to
+       start at the dive click (espilPreloadCity /
+       buildWalkMapOnce); on a fast machine the dive completes
+       seconds after the game page loads, so the window stood
+       open into the first walk. The fetch now starts when
+       this script runs on the game page, for the city this
+       load will enter: the landing handoff's pending city
+       when one is set (read here, before intro-earth's boot
+       poller consumes it - this classic script executes
+       before that module), else the direct /vancouver
+       entry's Vancouver (the same paths intro-earth's boot
+       auto-enters). When neither holds, the city is not
+       decided yet on this load and nothing starts early -
+       the dive click starts the fetch exactly as before.
+       Only the START moves: loadEspilDistrict consumes the
+       started promise when its city matches, and the build,
+       the consumers and the failure retry are unchanged. */
+    var espilDistrictEarly=null;
+    (function(){
+      if(!window.__ESPIL_GAME_PAGE)return;
+      var key=null;
+      try{
+        var pendingName=sessionStorage.getItem('espil_pending_city');
+        if(pendingName&&ESPIL_CITY_KEYS[pendingName]&&ESPIL_CITIES[ESPIL_CITY_KEYS[pendingName]])key=ESPIL_CITY_KEYS[pendingName];
+      }catch(e){}
+      if(!key){
+        try{
+          var pth=location.pathname;
+          if(pth==='/vancouver'||pth==='/vancouver/'||/^\/vancouver\/store\/[A-Za-z0-9_-]+/.test(pth))key='vancouver';
+        }catch(e){}
+      }
+      if(!key)return;
+      var started=espilDistrictFetchAll(ESPIL_CITIES[key]);
+      started.catch(function(){}); /* held silently until loadEspilDistrict consumes it; its own catch owns the failure + retry */
+      espilDistrictEarly={key:key,promise:started};
+    })();
     function espilCityDisplayName(){ return ESPIL_CITY_DISPLAY[espilCityKey()]||'Vancouver Downtown'; }
     /* Ground for offset cities (Auckland phase 1): a land plane under
        the district plus a harbour plane north of the waterfront
@@ -2516,13 +2557,22 @@
         water.receiveShadow=true; water.frustumCulled=false; mapScene.add(water);
       }
     }
+    function espilDistrictFetchAll(cfg){
+      return Promise.all([
+        fetch(cfg.district).then(function(r){return r.json();}),
+        fetch(cfg.collision).then(function(r){return r.json();})
+      ]);
+    }
     function loadEspilDistrict(){
       if(espilDistrict||espilDistrictLoading)return; espilDistrictLoading=true;
       var cfg=espilCityCfg(); window.__espilLoadedCityKey=espilCityKey();
-      Promise.all([
-        fetch(cfg.district).then(function(r){return r.json();}),
-        fetch(cfg.collision).then(function(r){return r.json();})
-      ]).then(function(res){
+      var fetchPromise;
+      if(espilDistrictEarly&&espilDistrictEarly.key===espilCityKey()){
+        fetchPromise=espilDistrictEarly.promise; espilDistrictEarly=null; /* consumed once: the failure retry below fetches fresh */
+      }else{
+        fetchPromise=espilDistrictFetchAll(cfg);
+      }
+      fetchPromise.then(function(res){
         espilDistrict=res[0]; espilCollision=res[1];
         espilCollision.cls=espilB64ToU8(espilCollision.classes_b64);
         espilCollision.roof=new Uint16Array((espilCollision.roof_dm_b64?espilB64ToU8(espilCollision.roof_dm_b64):new Uint8Array(0)).buffer); /* slim files omit the roof layer (perf 2026-10-20): no live reader on the Mapbox line */
@@ -13039,13 +13089,44 @@
        (rooftops, climb, support) always stay with the records; when
        the map or the layer is unavailable this returns false and the
        record sweep below is the wall judge. */
+    /* GROUND-REFERENCE HEIGHT GATE (tiles loading package
+       component 1, 2026-11-20): the three wall judges here
+       (espilP1QrfHit, espilP1QrfBakedAt, espilPolyResolveAxis)
+       share the record law's height gate - a record counts
+       only when its height clears the player's height by
+       more than 0.55 m. The records are baked against the
+       flat ground datum (player y is 0.05 with tiles off),
+       but while the tiles are live the support law stands
+       the player on the tile surface (+5.0-11.5 m around
+       spawn), so the raw comparison silently disqualified
+       every record shorter than the terrain lift: measured
+       3/3 pass-throughs of an h=4 building with every judge
+       blind, against the same building blocking with tiles
+       off (tiles-loading/DIAGNOSIS.md verdict 1). The gate
+       therefore reads the player's height in the records'
+       own frame: py minus the tile-surface height at the
+       player's column, as the shipped __espilTileSurfaceAt
+       reports it. When the hook is absent (tiles off / core
+       not loaded) or has no live sample for the column, the
+       reference is py itself and the gate is the old law
+       byte-for-byte. Only the comparison's reference
+       changes - the 0.55 threshold and every other law
+       (roof overlap, support, safe zone) are untouched. */
+    function espilP1GroundRefY(x,z,py){
+      if(!window.__espilTileSurfaceAt)return py;
+      var pose=null;
+      try{ pose=window.__espilPlayerPose?window.__espilPlayerPose():null; }catch(e){ pose=null; }
+      var s=null;
+      try{ s=window.__espilTileSurfaceAt(pose?pose.x:x,pose?pose.z:z,py); }catch(e){ s=null; }
+      return (typeof s==='number'&&isFinite(s))?py-s:py;
+    }
     function espilP1QrfHit(x,z,py){
       var ll=espilP1LngLat(x,z);
       var pt=espilP1.map.project(ll);
       var fs=espilP1.map.queryRenderedFeatures(pt,{layers:['espil-buildings-collision']});
       for(var i=0;i<fs.length;i++){
         var h=(fs[i].properties&&fs[i].properties.h)||0;
-        if(h-py>.55)return true; /* the record law's height gate, on the feature's own h */
+        if(h-espilP1GroundRefY(x,z,py)>.55)return true; /* the record law's height gate, on the feature's own h, against the ground reference */
       }
       return false;
     }
@@ -13074,9 +13155,10 @@
     function espilP1QrfBakedAt(x,z,py){
       var pb=espilPolyBucketAt(x,z);
       if(!pb)return false;
+      var refY=espilP1GroundRefY(x,z,py); /* component 1: the shared gate's ground reference */
       for(var i=0;i<pb.length;i++){
         var rec=pb[i];
-        if(rec.h-py<=.55)continue; /* the record law's height gate, same as QrfHit */
+        if(rec.h-refY<=.55)continue; /* the record law's height gate, same as QrfHit */
         if(x<rec.x0||x>rec.x1||z<rec.z0||z>rec.z1)continue;
         if(espilPolyProbe(rec,x,z).d<=0)return true; /* centre inside the footprint */
       }
@@ -13116,10 +13198,11 @@
     function espilPolyResolveAxis(p,axis,r){
       var pb=espilPolyBucketAt(p.pos.x,p.pos.z);
       if(!pb)return;
+      var refY=espilP1GroundRefY(p.pos.x,p.pos.z,p.pos.y); /* component 1: the shared gate's ground reference */
       for(var pi=0;pi<pb.length;pi++){
         var rec=pb[pi];
         if(p.pos.y+PLAYER_H<=0||p.pos.y>=rec.h)continue;
-        if(rec.h-p.pos.y<=.55)continue;
+        if(rec.h-refY<=.55)continue;
         if(p.pos.x<rec.x0-r||p.pos.x>rec.x1+r||p.pos.z<rec.z0-r||p.pos.z>rec.z1+r)continue;
         var pr=espilPolyProbe(rec,p.pos.x,p.pos.z);
         if(pr.d>=r||pr.d<0)continue;

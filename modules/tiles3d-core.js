@@ -111,7 +111,20 @@
    refinement never engaged and the mesh never materialised.
    The call now runs on every render, before tiles.update();
    it is a no-op when the size is unchanged. State surface:
-   __espilTilesState().core.resolution. */
+   __espilTilesState().core.resolution.
+   RESOLUTION CAP (tiles loading package component 2,
+   2026-11-20): the resolution set from the renderer is then
+   scaled by RESOLUTION_FACTOR_CAP (0.35) through the
+   renderer's own setResolution, so the traversal refines
+   against the capped size while the canvas keeps full size -
+   Han's trade of resolution for load speed after the
+   gap-window measurement (tiles-loading/DIAGNOSIS.md
+   verdict 3: spawn-view stability about +123 s at factor
+   1.0, about +45 s at 0.35, the lowest level measured
+   without contamination). State surface:
+   __espilTilesState().core.resolution reports the capped
+   value actually in force, and .core.resolutionFactor the
+   cap itself. */
 
 import * as THREE from 'three';
 import { TilesRenderer } from '3d-tiles-renderer/three';
@@ -132,6 +145,10 @@ var PARSE_QUEUE_MAX_JOBS = 14; /* combined tiles package section 3:
      network into memory pressure on low-power devices. Set on
      the renderer's own queue object at creation - the vendored
      chunks are not forked. */
+var RESOLUTION_FACTOR_CAP = 0.35;  /* component 2: LOD resolution
+     cap, applied at the setResolutionFromRenderer call site in
+     the layer render - see the header note for the ladder
+     numbers behind 0.35. */
 var ALT_ON = 800, ALT_OFF = 950;         /* altitude gate hysteresis (m) */
 var RANGE_ON = 1500, RANGE_OFF = 1700;   /* radius fallback (m) */
 var FADE_NEAR = 500, FADE_FAR = 1600;    /* ~1.6 km distance fade */
@@ -148,7 +165,8 @@ var state = {
   suppressedCount: 0,
   baseOff: false,          /* base-map toggle (Han 2026-11-19) */
   importOff: false,        /* style imports removed while live */
-  resolution: null,        /* [w, h] last set on the renderer */
+  resolution: null,        /* [w, h] last set on the renderer (post-cap) */
+  resolutionFactor: null,  /* component 2: the cap in force */
   parseQueueMax: null,     /* section 3: parse queue cap in force */
   surface: null,           /* section 2: last surface sample {x, z, hs, atMs} */
   streamedBytes: 0, streamedMB: 0,
@@ -588,7 +606,21 @@ function makeLayer() {
       try {
         tiles.setResolutionFromRenderer(lodCam, renderer);
         var rv = new THREE.Vector2();
-        if (tiles.getResolution(lodCam, rv) && rv.x > 0 && rv.y > 0) state.resolution = [rv.x, rv.y];
+        if (tiles.getResolution(lodCam, rv) && rv.x > 0 && rv.y > 0) {
+          /* RESOLUTION CAP (component 2): scale the
+             renderer-derived resolution down before the
+             traversal reads it for screen-space error. A cap
+             failure leaves the renderer-derived value
+             standing (the pre-package behaviour), never a
+             broken frame. */
+          try {
+            var cw = Math.max(1, Math.round(rv.x * RESOLUTION_FACTOR_CAP));
+            var ch = Math.max(1, Math.round(rv.y * RESOLUTION_FACTOR_CAP));
+            if ((cw !== rv.x || ch !== rv.y) && tiles.setResolution(lodCam, cw, ch)) { rv.x = cw; rv.y = ch; }
+          } catch (e2) {}
+          state.resolution = [rv.x, rv.y];
+          state.resolutionFactor = RESOLUTION_FACTOR_CAP;
+        }
       } catch (e) {}
       syncLodCamera(cv);
       evaluateGate();
