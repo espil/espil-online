@@ -183,6 +183,7 @@ var state = {
   resolutionFactor: null,  /* component 2: the cap in force */
   parseQueueMax: null,     /* section 3: parse queue cap in force */
   surface: null,           /* section 2: last surface sample {x, z, hs, atMs} */
+  groundNight: null,       /* night-mismatch fix: last tile-side ground apply {g, mats, base} */
   streamedBytes: 0, streamedMB: 0,
   attributions: []
 };
@@ -328,6 +329,86 @@ window.__espilTileSurfaceAt = function (x, z, refY) {
      higher surface. */
   return surfSample.hs[0];
 };
+
+/* --- ground night multiplier (night-mismatch fix) ---
+   The tiles scene is unlit: the GLB materials carry their
+   baked day imagery and no light in this scene ever moves, so
+   at night the tiles received only the #espil-daynight screen
+   (x0.5) while the character ALSO lost its scene lighting -
+   measured ground 0.49-0.51 against the character's 0.22-0.25
+   of day at the plateau (night-mismatch/DIAGNOSIS.md). The
+   monolith's base tint gives the Mapbox base the missing
+   share; here the same share lands on the tiles themselves:
+   every material colour, and the distance-fog colour, is
+   multiplied by g = ESPIL_GROUND_NIGHT_MIN + (1 -
+   ESPIL_GROUND_NIGHT_MIN) * dl, with dl from the shared
+   night state (window.__espilNightState - the hemisphere-
+   derived state the building glow already follows: daylight
+   is dl itself, factor is 1 - dl; no second clock, no new
+   curve). At dl = 1, g is exactly 1 and every colour is
+   restored to its captured base value, so the day frame is
+   the pre-fix one. Base colours are captured per material on
+   first sight (a GLB baseColorFactor is not always white)
+   and held in a WeakMap, so disposed tile materials are
+   never pinned. Streamed-in tiles are caught by the load
+   events (dirty flag) plus a slow sweep while g < 1. */
+var ESPIL_GROUND_NIGHT_MIN = 0.25; /* plateau multiplier, in
+     the renderer's LINEAR colour space: the material colour
+     multiply acts before the sRGB encode, so the constant
+     that produces the diagnosis's 0.45-0.50 screenshot-space
+     share is 0.25, not 0.47 (measured on the rig by a
+     same-frame g toggle, DIAG4/DIAG5: at MIN 0.25 the
+     near-field tile share reads 0.44-0.45 of day before the
+     overlay, ground total = 0.5 x 0.44 = 0.22, inside the
+     character's measured band 0.22-0.25; the monolith's
+     base tint works in compositing space and keeps 0.47) */
+var groundNightBase = new WeakMap(); /* material -> base Color */
+var groundNightBaseCount = 0;
+var groundNightG = 1, groundNightReadAt = 0, groundNightSweepAt = 0;
+var groundNightDirty = true;
+function groundNightDl() {
+  try {
+    var st = window.__espilNightState ? window.__espilNightState() : null;
+    if (!st) return null;
+    if (typeof st.daylight === 'number') return Math.max(0, Math.min(1, st.daylight));
+    if (typeof st.factor === 'number') return Math.max(0, Math.min(1, 1 - st.factor));
+  } catch (e) {}
+  return null;
+}
+function applyGroundNight() {
+  if (!tiles || !tiles.group) return;
+  var g = groundNightG, seen = new Set(), mats = 0;
+  tiles.group.traverse(function (o) {
+    var ms = o && o.material;
+    if (!ms) return;
+    if (!Array.isArray(ms)) ms = [ms];
+    for (var i = 0; i < ms.length; i++) {
+      var m = ms[i];
+      if (!m || !m.color || seen.has(m)) continue;
+      seen.add(m);
+      if (!groundNightBase.has(m)) { groundNightBase.set(m, m.color.clone()); groundNightBaseCount++; }
+      m.color.copy(groundNightBase.get(m)).multiplyScalar(g);
+      if (g === 1) groundNightBase.set(m, m.color.clone()); /* day re-base: heals any base captured from an already-multiplied clone */
+      mats++;
+    }
+  });
+  if (scene && scene.fog && scene.fog.color) scene.fog.color.setHex(FADE_COLOR).multiplyScalar(g);
+  state.groundNight = { g: Math.round(g * 1000) / 1000, mats: mats, base: groundNightBaseCount };
+}
+function groundNightTick() {
+  var now = (window.performance && performance.now) ? performance.now() : Date.now();
+  if (!groundNightDirty && now - groundNightReadAt < 400) return;
+  var dl = groundNightDl();
+  if (dl === null) return;
+  groundNightReadAt = now;
+  var g = ESPIL_GROUND_NIGHT_MIN + (1 - ESPIL_GROUND_NIGHT_MIN) * dl;
+  if (Math.abs(g - groundNightG) > 0.002) { groundNightG = g; groundNightDirty = true; }
+  if (groundNightDirty || (groundNightG < 0.999 && now - groundNightSweepAt > 2000)) {
+    groundNightDirty = false;
+    groundNightSweepAt = now;
+    applyGroundNight();
+  }
+}
 
 function applySuppression() {
   var cents = null;
@@ -724,6 +805,7 @@ function makeLayer() {
       syncLodCamera(cv);
       evaluateGate();
       sampleSurface(); /* section 2: throttled surface sampling at the player */
+      groundNightTick(); /* night-mismatch fix: tile-side ground night share */
       if (state.on) {
         try { tiles.update(); } catch (e) {}
         renderCam.projectionMatrix.copy(new THREE.Matrix4().fromArray(matrix)).multiply(bridgeMatrix());
@@ -794,6 +876,7 @@ export function start(sess, opts) {
   tiles.setCamera(lodCam);
   tiles.addEventListener('load-tileset', function () {
     state.tilesetLoaded = true;
+    groundNightDirty = true; /* night-mismatch fix: fresh materials take the current g */
     if (state.on) { applySuppression(); applyBaseOff(); buildAttribution(); }
   });
   tiles.addEventListener('tile-visibility-change', function () {
@@ -801,6 +884,7 @@ export function start(sess, opts) {
     scheduleAttributionRefresh();
   });
   tiles.addEventListener('load-model', function () {
+    groundNightDirty = true; /* night-mismatch fix: fresh materials take the current g */
     if (state.firstTileAtMs === null) {
       state.firstTileAtMs = Math.round(((window.performance && performance.now) ? performance.now() : Date.now()) - startedAt);
     }

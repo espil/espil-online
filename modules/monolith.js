@@ -3617,6 +3617,82 @@
     window.__espilNightGlowState=function(){ var G=espilNightGlow; return {f:G.f,color:G.color,pattern:G.pattern,applies:G.applies}; };
     setInterval(espilNightGlowTick,1000);
     /* ==== NIGHT GLOW (Mapbox layer paint) - END ==== */
+    /* ==== NIGHT GROUND (Mapbox base tint) - BEGIN ====
+       Night-mismatch fix (Han report 2026-11-20; diagnosis:
+       night-mismatch/DIAGNOSIS.md). The character darkens TWICE
+       at night - its scene lighting collapses with the
+       astronomical daylight dl AND the #espil-daynight screen
+       multiplies x0.5 on top - while the ground (the Mapbox base
+       here, the Google tiles in tiles3d-core) receives only the
+       screen, so at the night plateau the ground keeps
+       0.49-0.51 of its day value against the character's
+       0.22-0.25 and the world reads half-lit. This block gives
+       the BASE side the missing share: one background layer
+       ('espil-night-ground-tint', pure black) inserted BELOW
+       every game-owned ('espil-') layer and above the whole
+       basemap, its opacity driven by the SAME state the glow
+       above uses - window.__espilNightState().factor ONLY (the
+       hemisphere-derived factor: 1 at the night plateau, 0 in
+       day, forced 0 indoors, __espilNightForce seam shared).
+       opacity = ESPIL_GROUND_NIGHT_DIM * f, so at the plateau
+       the base's total is (1 - 0.53) x screen 0.5 = 0.235,
+       inside the character's measured band; at f = 0 the
+       opacity is exactly 0, the layer paints nothing, and the
+       day appearance is the pre-fix one byte for byte. The
+       game's own layers - the buildings extrusion with its
+       glow paint, the dither twin, the collision query layer,
+       the game layer, the tiles layer - all sit ABOVE the
+       tint, so the glow's night read is never multiplied a
+       second time: the tint darkens only the basemap it was
+       aimed at. Driver cadence follows the glow: one 1 s
+       interval, paint writes only on a >= 0.004 opacity move,
+       a map identity change, or a layer-order repair (a style
+       reload drops the layer; the same tick re-adds it below
+       the lowest game layer) - zero writes at day steady
+       state. */
+    var ESPIL_GROUND_NIGHT_DIM=0.53; /* plateau share: 1 - 0.47 */
+    var ESPIL_GROUND_TINT_ID='espil-night-ground-tint';
+    var espilGroundNight={o:-1,applies:0,map:null,layerOk:false,orderOk:false};
+    function espilGroundTintTick(){
+      var st=null;
+      try{ st=window.__espilNightState?window.__espilNightState():null; }catch(e){}
+      if(!st||typeof st.factor!=='number')return;
+      var f=st.factor; if(f<0)f=0; if(f>1)f=1;
+      var map=null;
+      try{ map=(typeof espilP1!=='undefined'&&espilP1)?espilP1.map:null; }catch(e){}
+      if(!map)return;
+      var G=espilGroundNight;
+      var o=ESPIL_GROUND_NIGHT_DIM*f;
+      try{
+        var layers=(map.getStyle()||{}).layers||[];
+        var tintIdx=-1, lowEspilIdx=-1, lowEspilId=null;
+        for(var i=0;i<layers.length;i++){
+          var lid=layers[i]&&layers[i].id;
+          if(!lid)continue;
+          if(lid===ESPIL_GROUND_TINT_ID){ tintIdx=i; continue; }
+          if(lid.indexOf('espil-')===0){ lowEspilIdx=i; lowEspilId=lid; break; }
+        }
+        if(tintIdx<0){
+          var spec={id:ESPIL_GROUND_TINT_ID,type:'background',paint:{'background-color':'#000000','background-opacity':o}};
+          if(lowEspilId)map.addLayer(spec,lowEspilId); else map.addLayer(spec);
+          G.o=o; G.applies++; G.map=map; G.layerOk=true; G.orderOk=true;
+          return;
+        }
+        G.layerOk=true;
+        G.orderOk=!(lowEspilIdx>=0&&tintIdx>lowEspilIdx);
+        if(!G.orderOk&&lowEspilId){
+          map.moveLayer(ESPIL_GROUND_TINT_ID,lowEspilId);
+          G.orderOk=true;
+        }
+        if(map!==G.map||Math.abs(o-G.o)>=0.004){
+          map.setPaintProperty(ESPIL_GROUND_TINT_ID,'background-opacity',o);
+          G.o=o; G.map=map; G.applies++;
+        }
+      }catch(e){}
+    }
+    window.__espilGroundNightState=function(){ var G=espilGroundNight; return {opacity:G.o,g:1-G.o,applies:G.applies,layerOk:G.layerOk,orderOk:G.orderOk}; };
+    setInterval(espilGroundTintTick,1000);
+    /* ==== NIGHT GROUND (Mapbox base tint) - END ==== */
     /* ============ CUSTOM-LAYER INTEGRATION (CarInMap method, Han
        2026-10-17) ============
        The game scene renders INSIDE the map's own WebGL context as a
