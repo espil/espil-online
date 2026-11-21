@@ -5605,8 +5605,13 @@
       g.position.copy(p.pos);
       g.rotation.y=p.faceY;
       if(p.av.mixer)p.av.mixer.update(dt);
-      p.av.shadow.position.set(p.pos.x,.03,p.pos.z);
-      p.av.shadow.material.opacity=Math.max(.08,.26-Math.max(0,p.pos.y-.05)*.05);
+      /* CHAR SHADOW (2026-11-20): same support law as the ground
+         write - the disc sits on the support below the ride and
+         fades with height above it, instead of staying pinned to
+         the baked datum .03 while the ride follows the terrain. */
+      var shSup=espilSupportAt(p.pos.x,p.pos.z,p.pos.y);
+      p.av.shadow.position.set(p.pos.x,shSup+.03,p.pos.z);
+      p.av.shadow.material.opacity=Math.max(.08,.26-Math.max(0,p.pos.y-shSup)*.05);
       /* --- mid-air player contact drops both flyers --- */
       espilFlyBumpCheck();
     }
@@ -9875,9 +9880,15 @@
           var rDrop=espilGlobeDrop(R.cur.x,R.cur.z);
           R.group.position.set(R.cur.x,R.cur.y-rDrop,R.cur.z);
           R.group.rotation.y=R.faceY;
-          R.shadow.position.set(R.cur.x,.03-rDrop,R.cur.z);
+          /* CHAR SHADOW (2026-11-20): same defect class as the local
+             write - the remote body rides its reported height (tile
+             surface included) while its disc stayed at the baked
+             datum. Resolve this column's support with the same
+             query the body law uses and put the disc on it. */
+          var rSup=espilSupportAt(R.cur.x,R.cur.z,R.cur.y);
+          R.shadow.position.set(R.cur.x,rSup+.03-rDrop,R.cur.z);
           var ss=Math.min(F,4); R.shadow.scale.set(ss,ss,1);
-          R.shadow.material.opacity=Math.max(.08,.26-Math.max(0,R.cur.y-.05)*.05);
+          R.shadow.material.opacity=Math.max(.08,.26-Math.max(0,R.cur.y-rSup)*.05);
           if(R.visual){ R.visual.scale.setScalar(1.5*F); R.visual.position.y=R.baseY*F; }
           if(R.plate){ R.plate.position.y=2.05*F; var ph=0.6*F; R.plate.scale.set(ph*3.4,ph,1); }
           if(R.bubble){
@@ -13689,8 +13700,17 @@
         g.rotation.y=p.faceY+ls*.55;
       }
       updateSkillFx(dt);
-      p.av.shadow.position.set(p.pos.x,.03,p.pos.z);
-      p.av.shadow.material.opacity=Math.max(.08,.26-Math.max(0,p.pos.y-.05)*.05);
+      /* CHAR SHADOW (2026-11-20): the contact disc shares the support
+         this frame's landing law resolved for the body (the local
+         `support` above, tile-surface follow included). The old
+         write pinned the disc to the baked datum .03 while the
+         shipped tile follow lifts the body 6.6-8.8 m above it, so
+         the disc stayed buried under the terrain - and the opacity
+         datum .05 faded it to the .08 floor at those heights.
+         Tiles off, support is the baked datum and the outcome is
+         the old one. */
+      p.av.shadow.position.set(p.pos.x,support+.03,p.pos.z);
+      p.av.shadow.material.opacity=Math.max(.08,.26-Math.max(0,p.pos.y-support)*.05);
       /* --- follow camera --- */
       if(espilKbFpvActive()){
         /* KONBINIYA FPV (overlay path): the camera sits at the
