@@ -1053,10 +1053,13 @@
       '#settings-panel.espil-booked.open{display:block!important}' +
       '#espil-cash-window.espil-booked{position:static!important;inset:auto!important;width:100%!important;height:100%!important;background:none!important;z-index:auto!important}' +
       '#espil-cash-window.espil-booked.open{display:block!important}' +
+      '#espil-portal-window.espil-booked{position:static!important;inset:auto!important;width:100%!important;height:100%!important;background:none!important;z-index:auto!important}' +
+      '#espil-portal-window.espil-booked.open{display:block!important}' +
       '.espil-booked .st-card{width:100%!important;max-width:none!important;height:100%;max-height:none!important;transform:none!important;overflow-y:auto!important}' +
       '.espil-booked .set-card{width:100%!important;max-width:none!important;height:100%;max-height:none!important}' +
       '.espil-booked .ecw-card{width:100%!important;max-width:none!important;height:100%;max-height:none!important}' +
-      '.espil-booked .st-close,.espil-booked .ecw-close{display:none!important}' +
+      '.espil-booked .epw-card{width:100%!important;max-width:none!important;height:100%;max-height:none!important}' +
+      '.espil-booked .st-close,.espil-booked .ecw-close,.espil-booked .epw-close{display:none!important}' +
       '.espil-booked .st-grid{overflow-y:auto!important}' +
       '#skill-tree.espil-booked .st-treeview{height:44dvh;flex:none}' +
       /* flex:none matters: game-ui makes .st-card a column
@@ -1417,10 +1420,16 @@
     { id: 'settings', title: 'Settings', nodeId: 'settings-panel', closeId: 'set-close',
       open: function () { var g = el('city-settings'); if (g) g.click(); },
       isOpen: function () { var n = el('settings-panel'); return !!(n && n.classList.contains('open')); } },
-    { id: 'cash', title: 'Cash Shop', nodeId: 'espil-cash-window',
-      open: function () { if (window.__espilCash) window.__espilCash.open(); },
-      close: function () { if (window.__espilCash) window.__espilCash.close(); },
-      isOpen: function () { var n = el('espil-cash-window'); return !!(n && n.classList.contains('open')); } }
+    /* Portal phase A (Han 2026-11-19/20): the book's cash page
+       becomes the portal page - same slot, same 9-page count.
+       The page's predecessor was the shop itself, so it lands on
+       the portal's cash tab (the 5.2 caller-intent rule); the
+       cash shop lives on inside the portal as the fixed cash
+       tab and is never a standalone book page again. */
+    { id: 'portal', title: 'Community', nodeId: 'espil-portal-window', closeId: 'espil-portal-close',
+      open: function () { if (window.__espilPortal) window.__espilPortal.open('cash'); },
+      close: function () { if (window.__espilPortal) window.__espilPortal.close(); },
+      isOpen: function () { var n = el('espil-portal-window'); return !!(n && n.classList.contains('open')); } }
   ];
   BK_PAGES.forEach(function (p) {
     p.hosted = false;
@@ -1826,7 +1835,7 @@
     idxWrap.appendChild(status);
     var rowMeta = {
       skill: SHEET[0], items: SHEET[1], bag: SHEET[2], map: SHEET[3], stall: SHEET[4],
-      friends: { icon: '👥', key: 'O' }, settings: { icon: '⚙️', key: '' }, cash: { icon: '💰', key: '' }
+      friends: { icon: '👥', key: 'O' }, settings: { icon: '⚙️', key: '' }, portal: { icon: '💬', key: '' }
     };
     BK_PAGES.forEach(function (p, i) {
       if (i === 0) return;

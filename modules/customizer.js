@@ -178,12 +178,17 @@
     wrap.querySelector('#ecl-close').addEventListener('click', closeLockPanel);
     wrap.querySelector('#ecl-shop').addEventListener('click', function () {
       closeLockPanel();
-      if (window.__espilCash && window.__espilCash.open) { window.__espilCash.open(); return; }
-      /* The cash shop rides the arrival bundle; if it has not
-         loaded yet on this page, pull it in directly. */
+      /* Portal phase A (Han 2026-11-20): this button is the road
+         to the appearance-change ticket, and the shop now lives
+         in the community portal's fixed cash tab - land there.
+         The intent (buy a ticket) is unchanged. */
+      if (window.__espilPortal && window.__espilPortal.open) { window.__espilPortal.open('cash'); return; }
+      /* The portal rides the arrival bundle; if it has not
+         loaded yet on this page, pull it in directly (the same
+         fallback this button used for the cash shop itself). */
       var s = document.createElement('script');
-      s.src = 'modules/cashshop.js';
-      s.onload = function () { if (window.__espilCash && window.__espilCash.open) window.__espilCash.open(); };
+      s.src = 'modules/comm-portal.js';
+      s.onload = function () { if (window.__espilPortal && window.__espilPortal.open) window.__espilPortal.open('cash'); };
       document.head.appendChild(s);
     });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeLockPanel(); });

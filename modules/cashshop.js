@@ -8,10 +8,14 @@
    Form: a lazy module in the npcs/monsters arrival family (loaded
    by modules/lazyload.js at the in-map arrival seam). Self-contained
    DOM in the panels palette; panels.js is NOT edited and neither is
-   monolith.js or mmo-hud.js. Entry: a floating CASH button shown
-   while in the map (any context, not just inside the Konbiniya),
-   plus window.__espilCash.open() for other systems (the arena gate
-   and the between-round rest open this same window).
+   monolith.js or mmo-hud.js. Entry: window.__espilCash.open() for
+   other systems (the arena gate and the between-round rest open
+   this same window). The floating CASH button this module used to
+   float over the map was RETIRED in portal phase A (Han
+   2026-11-20: the button covered the map) - the shop is now
+   entered from the character window through the community portal
+   (modules/comm-portal.js), whose fixed cash tab hosts this
+   window; open() callers land on that tab.
 
    Money rules (design section 3): cash is real-money currency and
    is NEVER mixed with Leo - nothing Leo-priced is sold here and no
@@ -219,19 +223,14 @@
   }
 
   /* ---------------- DOM ---------------- */
-  var winEl = null, btnEl = null, msgEl = null, balEl = null, bodyEl = null;
+  var winEl = null, msgEl = null, balEl = null, bodyEl = null;
   var renderSeq = 0;
   function fmt(cents) { return '$' + (cents / 100).toFixed(2); }
   function ensureDom() {
-    if (btnEl) return;
+    if (winEl) return;
     var st = document.createElement('style');
     st.id = 'espil-cash-style';
     st.textContent =
-      '#espil-cash-btn{position:fixed;right:14px;top:118px;z-index:9000;display:none;align-items:center;gap:6px;' +
-      'padding:8px 14px;border-radius:999px;border:1px solid #c9a227;background:linear-gradient(180deg,#5a4126,#3a2a1a);' +
-      'color:#ffd76a;font-family:sans-serif;font-size:13px;font-weight:800;letter-spacing:1px;cursor:pointer;' +
-      'box-shadow:0 4px 14px rgba(0,0,0,.45)}' +
-      '#espil-cash-btn.show{display:flex}' +
       '#espil-cash-window{position:fixed;inset:0;z-index:9990;display:none;align-items:center;justify-content:center;background:rgba(10,6,4,.55)}' +
       '#espil-cash-window.open{display:flex}' +
       '.ecw-card{background:linear-gradient(180deg,#3a2a1c,#241a10);border:2px solid #8a6a44;border-radius:14px;' +
@@ -258,13 +257,6 @@
       '.ecw-msg.err{color:#ff9d9d}' +
       '.ecw-note{font-size:12px;color:#b8a888;line-height:1.5;margin-top:8px}';
     document.head.appendChild(st);
-
-    btnEl = document.createElement('button');
-    btnEl.id = 'espil-cash-btn';
-    btnEl.type = 'button';
-    btnEl.textContent = '💰 CASH 상점';
-    btnEl.addEventListener('click', function () { open(); });
-    document.body.appendChild(btnEl);
 
     winEl = document.createElement('div');
     winEl.id = 'espil-cash-window';
@@ -408,32 +400,15 @@
     winEl.setAttribute('aria-hidden', 'true');
   }
 
-  /* ---------------- visibility: in-map only ---------------- */
+  /* ---------------- window housekeeping ----------------
+     Portal phase A retired the floating button (see the header):
+     nothing of this module renders outside the window itself any
+     more. The tick survives for its second job only - the window
+     belongs to the map, so leaving the map closes it. */
   function tickBtn() {
     if (!document.body) return;
     ensureDom();
     var inMap = document.body.classList.contains('in-map');
-    /* Flip-book companion fix (Han 2026-11-16): on coarse
-       pointers this pill (z-index 9000) floats over every z-50
-       panel and can cover a panel's own close button, so it
-       hides while any dialog is open. Desktop is deliberately
-       excluded - the matchMedia gate makes this branch inert
-       under fine pointers and the pill behaves exactly as
-       before on PC. */
-    var dialogOpen = false;
-    try {
-      if (window.matchMedia && matchMedia('(pointer:coarse)').matches) {
-        /* only a RENDERED dialog counts: hidden subtrees (e.g.
-           the flip book's leaf-face clones, which inherit
-           aria-hidden="false" from their source panel) have no
-           client rects and must not hold the pill down. */
-        var dl = document.querySelectorAll('[role="dialog"][aria-hidden="false"]');
-        for (var di = 0; di < dl.length && !dialogOpen; di++) {
-          if (dl[di].getClientRects().length > 0) dialogOpen = true;
-        }
-      }
-    } catch (e) { dialogOpen = false; }
-    btnEl.classList.toggle('show', inMap && !dialogOpen);
     if (!inMap) close();
   }
   if (document.body) tickBtn();

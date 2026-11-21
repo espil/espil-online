@@ -797,7 +797,7 @@
         else if (a === 'queue') enterQueue();
         else if (a === 'dequeue') leaveQueue();
         else if (a === 'invite') { invite(b.getAttribute('data-id')); banner('파티 초대를 보냈습니다'); }
-        else if (a === 'cash') { if (arenaChildOpen()) banner('아레나 창이 열려 있는 동안은 캐시상점을 열 수 없습니다'); else if (window.__espilCash) window.__espilCash.open(); }
+        else if (a === 'cash') { if (arenaChildOpen()) banner('아레나 창이 열려 있는 동안은 캐시상점을 열 수 없습니다'); else if (window.__espilPortal) window.__espilPortal.open('cash'); else if (window.__espilCash) window.__espilCash.open(); }
         renderPanel();
       });
     });
@@ -896,11 +896,14 @@
      cash shop's entry points. The cash lock is the shared-storage
      audit's guard (2026-11-18): espil_cash_v1 is a whole-object
      store cached per document, so while the child writes it
-     (cash revives), this window must not - its floating cash
-     button is cashshop.js's own element, hence the capture-phase
-     guard on it and on the cash window. The child's close (the
-     'espil-arena-close' message, or the handle polling closed)
-     releases every lock. */
+     (cash revives), this window must not. Portal phase A
+     (2026-11-20) retired the floating cash button the original
+     guard named; the entries that can now reach the ledger are
+     the cash window itself, the portal window (its cash tab
+     hosts the shop) and the character window's center button
+     (#eg-portal), so the capture-phase guard covers exactly
+     those. The child's close (the 'espil-arena-close' message,
+     or the handle polling closed) releases every lock. */
   var arenaChildWin = null;
   function arenaChildOpen() { return !!(arenaChildWin && !arenaChildWin.closed); }
   function writeHandoff() {
@@ -950,7 +953,7 @@
     if (ARENA_CHILD || !arenaChildOpen()) return;
     var t = e.target;
     if (!t || !t.closest) return;
-    if (t.closest('#espil-cash-btn') || t.closest('#espil-cash-window')) {
+    if (t.closest('#espil-cash-window') || t.closest('#espil-portal-window') || t.closest('#eg-portal')) {
       e.preventDefault(); e.stopImmediatePropagation();
       banner('아레나 창이 열려 있는 동안은 캐시상점을 열 수 없습니다');
     }

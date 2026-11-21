@@ -649,6 +649,7 @@
     '.eg-statrow b{color:#fff3d6;font-variant-numeric:tabular-nums}',
     '.eg-foot{margin:7px 0 0;font-size:11px;opacity:.85}',
     '.eg-custom{margin-left:8px;padding:4px 11px;border-radius:999px;border:1px solid rgba(201,168,106,.85);background:rgba(201,168,106,.16);color:#ffd97a;font:700 11.5px Manrope,sans-serif;cursor:pointer}',
+    '.eg-portal{margin-left:6px;padding:4px 11px;border-radius:999px;border:1px solid rgba(201,168,106,.85);background:rgba(201,168,106,.16);color:#ffd97a;font:700 11.5px Manrope,sans-serif;cursor:pointer}',
     '.eg-mount{padding:18px 6px;text-align:center;opacity:.8}',
     /* bag */
     '.espil-bag{grid-column:1/-1;color:#f5e6c8;font:12px Manrope,system-ui,sans-serif}',
@@ -775,7 +776,8 @@
       statRows([['무기 공격력', st.weaponAtk[0] + ' ~ ' + st.weaponAtk[1]], ['근접 공격력', st.melee], ['방어력', st.def], ['마법 공격력', st.magic], ['마법 방어력', st.mdef]]) +
       '</div></div>' +
       '<p class="eg-foot">Leo Coin: ' + info.leo + (info.city ? ' · Now in: ' + esc(info.city) : '') +
-      '<button class="eg-custom" id="eg-custom" type="button">Customize</button></p>';
+      '<button class="eg-custom" id="eg-custom" type="button">Customize</button>' +
+      '<button class="eg-portal" id="eg-portal" type="button">커뮤니티 센터</button></p>';
     g.innerHTML = ''; g.appendChild(wrap);
     if (document.getElementById('espil-gear-preview')) startPreviewLoop();
     wrap.querySelectorAll('[data-egtab]').forEach(function (b) {
@@ -797,6 +799,25 @@
     });
     var cb = document.getElementById('eg-custom');
     if (cb) cb.addEventListener('click', function () { toggleProfile(false); if (window.__espilOpenCustomizer) window.__espilOpenCustomizer(); });
+    /* Community portal entry (Han 2026-11-20, portal phase A
+       amendment A): the cash shop's floating button is retired;
+       the center is entered from this window's bottom row, next
+       to Customize, with the same pattern - close this window,
+       open the destination (the portal on its feed tab; the cash
+       shop lives on inside as the fixed cash tab). */
+    var pb = document.getElementById('eg-portal');
+    if (pb) pb.addEventListener('click', function () {
+      toggleProfile(false);
+      if (window.__espilPortal && window.__espilPortal.open) { window.__espilPortal.open('feed'); return; }
+      /* The portal rides the same arrival bundle as this module;
+         if it has not landed yet, import it the way the loader
+         itself would. */
+      try {
+        import('./comm-portal.js').then(function () {
+          if (window.__espilPortal && window.__espilPortal.open) window.__espilPortal.open('feed');
+        }).catch(function () {});
+      } catch (e) {}
+    });
   }
 
   /* ---------------- bag ---------------- */

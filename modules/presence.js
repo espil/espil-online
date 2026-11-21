@@ -245,6 +245,14 @@
         /* overhead speech bubble over the sender's avatar (own bubble
            is the world script's DOM bubble on send) */
         try { if (window.__espilAvatarBubble && m.from.id !== myId) window.__espilAvatarBubble(m.from.id, String(m.text || '')); } catch(_){}
+      } else if ((m.t === 'feed' || m.t === 'feed_replay') && !ARENA_CHILD) {
+        /* Community portal feed (2026-11-20): the city room's
+           board rides this same socket - single posts and the
+           join replay are handed to the portal module as an
+           event, exactly the shape of the chat branch above;
+           nothing is rendered or stored here. The arena room
+           carries no feed surface, like chat. */
+        try { window.dispatchEvent(new CustomEvent('espil-feed-recv', { detail: m })); } catch(_){}
       } else if (m.t === 'dm' && m.from && !ARENA_CHILD) {
         onDmFrame(m);
       } else if (m.t === 'stall_update' && m.user) {

@@ -65,9 +65,16 @@
      a world feature; the module itself is the LIGHT decision entry
      (the heavy renderer loads only on a tilesEnabled:true decision).
    - cashshop: the same seams as npcs - the cash shop (Han decision
-     round 3, 2026-11-09) is reachable from anywhere in the map
-     (its floating button self-gates on body.in-map), so it arms
-     with the arrival bundle like the other world features.
+     round 3, 2026-11-09) is reachable from anywhere in the map,
+     so it arms with the arrival bundle like the other world
+     features. (Its floating button was retired by portal phase
+     A, 2026-11-20; the window itself is unchanged.)
+   - comm-portal: the same seams as cashshop - the community
+     portal (Han 2026-11-19/20) wraps the communication center
+     and hosts the cash shop in its fixed cash tab; it is entered
+     from the character window in the map, so it arms with the
+     arrival bundle. Place-space children never load it: the
+     branch above returns before any seam exists there.
    - story: the same seams as npcs - the downtown story quest
      chain (Han decisions rounds 3-4, 2026-11-09/10) is a world
      feature whose NPCs stand in the city from arrival on, so it
@@ -169,7 +176,7 @@
   window.addEventListener('espil-dive-start', function () { load('tutorial.js'); });
   window.addEventListener('espil-guide', function (e) {
     var d = e && e.detail; if (!d) return;
-    if (d.type === 'arrival') { socialBundle(); load('npcs.js'); load('monsters.js'); load('tiles3d.js'); load('cashshop.js'); load('arena.js'); load('story.js'); load('vehicles.js'); load('billboard-video.js'); }
+    if (d.type === 'arrival') { socialBundle(); load('npcs.js'); load('monsters.js'); load('tiles3d.js'); load('cashshop.js'); load('comm-portal.js'); load('arena.js'); load('story.js'); load('vehicles.js'); load('billboard-video.js'); }
     if (d.type === 'interior') { storePair(); load('panels.js'); }
   });
   window.addEventListener('espil-party-frame', socialBundle);
@@ -237,7 +244,7 @@
      interception must be resident before the Enter click. 600 ms,
      and each arm is a no-op once loaded. */
   setInterval(function () {
-    if (document.body && document.body.classList.contains('in-map')) { socialBundle(); load('npcs.js'); load('monsters.js'); load('tiles3d.js'); load('cashshop.js'); load('arena.js'); load('story.js'); load('vehicles.js'); load('billboard-video.js'); }
+    if (document.body && document.body.classList.contains('in-map')) { socialBundle(); load('npcs.js'); load('monsters.js'); load('tiles3d.js'); load('cashshop.js'); load('comm-portal.js'); load('arena.js'); load('story.js'); load('vehicles.js'); load('billboard-video.js'); }
     if (window.__espilInside) storePair();
     var bp = document.getElementById('bldg-panel');
     if (bp && bp.getAttribute('aria-hidden') === 'false') load('store-page-link.js');
