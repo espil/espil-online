@@ -677,101 +677,114 @@
 })();
 /* __espilCustPreview END */
 
-/* __espilCustStyleOptions v1 - style option portraits in the
-   character gate (Han 2026-11-18: when a player picks among
-   Style 1-4 they must SEE each style's avatar on the option
-   itself - choosing by number or name alone is not enough.
-   On a gender switch the newly picked gender's Style 1-4
-   avatars show instead. Guests and signed-in users alike.)
+/* __espilCustStyleOptions v2 - LIVE 3D style option views in
+   the character gate (Han 2026-11-20: "게스트로 접속할 때
+   캐릭터 선택하는 거, 캐릭터 샘플 보여야 한다고 몇 번째
+   말했냐? 제발 좀 이행해라. 3D 모델 보여줘" - at guest entry
+   the character selection must show the samples, as 3D
+   MODELS). v1 (Han 2026-11-18) painted each option with a
+   rendered PORTRAIT (one shared offscreen renderer, a PNG
+   data URL per (gender, body), cached for the page's life).
+   Han's 2026-11-20 directive supersedes that form: every
+   offered body option now displays its ACTUAL 3D model,
+   rendered live by WebGL in the selection view.
 
-   Appended as its own block after __espilCustPreview v1; the
-   data hooks and the preview block above are untouched.
+   Step-1 record (this line, production bytes, 2026-11-20)
+   that the build answers:
+   • Canonical landing path: the guest step offers gender +
+     Style 1-4 as TEXT buttons with NO imagery at all, and
+     the gate panel is never presented on that path - the
+     canonical guest saw no sample anywhere.
+   • Direct game-page path: the gate's card samples are the
+     v1 portrait stills; the only live 3D is the preview
+     stage above the row, showing the SELECTED body alone.
 
-   Shape: PRESENTATION ONLY. The monolith's
-   espilRenderBodyRow owns the body row - it builds the
-   .char-body-card buttons, owns chosenBody, and re-renders
-   the whole row on every pick. This block never writes
-   selection state and never touches the cards' text or
-   handlers; it only places a portrait holder
-   (<div class="char-body-portrait">) at the head of each
-   card and paints it. Because the row is rebuilt on every
-   render, a MutationObserver + slow poll re-inject the
-   holders from the portrait cache - injection is idempotent
-   and a no-op when everything is already painted.
-
-   Rendering form - PORTRAITS, not live renders (measured in
-   STYLE-OPTIONS-REPORT.md): one shared offscreen renderer
-   renders each body ONCE per (gender, body) into a PNG data
-   URL, cached for the page's life; a gender switch renders
-   the other gender's set on demand. The live alternative
-   (one WebGL context + ticking mixer per card) would add
-   4-5 contexts on top of the game context and the preview
-   context and hold 4-5 avatar clones for the gate's whole
-   life, for options the player glances at once - the
-   portrait form adds exactly ONE small context and pays
-   each body once.
+   Shape: the v1 block's wiring, lifecycle and laws are kept;
+   only the presentation mechanism changes, and one shared
+   live core (window.__espilLiveViews) serves TWO surfaces:
+   • the gate's .char-body-card options (this block), and
+   • the landing guest step's #guest-style-1..4 buttons (the
+     __espilGuestLive block below) - the canonical guest pick.
+   The core holds ONE offscreen WebGL renderer (the v1 stage:
+   same camera, lights, disc, PI pivot, 192x224). Each option
+   carries a small visible 2D canvas; while its surface is
+   open, a RAF loop attaches the option's entry to the shared
+   pivot, ticks its mixer, renders once and blits the frame
+   into the option's canvas - a live render of the real GLB
+   every frame (the idle animation advances), never a cached
+   still. WebGL contexts added by option views: exactly ONE
+   (the same single context v1 used), shared by both surfaces
+   and by every option.
 
    Bodies (the REAL GLBs, same files the preview shows):
    • style1-4: built through window.__espilBuildGateAvatar
      (monolith), the same service the preview uses, so the
      chibi template cache and its Basis/KTX2 machinery are
-     shared and no GLB is parsed twice. The portrait clone
-     is dropped after its snapshot.
+     shared and no GLB is parsed twice.
    • master: __espilBuildGateAvatar returns null for the
      masters on purpose (the game builder fires entry
-     machinery), so - exactly like the preview block - this
-     block loads the body file itself (male.glb /
+     machinery), so - exactly like the preview block and v1 -
+     this core loads the body file itself (male.glb /
      female_idle.glb) with the preview's framing (PI
      counter-rotation, 1.5x scale, bbox grounding, embedded
-     idle). The male_idle.glb override is NOT awaited: it
-     swaps the idle loop, not the body's look.
-   • Framing and lighting mirror the preview stage: same
-     camera (36 deg, (0,1.04,3.35) -> (0,0.88,0)), same
-     three lights, same PI pivot, same shadow disc recipe.
+     idle).
 
-   Law kept intact:
-   • Locked gates (first-setup done, no ticket) and the
-     designated account render .char-body-lock and NO cards,
-     so there is nothing to paint and nothing reopens -
-     this block only ever follows .char-body-card elements.
-     The gate can still paint the cards briefly from the
-     pre-sync snapshot before the session sync lands the
-     lock (the Lunaris defect-1 window): the moment the row
-     shows the lock, injectAll drops every queued portrait
-     job and want() refuses new ones, so a locked gate costs
-     at most the one render already in flight.
-   • The revert modes (kaykit / sprite) hide the row, so
-     again no cards and no portraits.
-   • Clicking a portrait is clicking the card (the holder
-     sits inside the button), so the monolith's own pick
-     handler stays the only selection path.
-   • Layout: portrait rows make the gate taller than the
-     wrap's max-height (100dvh - 20px) on short viewports,
-     and the wrap is overflow:hidden with flex:none children
-     (espil-mobile-fit) - unpainted, the confirm button
-     would be clipped away unreachable. This block's style
-     therefore lets the gate wrap scroll vertically - the
-     same pattern the sign-in box already uses
-     (.modal #auth-box{overflow-y:auto}). On tall viewports
-     nothing changes; on short ones the whole gate, confirm
-     included, stays reachable by scrolling the wrap.
-     The holder also carries max-height:176px - a card left
-     alone on the last flex row grows to the full row width,
-     and an uncapped aspect-ratio holder would balloon with
-     it (measured 565px); capped, every option's portrait
-     shows at the same height and the paint letterboxes
-     inside (background-size:contain).
-   Test hook: window.__espilCustStyleOptionsState(). */
+   Laws kept from v1 (intact):
+   • PRESENTATION ONLY. espilRenderBodyRow owns the row and
+     chosenBody; entry-flow owns the landing step. These
+     blocks never write selection state and never touch the
+     options' text or handlers; clicking a view is clicking
+     the option itself (the holder sits inside the button,
+     the canvas ignores pointer events).
+   • Start order: styles first, Master last (the 2026-11-19
+     defect fix - the signed-in row leads with the ~16 MB
+     Master card; entry construction starts in the same
+     two-pass order so the style samples lead here too).
+   • Locked gates and the designated account render
+     .char-body-lock and NO cards, so there is nothing to
+     show and nothing reopens; queued starts drop the moment
+     the lock shows. The revert modes (kaykit / sprite) hide
+     the row - again no cards, no views.
+   • Layout: the v1 style still lets the gate wrap scroll
+     vertically on short viewports, and the holder keeps
+     max-height:176px so a lone last-row card cannot balloon.
+   • A body that fails twice stays unshown (honest empty
+     holder); no retry spin.
+
+   NEW law (the first-creation line's section-7 finding,
+   unscheduled until now - it belongs here because this core
+   is the sample path): the WRONG-STYLE GUARD. The monolith's
+   __espilEnsureChibi fail-soft can hand back style 1 when a
+   style's GLB fails to load, and v1 cached that picture as
+   the requested style's sample (observed once on
+   production: female Style 4 identical to Style 1). A live
+   entry whose built style (av.__cbStyle) differs from the
+   requested style is treated as FAILED here - it is never
+   presented as that style's model, and the 2-attempt retry
+   reloads the file. The in-world avatar fail-soft is
+   untouched.
+
+   Cost, stated plainly: entries are cached per (gender,
+   body) for the page's life (the preview keeps its own
+   selected-body entry, as before). The master bodies are
+   parsed once by this core (male.glb 15,999,984 B /
+   female_idle.glb 16,291,868 B) - one parse fewer than the
+   v1 world, where the portrait block parsed its own copy
+   on top of the preview's. Per frame the core renders one
+   small frame per visible option (4 guest / 5 signed-in).
+   Test hooks: window.__espilCustStyleOptionsState() (gate)
+   and window.__espilGuestLiveState() (landing step). */
 (function () {
   'use strict';
   if (window.__espilCustStyleOptions) return;
   window.__espilCustStyleOptions = true;
 
-  var PW = 192, PH = 224; /* portrait render size; CSS scales it to the card */
-  var so = {
-    open: false, renderer: null, scene: null, camera: null, pivot: null,
-    cache: {}, queue: [], busy: false, pollTimer: 0, injectQueued: false
+  var PW = 192, PH = 224; /* shared stage size; CSS scales it to the option */
+  var core = {
+    renderer: null, scene: null, camera: null, pivot: null,
+    entries: {}, startQueue: [], startTimer: 0, building: false
   };
+  var so = { open: false, views: [], pollTimer: 0, injectQueued: false, raf: 0, lastTs: 0, frameId: 0, ticked: {} };
 
   /* ---------- read-only state recipes (mirror the preview block's) ---------- */
   function domGender() {
@@ -779,16 +792,11 @@
     return (sel && sel.getAttribute('data-gender') === 'female') ? 'female' : 'male';
   }
   function keyOf(g, b) { return g + '|' + b; }
-  function hashStr(s) {
-    var h = 5381;
-    for (var i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
-    return h.toString(16);
-  }
   function noCull(group) { group.traverse(function (o) { if (o.isMesh || o.isSkinnedMesh) o.frustumCulled = false; }); }
 
-  /* ---------- offscreen stage (mirrors __espilCustPreview's) ---------- */
+  /* ---------- the one shared offscreen stage (mirrors v1 / the preview) ---------- */
   function ensureStage() {
-    if (so.renderer) return true;
+    if (core.renderer) return true;
     if (typeof THREE === 'undefined' || typeof THREE.GLTFLoader === 'undefined') return false;
     var cv = document.createElement('canvas');
     cv.width = PW; cv.height = PH;
@@ -809,7 +817,7 @@
     var pivot = new THREE.Group();
     pivot.rotation.y = Math.PI; /* same law as the preview stage */
     scene.add(pivot);
-    so.renderer = renderer; so.scene = scene; so.camera = camera; so.pivot = pivot;
+    core.renderer = renderer; core.scene = scene; core.camera = camera; core.pivot = pivot;
     return true;
   }
 
@@ -818,14 +826,22 @@
     var av = null;
     try { av = window.__espilBuildGateAvatar ? window.__espilBuildGateAvatar(gender, body) : null; } catch (e) {}
     if (!av) return { failed: true, group: null, ready: function () { return false; }, playIdle: function () {}, mixer: function () { return null; } };
+    var wantStyle = +body.slice(-1);
     return {
-      failed: false, group: av.group,
+      failed: false, group: av.group, av: av,
       ready: function () { return !!(av.ready && av.mixer); },
+      /* WRONG-STYLE GUARD: the built style is stamped on the
+         avatar (av.__cbStyle) once its template lands; a built
+         style different from the requested one means the
+         fail-soft served a substitute - never a sample. */
+      wrongStyle: function () {
+        return !!(av.ready && typeof av.__cbStyle === 'number' && av.__cbStyle !== wantStyle);
+      },
       playIdle: function () { try { av.playAnim('idle'); } catch (e) {} },
       mixer: function () { return av.mixer; }
     };
   }
-  /* Master entry: this block's own loader, mirroring the
+  /* Master entry: the core's own loader, mirroring the
      preview block's buildMasterEntry (see the header for why
      the game builder is not used for the masters). */
   function buildMasterEntry(gender) {
@@ -855,75 +871,106 @@
     ent.mixer = function () { return ent._mixer; };
     return ent;
   }
-  function entryFor(gender, body) {
-    return body === 'master' ? buildMasterEntry(gender) : buildChibiEntry(gender, body);
-  }
 
-  /* ---------- portrait production (one at a time) ---------- */
-  function renderPortrait(gender, body, done) {
-    var key = keyOf(gender, body);
-    var rec = so.cache[key];
-    if (rec && rec.status !== 'failed') { done(); return; }
-    var prevAttempts = rec ? (rec.attempts || 0) : 0;
-    rec = so.cache[key] = { status: 'pending', url: null, ms: 0, bytes: 0, hash: '', attempts: prevAttempts + 1 };
-    var t0 = performance.now();
-    if (!ensureStage()) { rec.status = 'failed'; done(); return; }
-    var ent = entryFor(gender, body);
-    if (!ent || ent.failed || !ent.group) { rec.status = 'failed'; done(); return; }
-    var tries = 0;
-    (function waitReady() {
-      if (ent.failed) { rec.status = 'failed'; done(); return; }
-      if (ent.ready()) {
-        try {
-          ent.playIdle();
-          noCull(ent.group);
-          so.pivot.add(ent.group);
-          var mx = ent.mixer();
-          for (var i = 0; i < 3; i++) { if (mx) mx.update(0.12); so.renderer.render(so.scene, so.camera); }
-          rec.url = so.renderer.domElement.toDataURL('image/png');
-          rec.bytes = rec.url.length;
-          rec.hash = hashStr(rec.url);
-          rec.status = 'ready';
-          rec.ms = Math.round(performance.now() - t0);
-          so.pivot.remove(ent.group);
-        } catch (e) { rec.status = 'failed'; }
-        done();
-        return;
-      }
-      if (++tries <= 400) setTimeout(waitReady, 150); /* up to ~60 s: the master parse is slow on cold loads */
-      else { rec.status = 'failed'; done(); }
-    })();
-  }
-  function pump() {
-    if (so.busy) return;
-    var job = so.queue.shift();
-    if (!job) return;
-    so.busy = true;
-    renderPortrait(job.gender, job.body, function () {
-      so.busy = false;
-      injectAll();
-      pump();
-    });
-  }
-  function rowLocked() {
-    var row = document.getElementById('char-body-row');
-    return !!(row && row.querySelector('.char-body-lock'));
-  }
+  /* ---------- entry lifecycle (shared by both surfaces) ---------- */
   function want(gender, body) {
-    if (rowLocked()) return; /* a locked row never queues portrait work */
-    var rec = so.cache[keyOf(gender, body)];
+    var rec = core.entries[keyOf(gender, body)];
     if (rec) {
       if (rec.status !== 'failed') return;
-      if ((rec.attempts || 0) >= 2) return; /* a body that failed twice stays unpainted; no retry spin */
+      if ((rec.attempts || 0) >= 2) return; /* a body that failed twice stays unshown; no retry spin */
     }
-    for (var i = 0; i < so.queue.length; i++) {
-      if (so.queue[i].gender === gender && so.queue[i].body === body) return;
+    for (var i = 0; i < core.startQueue.length; i++) {
+      if (core.startQueue[i].gender === gender && core.startQueue[i].body === body) return;
     }
-    so.queue.push({ gender: gender, body: body });
-    pump();
+    core.startQueue.push({ gender: gender, body: body });
+    pumpStarts();
+  }
+  function pumpStarts() {
+    if (core.building || core.startTimer) return;
+    var job = core.startQueue.shift();
+    if (!job) return;
+    core.building = true;
+    startEntry(job.gender, job.body);
+    core.building = false;
+    if (core.startQueue.length) {
+      /* Starts are staggered so the small style files lead and
+         the ~16 MB master parse starts last and alone (the
+         2026-11-19 order law, carried to construction). */
+      core.startTimer = setTimeout(function () { core.startTimer = 0; pumpStarts(); }, 200);
+    }
+  }
+  function startEntry(gender, body) {
+    var key = keyOf(gender, body);
+    var prev = core.entries[key];
+    var rec = core.entries[key] = { status: 'loading', ent: null, ms: 0,
+      attempts: (prev ? (prev.attempts || 0) : 0) + 1, startedAt: performance.now(), wrongStyle: false };
+    if (typeof THREE === 'undefined' || typeof THREE.GLTFLoader === 'undefined' ||
+        (body !== 'master' && !window.__espilBuildGateAvatar)) {
+      /* Machinery not up yet (early boot): not an attempt -
+         requeue shortly instead of burning the retry cap. */
+      rec.status = 'queued';
+      rec.attempts -= 1;
+      setTimeout(function () {
+        if (core.entries[key] === rec && rec.status === 'queued') { rec.status = 'failed'; want(gender, body); }
+      }, 600);
+      return;
+    }
+    rec.ent = (body === 'master') ? buildMasterEntry(gender) : buildChibiEntry(gender, body);
+    if (!rec.ent || rec.ent.failed || !rec.ent.group) rec.status = 'failed';
+  }
+  function tryPromote(rec) {
+    if (!rec || rec.status !== 'loading' || !rec.ent) return;
+    var ent = rec.ent;
+    if (ent.failed) { rec.status = 'failed'; return; }
+    if (ent.wrongStyle && ent.wrongStyle()) { rec.status = 'failed'; rec.wrongStyle = true; return; }
+    if (ent.ready()) {
+      rec.status = 'live';
+      rec.ms = Math.round(performance.now() - rec.startedAt);
+      try { ent.playIdle(); } catch (e) {}
+      noCull(ent.group);
+      return;
+    }
+    if (performance.now() - rec.startedAt > 120000) rec.status = 'failed'; /* a load that never lands is a failure, not a spinner */
+  }
+  function entryRec(gender, body) { return core.entries[keyOf(gender, body)] || null; }
+
+  /* Render ONE live frame of an entry into a view's 2D canvas.
+     The mixer ticks at most once per surface frame per entry
+     (frameId), so two surfaces never double-step an entry. */
+  function renderView(view, dt, frameId) {
+    var rec = entryRec(view.gender, view.body);
+    if (!rec) return;
+    if (rec.status === 'loading') { tryPromote(rec); if (rec.status !== 'live') return; }
+    if (rec.status !== 'live' || !rec.ent || !ensureStage()) return;
+    var ent = rec.ent;
+    try {
+      if (so.ticked[rec.key || (rec.key = keyOf(view.gender, view.body))] !== frameId) {
+        so.ticked[rec.key] = frameId;
+        var mx = ent.mixer();
+        if (mx) mx.update(dt);
+      }
+      if (ent.group.parent !== core.pivot) {
+        if (ent.group.parent) ent.group.parent.remove(ent.group);
+        core.pivot.add(ent.group);
+      }
+      core.renderer.render(core.scene, core.camera);
+      core.pivot.remove(ent.group);
+      view.ctx.drawImage(core.renderer.domElement, 0, 0, view.canvas.width, view.canvas.height);
+      view.frames++;
+    } catch (e) {}
   }
 
-  /* ---------- injection into the monolith's cards ---------- */
+  /* The shared service the landing-step block drives. */
+  window.__espilLiveViews = {
+    want: want,
+    entryRec: entryRec,
+    tryPromote: tryPromote,
+    renderView: renderView,
+    stageReady: function () { return !!core.renderer; },
+    newFrame: function () { return ++so.frameId; }
+  };
+
+  /* ---------- gate surface: injection into the monolith's cards ---------- */
   function ensureStyle() {
     if (document.getElementById('espil-cust-styleopt-style')) return;
     var st = document.createElement('style');
@@ -931,59 +978,75 @@
     st.textContent =
       '#char-custom .char-card-wrap{overflow-y:auto}' +
       '#char-custom .char-body-portrait{width:100%;aspect-ratio:6/7;max-height:176px;margin:0 auto 4px;border-radius:8px;' +
-      'background-color:rgba(255,250,235,.55);background-size:contain;background-position:center bottom;background-repeat:no-repeat;' +
-      'box-shadow:inset 0 0 0 1px rgba(207,169,111,.45)}' +
-      '#char-custom .char-body-portrait[data-so-status="ready"]{background-color:transparent;box-shadow:none}';
+      'background-color:rgba(255,250,235,.55);box-shadow:inset 0 0 0 1px rgba(207,169,111,.45);overflow:hidden}' +
+      '#char-custom .char-body-portrait[data-so-status="live"]{background-color:transparent;box-shadow:none}' +
+      '#char-custom .char-body-portrait canvas{display:block;width:100%;height:100%;pointer-events:none}';
     (document.head || document.documentElement).appendChild(st);
+  }
+  function rowLocked() {
+    var row = document.getElementById('char-body-row');
+    return !!(row && row.querySelector('.char-body-lock'));
+  }
+  function viewFor(card, gender, body) {
+    for (var i = 0; i < so.views.length; i++) {
+      if (so.views[i].el === card) {
+        so.views[i].gender = gender; so.views[i].body = body;
+        return so.views[i];
+      }
+    }
+    var holder = null;
+    for (var j = 0; j < card.childNodes.length; j++) {
+      var n = card.childNodes[j];
+      if (n.nodeType === 1 && n.className && String(n.className).indexOf('char-body-portrait') >= 0) { holder = n; break; }
+    }
+    if (!holder) {
+      holder = document.createElement('div');
+      holder.className = 'char-body-portrait';
+      card.insertBefore(holder, card.firstChild);
+    }
+    var canvas = holder.querySelector('canvas');
+    if (!canvas) {
+      canvas = document.createElement('canvas');
+      canvas.width = PW; canvas.height = PH;
+      holder.appendChild(canvas);
+    }
+    var view = { el: card, holder: holder, canvas: canvas, ctx: canvas.getContext('2d'),
+                 gender: gender, body: body, frames: 0 };
+    so.views.push(view);
+    return view;
   }
   function injectAll() {
     var row = document.getElementById('char-body-row');
     if (!row) return;
-    /* Locked / designated row: the gate can paint the cards
-       briefly from the pre-sync snapshot before the session
-       sync lands the lock line (the Lunaris defect-1 window).
-       When the lock is what the row now shows, drop any
-       queued portrait work and paint nothing - the lock
-       line stays the only presentation. */
-    if (row.querySelector('.char-body-lock')) { so.queue.length = 0; return; }
+    /* Locked / designated row: drop any queued starts and
+       show nothing - the lock line stays the only
+       presentation (v1 law, unchanged). */
+    if (row.querySelector('.char-body-lock')) { core.startQueue.length = 0; so.views = []; return; }
     var cards = row.querySelectorAll('.char-body-card');
-    if (!cards.length) return;
+    if (!cards.length) { so.views = []; return; }
     ensureStyle();
     var gender = domGender();
+    /* Drop views whose card element left the row (the row is
+       rebuilt on every render; the fresh cards get fresh
+       views bound to the same cached entries). */
+    var live = [];
+    for (var v = 0; v < so.views.length; v++) {
+      if (so.views[v].el.isConnected && row.contains(so.views[v].el)) live.push(so.views[v]);
+    }
+    so.views = live;
     function visitCard(card) {
       var body = card.getAttribute('data-body');
       if (!body) return;
-      var holder = null;
-      for (var j = 0; j < card.childNodes.length; j++) {
-        var n = card.childNodes[j];
-        if (n.nodeType === 1 && n.className && String(n.className).indexOf('char-body-portrait') >= 0) { holder = n; break; }
-      }
-      if (!holder) {
-        holder = document.createElement('div');
-        holder.className = 'char-body-portrait';
-        card.insertBefore(holder, card.firstChild);
-      }
-      var rec = so.cache[keyOf(gender, body)];
-      var wantBg = (rec && rec.status === 'ready' && rec.url) ? 'url(' + rec.url + ')' : '';
-      if (holder.style.backgroundImage !== wantBg) holder.style.backgroundImage = wantBg;
-      var wantStatus = rec ? rec.status : 'queued';
-      if (holder.getAttribute('data-so-status') !== wantStatus) holder.setAttribute('data-so-status', wantStatus);
-      if (holder.getAttribute('data-so-body') !== body) holder.setAttribute('data-so-body', body);
-      if (holder.getAttribute('data-so-gender') !== gender) holder.setAttribute('data-so-gender', gender);
+      var view = viewFor(card, gender, body);
+      var rec = entryRec(gender, body);
+      var status = rec ? rec.status : 'queued';
+      if (view.holder.getAttribute('data-so-status') !== status) view.holder.setAttribute('data-so-status', status);
+      if (view.holder.getAttribute('data-so-body') !== body) view.holder.setAttribute('data-so-body', body);
+      if (view.holder.getAttribute('data-so-gender') !== gender) view.holder.setAttribute('data-so-gender', gender);
       if (!rec || rec.status === 'failed') want(gender, body);
     }
-    /* Queue order (defect fix, 2026-11-19): the portrait queue
-       is serial, and the signed-in row leads with the Master
-       card - whose body file is ~16 MB - so at first login
-       EVERY style sample waited behind the single heaviest
-       load and the row read as "no samples" until it landed
-       (measured on production: first paint 65 s, full row
-       235 s on the rig; the guest row, which has no Master
-       card, paints its first sample after one small file).
-       The style portraits are the samples a first-time user
-       compares, so they are queued FIRST and the Master
-       portrait last. Painting and holder injection are
-       unchanged; only the want() queueing order differs. */
+    /* Start order (2026-11-19 defect-fix law): styles first,
+       the Master entry last - see the header. */
     for (var i = 0; i < cards.length; i++) {
       if (cards[i].getAttribute('data-body') !== 'master') visitCard(cards[i]);
     }
@@ -1000,15 +1063,27 @@
     }, 40);
   }
 
-  /* ---------- wiring (mirrors the preview block's lifecycle) ---------- */
+  /* ---------- gate render loop (gate-open only) ---------- */
+  function tick(ts) {
+    if (!so.open) { so.raf = 0; return; }
+    so.raf = requestAnimationFrame(tick);
+    var dt = Math.min(0.05, so.lastTs ? (ts - so.lastTs) / 1000 : 0.016);
+    so.lastTs = ts;
+    var fid = ++so.frameId;
+    for (var i = 0; i < so.views.length; i++) renderView(so.views[i], dt, fid);
+  }
   function setOpen(on) {
     if (on === so.open) return;
     so.open = on;
     if (on) {
       injectAll();
+      so.lastTs = 0;
+      if (!so.raf) so.raf = requestAnimationFrame(tick);
       if (so.pollTimer) clearInterval(so.pollTimer);
       so.pollTimer = setInterval(function () { if (so.open) injectAll(); }, 900);
     } else {
+      if (so.raf) cancelAnimationFrame(so.raf);
+      so.raf = 0;
       if (so.pollTimer) { clearInterval(so.pollTimer); so.pollTimer = 0; }
     }
   }
@@ -1035,27 +1110,190 @@
     if (row) {
       var list = row.querySelectorAll('.char-body-card');
       for (var i = 0; i < list.length; i++) {
-        var holder = list[i].querySelector('.char-body-portrait');
+        var body = list[i].getAttribute('data-body');
+        var view = null;
+        for (var v = 0; v < so.views.length; v++) { if (so.views[v].el === list[i]) { view = so.views[v]; break; } }
+        var rec = body ? entryRec(domGender(), body) : null;
         cards.push({
-          body: list[i].getAttribute('data-body'),
+          body: body,
           selected: list[i].classList.contains('is-selected'),
-          portrait: !!holder,
-          status: holder ? holder.getAttribute('data-so-status') : null,
-          gender: holder ? holder.getAttribute('data-so-gender') : null,
-          painted: holder ? !!holder.style.backgroundImage : false
+          portrait: !!list[i].querySelector('.char-body-portrait'),
+          live: true,
+          status: rec ? rec.status : (view ? 'queued' : null),
+          gender: domGender(),
+          painted: view ? view.frames > 0 : false,
+          frames: view ? view.frames : 0
         });
       }
     }
     var cache = {};
-    for (var k in so.cache) {
-      var r = so.cache[k];
-      cache[k] = { status: r.status, ms: r.ms, bytes: r.bytes, hash: r.hash };
+    for (var k in core.entries) {
+      var r = core.entries[k];
+      cache[k] = { status: r.status, ms: r.ms, attempts: r.attempts, wrongStyle: !!r.wrongStyle };
     }
     return {
       open: so.open, gender: domGender(), cards: cards, cache: cache,
       lockPresent: row ? !!row.querySelector('.char-body-lock') : false,
-      queued: so.queue.length, busy: so.busy
+      queued: core.startQueue.length, busy: core.building,
+      live: true, contexts: core.renderer ? 1 : 0
     };
   };
 })();
 /* __espilCustStyleOptions END */
+
+/* __espilGuestLive v1 - LIVE 3D style views on the LANDING
+   guest step (Han 2026-11-20, same directive as the v2 block
+   above). The landing guest step is the canonical guest
+   character selection: entry-flow offers name + Male/Female
+   + Style 1-4 there, and the Step-1 record (this line,
+   production bytes, 2026-11-20) proved the step carried NO
+   imagery at all - text buttons only - and that the gate
+   panel (with its samples) is never presented on the
+   canonical path, so the canonical guest picked blind.
+
+   Shape: PRESENTATION ONLY, a follower of the step's DOM.
+   Each #guest-style-N button gains a live view of that style
+   for the gender the step currently has picked (read from
+   the gender buttons' aria-pressed state - entry-flow owns
+   the pick; this block reads it and never writes it). The
+   views are driven by the shared live core above
+   (window.__espilLiveViews): ONE WebGL context serves the
+   gate cards and these buttons together, entries are shared
+   per (gender, body), and the idle animation advances in
+   every view. The loop runs only while #auth-gueststep is
+   visible. Name / gender / style behaviour, guestGo and the
+   espil_character record it writes are untouched;
+   entry-flow.js and index.html are not modified.
+
+   Layout note (measured on this build's first run): the
+   step's buttons carry pair.css's .city-name form -
+   display:flex row, height:40px - so a holder placed inside
+   is compressed into the 40 px row (the first build's views
+   measured ~22 px tall beside the label). This block's
+   style therefore turns ONLY the four style buttons into a
+   column layout with an explicit holder height; the gender
+   buttons keep the 40 px row form, and no other .city-name
+   surface is touched (the rules are scoped to
+   #auth-gueststep and the style buttons' own ids).
+   Test hook: window.__espilGuestLiveState(). */
+(function () {
+  'use strict';
+  if (window.__espilGuestLive) return;
+  window.__espilGuestLive = true;
+
+  var gl = { views: [], active: false, gender: 'male', raf: 0, lastTs: 0, pollTimer: 0, booted: false };
+
+  function stepEl() { return document.getElementById('auth-gueststep'); }
+  function stepVisible() {
+    var s = stepEl();
+    return !!(s && !s.hidden && s.offsetParent !== null);
+  }
+  function pickedGender() {
+    var f = document.getElementById('guest-char-female');
+    return (f && f.getAttribute('aria-pressed') === 'true') ? 'female' : 'male';
+  }
+  function ensureStyle() {
+    if (document.getElementById('espil-guest-live-style')) return;
+    var st = document.createElement('style');
+    st.id = 'espil-guest-live-style';
+    st.textContent =
+      '#auth-gueststep #guest-style-1,#auth-gueststep #guest-style-2,#auth-gueststep #guest-style-3,#auth-gueststep #guest-style-4' +
+      '{flex-direction:column;height:auto;padding:8px 4px 7px;gap:3px;white-space:normal}' +
+      '#auth-gueststep .elp-live{display:block;width:100%;max-width:76px;height:88px;flex:none;' +
+      'margin:0 auto;border-radius:8px;background-color:rgba(255,250,235,.55);overflow:hidden;' +
+      'box-shadow:inset 0 0 0 1px rgba(207,169,111,.45)}' +
+      '#auth-gueststep .elp-live[data-glive-status="live"]{background-color:transparent;box-shadow:none}' +
+      '#auth-gueststep .elp-live canvas{display:block;width:100%;height:100%;pointer-events:none}';
+    (document.head || document.documentElement).appendChild(st);
+  }
+  function buildViews() {
+    ensureStyle();
+    gl.views = [];
+    for (var n = 1; n <= 4; n++) {
+      var btn = document.getElementById('guest-style-' + n);
+      if (!btn) return false;
+      var holder = btn.querySelector('.elp-live');
+      if (!holder) {
+        holder = document.createElement('div');
+        holder.className = 'elp-live';
+        btn.insertBefore(holder, btn.firstChild);
+      }
+      var canvas = holder.querySelector('canvas');
+      if (!canvas) {
+        canvas = document.createElement('canvas');
+        canvas.width = 144; canvas.height = 168;
+        holder.appendChild(canvas);
+      }
+      gl.views.push({ el: btn, holder: holder, canvas: canvas, ctx: canvas.getContext('2d'),
+                      gender: gl.gender, body: 'style' + n, frames: 0 });
+    }
+    return true;
+  }
+  function refresh() {
+    if (!window.__espilLiveViews) return;
+    var g = pickedGender();
+    if (g !== gl.gender) {
+      gl.gender = g;
+      for (var i = 0; i < gl.views.length; i++) gl.views[i].gender = g;
+    }
+    for (var j = 0; j < gl.views.length; j++) {
+      var view = gl.views[j];
+      var rec = window.__espilLiveViews.entryRec(view.gender, view.body);
+      var status = rec ? rec.status : 'queued';
+      if (view.holder.getAttribute('data-glive-status') !== status) view.holder.setAttribute('data-glive-status', status);
+      if (!rec || rec.status === 'failed') window.__espilLiveViews.want(view.gender, view.body);
+      else if (rec.status === 'loading') window.__espilLiveViews.tryPromote(rec);
+    }
+  }
+  function tick(ts) {
+    if (!gl.active) { gl.raf = 0; return; }
+    gl.raf = requestAnimationFrame(tick);
+    var dt = Math.min(0.05, gl.lastTs ? (ts - gl.lastTs) / 1000 : 0.016);
+    gl.lastTs = ts;
+    if (!window.__espilLiveViews) return;
+    var fid = window.__espilLiveViews.newFrame();
+    for (var i = 0; i < gl.views.length; i++) window.__espilLiveViews.renderView(gl.views[i], dt, fid);
+  }
+  function setActive(on) {
+    if (on === gl.active) return;
+    gl.active = on;
+    if (on) {
+      if (!gl.views.length && !buildViews()) return;
+      refresh();
+      gl.lastTs = 0;
+      if (!gl.raf) gl.raf = requestAnimationFrame(tick);
+    } else {
+      if (gl.raf) cancelAnimationFrame(gl.raf);
+      gl.raf = 0;
+    }
+  }
+  function boot() {
+    var step = stepEl();
+    if (!step || !document.getElementById('guest-style-1')) { setTimeout(boot, 600); return; }
+    gl.booted = true;
+    if (gl.pollTimer) clearInterval(gl.pollTimer);
+    gl.pollTimer = setInterval(function () {
+      var vis = stepVisible();
+      setActive(vis);
+      if (vis) refresh();
+    }, 500);
+    setActive(stepVisible());
+    if (gl.active) refresh();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+
+  window.__espilGuestLiveState = function () {
+    var views = [];
+    for (var i = 0; i < gl.views.length; i++) {
+      var view = gl.views[i];
+      var rec = window.__espilLiveViews ? window.__espilLiveViews.entryRec(view.gender, view.body) : null;
+      views.push({ style: view.body, gender: view.gender,
+                   status: rec ? rec.status : 'queued', frames: view.frames });
+    }
+    return { booted: gl.booted, active: gl.active, visible: stepVisible(),
+             gender: gl.gender, views: views,
+             contexts: (window.__espilLiveViews && window.__espilLiveViews.stageReady()) ? 1 : 0 };
+  };
+})();
+/* __espilGuestLive END */
