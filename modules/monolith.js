@@ -3210,8 +3210,14 @@
        'when I zoom out the character grows with it - hold the
        character size'). With F constant the character keeps ONE world
        size at every zoom and its screen size scales with the map,
-       like every other object in the world. */
-    var ESPIL_AVATAR_F=4.67*Math.pow(2,-0.5);
+       like every other object in the world.
+       HALVED (Han 2026-11-20): the web character is halved - the
+       exponent steps one further power of two, 4.67 x 2^(-1.5) =
+       1.6511, exactly half of the frozen 3.3022. Every consumer
+       reads this constant or the published window.__espilAvatarScaleF,
+       so the halving propagates from this one definition; physics,
+       collision and support keep the true body as before. */
+    var ESPIL_AVATAR_F=4.67*Math.pow(2,-1.5);
     var espilP1={map:null,ready:false,failed:null,hiddenApplied:false,initTried:false,bannerEl:null,mapEl:null,layerAdded:false,layerLive:false,layerRenderer:null,layerCam:null,gameCanvasHidden:false,layerSignaled:false,zoom:null,zoomT:null,zoomDrive:false,style3dOff:false,style3dTries:0};
     /* ARENA PLACE (Han 2026-11-18): the follow framing's default
        zoom target, as a variable instead of the 19.95 literal
