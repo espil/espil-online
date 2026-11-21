@@ -52,7 +52,7 @@
     '@media (pointer:fine){' +
       '#quickbar{display:flex;align-items:flex-end;gap:12px;left:50%;right:auto;' +
         'transform:translateX(-50%) scale(.8);transform-origin:bottom center;' +
-        'bottom:0;margin-bottom:0;' +
+        'bottom:var(--espil-attrib-h,0px);margin-bottom:0;' +
         'background:transparent;border:none;box-shadow:none;' +
         'backdrop-filter:none;-webkit-backdrop-filter:none;padding:0 4px}' +
       /* the centre panel is transparent: the log SVG is its skin */
@@ -703,6 +703,14 @@
   if (window.__espilHud2) return;
   window.__espilHud2 = true;
 
+  /* ATTRIBUTION RAISE (Han 2026-11-20): while the Google tiles
+     attribution chip is on screen, tiles3d-core publishes
+     --espil-attrib-h (chip height + gap) on :root and every
+     bottom-anchored family below (bars, actions, portrait chat
+     button, joystick - and the fine-pointer quickbar in the
+     first IIFE) lifts by that var, so the attribution zone
+     never meets the UI. Tiles off -> the var is 0 and every
+     offset rests exactly as shipped. */
   var css =
     '#espil-hud2-coin,#espil-hud2-score,#espil-hud2-timefps,#espil-hud2-menu,' +
     '#espil-hud2-bars,#espil-hud2-actions,#espil-hud2-chars,#espil-hud2-chat,#espil-hud2-chat-tab{display:none}' +
@@ -716,7 +724,7 @@
       '#map-attack,#map-jump,#map-interact{display:none!important}' +
       /* joystick: the pair's own stick, moved bottom-left, kept LARGE
          (a drag surface, not a button) */
-      'body.in-map .joystick{left:12px!important;right:auto!important;bottom:12px!important;' +
+      'body.in-map .joystick{left:12px!important;right:auto!important;bottom:calc(12px + var(--espil-attrib-h,0px))!important;' +
         'width:148px!important;height:148px!important;opacity:.5!important;z-index:34;' +
         'background:radial-gradient(circle,rgba(8,12,16,.16),rgba(8,12,16,.42));' +
         'border:2px solid rgba(255,255,255,.28);box-shadow:0 4px 18px rgba(0,0,0,.3)}' +
@@ -804,8 +812,8 @@
         'width:118px!important;height:118px!important;border-radius:12px!important;transform:none}' +
       'body.in-map #espil-hud2-timefps{top:132px;right:10px;width:118px}' +
       'body.in-map #espil-hud2-menu{left:50%;transform:translateX(-50%);top:46px;flex-direction:row}' +
-      'body.in-map #espil-hud2-bars{left:50%;transform:translateX(-50%);bottom:14px;width:min(210px,32vw)}' +
-      'body.in-map #espil-hud2-actions{right:8px;bottom:8px;width:236px;height:132px}' +
+      'body.in-map #espil-hud2-bars{left:50%;transform:translateX(-50%);bottom:calc(14px + var(--espil-attrib-h,0px));width:min(210px,32vw)}' +
+      'body.in-map #espil-hud2-actions{right:8px;bottom:calc(8px + var(--espil-attrib-h,0px));width:236px;height:132px}' +
       'body.in-map #espil-hud2-chars{display:none!important}' +
       /* chat toggle (Han 2026-11-17): landscape gains the chat
          open/close button too - the coin column ends ~59px down
@@ -820,7 +828,7 @@
     '}' +
     /* ---- PORTRAIT arrangement (reference 2) ---- */
     '@media (pointer:coarse) and (orientation:portrait){' +
-      'body.in-map .joystick{width:118px!important;height:118px!important;left:14px!important;bottom:56px!important;opacity:.22!important}' +
+      'body.in-map .joystick{width:118px!important;height:118px!important;left:14px!important;bottom:calc(56px + var(--espil-attrib-h,0px))!important;opacity:.22!important}' +
       'body.in-map .joystick.joy-live{opacity:.55!important}' +
       'body.in-map #minimap-wrap[data-stage="1"]{top:10px!important;left:10px!important;right:auto!important;' +
         'width:92px!important;height:92px!important;border-radius:50%!important;transform:none}' +
@@ -831,9 +839,9 @@
       'body.in-map #espil-hud2-menu{top:10px;right:10px;flex-direction:row}' +
       'body.in-map #espil-hud2-score{top:66px;left:110px;transform:none;width:250px;height:22px;padding:0 16px;font-size:10px}' +
       'body.in-map #espil-hud2-chars{display:flex;position:fixed;z-index:36;right:8px;top:32%;width:94px;flex-direction:column;gap:5px}' +
-      'body.in-map #espil-hud2-bars{left:50%;transform:translateX(-50%);bottom:12px;width:172px}' +
-      'body.in-map #espil-hud2-actions{right:6px;bottom:64px;width:238px;height:132px}' +
-      'body.in-map #espil-hud2-chat{display:flex;position:fixed;z-index:36;left:8px;bottom:6px;width:44px;height:44px;font-size:19px}' +
+      'body.in-map #espil-hud2-bars{left:50%;transform:translateX(-50%);bottom:calc(12px + var(--espil-attrib-h,0px));width:172px}' +
+      'body.in-map #espil-hud2-actions{right:6px;bottom:calc(64px + var(--espil-attrib-h,0px));width:238px;height:132px}' +
+      'body.in-map #espil-hud2-chat{display:flex;position:fixed;z-index:36;left:8px;bottom:calc(6px + var(--espil-attrib-h,0px));width:44px;height:44px;font-size:19px}' +
       /* __espilChatSwipe v1: the restore tab rests at the chat
          zone's top edge (zone top 200 + 12) while it is hidden. */
       '#espil-hud2-chat-tab{top:212px}' +

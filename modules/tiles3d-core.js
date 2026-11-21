@@ -69,6 +69,20 @@
    while this core runs (off/denied sessions carry no wrap). Read it
    via __espilTilesState().core.streamedBytes.
    Attribution: shown only while tiles are on (licence boundary).
+   ATTRIBUTION CHIP (Han 2026-11-20, terms-checked form): the
+   full-width white strip is replaced by a small chip at the
+   bottom-left - the "Google Maps" branding text (the Policies'
+   space-limited text form) plus a "Data sources" affordance;
+   click/hover expands the FULL aggregated provider text,
+   verbatim and untruncated, in a panel inside the map window
+   (the Policies' named alternative when full display is
+   difficult). Our own "Data: " label prefix is dropped (it was
+   never Google-provided text); the aggregated strings pass
+   through byte-identical. While the chip is on screen the core
+   publishes --espil-attrib-h (chip height + gap) on :root and
+   mmo-hud lifts its bottom HUD families by that var, so the
+   attribution zone never meets the UI; tiles off -> var 0 and
+   the HUD rests exactly as shipped.
    BASE-MAP TOGGLE (Han 2026-11-19): while the tiles are LIVE in
    this session (tileset loaded + gate on), the Mapbox base is
    turned OFF so the Google photorealistic mesh is the visible
@@ -461,10 +475,38 @@ function restoreBase() {
   }
 }
 
-var attribEl = null;
+var attribEl = null;       /* container: fixed, bottom-left */
+var attribChipEl = null;   /* the collapsed chip row */
+var attribPanelEl = null;  /* the expanded full-text panel */
+var attribText = '';       /* aggregated provider strings, verbatim */
+var attribExpanded = false;
+var attribPinned = false;  /* click-pinned open (hover-open is not) */
+var ATTRIB_RAISE_GAP = 14; /* px of air between chip top and raised HUD */
+function attribSyncChrome() {
+  /* The one shared UI-raise signal: while the chip is on screen,
+     :root carries --espil-attrib-h = chip height + gap and the
+     mmo-hud bottom families lift by it; otherwise the var is 0
+     and the HUD rests exactly as shipped. Called from every
+     lifecycle point that shows, hides or rebuilds the chip. */
+  try {
+    var h = 0;
+    if (attribEl && state.on && attribEl.style.display !== 'none') {
+      h = (attribChipEl ? attribChipEl.offsetHeight : 0) + ATTRIB_RAISE_GAP;
+      if (h <= ATTRIB_RAISE_GAP) h = 21 + ATTRIB_RAISE_GAP;
+    }
+    document.documentElement.style.setProperty('--espil-attrib-h', h + 'px');
+  } catch (e) {}
+}
+function attribSetExpanded(open, pinned) {
+  attribExpanded = !!open;
+  if (typeof pinned === 'boolean') attribPinned = pinned;
+  if (attribPanelEl) attribPanelEl.style.display = attribExpanded ? 'block' : 'none';
+  if (attribChipEl) attribChipEl.setAttribute('aria-expanded', attribExpanded ? 'true' : 'false');
+}
 function setAttributionVisible(vis) {
   if (!attribEl) return;
   attribEl.style.display = vis ? 'block' : 'none';
+  attribSyncChrome();
 }
 var attribRefreshTimer = null;
 function buildAttribution() {
@@ -472,9 +514,7 @@ function buildAttribution() {
     if (attribEl && attribEl.parentNode) attribEl.parentNode.removeChild(attribEl);
     attribEl = document.createElement('div');
     attribEl.id = 'espil-tiles-attrib';
-    attribEl.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:5;'
-      + 'background:rgba(255,255,255,.88);color:#222;font:11px/1.5 system-ui,sans-serif;'
-      + 'padding:2px 10px;pointer-events:none;'
+    attribEl.style.cssText = 'position:fixed;left:8px;bottom:6px;z-index:5;'
       + 'display:' + (state.on ? 'block' : 'none') + ';';
     var items = [];
     /* Direct-Google path: attribution is aggregated by the renderer
@@ -499,8 +539,67 @@ function buildAttribution() {
       else if (a && a.value) items.push(a.value);
       else if (a && a.html) items.push(a.html);
     }
-    attribEl.innerHTML = '<span>Data: </span>' + items.filter(Boolean).join(' ');
+    /* The provided strings pass through byte-identical (same
+       collection, same join as the strip form) - only our own
+       "Data: " label prefix is gone: it was never Google text. */
+    attribText = items.filter(Boolean).join(' ');
+    /* Expanded panel: the FULL aggregated text inside the map
+       window (the Policies' "Data sources" alternative). Capped
+       height with scroll so every character stays reachable. */
+    attribPanelEl = document.createElement('div');
+    attribPanelEl.style.cssText = 'display:' + (attribExpanded ? 'block' : 'none') + ';'
+      + 'margin:0 0 6px 0;max-width:min(520px,92vw);max-height:38vh;overflow-y:auto;'
+      + 'background:rgba(255,255,255,.94);color:#222;'
+      + 'font:11px/1.5 system-ui,sans-serif;padding:6px 10px;border-radius:8px;'
+      + 'box-shadow:0 4px 16px rgba(0,0,0,.35);word-break:break-word;';
+    attribPanelEl.textContent = attribText;
+    attribEl.appendChild(attribPanelEl);
+    /* Chip row: the "Google Maps" branding text (Policies:
+       text form where space is limited) + the Data sources
+       affordance. Bottom-left is the one corner no HUD family
+       rests in once the raise below lifts the bottom band. */
+    attribChipEl = document.createElement('div');
+    attribChipEl.setAttribute('role', 'button');
+    attribChipEl.setAttribute('tabindex', '0');
+    attribChipEl.setAttribute('aria-expanded', attribExpanded ? 'true' : 'false');
+    attribChipEl.setAttribute('aria-label', 'Google Maps - data sources');
+    attribChipEl.style.cssText = 'display:inline-flex;align-items:center;gap:7px;'
+      + 'background:rgba(255,255,255,.88);color:#222;'
+      + 'font:11px/1.5 system-ui,sans-serif;padding:2px 10px;border-radius:999px;'
+      + 'box-shadow:0 2px 8px rgba(0,0,0,.25);cursor:pointer;user-select:none;'
+      + '-webkit-user-select:none;white-space:nowrap;';
+    var brandEl = document.createElement('span');
+    brandEl.textContent = 'Google Maps';
+    brandEl.style.cssText = 'font-weight:600;';
+    var affordEl = document.createElement('span');
+    affordEl.textContent = 'Data sources';
+    affordEl.style.cssText = 'text-decoration:underline;opacity:.85;';
+    attribChipEl.appendChild(brandEl);
+    attribChipEl.appendChild(affordEl);
+    attribChipEl.addEventListener('click', function () {
+      var open = !attribExpanded;
+      attribSetExpanded(open, open);
+    });
+    attribChipEl.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        var open = !attribExpanded;
+        attribSetExpanded(open, open);
+      }
+    });
+    attribEl.addEventListener('mouseenter', function () {
+      /* hover-open is a desktop affordance only: on coarse
+         pointers a tap synthesises mouseenter before the click,
+         which would open-then-close in one tap. */
+      if (!window.matchMedia || !matchMedia('(pointer:fine)').matches) return;
+      if (!attribExpanded) attribSetExpanded(true, false);
+    });
+    attribEl.addEventListener('mouseleave', function () {
+      if (attribExpanded && !attribPinned) attribSetExpanded(false, false);
+    });
+    attribEl.appendChild(attribChipEl);
     document.body.appendChild(attribEl);
+    attribSyncChrome();
   } catch (e) {}
 }
 function scheduleAttributionRefresh() {
