@@ -1265,7 +1265,7 @@
     }
     var walkPlayer=null,walkColliders=[];
     var walkKeys={};
-    var walkCamYaw=0,walkCamPitch=.84,walkCamDist=7.0; /* Cauldron style: 48° pitch; default follow distance 7.0 m (Han 2026-11-10: zoom out a little from the 6.2 m default landed 2026-11-09 - same working step he took then, landing at 7.0 m; the 6.2 m, 5.5 m, 2.95 m and 14 m defaults before it are all superseded) */
+    var walkCamYaw=0,walkCamPitch=.84,walkCamDist=5.5; /* Cauldron style: 48° pitch; default follow distance 5.5 m (Han 2026-11-23 tuning verdict - screen too far: back to his 2026-11-09 proportion default; the 7.0 m zoom-out of 2026-11-10, and the 6.2 m, 2.95 m and 14 m defaults before it, are all superseded) */
     /* QA #15 (2026-10-06): sprint is a Ctrl toggle, not hold-Shift. */
     var sprintOn=false;
     function updateSprintUI(){
@@ -2204,7 +2204,7 @@
       p.pos.y=base;
       p.velY=0; p.onGround=true; p.jumps=0;
       p._espilArrive={surf:base,probeAt:0,startedAt:performance.now(),dur:1900};
-      walkCamDist=60; /* wide sky framing; the step eases it to 7.0 */
+      walkCamDist=60; /* wide sky framing; the step eases it to 5.5 */
       if(typeof espilP1!=='undefined'&&espilP1)espilP1.zoomDrive=false; /* the arrival envelope leads the map zoom for this entry */
     }
     function espilArrivalStep(p,dt){
@@ -2217,18 +2217,18 @@
             if(typeof walkAvatar!=='undefined'&&walkAvatar&&walkAvatar.playLand)walkAvatar.playLand(); }
         }
         var td=Math.max(0,Math.min(1,(nowD-a.startedAt)/a.dur));
-        var fd=1-td; walkCamDist=7.0+53.0*fd*fd;
-        if(td>=1){ p._espilArrive=null; walkCamDist=7.0; }
+        var fd=1-td; walkCamDist=5.5+54.5*fd*fd;
+        if(td>=1){ p._espilArrive=null; walkCamDist=5.5; }
         return;
       }
       var now=performance.now();
       if(now-a.probeAt>150){ a.probeAt=now; var y=espilTileBase(p.pos.x,p.pos.z); if(y===null)y=espilOwnSurfaceY(p.pos.x,p.pos.z); if(y!==null&&y!==undefined)a.surf=y; }
       if(a.surf!==null&&a.surf!==undefined){ p.pos.y=a.surf; p.onGround=true; }
       var t=Math.max(0,Math.min(1,(now-a.startedAt)/a.dur));
-      var f=1-t; walkCamDist=7.0+53.0*f*f;
+      var f=1-t; walkCamDist=5.5+54.5*f*f;
       if(t>=1){
         p._espilArrive=null;
-        walkCamDist=7.0;
+        walkCamDist=5.5;
         espilUiRise();
         /* GUIDE HOOKS (joint guide project, 2026-10-21): the guide
            layer watches ACTIONS, not clicks, so the build reports the
@@ -3147,7 +3147,7 @@
          movement speed (moveSpeeds().run - the one run mode), lateral
          at the draft's 0.6 ratio, slide capped at the same speed. This
          supersedes the 2026-10-16 option-3 value of 1.0 m/s. */
-      var spd=(typeof moveSpeeds==='function')?moveSpeeds().run:21.6;
+      var spd=(typeof moveSpeeds==='function')?moveSpeeds().run:8;
       if(keyUp)cl.h+=spd*dt; else if(keyDown)cl.h-=spd*dt;
       /* Screen-right mapped onto the wall: the tangent is the
          character's right hand while facing into the wall. */
@@ -3220,12 +3220,14 @@
     var ESPIL_AVATAR_F=4.67*Math.pow(2,-1.5);
     var espilP1={map:null,ready:false,failed:null,hiddenApplied:false,initTried:false,bannerEl:null,mapEl:null,layerAdded:false,layerLive:false,layerRenderer:null,layerCam:null,gameCanvasHidden:false,layerSignaled:false,zoom:null,zoomT:null,zoomDrive:false,style3dOff:false,style3dTries:0};
     /* ARENA PLACE (Han 2026-11-18): the follow framing's default
-       zoom target, as a variable instead of the 19.95 literal
-       (19.95 = ZoomFromDist(7.0), the street default). The arena
+       zoom target, as a variable instead of the 20.39 literal
+       (20.39 = ZoomFromDist(5.5), the street default since the
+       2026-11-23 tuning verdict; 19.95 = ZoomFromDist(7.0) before
+       it). The arena
        place-space child raises its own document's default to the
        9.5 m draft through __espilSetFollowDist below; the street
-       window never calls it and keeps 19.95 exactly. */
-    var espilFollowZoomT=19.95;
+       window never calls it and keeps 20.39 exactly. */
+    var espilFollowZoomT=20.39;
     espilP1.envReady=false;
     (window.__ESPIL_ENV_READY__||Promise.resolve()).then(function(){espilP1.envReady=true;},function(){espilP1.envReady=true;});
     function espilP1Token(){
@@ -3263,7 +3265,14 @@
        Retied again 2026-11-10 (Han: 줌레벨 좀 줌아웃해): the P1
        default zoom is now 19.95 = ZoomFromDist(7.0), and
        DistFromZoom(19.95) = 7.01 - the identity holds at the new
-       7.0 m overlay default, again unsaturated at both ends. */
+       7.0 m overlay default, again unsaturated at both ends.
+       Retied again 2026-11-23 (Han tuning verdict: movement too
+       fast, animation too fast, screen too far): the P1 default
+       zoom is now 20.39 = ZoomFromDist(5.5), and
+       DistFromZoom(20.39) = 5.5 - the identity holds at the 5.5 m
+       overlay default, again unsaturated at both ends. The curve
+       itself (intercept, slope, floors) is unchanged; the walk
+       bases fall to 5.0 / 8.0 in the same batch (moveSpeeds). */
     function espilP1ZoomFromDist(d){ return Math.max(14.5,Math.min(23,23.44-1.242*Math.log2(Math.max(2,d)))); }
     function espilP1DistFromZoom(z){ return Math.max(2,Math.min(60,Math.pow(2,(23.44-z)/1.242))); }
     function espilP1LngLat(x,z){
@@ -3403,7 +3412,7 @@
       var px=espilPaintAnchor.x, pz=espilPaintAnchor.y;
       var py=(typeof walkPlayer!=='undefined'&&walkPlayer)?walkPlayer.pos.y:0;
       var scanned=0, changed=0, lodFlat=0;
-      var zm=(typeof espilP1!=='undefined'&&espilP1&&typeof espilP1.zoom==='number')?espilP1.zoom:19.95;
+      var zm=(typeof espilP1!=='undefined'&&espilP1&&typeof espilP1.zoom==='number')?espilP1.zoom:20.39;
       for(var i=0;i<feats.length;i++){
         var m=meta[i];
         var bx=px<m.mnx?m.mnx-px:(px>m.mxx?px-m.mxx:0), bz=pz<m.mnz?m.mnz-pz:(pz>m.mxz?pz-m.mxz:0);
@@ -3441,7 +3450,7 @@
     function espilP1PaintUpdate(){
       if(!espilP1.buildingsAdded||!espilP1BldCache||!espilP1.map)return;
       var now=performance.now();
-      var zm=(typeof espilP1.zoom==='number')?espilP1.zoom:19.95;
+      var zm=(typeof espilP1.zoom==='number')?espilP1.zoom:20.39;
       if(espilP1PaintLast){
         var dx=espilPaintAnchor.x-espilP1PaintLast.x, dz=espilPaintAnchor.y-espilP1PaintLast.z;
         if(dx*dx+dz*dz<9&&Math.abs(zm-espilP1PaintLast.zm)<0.05)return; /* anchor still (3 m gate) and zoom steady */
@@ -3889,7 +3898,7 @@
            both surfaces stay scale-locked. During descent the descent
            envelope leads the zoom (and the target tracks it), unless
            the player has taken the zoom over with the wheel. */
-        if(espilP1.zoom===null){ espilP1.zoom=19.95; espilP1.zoomT=19.95; } /* default framing: 19.3 until 2026-11-08 (Han PC QA 2026-10-18), 21.5 during the 2026-11-08 close framing; Han 2026-11-09 corrected the proportion (MapleStory-like: character ~0.30 of viewport height, never screen-filling) at 20.39 = 5.5 m, then asked for a small step farther the same evening - 20.17 via the bridge = 6.2 m; Han 2026-11-10 asked to zoom out a little again - 19.95 via the bridge = the same 7.0 m physical distance as the overlay default */
+        if(espilP1.zoom===null){ espilP1.zoom=20.39; espilP1.zoomT=20.39; } /* default framing: 19.3 until 2026-11-08 (Han PC QA 2026-10-18), 21.5 during the 2026-11-08 close framing; Han 2026-11-09 corrected the proportion (MapleStory-like: character ~0.30 of viewport height, never screen-filling) at 20.39 = 5.5 m, then asked for a small step farther the same evening - 20.17 via the bridge = 6.2 m; Han 2026-11-10 asked to zoom out a little again - 19.95 via the bridge = the same 7.0 m physical distance as the overlay default; Han 2026-11-23 returns the default to 20.39 = 5.5 m (tuning verdict: screen too far) */
         var kbFpv=(typeof espilKbFpvActive==='function')&&espilKbFpvActive();
         if(kbFpv){
           /* KONBINIYA FPV (P1 path): while the Konbiniya FPV is
@@ -3906,7 +3915,7 @@
         }else if(walkPlayer._espilArrive&&!espilP1.zoomDrive){
           espilP1.zoom=espilP1.zoomT=espilP1ZoomFromDist(walkCamDist);
         }else{
-          if(!espilP1.zoomDrive)espilP1.zoomT=espilFollowZoomT; /* until the player takes the wheel, the target is the default framing (espilFollowZoomT: 19.95 street, raised only inside an arena place child) */
+          if(!espilP1.zoomDrive)espilP1.zoomT=espilFollowZoomT; /* until the player takes the wheel, the target is the default framing (espilFollowZoomT: 20.39 street, raised only inside an arena place child) */
           espilP1.zoom+=(espilP1.zoomT-espilP1.zoom)*0.2;
           if(Math.abs(espilP1.zoomT-espilP1.zoom)<0.001)espilP1.zoom=espilP1.zoomT;
           walkCamDist=espilP1DistFromZoom(espilP1.zoom);
@@ -6135,7 +6144,7 @@
       }
       walkPlayer.velY=0;walkPlayer.onGround=true;
       walkPlayer.jumps=0;walkPlayer.faceY=.5;walkPlayer.bobT=0;
-      walkCamPitch=.84;walkCamDist=7.0; /* Cauldron 48°; distance = the 2026-11-10 zoom-out default (7.0 m; 6.2 m before) */
+      walkCamPitch=.84;walkCamDist=5.5; /* Cauldron 48°; distance = the 2026-11-23 tuning default (5.5 m; 7.0 m before, 6.2 m before that) */
       walkPlayer.av.group.position.copy(walkPlayer.pos);
       walkPlayer.av.group.rotation.y=.5;
       /* Snap the follow camera behind the player on entry. */
@@ -6148,7 +6157,7 @@
       /* ZOOM-FPV (Han 2026-11-17): entry folds the zoom-FPV state
          flat with the camera reset - a dive always starts from the
          third-person default framing, exactly as zoom itself
-         resets to 7.0 here; nothing about the state is persisted. */
+         resets to 5.5 here; nothing about the state is persisted. */
       if(typeof espilZoomFpv!=='undefined'&&espilZoomFpv)espilZoomFpvFold();
     }
     function enterWalkMap(){
@@ -6716,9 +6725,20 @@
     function moveSpeeds(){
       var a=skillState.alloc;
       var sw=espilTreeAlloc('s_swift'), st2=espilTreeAlloc('s_stride'), lp=espilTreeAlloc('s_leap');
+      /* TUNING (Han 2026-11-23: movement too fast, animation too
+         fast, screen too far): the street bases fall from walk
+         13.5 / run 21.6 to walk 5.0 / run 8.0 - the 1.6 run/walk
+         ratio is preserved exactly, and the stride sync divides
+         the locomotion timeScale by the same 2.7x, so the legs
+         slow WITH the body. ESPIL_ANIM_SPEED_F itself is NOT
+         deepened: it is the foot-ground deviation Han set on
+         2026-11-16, and cutting it further would add slide, not
+         calm. Swim keeps 4 - it already sat inside the tuned band
+         and its clip is not stride-synced. The skill multipliers
+         below ride the bases unchanged. */
       var r={
-        walk:13.5*(1+.015*(a['m_walk']||0))*(1+.015*sw),
-        run:21.6*(1+.02*(a['m_run']||0))*(1+.015*sw+.03*st2),
+        walk:5*(1+.015*(a['m_walk']||0))*(1+.015*sw),
+        run:8*(1+.02*(a['m_run']||0))*(1+.015*sw+.03*st2),
         swim:4,
         jumpV:9*(1+.01*(a['m_jump']||0))*(1+.015*lp),
         djumpV:9*(1+.02*(a['m_djump']||0))*(1+.015*lp)
@@ -8534,7 +8554,7 @@
        per-frame pin holds until the player takes the wheel). The
        arena place-space child calls it once with its 9.5 m draft
        after the summon; nothing on the street calls it, so the
-       street default (7.0 m / zoom 19.95) is untouched. The
+       street default (5.5 m / zoom 20.39) is untouched. The
        player's own wheel zoom overrides the default from the
        first notch, exactly as on the street. */
     window.__espilSetFollowDist=function(d){
@@ -13047,14 +13067,15 @@
       /* ZOOM OPERATION (Han 2026-10-17): in Mapbox mode the wheel and
          pinch move the MAP ZOOM target directly, in zoom units (range
          16 to 23 (Mapbox default max was 22, Han 2026-10-17; top raised
-         2026-11-08; the 19.95 default since the 2026-11-10 zoom-out
-         (20.17 at 6.2 m before it, 20.39 earlier on 2026-11-09) sits mid-range,
+         2026-11-08; the 20.39 default since the 2026-11-23 tuning
+         verdict (19.95 from the 2026-11-10 zoom-out before it,
+         20.17 at 6.2 m before that) sits mid-range,
          clear of both clamp edges), 0.28
          per wheel notch) - not a camera distance
          translated through a curve. Outside Mapbox mode the legacy
          distance behaviour is unchanged. */
       if(ESPIL_P1&&typeof espilP1!=='undefined'&&espilP1&&espilP1.map&&espilP1.ready&&!espilP1.failed){
-        if(espilP1.zoomT===null)espilP1.zoomT=19.95;
+        if(espilP1.zoomT===null)espilP1.zoomT=20.39;
         /* ZOOM-FPV push (Han 2026-11-17): the part of a zoom-in
            input the 23 cap absorbs is banked as push (in notch
            units - overshoot zoom / 0.28); a zoom-out input bleeds
@@ -13085,7 +13106,7 @@
         else if(d>0&&(espilZoomFpv.on||espilZoomFpv.push>0)){ espilZoomFpv.push-=d; }
         espilZoomFpv.push=Math.max(-2,Math.min(2,espilZoomFpv.push));
       }
-      walkCamDist=Math.max(_wdFloor,Math.min(16,_wdWanted)); /* floor 1.8 (was 3) since 2026-11-08 so the default (7.0 since the 2026-11-10 zoom-out) sits inside the wheel range; the inside-store 0.4 floor is unchanged */
+      walkCamDist=Math.max(_wdFloor,Math.min(16,_wdWanted)); /* floor 1.8 (was 3) since 2026-11-08 so the default (5.5 since the 2026-11-23 tuning verdict; 7.0 from the 2026-11-10 zoom-out before it) sits inside the wheel range; the inside-store 0.4 floor is unchanged */
     }
     /* Keyboard: tracked only while the map is open (globe keeps its own bindings). */
     document.addEventListener('keydown',function(e){

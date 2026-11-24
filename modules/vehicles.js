@@ -15,7 +15,9 @@
      deviation is recorded in the build report).
    • The one v1 car: 씨엘로 (Cielo) - Leo 3,000 (LOCKED, design
      section 1), top speed 54 m/s (LOCKED, design section 2 -
-     2.5x the 21.6 m/s run). The display name is NEVER "Civic"
+     6.75x the 8 m/s run since the 2026-11-23 tuning - the
+     ratio moved with the run base; the 54 m/s is unchanged).
+     The display name is NEVER "Civic"
      (Han's naming rule). The model is Kenney Car Kit 3.1's
      generic sedan, CC0 (assets/vehicles/sedan.glb + LICENSE.txt
      in-tree, the KayKit placeholder precedent).
@@ -222,7 +224,7 @@
   var speed = 0;                 /* the car's own speed state, m/s */
   var heading = rec.parked ? (rec.parked.face || 0) : 0;  /* angle; vector = (sin h, cos h) */
   var boost = null;              /* current __espilSpeedBoost value while driving */
-  var boostCorr = 1;             /* feedback correction factor on (speed / 21.6) */
+  var boostCorr = 1;             /* feedback correction factor on (speed / 8) */
   var stallTime = 0;             /* game-seconds of input-held-but-body-stopped */
   var priorBoost;                /* the boost value found at board time, restored at alight */
   var boostOwned = false;
@@ -797,8 +799,11 @@
     }
     if (speed > 0) {
       /* the lever is DERIVED from the speed state every tick
-         (boost = speed / 21.6, the run the design's 2.5x is
-         taken on); a slow multiplicative correction trims it
+         (boost = speed / 8, the run the lever is taken
+         on - TUNING 2026-11-23: the run base fell 21.6 -> 8, so
+         the divisor and the old 3.4 clamp scale by the same 2.7x
+         (clamp now 9.18) and the car's absolute speed at every
+         speed state is exactly what it was); a slow multiplicative correction trims it
          against the measured body speed so tree-boosted run
          speeds cannot push the car past its cap. An earlier
          shape seeded the lever once and gated the correction
@@ -809,7 +814,7 @@
       if (measured > 2 && speed > 3) {
         boostCorr = Math.max(0.45, Math.min(2.2, boostCorr * Math.max(0.92, Math.min(1.08, speed / measured))));
       }
-      boost = Math.max(0, Math.min(3.4, (speed / 21.6) * boostCorr));
+      boost = Math.max(0, Math.min(9.18, (speed / 8) * boostCorr));
       setBoost(boost);
     } else {
       /* the lever stays owned for the whole drive (restored at
