@@ -40,11 +40,24 @@
 
   var DECISION_BUDGET_MS = 10000;
   var DECISION_RETRY_DELAY_MS = 3000; /* one retry, timeouts only */
+  /* STREET GATE (Han's terrain decision, 2026-11-23): the street /
+     world view's base terrain is Mapbox. Google Earth terrain now
+     serves ONLY as arena/dungeon background excerpts (a separate
+     surface that does not load through this street entry), so street
+     entry never starts the tiles layer. The gate sits in decide()
+     BEFORE the session fetch - the endpoint increments its meter
+     first, so blocking after the fetch would still consume one count
+     per entry - and before the core import, so a gated entry
+     downloads 0 tile-renderer bytes. The tiles code below stays
+     intact behind the gate; reopening street tiles is flipping this
+     one switch. */
+  var ESPIL_STREET_TILES = false;
   var state = {
     phase: 'idle',          /* idle|deciding|off|gated|loading-core|core|error */
     decision: null,         /* 'on' | 'off' */
     reason: null,           /* monthly_root_quota | handshake_failed | timeout |
-                               not_enabled | core_load_failed | city */
+                               not_enabled | core_load_failed | city |
+                               street_mapbox */
     meter: null,            /* meter view echoed by the endpoint */
     deviceGate: null,       /* null | 'mobile' | 'save-data' | 'slow-net' */
     override: false,
@@ -115,6 +128,15 @@
     try { city = window.__espilLoadedCityKey || null; } catch (e) { city = null; }
     if (city && city !== 'vancouver') {
       state.phase = 'off'; state.decision = 'off'; state.reason = 'city';
+      return;
+    }
+    /* Street gate: see ESPIL_STREET_TILES above. Recorded with its
+       own reason so a screen check can read the decision's ground
+       (__espilTilesState().reason === 'street_mapbox'). The manual
+       override does NOT revive a street-gated entry - it only lifts
+       the device gate - matching the city gate's behaviour. */
+    if (!ESPIL_STREET_TILES) {
+      state.phase = 'off'; state.decision = 'off'; state.reason = 'street_mapbox';
       return;
     }
     state.phase = 'deciding';
