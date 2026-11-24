@@ -177,10 +177,22 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
 #char-custom input[type="text"]{background:#fffdf6;border:1.5px solid #d9b380;color:#5a4020}
 #signin-div #auth-box{visibility:hidden}
 #signin-div #auth-box[data-entryflow="1"]{visibility:visible}
+#espil-intro-video{position:fixed;inset:0;z-index:4000;background:#000;display:flex;align-items:center;justify-content:center;transition:opacity .45s ease}
+#espil-intro-video.iv-hide{opacity:0;pointer-events:none}
+#espil-intro-video video{width:100%;height:100%;object-fit:contain;background:#000}
+#espil-intro-video-skip{position:absolute;right:22px;bottom:22px;padding:10px 18px;border-radius:999px;border:1px solid rgba(255,255,255,.45);background:rgba(10,14,20,.55);color:#fff;font:600 15px Manrope,sans-serif;cursor:pointer;letter-spacing:.02em}
+#espil-intro-video-skip:hover{background:rgba(30,40,55,.75)}
 </style>
 <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
+  <!-- Start intro video (Han 2026-11-24): the 10 s cauldron reveal plays over the landing, skippable; modules/intro-video.js drives it, the inline timer is the fail-open if that module never loads. -->
+  <div id="espil-intro-video" role="dialog" aria-label="Espil Online intro video">
+    <video id="espil-intro-video-el" autoplay muted playsinline preload="auto" poster="assets/intro/cauldron-reveal.jpg" src="assets/intro/cauldron-reveal.mp4"></video>
+    <button id="espil-intro-video-skip" type="button">건너뛰기</button>
+  </div>
+  <noscript><style>#espil-intro-video{display:none}</style></noscript>
+  <script>window.__espilIntroVideoTimer=setTimeout(function(){var d=document.getElementById('espil-intro-video');if(d&&!window.__espilIntroVideoBooted){d.style.opacity='0';d.style.pointerEvents='none';setTimeout(function(){if(d.parentNode)d.parentNode.removeChild(d);},500);}},9000);</script>
   <!-- Fisheye defs for the loader % (Han 2026-10-14 edit #3, from han.espil.online).
        Lives OUTSIDE #loader because the loader removes itself after loading. -->
     <!-- Loading screen (2026-10-14, Han): water-glass v4 sequence from han.espil.online. -->
@@ -800,6 +812,7 @@ tx.fillStyle=grad; ctx.fill();
   </script>
 <script type="module" src="modules/language.js"></script>
 <script type="module" src="modules/pointer-shadow.js"></script>
+<script type="module" src="modules/intro-video.js"></script>
 <script type="module" src="modules/entry-flow.js"></script>
 <script type="module" src="modules/game-ui.js"></script>
 <script type="module" src="modules/customizer.js"></script>
