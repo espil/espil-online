@@ -1,18 +1,20 @@
-/* __espilGearWindow v2 - EverPlanet-style character window + bag.
+/* __espilGearWindow v3 - EverPlanet-style character window + bag.
    Successor of __espilPanels v1 (same storage keys, purchase
    mirror, P-key ownership and window.__espilGear surface): the
    profile (P) carries 13 equipment slots around the character,
    a separate fashion (치장) layer, and the EverPlanet stat
    blocks (기본 능력치 / 주요 능력치); the inventory (I) is a
    bag with category tabs, an icon grid and an item detail pane.
-   v2 (Han, UI room 2026-11-04): the preview IS the customizer
-   character - the EP customizer's part frames (skin / lower /
-   upper / foot / face / hair / weapon, 24-frame idle) composited
-   live from ~/workspace/ui-room/gear/ep-parts (512 px webp,
-   served as assets/ep-parts/), with worn top and weapon mapped
-   onto the real garment / weapon part sets; both windows wear
-   the logwood concept (assets/tex/logwood.jpg, the same texture
-   as the HUD tray). Spec: ~/workspace/ui-room/gear/SPEC.md.
+   v2 (Han, UI room 2026-11-04): the preview was the EP
+   customizer's 2D part-frame composite. v3 (Han decision,
+   2026-11-18, option A first): the preview is the player's REAL
+   avatar - the verified gate-preview pattern transplanted (own
+   small stage, game builders for chibi / KayKit, own loaders for
+   master / Lunaris, saved-character selection, RAF only while
+   open); the stat box shows only numbers the combat code really
+   consumes. Both windows wear the logwood concept
+   (assets/tex/logwood.jpg, the same texture as the HUD tray).
+   Spec: ~/workspace/ui-room/gear/SPEC.md.
    __espilGearWindow END */
 (function () {
   'use strict';
@@ -479,144 +481,336 @@
     return '<svg viewBox="0 0 36 36" width="' + s + '" height="' + s + '" aria-hidden="true">' + b + '</svg>';
   }
 
-  /* ---------------- the customizer character (EP parts) ----------------
-     The preview composites the EP customizer's own part frames
-     (~/workspace/ui-room/gear/ep-parts, 512 px webp served as
-     assets/ep-parts/): skin (3 baked tones) -> lower -> upper ->
-     foot -> face -> hair -> weapon, 24-frame idle, EP layer
-     order. Hair / eye tinting reuses the EP page's luminance
-     remap and gates. Worn top / weapon select the real garment /
-     weapon part sets via each item's ep field; slots whose part
-     sets do not exist yet (hat, cape, gloves, accessories, pet)
-     show in their slot only, until the customizer / asset rooms
-     ship those sets. */
-  var PARTS_BASE = (typeof window.__espilGearPartsBase === 'string' && window.__espilGearPartsBase) || 'assets/ep-parts/';
-  var FRAMES = 24;
-  var HC_RGB = [[58, 42, 28], [122, 74, 43], [179, 118, 74], [227, 193, 136], [236, 236, 236], [35, 38, 43], [201, 79, 79], [74, 106, 201], [93, 168, 115]];
-  var setCache = {};
-  function loadSet(path, suffix) {
-    var key = path + '|' + (suffix || '');
-    if (setCache[key]) return setCache[key];
-    var jobs = [];
-    for (var f = 0; f < FRAMES; f++) {
-      (function (src) {
-        jobs.push(new Promise(function (res) {
-          var i = new Image();
-          i.onload = function () { res(i); };
-          i.onerror = function () { res(null); };
-          i.src = src;
-        }));
-      })(PARTS_BASE + path + '/f' + String(f).padStart(2, '0') + (suffix || '') + '.webp');
+  /* ---------------- character stage (real avatar, v3) ----------------
+     Han 2026-11-18 (option A first): the profile shows the player's
+     REAL avatar, not a 2D composite. This block transplants the
+     verified gate-preview pattern (__espilCustPreview v1, espil
+     .online room, re-verified 2026-11-18 on the Lunaris bytes):
+     a small self-contained stage (own renderer / scene / camera /
+     lights) that stands the actual body - same builders, same
+     files, same framing - and idles it while the profile is open.
+
+     Bodies:
+     - style1-4 / kaykit: built through window.__espilBuildGateAvatar
+       (monolith), sharing the game's template caches. If that
+       surface is absent (builds before the preview shipment), the
+       entry reports failed and the stage shows a plain notice -
+       never a substitute character.
+     - master: loaded by this block (male.glb / female_idle.glb),
+       exactly like the gate preview, so entry machinery is never
+       fired from a window.
+     - lunaris: designated accounts only, read from the session
+       record's server mark; loads assets/zealandia/lunaris.glb
+       with the player path's framing.
+     Selection here is the SAVED character (espil_character +
+     espil_session_v1), read-only; this block writes no state.
+
+     Grounding: master / lunaris entries are grounded twice - at
+     bind pose (bbox) and again on the posed first frame (the idle
+     action applied, mixer updated, bbox recomputed). The second
+     pass answers the re-verification flag that the female master
+     could float above the shadow disc on bind-pose grounding.
+
+     Equipment on the 3D body: the game has no weapon GLBs or bone
+     attach for these bodies yet, so nothing is faked onto the
+     model; equipment lives in the slots and the (now honest) stat
+     box, and an equip change answers with the selection turn
+     gesture. Body-level gear reflection rides the avatar track. */
+  var AV = {
+    mounted: false, open: false, raf: 0, lastTs: 0,
+    renderer: null, scene: null, camera: null, pivot: null,
+    stageEl: null, labelEl: null, msgEl: null,
+    cur: null, selKey: '', equipKey: '', cache: {}, gesture: null, pollTimer: 0
+  };
+  function avLs(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
+  function avLsJson(k) { try { var v = window.localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+  function avSelection() {
+    var rec = avLsJson('espil_character') || {};
+    var ses = avLsJson('espil_session_v1');
+    var gender = rec.gender === 'female' ? 'female' : 'male';
+    if (ses && ses.designatedBody === 'lunaris') return { gender: gender, body: 'lunaris', designated: 'lunaris' };
+    var bc = rec.bodyChoice;
+    if (/^(master|style[1-4]|kaykit)$/.test(bc || '')) return { gender: gender, body: bc, designated: null };
+    if (!ses) {
+      var mode = 'chibi';
+      try {
+        if (window.__espilGuestBodyState) mode = window.__espilGuestBodyState().mode || mode;
+        else if (window.__ESPIL_GUEST_BODY__) mode = window.__ESPIL_GUEST_BODY__;
+      } catch (e) {}
+      if (mode === 'kaykit') return { gender: gender, body: 'kaykit', designated: null };
+      if (mode === 'sprite') return { gender: gender, body: 'sprite', designated: null };
+      return { gender: gender, body: 'style1', designated: null };
     }
-    setCache[key] = Promise.all(jobs);
-    return setCache[key];
+    return { gender: gender, body: 'master', designated: null };
   }
-  function hairGate(p, i) { var lum = (p[i] + p[i + 1] + p[i + 2]) / 3; return lum >= 40; }
-  function eyeGate(p, i) {
-    var r = p[i], g = p[i + 1], b = p[i + 2], lum = (r + g + b) / 3, sat = Math.max(r, g, b) - Math.min(r, g, b);
-    return lum >= 40 && lum <= 220 && sat > 20;
+  function avSelKey(sel) { return sel.designated ? 'lunaris' : sel.gender + '|' + sel.body; }
+  function avBodyLabel(sel) {
+    if (sel.designated) return 'Lunaris · 이 계정의 지정 캐릭터입니다';
+    var g = sel.gender === 'female' ? 'Female' : 'Male';
+    var b = sel.body === 'master' ? 'Master' : sel.body === 'kaykit' ? 'KayKit' : sel.body === 'sprite' ? 'Sprite' : 'Style ' + sel.body.slice(-1);
+    return g + ' · ' + b;
   }
-  function tintFrame(src, rgb, gate) {
-    var cv = document.createElement('canvas'); cv.width = 512; cv.height = 512;
-    var x = cv.getContext('2d'); x.drawImage(src, 0, 0, 512, 512);
-    var d = x.getImageData(0, 0, 512, 512), p = d.data, lums = [], i, lum;
-    for (i = 0; i < p.length; i += 4) if (p[i + 3] > 8 && gate(p, i)) lums.push((p[i] + p[i + 1] + p[i + 2]) / 3);
-    lums.sort(function (a, b) { return a - b; });
-    var ref = lums.length ? lums[Math.floor(lums.length / 2)] : 128;
-    for (i = 0; i < p.length; i += 4) {
-      if (p[i + 3] <= 8 || !gate(p, i)) continue;
-      lum = (p[i] + p[i + 1] + p[i + 2]) / 3;
-      var k = Math.min(lum / Math.max(ref, 1), 2.2);
-      p[i] = Math.min(255, rgb[0] * k); p[i + 1] = Math.min(255, rgb[1] * k); p[i + 2] = Math.min(255, rgb[2] * k);
-    }
-    x.putImageData(d, 0, 0);
-    return cv;
-  }
-  var tintCache = {};
-  function tintSet(kind, frames, rgb, gate) {
-    if (!rgb) return frames;
-    var key = kind + '|' + rgb.join(',');
-    if (tintCache[key]) return tintCache[key];
-    var out = frames.map(function (fr) { return fr ? tintFrame(fr, rgb, gate) : null; });
-    tintCache[key] = out;
-    return out;
-  }
-  function epSelection() {
-    var info = myInfo(), lk = info.look || {};
-    var tone = '';
-    if (typeof lk.skinTone === 'string') tone = lk.skinTone === 'light' ? '_light' : (lk.skinTone === 'deep' ? '_deep' : '');
-    else if (typeof lk.skin === 'number') tone = ['_light', '', '', '_deep', '_deep'][lk.skin] || '';
-    var hairRgb = null;
-    if (Array.isArray(lk.hairDye)) hairRgb = lk.hairDye;
-    else if (typeof lk.hairColor === 'number') hairRgb = HC_RGB[lk.hairColor] || null;
-    var eyeRgb = Array.isArray(lk.eyeColor) ? lk.eyeColor : null;
-    var eq = equippedMap(), lw = lookMap();
-    var topIt = null, topName = lw.top || eq.top;
-    if (topName) topIt = itemOf(topName);
-    var wpnIt = null, wpnName = lw.weapon || eq.weapon;
-    if (wpnName) wpnIt = itemOf(wpnName);
-    return { tone: tone, hairRgb: hairRgb, eyeRgb: eyeRgb,
-      upper: (topIt && topIt.ep && topIt.ep.upper) || 'default',
-      weapon: (wpnIt && wpnIt.ep && wpnIt.ep.weapon) || null };
-  }
-  var pv = { frame: 0, timer: null, sets: null, key: '', error: false };
-  function drawFrame() {
-    var cv = document.getElementById('espil-gear-preview'); if (!cv) return;
-    var x = cv.getContext('2d'); if (!x) return;
-    x.clearRect(0, 0, 512, 512);
-    var g = x.createRadialGradient(256, 210, 60, 256, 256, 330);
-    g.addColorStop(0, '#3a2a18'); g.addColorStop(1, '#17100a');
-    x.fillStyle = g; x.fillRect(0, 0, 512, 512);
-    if (pv.error) {
-      x.fillStyle = '#d8c49a'; x.font = '600 17px Manrope, sans-serif'; x.textAlign = 'center';
-      x.fillText('캐릭터 에셋을 불러오지 못했습니다.', 256, 248);
-      x.font = '13px Manrope, sans-serif'; x.fillStyle = 'rgba(216,196,154,.7)';
-      x.fillText('assets/ep-parts 가 필요합니다.', 256, 274);
-      return;
-    }
-    if (!pv.sets) {
-      x.fillStyle = 'rgba(216,196,154,.75)'; x.font = '600 15px Manrope, sans-serif'; x.textAlign = 'center';
-      x.fillText('캐릭터를 불러오는 중입니다...', 256, 256);
-      return;
-    }
-    var s = pv.sets, f = pv.frame % FRAMES;
-    var order = [s.skin, s.lower, s.upper, s.foot, s.face, s.hair, s.weapon];
-    for (var i = 0; i < order.length; i++) {
-      var layer = order[i];
-      if (layer && layer[f]) x.drawImage(layer[f], 0, 0, 512, 512);
-    }
-  }
-  function ensurePreview() {
-    var sel = epSelection();
-    var key = [sel.tone, sel.upper, sel.weapon || '-', sel.hairRgb ? sel.hairRgb.join(',') : '-', sel.eyeRgb ? sel.eyeRgb.join(',') : '-'].join('|');
-    if (key === pv.key && (pv.sets || pv.error)) { drawFrame(); return; }
-    pv.key = key; pv.sets = null; pv.error = false;
-    drawFrame();
-    Promise.all([
-      loadSet('skin/front', sel.tone), loadSet('lower/front/default'), loadSet('upper/front/' + sel.upper),
-      loadSet('foot/front/default'), loadSet('face/front'), loadSet('hair/front'),
-      sel.weapon ? loadSet('weapon/front/' + sel.weapon) : Promise.resolve(null)
-    ]).then(function (r) {
-      if (pv.key !== key) return;
-      if (!r[0] || !r[0][0]) { pv.error = true; drawFrame(); return; }
-      pv.sets = { skin: r[0], lower: r[1], upper: r[2], foot: r[3],
-        face: tintSet('eye', r[4], sel.eyeRgb, eyeGate),
-        hair: tintSet('hair', r[5], sel.hairRgb, hairGate),
-        weapon: r[6] };
-      drawFrame();
+  function avStripRootMotion(clip) {
+    clip.tracks = clip.tracks.filter(function (t) {
+      var n = (t.name || '').toLowerCase();
+      var isPos = n.indexOf('.position') >= 0;
+      var isRoot = /^(mixamorig[_:]?hips|hips|armature|root)/.test(n);
+      return !(isPos && isRoot);
     });
+    return clip;
   }
-  function startPreviewLoop() {
-    ensurePreview();
-    if (pv.timer) return;
-    pv.timer = setInterval(function () {
-      if (!profileOpen() || !document.getElementById('espil-gear-preview')) {
-        clearInterval(pv.timer); pv.timer = null; return;
+  function avNoCull(group) { group.traverse(function (o) { if (o.isMesh || o.isSkinnedMesh) o.frustumCulled = false; }); }
+  function avGroundPosed(model) {
+    try {
+      var bbox = new THREE.Box3().setFromObject(model);
+      if (isFinite(bbox.min.y)) model.position.y -= bbox.min.y;
+    } catch (e) {}
+  }
+  function avBuildMasterEntry(gender) {
+    var ent = { kind: 'master', ready: false, failed: false, group: new THREE.Group(), mixer: null, actions: {}, curAnim: null };
+    var loader = new THREE.GLTFLoader();
+    try { if (window.MeshoptDecoder) loader.setMeshoptDecoder(window.MeshoptDecoder); } catch (e) {}
+    loader.load(gender === 'female' ? 'assets/character/female_idle.glb' : 'assets/character/male.glb', function (gltf) {
+      try {
+        var model = gltf.scene;
+        model.rotation.y = Math.PI;
+        model.scale.setScalar(1.5);
+        var bbox = new THREE.Box3().setFromObject(model);
+        model.position.y -= bbox.min.y;
+        model.traverse(function (o) { if (o.isMesh) o.castShadow = true; });
+        ent.group.add(model);
+        var mixer = new THREE.AnimationMixer(model);
+        ent.mixer = mixer;
+        var clips = gltf.animations || [];
+        function findClip(rx) { for (var i = 0; i < clips.length; i++) { if (rx.test(clips[i].name)) return clips[i]; } return null; }
+        var idleClip = findClip(/baselayer|idle/i) || clips[0];
+        /* master-female grounding (2026-11-24): female_idle.glb's Idle carries
+           its Hips .position track at bind +20.14 parent units (constant), which
+           lifts the posed body off the disc; strip it like the male swap below. */
+        if (gender === 'female' && idleClip) idleClip = avStripRootMotion(idleClip);
+        if (idleClip) { ent.actions.idle = mixer.clipAction(idleClip); ent.actions.idle.play(); ent.curAnim = 'idle'; }
+        try { mixer.update(0); } catch (e) {}
+        avGroundPosed(model);
+        ent.ready = true;
+        if (gender === 'male') {
+          loader.load('assets/character/male_idle.glb', function (g2) {
+            var cs = g2.animations || [];
+            if (!cs.length || !ent.mixer) return;
+            var act = ent.mixer.clipAction(avStripRootMotion(cs[0]));
+            var old = ent.actions.idle;
+            ent.actions.idle = act;
+            if (ent.curAnim === 'idle') {
+              act.reset().fadeIn(.15).play();
+              if (old && old !== act) { old.fadeOut(.15); setTimeout(function () { try { old.stop(); } catch (e) {} }, 220); }
+            }
+          });
+        }
+      } catch (e) { ent.failed = true; }
+    }, undefined, function () { ent.failed = true; });
+    return ent;
+  }
+  function avBuildLunarisEntry() {
+    var ent = { kind: 'lunaris', ready: false, failed: false, group: new THREE.Group(), mixer: null, actions: {}, curAnim: null };
+    var loader = new THREE.GLTFLoader();
+    try { if (window.MeshoptDecoder) loader.setMeshoptDecoder(window.MeshoptDecoder); } catch (e) {}
+    loader.load('assets/zealandia/lunaris.glb', function (gltf) {
+      try {
+        var model = gltf.scene;
+        model.rotation.y = Math.PI;
+        var bbox = new THREE.Box3().setFromObject(model);
+        model.position.y -= bbox.min.y;
+        model.traverse(function (o) { if (o.isMesh) o.castShadow = true; });
+        ent.group.add(model);
+        var mixer = new THREE.AnimationMixer(model);
+        ent.mixer = mixer;
+        (gltf.animations || []).forEach(function (clip) { ent.actions[clip.name] = mixer.clipAction(clip); });
+        if (ent.actions.Idle) { ent.actions.Idle.play(); ent.curAnim = 'Idle'; }
+        try { mixer.update(0); } catch (e) {}
+        avGroundPosed(model);
+        ent.ready = true;
+      } catch (e) { ent.failed = true; }
+    }, undefined, function () { ent.failed = true; });
+    return ent;
+  }
+  function avBuildGameEntry(sel) {
+    var av = null;
+    try { av = window.__espilBuildGateAvatar ? window.__espilBuildGateAvatar(sel.gender, sel.body) : null; } catch (e) {}
+    if (!av) return { kind: 'game', ready: false, failed: true, group: new THREE.Group(), mixer: null, actions: {}, curAnim: null, av: null };
+    return { kind: 'game', ready: false, failed: false, group: av.group, av: av,
+             get mixer() { return av.mixer; }, get actions() { return av.actions || {}; },
+             get curAnim() { return av.curAnim; } };
+  }
+  function avEntryFor(sel) {
+    var key = avSelKey(sel);
+    if (AV.cache[key]) return AV.cache[key];
+    var ent;
+    if (sel.designated) ent = avBuildLunarisEntry();
+    else if (sel.body === 'master') ent = avBuildMasterEntry(sel.gender);
+    else ent = avBuildGameEntry(sel);
+    ent.key = key;
+    AV.cache[key] = ent;
+    return ent;
+  }
+  function avEntryReady(ent) {
+    if (!ent || ent.failed) return false;
+    if (ent.kind === 'game') return !!(ent.av && ent.av.ready && ent.av.mixer);
+    return !!ent.ready;
+  }
+  function avEntryPlayIdle(ent) {
+    if (!ent) return;
+    try {
+      if (ent.kind === 'game') { if (ent.av && ent.av.playAnim) ent.av.playAnim('idle'); return; }
+      if (ent.kind === 'lunaris') {
+        var w = ent.actions.Wave, id = ent.actions.Idle;
+        if (w && ent.curAnim === 'Wave') w.fadeOut(.15);
+        if (id) { id.reset().fadeIn(.15).play(); ent.curAnim = 'Idle'; }
+        return;
       }
-      pv.frame = (pv.frame + 1) % FRAMES;
-      drawFrame();
-    }, 130);
+      var a = ent.actions.idle;
+      if (a && ent.curAnim !== 'idle') { a.reset().fadeIn(.15).play(); ent.curAnim = 'idle'; }
+    } catch (e) {}
   }
+  function avEase(t) { return t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+  function avMount() {
+    if (typeof THREE === 'undefined' || typeof THREE.GLTFLoader === 'undefined') return false;
+    var box = document.createElement('div');
+    box.className = 'eg-stage3d';
+    box.innerHTML = '<canvas class="eg-stage3d-cv"></canvas><div class="eg-stage-msg" style="display:none"></div><div class="eg-stage-label"></div>';
+    AV.stageEl = box;
+    AV.labelEl = box.querySelector('.eg-stage-label');
+    AV.msgEl = box.querySelector('.eg-stage-msg');
+    var cv = box.querySelector('canvas');
+    var renderer = new THREE.WebGLRenderer({ canvas: cv, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    AV.renderer = renderer;
+    var scene = new THREE.Scene();
+    AV.scene = scene;
+    var camera = new THREE.PerspectiveCamera(36, 1, 0.1, 60);
+    camera.position.set(0, 1.04, 3.35);
+    camera.lookAt(0, 0.88, 0);
+    AV.camera = camera;
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x8a6a3b, 1.05));
+    var key = new THREE.DirectionalLight(0xfff2dd, 1.6); key.position.set(1.6, 3.0, 2.4); scene.add(key);
+    var fill = new THREE.DirectionalLight(0xdfe8ff, 0.5); fill.position.set(-2.0, 1.2, 1.4); scene.add(fill);
+    var disc = new THREE.Mesh(new THREE.CircleGeometry(0.62, 28),
+      new THREE.MeshBasicMaterial({ color: 0x2a1a0c, transparent: true, opacity: 0.35, depthWrite: false }));
+    disc.rotation.x = -Math.PI / 2; disc.position.y = 0.002;
+    scene.add(disc);
+    var pivot = new THREE.Group();
+    pivot.rotation.y = Math.PI;
+    scene.add(pivot);
+    AV.pivot = pivot;
+    AV.mounted = true;
+    return true;
+  }
+  function avSizeRenderer() {
+    if (!AV.renderer || !AV.camera) return;
+    var cv = AV.renderer.domElement;
+    var w = cv.clientWidth || 260, h = cv.clientHeight || 292;
+    AV.renderer.setSize(w, h, false);
+    AV.camera.aspect = w / h;
+    AV.camera.updateProjectionMatrix();
+  }
+  function avShowSelection(animate) {
+    var sel = avSelection();
+    AV.sel = sel;
+    var key = avSelKey(sel);
+    if (AV.labelEl) AV.labelEl.textContent = sel.body === 'sprite' ? '' : avBodyLabel(sel);
+    if (sel.body === 'sprite') {
+      if (AV.cur && AV.cur.group && AV.cur.group.parent === AV.pivot) AV.pivot.remove(AV.cur.group);
+      AV.cur = null; AV.selKey = key;
+      if (AV.msgEl) { AV.msgEl.style.display = ''; AV.msgEl.textContent = '이 몸은 2D 스프라이트라 3D 미리보기가 없습니다.'; }
+      return;
+    }
+    var ent = avEntryFor(sel);
+    if (ent.failed) {
+      if (AV.msgEl) { AV.msgEl.style.display = ''; AV.msgEl.textContent = '캐릭터를 불러오지 못했습니다.'; }
+    } else if (AV.msgEl) AV.msgEl.style.display = 'none';
+    if (key !== AV.selKey || AV.cur !== ent) {
+      if (AV.cur && AV.cur.group && AV.cur.group.parent === AV.pivot) AV.pivot.remove(AV.cur.group);
+      AV.gesture = null;
+      if (AV.pivot) { AV.pivot.rotation.y = Math.PI; AV.pivot.position.y = 0; }
+      avNoCull(ent.group);
+      AV.pivot.add(ent.group);
+      AV.cur = ent;
+      avEntryPlayIdle(ent);
+      AV.selKey = key;
+      if (animate) AV.gesture = { t0: performance.now() };
+    }
+  }
+  function avTick(ts) {
+    if (!AV.open) { AV.raf = 0; return; }
+    AV.raf = requestAnimationFrame(avTick);
+    var dt = Math.min(0.05, AV.lastTs ? (ts - AV.lastTs) / 1000 : 0.016);
+    AV.lastTs = ts;
+    var ent = AV.cur;
+    if (ent && ent.mixer && avEntryReady(ent)) { try { ent.mixer.update(dt); } catch (e) {} }
+    if (AV.gesture && AV.pivot) {
+      var t = (ts - AV.gesture.t0) / 850;
+      if (t >= 1) { AV.pivot.rotation.y = Math.PI; AV.pivot.position.y = 0; AV.gesture = null; }
+      else { AV.pivot.rotation.y = Math.PI + Math.PI * 2 * avEase(t); AV.pivot.position.y = Math.sin(Math.PI * t) * 0.05; }
+    }
+    if (AV.renderer && AV.scene && AV.camera) AV.renderer.render(AV.scene, AV.camera);
+  }
+  function avSetOpen(on) {
+    if (on === AV.open) return;
+    AV.open = on;
+    if (on) {
+      if (!AV.mounted && !avMount()) return;
+      avAttachToSlot();
+      AV.lastTs = 0;
+      avSizeRenderer();
+      avShowSelection(false);
+      AV.equipKey = avEquipKey();
+      if (!AV.raf) AV.raf = requestAnimationFrame(avTick);
+      if (AV.pollTimer) clearInterval(AV.pollTimer);
+      AV.pollTimer = setInterval(function () {
+        if (!AV.open) return;
+        var k = avSelKey(avSelection());
+        if (k !== AV.selKey) avShowSelection(true);
+        var ek = avEquipKey();
+        if (ek !== AV.equipKey) { AV.equipKey = ek; AV.gesture = { t0: performance.now() }; }
+      }, 700);
+    } else {
+      if (AV.raf) cancelAnimationFrame(AV.raf);
+      AV.raf = 0;
+      if (AV.pollTimer) { clearInterval(AV.pollTimer); AV.pollTimer = 0; }
+      AV.gesture = null;
+      if (AV.pivot) { AV.pivot.rotation.y = Math.PI; AV.pivot.position.y = 0; }
+    }
+  }
+  function avEquipKey() {
+    var eq = equippedMap(), lk = lookMap();
+    return [eq.weapon, eq.top, lk.weapon, lk.top].join('|');
+  }
+  function avAttachToSlot() {
+    var slot = document.getElementById('espil-gear-stage-slot');
+    if (slot && AV.stageEl && AV.stageEl.parentNode !== slot) slot.appendChild(AV.stageEl);
+  }
+  function avOnProfileRender() {
+    if (AV.mounted) { avAttachToSlot(); avSizeRenderer(); if (AV.open) avShowSelection(false); }
+  }
+  function avStateHook() {
+    var ent = AV.cur;
+    return {
+      mounted: AV.mounted, open: AV.open, raf: !!AV.raf,
+      gender: AV.sel ? AV.sel.gender : null,
+      bodyKey: AV.sel ? AV.sel.body : null,
+      designated: AV.sel ? (AV.sel.designated || null) : null,
+      ready: ent ? avEntryReady(ent) : false,
+      failed: ent ? !!ent.failed : false,
+      clip: ent ? (ent.kind === 'game' ? (ent.av ? ent.av.curAnim : null) : ent.curAnim) : null
+    };
+  }
+  (function avWatchPanel() {
+    var p = document.getElementById('character-panel');
+    if (!p) { setTimeout(avWatchPanel, 800); return; }
+    new MutationObserver(function () {
+      avSetOpen(p.getAttribute('aria-hidden') === 'false');
+    }).observe(p, { attributes: true, attributeFilter: ['aria-hidden'] });
+    if (p.getAttribute('aria-hidden') === 'false') avSetOpen(true);
+    window.addEventListener('resize', function () { if (AV.open && AV.mounted) avSizeRenderer(); });
+  })();
 
   /* ---------------- styles ---------------- */
   var LOGWOOD_URL = (typeof window.__espilLogwoodUrl === 'string' && window.__espilLogwoodUrl) || 'assets/tex/logwood.jpg';
@@ -640,6 +834,11 @@
     '.eg-slot .eg-slotlab{display:block;font-size:9px;letter-spacing:.05em;opacity:.75;margin-top:1px}',
     '.eg-slot .eg-itemlab{display:block;font-size:8.5px;line-height:1.15;color:#ffe9b0;min-height:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
     '.eg-stage{flex:none;border:1.6px solid rgba(169,126,70,.5);border-radius:10px;overflow:hidden;background:#1a120b}',
+    '.eg-stage3d{position:relative;background:radial-gradient(120% 95% at 50% 0%,#2e2013 0%,#1a120b 80%)}',
+    '.eg-stage3d-cv{display:block;width:100%;height:292px}',
+    'body.espil-book-open .eg-stage3d-cv{height:34dvh}',
+    '.eg-stage-label{padding:4px 8px 6px;text-align:center;font:700 11px Manrope,sans-serif;color:#e8cf9f;letter-spacing:.04em}',
+    '.eg-stage-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:12px;font:600 12px Manrope,sans-serif;color:#cbb27f}',
     '.eg-bottom{display:flex;gap:6px;justify-content:center;margin-top:5px}',
     '.eg-stats{display:flex;gap:10px;margin-top:7px;flex-wrap:wrap}',
     '.eg-statbox{flex:1;min-width:128px;border:1px solid rgba(169,126,70,.5);border-radius:10px;background:rgba(30,20,12,.55);padding:6px 8px}',
@@ -673,6 +872,9 @@
     '.bag-dbtns{flex:none;display:flex;flex-direction:column;gap:5px;justify-content:center}',
     '.bag-dbtn{padding:5px 11px;border-radius:7px;border:1px solid #a97e46;background:linear-gradient(#8a5a2b,#6e4520);color:#ffe9b0;font:700 11.5px Manrope,sans-serif;cursor:pointer}',
     '.bag-dbtn.sub{background:rgba(59,42,28,.8);color:#d8c49a}',
+    /* Han button standard (2026-11-24) item 5: visible press feedback on every gear/bag control (CSS-only addition at splice verification; no layout or behaviour change) */
+    '.eg-tab:active,.bag-tab:active,.bag-dbtn:active,.eg-titlebtn:active,.eg-portal:active,.eg-custom:active{filter:brightness(1.3)}',
+    '.bag-cell:active,.eg-slot.filled:active{filter:brightness(1.22)}',
     '.bag-foot{margin:7px 0 0;font-size:11px;opacity:.85;display:flex;justify-content:space-between}',
     /* Item 5 (Han 2026-11-04): smaller cards, and when the profile
        and the bag are open together they sit side by side (each
@@ -680,14 +882,12 @@
        under 1020px they split top/bottom so neither is hidden. */
     /* Han 2026-11-11: both windows smaller (profile 408 -> 356,
        bag 440 -> 384) and draggable with saved positions - the
-       drag wiring lives further below. */
+       drag wiring lives further below (carried from production). */
     '.skill-tree#character-panel .st-card{width:min(356px,calc(100% - 20px));padding:13px 15px}',
     '.skill-tree#character-panel .st-head{margin-bottom:7px;padding-bottom:7px}',
     '.skill-tree#inventory-panel .st-card{width:min(384px,calc(100% - 20px))}',
     /* Drag affordance for ONLY these two windows: the header is
-       the drag handle (grab cursor, no touch scrolling hijack).
-       The other .skill-tree windows (skill trees, stall, friends)
-       keep the shared fixed-centre behaviour. */
+       the drag handle (grab cursor, no touch scrolling hijack). */
     '#character-panel .st-head,#inventory-panel .st-head{cursor:grab;touch-action:none}',
     'body.espil-panel-dragging,body.espil-panel-dragging *{cursor:grabbing!important;user-select:none!important;-webkit-user-select:none!important}',
     'body.espil-panels-both #character-panel{left:0;right:auto;width:50%}',
@@ -756,7 +956,7 @@
     var bottom = SLOT_DEFS.filter(function (s) { return s.col === 'B'; }).map(function (s) { return slotCell(s.key, map[s.key], profTab === 'look'); }).join('');
     var stage = profTab === 'mount'
       ? '<div class="eg-stage"><div class="eg-mount">탈것은 준비 중입니다.<br><span style="font-size:11.5px">이동 수단이 생기면 이곳에 표시됩니다.</span></div></div>'
-      : '<div class="eg-stage"><canvas id="espil-gear-preview" width="512" height="512" style="display:block;width:172px;height:172px"></canvas></div>';
+      : '<div class="eg-stage" id="espil-gear-stage-slot"></div>';
     wrap.innerHTML =
       '<div class="eg-head"><span class="eg-name">' + esc(info.name) + '</span>' +
       '<span class="eg-lv">레벨 ' + info.level + ' ' + esc(info.cls) + '</span>' +
@@ -769,17 +969,17 @@
       '<div class="eg-main"><div class="eg-col">' + left + '</div>' + stage + '<div class="eg-col">' + right + '</div></div>' +
       '<div class="eg-bottom">' + bottom + '</div>' +
       (profTab === 'look' ? '<p class="eg-foot">치장 아이템은 외형만 바꿉니다. 능력치는 장비 아이템 기준으로 계산됩니다.</p>' : '') +
-      '<p class="eg-foot" style="font-size:10px;opacity:.65;margin-top:3px">캐릭터는 커스터마이저 캐릭터이며 상의와 무기는 실제 부품으로 반영됩니다. 모자, 망토, 장갑, 장신구, 펫은 부품이 준비되는 대로 연결됩니다.</p>' +
+      '<p class="eg-foot" style="font-size:10px;opacity:.65;margin-top:3px">실제 아바타가 표시됩니다. 능력치는 실제 전투 계산에 닿는 수치만 표시합니다. 무기와 의상의 3D 반영은 아바타 트랙에서 단계적으로 연결됩니다.</p>' +
       '<div class="eg-stats"><div class="eg-statbox"><h4>기본 능력치</h4>' +
       statRows(STAT_KEYS.map(function (k) { return [STAT_KR[k], st.tot[k]]; })) +
       '</div><div class="eg-statbox"><h4>주요 능력치</h4>' +
-      statRows([['무기 공격력', st.weaponAtk[0] + ' ~ ' + st.weaponAtk[1]], ['근접 공격력', st.melee], ['방어력', st.def], ['마법 공격력', st.magic], ['마법 방어력', st.mdef]]) +
+      statRows([['무기 공격력', st.weaponAtk[0] + ' ~ ' + st.weaponAtk[1]], ['방어력', st.def]]) +
       '</div></div>' +
       '<p class="eg-foot">Leo Coin: ' + info.leo + (info.city ? ' · Now in: ' + esc(info.city) : '') +
       '<button class="eg-custom" id="eg-custom" type="button">Customize</button>' +
       '<button class="eg-portal" id="eg-portal" type="button">커뮤니티 센터</button></p>';
     g.innerHTML = ''; g.appendChild(wrap);
-    if (document.getElementById('espil-gear-preview')) startPreviewLoop();
+    avOnProfileRender();
     wrap.querySelectorAll('[data-egtab]').forEach(function (b) {
       b.addEventListener('click', function () { profTab = b.getAttribute('data-egtab'); renderProfile(); });
     });
@@ -969,7 +1169,6 @@
   }
   watch('inventory-panel', renderBag);
   watch('character-panel', renderProfile);
-
   /* ---------------- draggable windows (Han 2026-11-11) ----------------
      The profile and the bag no longer sit fixed at screen centre:
      each can be dragged by its header (mouse or touch) and the
@@ -1113,7 +1312,7 @@
   document.addEventListener('keydown', function (e) {
     var ae = document.activeElement, tag = (ae && ae.tagName) || '';
     if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
-    var k = ((window.__espilNormKey ? window.__espilNormKey(e) : e.key) || '').toLowerCase(); /* IME fix: jamo -> letter via the monolith helper, raw key if it is absent */
+    var k = ((window.__espilNormKey ? window.__espilNormKey(e) : e.key) || '').toLowerCase(); /* IME fix: jamo -> letter via the monolith helper, raw key if it is absent (carried from production panels.js) */
     if (k === 'p' && !e.repeat) toggleProfile();
     if (k === 'escape') { var p = charPanel(); if (p && p.getAttribute('aria-hidden') === 'false') toggleProfile(false); }
   });
@@ -1126,9 +1325,8 @@
     stats: computeStats, itemOf: itemOf, slots: SLOT_DEFS,
     openProfile: function () { toggleProfile(true); },
     openBag: function () { var ip = invPanel(); if (ip) { ip.setAttribute('aria-hidden', 'false'); renderBag(); } },
-    state: function () { var sel = epSelection(); return { equipped: equippedMap(), look: lookMap(), stats: computeStats(), bagTab: bagTab, profTab: profTab,
-      parts: { ready: !!pv.sets, error: pv.error, upper: sel.upper, weapon: sel.weapon, frame: pv.frame } }; },
-    previewFrame: function (i) { pv.frame = ((i % FRAMES) + FRAMES) % FRAMES; drawFrame(); }
+    state: function () { return { equipped: equippedMap(), look: lookMap(), stats: computeStats(), bagTab: bagTab, profTab: profTab,
+      avatar: avStateHook() }; }
   };
   seedStarter();
 })();
