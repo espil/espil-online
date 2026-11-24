@@ -209,7 +209,7 @@
   document.addEventListener('keydown', function (e) {
     var ae = document.activeElement, tag = (ae && ae.tagName) || '';
     if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
-    var k = (e.key || '').toLowerCase();
+    var k = ((window.__espilNormKey ? window.__espilNormKey(e) : e.key) || '').toLowerCase(); /* IME fix: jamo -> letter via the monolith helper, raw key if it is absent */
     if (k === 'i') load('panels.js');
     if (k === 'p') { if (!loaded['panels.js']) pendingProfile = true; load('panels.js'); }
     if (k === 'o') socialBundle();

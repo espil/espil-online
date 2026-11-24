@@ -1,5 +1,29 @@
 
   (function(){
+    /* IME KEY NORMALIZATION (2026-11-23, home-key fix): with the
+       Korean IME in Hangul mode on Windows, a physical letter key
+       delivers e.key as the Hangul jamo (H -> the jamo for H, code
+       'KeyH'), or 'Process' during composition, so every letter
+       branch keyed on e.key missed and the whole keyboard map
+       (movement, skills, menus, H) read as dead. __espilNormKey
+       derives the effective key ONCE: when e.key is a single
+       character that is not a Latin letter, or is 'Process', and
+       e.code names a letter key (KeyA-KeyZ), the effective key is
+       that letter, lowercased. Every other event is returned
+       untouched, so English-mode behaviour is exactly the old
+       behaviour. Digit keys are NOT normalized: no handler in this
+       fix branches on digit keys. Consumers call this only AFTER
+       their typing guard, so text fields keep their raw events and
+       Korean composition is never touched. */
+    window.__espilNormKey=function(e){
+      var k=e&&e.key;
+      if(typeof k!=='string'||!k)return k;
+      if(k==='Process'||(k.length===1&&!/^[a-zA-Z]$/.test(k))){
+        var m=/^Key([A-Z])$/.exec((e&&e.code)||'');
+        if(m)return m[1].toLowerCase();
+      }
+      return k;
+    };
     var reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var status=document.getElementById('city-message');
     /* Han 2026-10-16 (landing text rules): the landing message line
@@ -7364,7 +7388,11 @@
       if(!espilKbArm)return;
       e.preventDefault(); e.stopPropagation();
       if(e.key!=='Escape'){
-        espilKeybinds[espilKbArm]=(espilKbArm==='stall'&&e.key.length===1)?e.key.toLowerCase():e.key;
+        /* IME fix (2026-11-23): store the NORMALIZED key - a rebind
+           armed in Hangul mode would otherwise persist the jamo
+           itself as the binding and never match again. */
+        var nk=window.__espilNormKey?window.__espilNormKey(e):e.key;
+        espilKeybinds[espilKbArm]=(espilKbArm==='stall'&&nk.length===1)?nk.toLowerCase():nk;
         try{ localStorage.setItem('espil_keybinds',JSON.stringify(espilKeybinds)); }catch(err){}
       }
       espilKbArm=null; espilKbPaint();
@@ -7511,7 +7539,7 @@
       var ae=document.activeElement,at=(ae&&ae.tagName)||'';
       if(/INPUT|TEXTAREA|SELECT/.test(at))return;
       var binds={}; try{ binds=JSON.parse(localStorage.getItem('espil_keybinds')||'{}'); }catch(_){}
-      if(e.key!==(binds.interact||' '))return;
+      if((window.__espilNormKey?window.__espilNormKey(e):e.key)!==(binds.interact||' '))return; /* IME fix: the interact binding may be a letter */
       if(espilCityKey()!=='auckland'||!espilTimeStoneGroup)return;
       var p=walkPlayer; if(!p)return;
       if(Math.hypot(p.pos.x-ESPIL_TIMESTONE.x,p.pos.z-ESPIL_TIMESTONE.z)>3)return; /* execution range 3 m from centre (confirmed standard, Zealandia room 2026-10-21): the real footprint blocks approach at ~2.2 m */
@@ -13114,7 +13142,7 @@
       /* Chat input guard (2026-10-11): game keys stay off while typing. */
       var _ae=document.activeElement,_at=(_ae&&_ae.tagName)||'';
       if(/INPUT|TEXTAREA|SELECT/.test(_at))return;
-      var k=e.key;
+      var k=window.__espilNormKey?window.__espilNormKey(e):e.key; /* IME fix (2026-11-23): normalized AFTER the typing guard above - text fields never reach this line */
       if(k==='Enter'&&!e.repeat){setChatTyping(true);return;}
       /* Han 2026-10-14 #1: ESC in-map closes panels ONLY — never exits to landing.
          (Re-applied 2026-10-14 after the working-copy overwrite.) */
@@ -13188,7 +13216,11 @@
       }
     });
     document.addEventListener('keyup',function(e){
-      walkKeys[e.key.toLowerCase()]=false;
+      /* IME fix (2026-11-23): the SAME normalization as keydown,
+         so a key pressed in one IME mode and released in the
+         other still clears its walkKeys entry - never a stuck
+         movement key. */
+      walkKeys[(window.__espilNormKey?window.__espilNormKey(e):e.key).toLowerCase()]=false;
     });
     var jumpBtn=document.getElementById('map-jump');
     if(jumpBtn)jumpBtn.addEventListener('pointerdown',function(e){e.preventDefault();tryJump();});

@@ -709,7 +709,8 @@
     if (ARENA_CHILD) return;   /* ARENA PLACE: the interact / DM keys stay down in an arena child */
     var ae = document.activeElement;
     var typing = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA');
-    if ((e.key === 'f' || e.key === 'F') && nearPeer && !typing && document.body.classList.contains('in-map')) {
+    var nk = window.__espilNormKey ? window.__espilNormKey(e) : e.key; /* IME fix: the jamo for F (code KeyF) must open the menu too */
+    if ((nk === 'f' || nk === 'F') && nearPeer && !typing && document.body.classList.contains('in-map')) {
       openInteractMenu(nearPeer);
     } else if (e.key === 'Escape') {
       if (menuPeer) closeInteractMenu();

@@ -576,7 +576,7 @@
     var ae = document.activeElement, tag = (ae && ae.tagName) || '';
     if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
     if (!inMap()) return;
-    var k = (e.key || '').toLowerCase();
+    var k = ((window.__espilNormKey ? window.__espilNormKey(e) : e.key) || '').toLowerCase(); /* IME fix: jamo -> letter via the monolith helper, raw key if it is absent */
     if (k === 'o' && !e.repeat) { e.preventDefault(); e.stopPropagation(); togglePanel(); }
     else if (k === 'escape') { var p = panelEl(); if (p && p.getAttribute('aria-hidden') === 'false') togglePanel(false); }
   }, true);
