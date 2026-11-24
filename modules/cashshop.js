@@ -59,6 +59,19 @@
        buy(itemId) -> { ok, why? } atomic charge+grant w/ guards,
        open(), close(), state()
      }
+
+   TEMPORARY CLOSURE (Han 2026-11-23, "캐시상점은 일단 닫아"):
+   the shop is CLOSED, not removed - the catalogue, the ledger
+   and the appearance-change ticket path in this module are all
+   intact. While the switch ESPIL_CASH_SHOP_CLOSED (top of this
+   module) is true, open() renders a closed notice instead of
+   the catalogue, and the purchase paths (buy(), and the charge /
+   grant halves it is built from) refuse without touching the
+   ledger. Spending a held entitlement is NOT a purchase and
+   stays open: the character gate keeps spending 'bodyChanges'
+   through spendEntitlement exactly as before. Reopening is
+   Han's word only - flip the one switch to false.
+
    Module sources are TAGLESS (house rule) - no script tags here. */
 (function () {
   'use strict';
@@ -66,6 +79,12 @@
 
   var LS_CASH = 'espil_cash_v1';
   var LS_OWN = 'espil_owned_items';
+
+  /* TEMPORARY CLOSURE switch (Han 2026-11-23): true = the shop
+     renders its closed notice and refuses every purchase.
+     Reopen by setting this one value to false; nothing else in
+     the module changes. */
+  var ESPIL_CASH_SHOP_CLOSED = true;
 
   /* ---------------- catalogue ----------------
      price in USD cents. grants = item names pushed into
@@ -152,6 +171,7 @@
   /* ---------------- money ---------------- */
   function balanceCents() { return ledger.balanceCents; }
   function charge(cents, label) {
+    if (ESPIL_CASH_SHOP_CLOSED) return false; /* closed: no cash leaves the ledger */
     cents = Math.floor(Number(cents));
     if (!isFinite(cents) || cents <= 0) return false;
     if (ledger.balanceCents < cents) return false;
@@ -173,6 +193,7 @@
 
   /* ---------------- grants + atomic buy ---------------- */
   function grant(itemId) {
+    if (ESPIL_CASH_SHOP_CLOSED) return { ok: false, why: 'closed' };
     var c = BY_ID[itemId];
     if (!c) return { ok: false, why: 'unknown-item' };
     var granted = grantNames(c.grants || []);
@@ -203,6 +224,10 @@
   var buyLock = false;
   var spentTokens = {};
   function buy(itemId, token) {
+    if (ESPIL_CASH_SHOP_CLOSED) {
+      setMsg('캐시 상점이 닫혀 있어 지금은 구매할 수 없습니다.', true);
+      return { ok: false, why: 'closed' };
+    }
     var c = BY_ID[itemId];
     if (!c) return { ok: false, why: 'unknown-item' };
     if (buyLock) return { ok: false, why: 'busy' };
@@ -255,7 +280,12 @@
       '.ecw-owned{font-size:12px;font-weight:700;color:#9fd48a}' +
       '.ecw-msg{min-height:20px;font-size:13px;margin-top:10px;color:#ffd76a}' +
       '.ecw-msg.err{color:#ff9d9d}' +
-      '.ecw-note{font-size:12px;color:#b8a888;line-height:1.5;margin-top:8px}';
+      '.ecw-note{font-size:12px;color:#b8a888;line-height:1.5;margin-top:8px}' +
+      '#espil-cash-window.closed .ecw-note{display:none}' +
+      '#espil-cash-window.closed #espil-cash-topup{display:none}' +
+      '.ecw-closed{padding:26px 6px 18px;text-align:center}' +
+      '.ecw-closed-title{font-size:17px;font-weight:800;color:#ffe9bd;margin-bottom:8px}' +
+      '.ecw-closed-line{font-size:13.5px;line-height:1.6;color:#d8c49a}';
     document.head.appendChild(st);
 
     winEl = document.createElement('div');
@@ -307,6 +337,20 @@
   function render() {
     if (!winEl || !winEl.classList.contains('open')) return;
     if (balEl) balEl.textContent = '보유 캐시 ' + fmt(ledger.balanceCents);
+    winEl.classList.toggle('closed', ESPIL_CASH_SHOP_CLOSED);
+    if (ESPIL_CASH_SHOP_CLOSED) {
+      /* TEMPORARY CLOSURE: the catalogue does not render; the
+         window shows the closed notice only. The balance line
+         above still renders, so a held balance stays visible
+         and provably untouched. */
+      if (bodyEl) bodyEl.innerHTML =
+        '<div class="ecw-closed">' +
+        '<div class="ecw-closed-title">캐시 상점이 닫혀 있습니다</div>' +
+        '<div class="ecw-closed-line">지금은 캐시 상점을 이용하실 수 없습니다.<br>' +
+        '보유하신 캐시와 아이템, 변경권은 그대로 유지됩니다.</div>' +
+        '</div>';
+      return;
+    }
     if (!bodyEl) return;
     renderSeq++;
     bodyEl.innerHTML = '';
@@ -431,6 +475,7 @@
         entitlements: { arenaRevives: ledger.entitlements.arenaRevives || 0, bodyChanges: ledger.entitlements.bodyChanges || 0 },
         potionStock: potionStock(),
         txns: ledger.txns.slice(-10),
+        closed: ESPIL_CASH_SHOP_CLOSED,
         payment: 'stripe_not_connected',
         catalogue: CATALOGUE.map(function (c) { return c.id; })
       };
