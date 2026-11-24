@@ -823,19 +823,19 @@
     '.eg-name{font-size:16px;font-weight:800;color:#ffd97a;letter-spacing:.02em}',
     '.eg-lv{font-size:12px;opacity:.92}',
     '.eg-title{font-size:12px;color:#e8b04b;font-weight:700}',
-    '.eg-titlebtn{margin-left:auto;padding:4px 11px;border-radius:6px;border:1px solid #a97e46;background:linear-gradient(#8a2f23,#6e241b);color:#ffe9b0;font:700 11.5px Manrope,sans-serif;cursor:pointer}',
+    '.eg-titlebtn{margin-left:auto;padding:4px 11px;border-radius:6px;border:1px solid #a97e46;background:linear-gradient(#8a2f23,#6e241b);color:#ffe9b0;font:700 11.5px Manrope,sans-serif;cursor:pointer;min-width:50px;min-height:50px;display:inline-flex;align-items:center;justify-content:center}',
     '.eg-tabs{display:flex;gap:5px;margin:4px 0 7px}',
-    '.eg-tab{padding:5px 10px;border-radius:8px 8px 0 0;border:1px solid rgba(169,126,70,.55);border-bottom:none;background:rgba(59,42,28,.55);color:#d8c49a;font:700 11.5px Manrope,sans-serif;cursor:pointer}',
+    '.eg-tab{padding:5px 10px;border-radius:8px 8px 0 0;border:1px solid rgba(169,126,70,.55);border-bottom:none;background:rgba(59,42,28,.55);color:#d8c49a;font:700 11.5px Manrope,sans-serif;cursor:pointer;min-width:50px;min-height:50px;display:inline-flex;align-items:center;justify-content:center}',
     '.eg-tab.on{background:#8a2f23;color:#ffe9b0;border-color:#a97e46}',
     '.eg-main{display:flex;gap:7px;justify-content:center;align-items:flex-start}',
-    '.eg-col{display:flex;flex-direction:column;gap:6px}',
-    '.eg-slot{width:47px;padding:3px 1px 2px;border-radius:8px;border:1.6px solid rgba(169,126,70,.5);background:rgba(30,20,12,.66);text-align:center;color:#d8c49a}',
+    '.eg-col{display:flex;flex-direction:column;gap:4px}',
+    '.eg-slot{width:48px;min-height:50px;padding:2px 1px 1px;border-radius:8px;border:1.6px solid rgba(169,126,70,.5);background:rgba(30,20,12,.66);text-align:center;color:#d8c49a}',
     '.eg-slot.filled{cursor:pointer;background:rgba(59,42,28,.9)}',
-    '.eg-slot .eg-slotlab{display:block;font-size:9px;letter-spacing:.05em;opacity:.75;margin-top:1px}',
-    '.eg-slot .eg-itemlab{display:block;font-size:8.5px;line-height:1.15;color:#ffe9b0;min-height:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+    '.eg-slot .eg-slotlab{display:block;font-size:9px;letter-spacing:.05em;opacity:.75;margin-top:0;line-height:1}',
+    '.eg-slot .eg-itemlab{display:block;font-size:8.5px;line-height:1;color:#ffe9b0;min-height:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
     '.eg-stage{flex:none;border:1.6px solid rgba(169,126,70,.5);border-radius:10px;overflow:hidden;background:#1a120b}',
     '.eg-stage3d{position:relative;background:radial-gradient(120% 95% at 50% 0%,#2e2013 0%,#1a120b 80%)}',
-    '.eg-stage3d-cv{display:block;width:100%;height:292px}',
+    '.eg-stage3d-cv{display:block;width:100%;height:220px}',
     'body.espil-book-open .eg-stage3d-cv{height:34dvh}',
     '.eg-stage-label{padding:4px 8px 6px;text-align:center;font:700 11px Manrope,sans-serif;color:#e8cf9f;letter-spacing:.04em}',
     '.eg-stage-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:12px;font:600 12px Manrope,sans-serif;color:#cbb27f}',
@@ -847,16 +847,16 @@
     '.eg-statrow:last-child{border-bottom:none}',
     '.eg-statrow b{color:#fff3d6;font-variant-numeric:tabular-nums}',
     '.eg-foot{margin:7px 0 0;font-size:11px;opacity:.85}',
-    '.eg-custom{margin-left:8px;padding:4px 11px;border-radius:999px;border:1px solid rgba(201,168,106,.85);background:rgba(201,168,106,.16);color:#ffd97a;font:700 11.5px Manrope,sans-serif;cursor:pointer}',
-    '.eg-portal{margin-left:6px;padding:4px 11px;border-radius:999px;border:1px solid rgba(201,168,106,.85);background:rgba(201,168,106,.16);color:#ffd97a;font:700 11.5px Manrope,sans-serif;cursor:pointer}',
+    '.eg-custom{margin-left:8px;padding:4px 11px;border-radius:999px;border:1px solid rgba(201,168,106,.85);background:rgba(201,168,106,.16);color:#ffd97a;font:700 11.5px Manrope,sans-serif;cursor:pointer;min-width:50px;min-height:50px;display:inline-flex;align-items:center;justify-content:center}',
+    '.eg-portal{margin-left:6px;padding:4px 11px;border-radius:999px;border:1px solid rgba(201,168,106,.85);background:rgba(201,168,106,.16);color:#ffd97a;font:700 11.5px Manrope,sans-serif;cursor:pointer;min-width:50px;min-height:50px;display:inline-flex;align-items:center;justify-content:center}',
     '.eg-mount{padding:18px 6px;text-align:center;opacity:.8}',
     /* bag */
     '.espil-bag{grid-column:1/-1;color:#f5e6c8;font:12px Manrope,system-ui,sans-serif}',
     '.espil-bag *{box-sizing:border-box}',
-    '.bag-tabs{display:flex;gap:5px;margin-bottom:7px;flex-wrap:wrap}',
-    '.bag-tab{padding:5px 11px;border-radius:8px;border:1px solid rgba(169,126,70,.55);background:rgba(59,42,28,.55);color:#d8c49a;font:700 11.5px Manrope,sans-serif;cursor:pointer}',
+    '.bag-tabs{display:flex;gap:5px;margin-bottom:4px;flex-wrap:wrap}',
+    '.bag-tab{padding:5px 11px;border-radius:8px;border:1px solid rgba(169,126,70,.55);background:rgba(59,42,28,.55);color:#d8c49a;font:700 11.5px Manrope,sans-serif;cursor:pointer;min-width:50px;min-height:50px;display:inline-flex;align-items:center;justify-content:center}',
     '.bag-tab.on{background:#8a2f23;color:#ffe9b0}',
-    '.bag-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:5px}',
+    '.bag-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;max-height:124px;overflow-y:auto;scrollbar-width:thin}',
     '.bag-cell{position:relative;border:1.6px solid rgba(169,126,70,.45);border-radius:7px;background:rgba(30,20,12,.66);aspect-ratio:1;display:flex;align-items:center;justify-content:center;cursor:pointer}',
     '.bag-cell.sel{outline:2px solid #ffd97a}',
     '.bag-cell .bag-n{position:absolute;right:2px;bottom:1px;font-size:9.5px;font-weight:800;color:#fff3d6;text-shadow:0 1px 2px #000}',
@@ -870,7 +870,9 @@
     '.bag-dstats{font-size:11.5px;color:#ffd97a}',
     '.bag-ddesc{font-size:11.5px;opacity:.9;margin-top:2px}',
     '.bag-dbtns{flex:none;display:flex;flex-direction:column;gap:5px;justify-content:center}',
-    '.bag-dbtn{padding:5px 11px;border-radius:7px;border:1px solid #a97e46;background:linear-gradient(#8a5a2b,#6e4520);color:#ffe9b0;font:700 11.5px Manrope,sans-serif;cursor:pointer}',
+    '.bag-dbtn{padding:5px 11px;border-radius:7px;border:1px solid #a97e46;background:linear-gradient(#8a5a2b,#6e4520);color:#ffe9b0;font:700 11.5px Manrope,sans-serif;cursor:pointer;min-width:50px;min-height:50px;display:inline-flex;align-items:center;justify-content:center}',
+    '#eg-craft-target{min-width:50px;min-height:50px}',
+    '#character-panel .st-close,#inventory-panel .st-close{width:50px;height:50px;min-width:50px;min-height:50px}',
     '.bag-dbtn.sub{background:rgba(59,42,28,.8);color:#d8c49a}',
     /* Han button standard (2026-11-24) item 5: visible press feedback on every gear/bag control (CSS-only addition at splice verification; no layout or behaviour change) */
     '.eg-tab:active,.bag-tab:active,.bag-dbtn:active,.eg-titlebtn:active,.eg-portal:active,.eg-custom:active{filter:brightness(1.3)}',
@@ -936,7 +938,7 @@
     return '<div class="eg-slot' + (it ? ' filled' : '') + '" data-gear-slot="' + slot + '"' +
       (it ? ' title="' + esc(it.kr || it.name) + '"' : '') +
       ' style="border-color:' + gradeCol + '">' +
-      (it ? iconSVG(it, 22) : '<span style="display:block;height:22px;line-height:22px;font-size:12px;opacity:.4">·</span>') +
+      (it ? iconSVG(it, 20) : '<span style="display:block;height:20px;line-height:20px;font-size:12px;opacity:.4">·</span>') +
       '<span class="eg-itemlab">' + (it ? esc(it.kr || it.name) + (slot === 'weapon' && craftTierOf(name) ? ' +' + craftTierOf(name) : '') : '') + '</span>' +
       '<span class="eg-slotlab">' + SLOT_KR[slot] + '</span></div>';
   }
@@ -1061,7 +1063,7 @@
       return '<div class="bag-cell' + (bagSel === c.name ? ' sel' : '') + '" data-bag-item="' + esc(c.name) + '" title="' + esc(it.kr || it.name) + '" style="border-color:' + (GRADES[it.grade] || 'rgba(169,126,70,.45)') + '">' +
         iconSVG(it, 26) + badge + (c.n > 1 ? '<span class="bag-n">' + c.n + '</span>' : '') + '</div>';
     });
-    var total = Math.max(40, Math.ceil(items.length / 8) * 8);
+    var total = Math.max(40, Math.ceil(items.length / 5) * 5);
     for (var i = items.length; i < total; i++) cells.push('<div class="bag-cell empty"></div>');
     var detail = '<div class="bag-dbody"><div class="bag-dname">아이템을 선택하세요</div><div class="bag-ddesc">가방의 아이템을 누르면 정보가 표시됩니다.</div></div>';
     var btns = '';
