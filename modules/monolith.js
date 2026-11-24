@@ -13566,6 +13566,54 @@
         blockedAt:espilCamBlockedAt, checks:espilCamChecks, segClear:espilCamSegClear,
         camPos:espilCamPos, camInside:espilCamInside };
     };
+    /* FIX BATCH 9 - COLD-LOAD JUDGE GAP (diagnosis 2c): the
+       collision judges (the polygon record buckets and the baked
+       guard's source) are built from the district + collision
+       payloads, and until espilDistrictBuilt flips they are all
+       empty - no wall judgment exists at all. The entry gates wait
+       for the build, but their 25 s failsafe can release the dive
+       first on a slow load, and nothing else ever gated movement
+       on the build. The chosen shape is a movement hold in the
+       ground input below: while the build is outstanding, input
+       is zeroed exactly like the landing/climb/death holds beside
+       it, so the player stands at the entry point (a plaza clear
+       of footprints) instead of walking an unjudged world. The
+       hold starts when free movement would begin (arrival and
+       landing own the body before that) and is invisible in the
+       normal case - the fetch starts at script run, so the build
+       has landed long before the dive in all but pathological
+       loads. Two bounded exits keep it from ever becoming a
+       soft-lock: a failed fetch is retried (throttled) while the
+       hold stands, and 30 s after free movement began the hold
+       releases unconditionally - into the pre-fix unjudged state,
+       never into a freeze; that mirrors the entry gates' own
+       "never held hostage" failsafe. Interiors are exempt: the
+       inside tick's footprint clamp, not the district records,
+       judges movement there. The vehicle path needs no gate -
+       boarding requires foot movement first, which the hold
+       already freezes, and entry always arrives via the dive on
+       foot. Test hook: window.__espilDistrictHoldState. */
+    var espilDistrictHoldSince=0, espilDistrictHoldOver=false, espilDistrictHoldRetryAt=0;
+    var ESPIL_DISTRICT_HOLD_CAP_MS=30000;
+    function espilDistrictHold(p){
+      if(espilDistrictBuilt){ espilDistrictHoldOver=true; return false; }
+      if(espilDistrictHoldOver)return false;
+      if(!p||p._espilLanding||p._espilArrive||p.flying)return false;
+      if(window.__espilInside)return false; /* the inside clamp owns interiors, not the district records */
+      var now=Date.now();
+      if(!espilDistrictHoldSince)espilDistrictHoldSince=now;
+      if(now-espilDistrictHoldSince>ESPIL_DISTRICT_HOLD_CAP_MS){
+        espilDistrictHoldOver=true;
+        console.warn('[District] fix batch 9: movement hold released after 30 s without a district build - movement is unjudged until the data lands');
+        return false;
+      }
+      if(!espilDistrictLoading&&now>=espilDistrictHoldRetryAt){ espilDistrictHoldRetryAt=now+2000; loadEspilDistrict(); }
+      return true;
+    }
+    window.__espilDistrictHoldState=function(){
+      return { built:!!espilDistrictBuilt, holding:!!(espilDistrictHoldSince&&!espilDistrictHoldOver&&!espilDistrictBuilt),
+        since:espilDistrictHoldSince||null, over:espilDistrictHoldOver, capMs:ESPIL_DISTRICT_HOLD_CAP_MS };
+    };
     function updateWalkMap(dt,t){
       var p=walkPlayer;
       if(!p)return;
@@ -13610,6 +13658,7 @@
       if(p._espilLanding){ix=0;iz=0;} /* ESPIL TILES BRIDGE: the land clip owns input until it settles */
       if(p._espilClimb){ix=0;iz=0;} /* ESPIL CLIMB: the climb step owns movement while attached */
       if(espilDead){ix=0;iz=0;} /* SURVIVAL S1: input frozen while the death choice is open */
+      if(espilDistrictHold(p)){ix=0;iz=0;} /* FIX BATCH 9: no movement while no collision judge exists (cold-load window, diagnosis 2c) */
       var il=Math.sqrt(ix*ix+iz*iz);
       if(il>1){ix/=il;iz/=il;}
       var fx=-Math.sin(walkCamYaw),fz=-Math.cos(walkCamYaw);

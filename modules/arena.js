@@ -138,8 +138,16 @@
   ];
   /* wave composition by round (DRAFT; tier unlock per design) */
   function poolForRound(r) {
-    if (r <= 2) return ['rat', 'wisp'];
-    if (r <= 4) return ['rat', 'wisp', 'stray', 'shambler'];
+    /* FIX BATCH 9 (diagnosis 3b): 'wisp' was deleted from
+       monsters.js KINDS on 2026-11-10 but stayed in these two
+       pools - __espilInstanceSpawn returns null for it, so 50% of
+       spawn picks in rounds 1-2 and 25% in rounds 3-4 were dead.
+       The pools now name only live kinds; rates and budgets are
+       unchanged (the spawn-director rewrite stays with D&D
+       Phase B step B2). Rounds 1-2 are single-kind ('rat') -
+       that was already the only live kind those rounds dealt. */
+    if (r <= 2) return ['rat'];
+    if (r <= 4) return ['rat', 'stray', 'shambler'];
     if (r === 5) return ['stray', 'shambler', 'brute'];
     if (r <= 7) return ['shambler', 'brute', 'wraith'];
     if (r <= 9) return ['brute', 'wraith', 'hound'];
