@@ -2539,6 +2539,14 @@
        gallery entry for that page load. */
     var espilVillageSuspended=false;
     function espilLandmark(){ var cfg=espilCityCfg(); return (cfg&&cfg.landmark)?cfg.landmark:null; }
+    /* NAME-ONLY ENTRY package 2 (2026-11-24): the landmark read
+       hook for lazy modules (the boat) - the registry above stays
+       the only home of the landmark data; this only reads it out. */
+    window.__espilLandmarkInfo=function(){
+      var lm=espilLandmark(); if(!lm)return null;
+      return {key:espilCityKey(),name:lm.name,x:lm.x,z:lm.z,face:lm.face,radius:lm.radius,
+        activities:(lm.activities||[]).slice(),boatArea:lm.boatArea?{x0:lm.boatArea.x0,x1:lm.boatArea.x1,z0:lm.boatArea.z0,z1:lm.boatArea.z1}:null};
+    };
     function espilVillageActive(){
       if(espilVillageSuspended)return false;
       if(!espilGuestNow())return false;
@@ -2573,8 +2581,12 @@
        landmark centre. PHOTO and EAT exist at every landmark;
        SWIM is a guidance row (the mechanic is the patched water
        itself - no new code); the ARENA row (Vancouver) is the
-       handoff of design section 5.2. The BOAT is package 2: the
-       registry keeps its field, no row is rendered here. */
+       handoff of design section 5.2. The BOAT row is package 2
+       (2026-11-24): a guidance row like swim, rendered only
+       where the registry carries a boatArea (a city whose grid
+       cannot support one keeps the activity in its list with
+       no row and no craft - London in v1); the craft itself
+       lives in the lazy boat.js module. */
     var espilPhotoMode=null;
     function espilLmGroundY(x,z){
       var y=null;
@@ -2712,6 +2724,10 @@
       if(acts.indexOf('photo')>=0)row('사진 찍기',espilPhotoStart);
       if(acts.indexOf('eat')>=0)row('음식 먹기',espilLandmarkEat);
       if(acts.indexOf('swim')>=0)row('수영하기',function(){ espilVillageNotice('부두 가장자리에서 물로 들어갈 수 있습니다'); });
+      if(acts.indexOf('boat')>=0&&lm.boatArea)row('배 타기',function(){
+        if(window.__espilBoat&&typeof window.__espilBoat.guideMooring==='function'){ window.__espilBoat.guideMooring(); }
+        else espilVillageNotice('부두 끝 계류지에서 배에 오를 수 있습니다');
+      });
       if(acts.indexOf('arena')>=0)row('아레나 가기',espilLandmarkArena);
       /* The account line is always the last row (the upgrade door). */
       row('계정이 있으면 로그인',function(){
@@ -13992,7 +14008,7 @@
       else if(!p.swimming&&_wasSwim)espilWaterExit(p);
       if(p.swimming){p._espilWaterX=p.pos.x;p._espilWaterZ=p.pos.z;}
       var _ms=moveSpeeds();
-      var SPEED=p.swimming?_ms.swim:((p.running?_ms.run:_ms.walk)*(window.__espilSpeedBoost||1)); /* fast track (Han 2026-10-28): street tiles x2 */
+      var SPEED=p.swimming?_ms.swim*((typeof window.__espilSwimBoost==='number')?window.__espilSwimBoost:1):((p.running?_ms.run:_ms.walk)*(window.__espilSpeedBoost||1)); /* fast track (Han 2026-10-28): street tiles x2. NAME-ONLY ENTRY package 2 (2026-11-24): the swim branch reads its own lever - __espilSwimBoost is the boat module's speed lever, the exact analogue of __espilSpeedBoost on the land branch; unset it reads 1 and every swimmer is unchanged. The read is typeof-based, NOT ||1: the boat module brakes the body with lever 0 at a harbour edge, and ||1 would read that 0 as 1 (full swim speed) - the P2 verification rig caught exactly that escape at the Canada Place shoreline */
       p._dx=mx*SPEED*dt;p._dz=mz*SPEED*dt;
       espilTreeOnMove(Math.sqrt(p._dx*p._dx+p._dz*p._dz)); /* Batch 6: shoes-tree metres */
       p.moving=il>.12;
