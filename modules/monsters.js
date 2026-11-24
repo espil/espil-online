@@ -101,9 +101,18 @@
      east of the spawn. Radius 40 m is the design DRAFT. Store
      interiors are safe by the interior rule, not by this circle. */
   var SAFE_ZONE = { x: 3, z: 33, r: 40 };
+  /* NAME-ONLY ENTRY (Han 2026-11-24): the landmark village holds
+     a second circle of the same radius at Canada Place (the
+     entrant summon) - no monster summons and no aggro inside
+     either circle. __espilSafeZone keeps reporting the gallery
+     circle; __espilSafeZoneAt judges the list. */
+  var SAFE_ZONES = [SAFE_ZONE, { x: 694, z: -560, r: 40 }];
   function inSafeZone(x, z) {
-    var dx = x - SAFE_ZONE.x, dz = z - SAFE_ZONE.z;
-    return (dx * dx + dz * dz) < SAFE_ZONE.r * SAFE_ZONE.r;
+    for (var i = 0; i < SAFE_ZONES.length; i++) {
+      var dx = x - SAFE_ZONES[i].x, dz = z - SAFE_ZONES[i].z;
+      if ((dx * dx + dz * dz) < SAFE_ZONES[i].r * SAFE_ZONES[i].r) return true;
+    }
+    return false;
   }
 
   /* ---- Zone radii (measured) ----

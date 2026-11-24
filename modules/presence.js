@@ -90,6 +90,11 @@
        style1, signed-in the master body. */
     try {
       var rec = JSON.parse(localStorage.getItem('espil_character') || 'null');
+      /* NAME-ONLY ENTRY (Han 2026-11-24): an entrant's record
+         carries the one neutral body - it rides the join frame
+         as 'neutral', and the Worker relays it (its join branch
+         accepts the id with no stamp; it carries no privilege). */
+      if (rec && rec.bodyChoice === 'neutral' && !localStorage.getItem('espil_session_v1')) return 'neutral';
       if (rec && ['master', 'style1', 'style2', 'style3', 'style4'].indexOf(rec.bodyChoice) >= 0) return rec.bodyChoice;
     } catch(_){}
     try { return localStorage.getItem('espil_session_v1') ? 'master' : 'style1'; } catch(_){ return 'style1'; }

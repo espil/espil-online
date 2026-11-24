@@ -1133,9 +1133,12 @@
   }
   function showLoginStep() {
     step = 'login';
-    /* Restructure (Han 2026-11-11): the step opens on the
-       three-entry list; a live session keeps the combined form. */
-    presentAuthStep(sessionRecord() ? null : 'choice');
+    /* Restructure (Han 2026-11-11): the step opened on the
+       three-entry list; a live session keeps the combined form.
+       NAME-ONLY ENTRY (Han 2026-11-24): the step now opens on the
+       NAME step - no login wall; the account forms branch off it
+       and return via Back. */
+    presentAuthStep(sessionRecord() ? null : 'name');
     if (typeof window.__espilOpenAuth === 'function') { window.__espilOpenAuth(); return; }
     var m = $('signin-modal');
     if (m) {
@@ -1405,8 +1408,47 @@
     }
     label.insertBefore(document.createTextNode(text), label.firstChild);
   }
+  /* NAME-ONLY ENTRY (Han 2026-11-24): the name step reuses the
+     guest step's box in the same list grammar - name input +
+     enter - with the gender/style sub-steps hidden (entrants wear
+     the one neutral body; there is nothing to pick), the guest
+     Back hidden (the name step is the root step), and the account
+     line as a first-class row under the enter button. Returning
+     entrants get their stored name prefilled. Prepared once. */
+  var espilNameStepReady = false;
+  function espilNameStepPrep() {
+    var gName = document.getElementById('guest-name');
+    if (gName && !gName.value) {
+      try { gName.value = (localStorage.getItem('espil_username') || '').trim(); } catch (e) {}
+    }
+    if (espilNameStepReady) return;
+    espilNameStepReady = true;
+    var gMale = document.getElementById('guest-char-male');
+    var gFemale = document.getElementById('guest-char-female');
+    var row = gMale && gMale.parentNode ? gMale.parentNode : (gFemale ? gFemale.parentNode : null);
+    if (row) row.style.display = 'none';
+    var s1 = document.getElementById('guest-style-1');
+    var sRow = s1 ? s1.parentNode : null;
+    if (sRow) sRow.style.display = 'none';
+    var gBack = document.getElementById('guest-back');
+    if (gBack) gBack.style.display = 'none';
+    var gGo = document.getElementById('guest-go');
+    if (gGo) gGo.textContent = '들어가기';
+    var guestBox = document.getElementById('auth-gueststep');
+    if (guestBox && gGo && !document.getElementById('auth-name-account')) {
+      var acct = document.createElement('button');
+      acct.type = 'button';
+      acct.id = 'auth-name-account';
+      acct.className = 'city-name';
+      acct.textContent = '계정이 있으면 로그인';
+      acct.addEventListener('click', function () { presentAuthStep('login'); });
+      if (gGo.nextSibling) guestBox.insertBefore(acct, gGo.nextSibling);
+      else guestBox.appendChild(acct);
+    }
+  }
   function presentAuthStep(name) {
     if (!authDiv) return;
+    if (name === 'guest') name = 'name'; /* legacy alias: the guest step IS the name step now */
     var choiceBox = document.getElementById('auth-choice');
     var guestBox = document.getElementById('auth-gueststep');
     var authBox = document.getElementById('auth-box');
@@ -1415,7 +1457,7 @@
     var formMode = (name === 'login' || name === 'signup');
     var formShown = formMode || name === null;
     if (choiceBox) choiceBox.hidden = name !== 'choice';
-    if (guestBox) guestBox.hidden = name !== 'guest';
+    if (guestBox) guestBox.hidden = name !== 'name';
     if (toBack) toBack.hidden = !formMode;
     if (authBox) authBox.style.display = formShown ? '' : 'none';
     if (guestEnter) guestEnter.style.display = name === null ? '' : 'none';
@@ -1470,7 +1512,8 @@
       var focusEl = isLogin ? idInput : nameInput;
       if (focusEl) { try { focusEl.focus({ preventScroll: true }); } catch (e) {} }
     }
-    if (name === 'guest') {
+    if (name === 'name') {
+      espilNameStepPrep();
       var gName = document.getElementById('guest-name');
       if (gName) { try { gName.focus({ preventScroll: true }); } catch (e) {} }
     }
@@ -1483,21 +1526,23 @@
     if (goLogin) goLogin.addEventListener('click', function () { presentAuthStep('login'); });
     if (goSignup) goSignup.addEventListener('click', function () { presentAuthStep('signup'); });
     if (goGuest) goGuest.addEventListener('click', function () {
-      /* Returning guest (Han 2026-11-17): a saved character AND
-         name on this device enter directly - the guest step is
-         the first-run completion path, not a per-visit form. */
-      if (espilReturningGuestEnter()) return;
-      presentAuthStep('guest');
+      /* NAME-ONLY ENTRY (Han 2026-11-24): the old Guest row lands
+         on the name step like everything else - entry is ONE
+         explicit click on the name step's enter button (the
+         2026-11-17 returning-guest fast path below is retired
+         with the guest step; its records are the same ones the
+         name step pre-fills and rewrites). */
+      presentAuthStep('name');
     });
     var toBack = document.getElementById('auth-toback');
-    if (toBack) toBack.addEventListener('click', function () { presentAuthStep('choice'); });
+    if (toBack) toBack.addEventListener('click', function () { presentAuthStep('name'); });
     var guestBack = document.getElementById('guest-back');
-    if (guestBack) guestBack.addEventListener('click', function () { presentAuthStep('choice'); });
+    if (guestBack) guestBack.addEventListener('click', function () { presentAuthStep('name'); });
     /* The name-claim Back (#auth-back, social.js's abandon control)
-       also returns the presentation to the three-entry list; its
+       also returns the presentation to the name step; its
        claim semantics stay with social.js's own listener. */
     var claimBack = document.getElementById('auth-back');
-    if (claimBack) claimBack.addEventListener('click', function () { presentAuthStep('choice'); });
+    if (claimBack) claimBack.addEventListener('click', function () { presentAuthStep('name'); });
     /* Apple / Facebook have no backend yet: on the landing the
        items are selectable and answer with an honest notice in the
        form's message line (the Google 503 pattern) instead of a
@@ -1580,34 +1625,71 @@
     var GUEST_RESERVED = ['espil', '에스필', 'lunaris', '루나리스', 'leo', '레오', 'admin', '어드민', 'official', 'system', 'guest'];
     var guestNameEl = document.getElementById('guest-name');
     var guestMsg = document.getElementById('guest-msg');
-    function guestGo() {
+    /* NAME-ONLY ENTRY (Han 2026-11-24): the name step's enter -
+       this replaces the guest step's guestGo. The reserved check
+       mirrors the Worker's isReservedName (reduced form: lowercase,
+       letters/digits only; a reserved word, or a reserved word
+       followed only by digits). The registered-name pre-check asks
+       the Worker (GET /auth/name/available) - a courtesy layer
+       that fails OPEN on any network trouble, because the CityRoom
+       join re-checks both rules for session-less sockets. On entry
+       the records are the guest machinery's own (espil_username +
+       the tab's named stamp, fix batch 7 item 2), with the
+       character record carrying the ONE neutral body and a fixed
+       gender - entrants never see a picker. */
+    var nameCheckInFlight = false;
+    function nameGo() {
+      if (nameCheckInFlight) return;
       var v = guestNameEl ? (guestNameEl.value || '').trim() : '';
       if (!v) { if (guestMsg) guestMsg.textContent = 'Please enter a name.'; return; }
-      if (GUEST_RESERVED.indexOf(v.toLowerCase()) >= 0) {
+      var reduced = v.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+      var reducedBase = reduced.replace(/[0-9]+$/, '');
+      if (GUEST_RESERVED.indexOf(reduced) >= 0 || (reducedBase !== reduced && GUEST_RESERVED.indexOf(reducedBase) >= 0)) {
         if (guestMsg) guestMsg.textContent = 'That name is reserved - please choose another.';
         return;
       }
-      try { localStorage.setItem('espil_username', v); } catch (e) {}
-      /* Fix batch 7 item 2 (Han 2026-11-12): stamp this tab's
-         session with the name the guest just gave HERE, so the
-         game page can tell "named on the landing a moment ago"
-         apart from any older stored name and never ask again.
-         sessionStorage rides the same-tab dive exactly like the
-         espil_pending_city handoff mark does. */
-      try { sessionStorage.setItem('espil_guest_named_v1', v); } catch (e) {}
-      try {
-        var rec = { gender: guestGender, ts: Date.now(), bodyChoice: 'style' + guestStyle };
-        if (window.__espilPendingLook && typeof window.__espilPendingLook === 'object') rec.look = window.__espilPendingLook;
-        localStorage.setItem('espil_character', JSON.stringify(rec));
-      } catch (e) {}
+      nameCheckInFlight = true;
       if (guestMsg) guestMsg.textContent = '';
-      var ge = document.getElementById('guest-enter');
-      if (ge) ge.click();
+      var proceed = function () {
+        nameCheckInFlight = false;
+        try { localStorage.setItem('espil_username', v); } catch (e) {}
+        try { sessionStorage.setItem('espil_guest_named_v1', v); } catch (e) {}
+        try {
+          var rec = { gender: 'male', ts: Date.now(), bodyChoice: 'neutral' };
+          if (window.__espilPendingLook && typeof window.__espilPendingLook === 'object') rec.look = window.__espilPendingLook;
+          localStorage.setItem('espil_character', JSON.stringify(rec));
+        } catch (e) {}
+        var ge = document.getElementById('guest-enter');
+        if (ge) ge.click();
+      };
+      var refuse = function (reason) {
+        nameCheckInFlight = false;
+        if (!guestMsg) return;
+        guestMsg.textContent = reason === 'taken'
+          ? '이미 계정으로 등록된 이름입니다'
+          : 'That name is reserved - please choose another.';
+      };
+      try {
+        /* The API base is resolved here, not read from the auth
+           module's scope (its API_BASE is private to that IIFE):
+           the same window override it honours, else production. */
+        var apiBase = (typeof window.__espilAuthApiBase === 'string' && window.__espilAuthApiBase) || 'https://api.espil.online';
+        var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+        var to = ctl ? setTimeout(function () { try { ctl.abort(); } catch (e) {} }, 2500) : 0;
+        fetch(apiBase + '/auth/name/available?name=' + encodeURIComponent(v), ctl ? { signal: ctl.signal } : {})
+          .then(function (r) { return r.json(); })
+          .then(function (j) {
+            if (to) clearTimeout(to);
+            if (j && j.available === false) refuse(j.reason === 'taken' ? 'taken' : 'reserved');
+            else proceed();
+          })
+          .catch(function () { if (to) clearTimeout(to); proceed(); });
+      } catch (e) { proceed(); }
     }
     var guestGoBtn = document.getElementById('guest-go');
-    if (guestGoBtn) guestGoBtn.addEventListener('click', guestGo);
+    if (guestGoBtn) guestGoBtn.addEventListener('click', nameGo);
     if (guestNameEl) guestNameEl.addEventListener('keydown', function (ev) {
-      if (ev.key === 'Enter') { ev.preventDefault(); guestGo(); }
+      if (ev.key === 'Enter') { ev.preventDefault(); nameGo(); }
     });
   })();
   setInterval(function () {

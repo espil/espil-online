@@ -830,7 +830,7 @@
       var r=espilCharRecord();
       return !!(r&&r.setupDone===true);
     }
-    function espilBodyName(c){ if(c==='lunaris')return 'Lunaris'; return c==='master'?'Master':'Style '+(c||'style1').slice(-1); }
+    function espilBodyName(c){ if(c==='lunaris')return 'Lunaris'; if(c==='neutral')return 'Neutral'; return c==='master'?'Master':'Style '+(c||'style1').slice(-1); }
     /* Change tickets live in the cash ledger (espil_cash_v1).
        This gate renders BEFORE the arrival bundle loads
        cashshop.js, so the count is read from the ledger store
@@ -907,6 +907,12 @@
       if(rec.gender!=='male'&&rec.gender!=='female')return false;
       var bc=rec.bodyChoice;
       if(bc==null||bc==='')return true; /* a pre-selection-era record: the designed defaults (espilBodyChoice) apply */
+      /* NAME-ONLY ENTRY (Han 2026-11-24): a 'neutral' record is
+         complete ONLY for the entrant population - a signed-in
+         arrival carrying a stale 'neutral' device record must
+         still present the panel and rewrite properly (the
+         account allowlist never carries the id). */
+      if(bc==='neutral')return espilGuestNow();
       return ESPIL_BODY_CHOICES.indexOf(bc)>=0;
     }
     function espilGateDesignated(){
@@ -2506,15 +2512,232 @@
        loads per page session; the landing sets window.__espilCityKey
        at entry and a city switch reloads (see startCityEntry). --- */
     var ESPIL_CITIES={
-      vancouver:{district:'assets/osm/vancouver_district_sample.json',collision:'assets/osm/vancouver_collision.json',ox:0,oz:0,core:true,bounds:{x0:-1799,z0:-2028,x1:2027,z1:1956},spawn:{x:3,z:31}}, /* bounds = the district extent, added 2026-10-19 for the last-place resume rule (Han PC verdict #9): resume judges the full playable extent, not the smaller downtown boundary polygon. First-summon place (Han 2026-10-18): the Vancouver Art Gallery's Robson Square plaza - gallery record bbox x[-46.9..52.9] z[-57.6..16.8], the point sits 14.2 m south of its south face on its centre axis, inside no footprint */
-      auckland:{district:'assets/osm/auckland_district.json',collision:'assets/osm/auckland_collision.json',ox:10000,oz:0,core:false,spawn:{x:10302.9,z:-1001.9},bounds:{x0:9243,z0:-1595,x1:11024,z1:1080},harbour:{w:3600,d:1750,dx:140,dz:-1865}},
-      tokyo:{district:'assets/osm/tokyo_district.json',collision:'assets/osm/tokyo_collision.json',ox:5000,oz:0,core:false,spawn:{x:4870,z:0},bounds:{x0:3010,z0:-2032,x1:7034,z1:2011}}, /* Tokyo (built 2026-10-18, restored to this tree 2026-10-19 after the production-mirror reset): OSM extract radius 2 km on Tokyo Station (35.68124, 139.76714), 18,002 buildings; spawn = local (-130, 0), the Marunouchi plaza in front of the station, 15.5 m clear of every footprint */
-      newyork:{district:'assets/osm/newyork_district.json',collision:'assets/osm/newyork_collision.json',ox:-5000,oz:0,core:false,spawn:{x:-5000,z:0},bounds:{x0:-6906,z0:-2063,x1:-2972,z1:2058}}, /* New York (2026-10-19): OSM extract radius 2 km on Times Square (40.75800, -73.98554), 9,020 buildings; spawn = local (0, 0), the Times Square pedestrian plaza at the anchor itself, 17.8 m clear of every footprint (offline scan of the shipped district records) */
-      paris:{district:'assets/osm/paris_district.json',collision:'assets/osm/paris_collision.json',ox:-10000,oz:0,core:false,spawn:{x:-10000,z:0},bounds:{x0:-12016,z0:-2049,x1:-7946,z1:2042}}, /* Paris (2026-10-19): OSM extract radius 2 km on the Trocadero (48.86272, 2.28756), 11,957 buildings; spawn = local (0, 0), the Trocadero parvis at the anchor itself, 42.8 m clear of every footprint (offline scan of the shipped district records); about half of Paris footprints carry no OSM height tag, so many fall back to the default height */
-      london:{district:'assets/osm/london_district.json',collision:'assets/osm/london_collision.json',ox:0,oz:-10000,core:false,spawn:{x:0,z:-10000},bounds:{x0:-1996,z0:-12051,x1:2074,z1:-7957}} /* London (2026-10-19): OSM extract radius 2 km on Trafalgar Square (51.50804, -0.12807), 13,911 buildings; spawn = local (0, 0), the square's centre between the fountains at the anchor itself, 22.5 m clear of every footprint (offline scan of the shipped district records); most London footprints carry no OSM height tag (86% in the default band), so the skyline reads flatter than the real city - height enrichment is future work */
+      vancouver:{district:'assets/osm/vancouver_district_sample.json',collision:'assets/osm/vancouver_collision.json',ox:0,oz:0,core:true,bounds:{x0:-1799,z0:-2028,x1:2027,z1:1956},spawn:{x:3,z:31},landmark:{name:'Canada Place',x:694,z:-560,face:0,radius:800,activities:['photo','eat','swim','boat','arena'],boatArea:{x0:600,x1:840,z0:-800,z1:-575},photo:{cx:694,cz:-560,camH:2,lx:694,lz:-649.8,lookH:16}}}, /* bounds = the district extent, added 2026-10-19 for the last-place resume rule (Han PC verdict #9): resume judges the full playable extent, not the smaller downtown boundary polygon. First-summon place (Han 2026-10-18): the Vancouver Art Gallery's Robson Square plaza - gallery record bbox x[-46.9..52.9] z[-57.6..16.8], the point sits 14.2 m south of its south face on its centre axis, inside no footprint */
+      auckland:{district:'assets/osm/auckland_district.json',collision:'assets/osm/auckland_collision.json',ox:10000,oz:0,core:false,spawn:{x:10302.9,z:-1001.9},bounds:{x0:9243,z0:-1595,x1:11024,z1:1080},harbour:{w:3600,d:1750,dx:140,dz:-1865},landmark:{name:'Sky Tower',x:9904,z:-406,face:0.795,radius:800,activities:['photo','eat'],photo:{cx:9904,cz:-406,camH:2,lx:9882.8,lz:-426.8,lookH:110}}},
+      tokyo:{district:'assets/osm/tokyo_district.json',collision:'assets/osm/tokyo_collision.json',ox:5000,oz:0,core:false,spawn:{x:4870,z:0},bounds:{x0:3010,z0:-2032,x1:7034,z1:2011},landmark:{name:'Tokyo Station',x:4870,z:0,face:-1.571,radius:800,activities:['photo','eat'],photo:{cx:4870,cz:0,camH:2,lx:5000,lz:0,lookH:12}}}, /* Tokyo (built 2026-10-18, restored to this tree 2026-10-19 after the production-mirror reset): OSM extract radius 2 km on Tokyo Station (35.68124, 139.76714), 18,002 buildings; spawn = local (-130, 0), the Marunouchi plaza in front of the station, 15.5 m clear of every footprint */
+      newyork:{district:'assets/osm/newyork_district.json',collision:'assets/osm/newyork_collision.json',ox:-5000,oz:0,core:false,spawn:{x:-5000,z:0},bounds:{x0:-6906,z0:-2063,x1:-2972,z1:2058},landmark:{name:'Central Park South',x:-4701,z:-919,face:-1.700,radius:800,activities:['photo','eat'],photo:{cx:-4701,cz:-919,camH:2,lx:-4214,lz:-855,lookH:6}}}, /* New York (2026-10-19): OSM extract radius 2 km on Times Square (40.75800, -73.98554), 9,020 buildings; spawn = local (0, 0), the Times Square pedestrian plaza at the anchor itself, 17.8 m clear of every footprint (offline scan of the shipped district records) */
+      paris:{district:'assets/osm/paris_district.json',collision:'assets/osm/paris_collision.json',ox:-10000,oz:0,core:false,spawn:{x:-10000,z:0},bounds:{x0:-12016,z0:-2049,x1:-7946,z1:2042},landmark:{name:'Eiffel Tower',x:-9492,z:590,face:0,radius:800,activities:['photo','eat'],photo:{cx:-9492,cz:686,camH:2,lx:-9491.7,lz:496.4,lookH:130}}}, /* Paris (2026-10-19): OSM extract radius 2 km on the Trocadero (48.86272, 2.28756), 11,957 buildings; spawn = local (0, 0), the Trocadero parvis at the anchor itself, 42.8 m clear of every footprint (offline scan of the shipped district records); about half of Paris footprints carry no OSM height tag, so many fall back to the default height */
+      london:{district:'assets/osm/london_district.json',collision:'assets/osm/london_collision.json',ox:0,oz:-10000,core:false,spawn:{x:0,z:-10000},bounds:{x0:-1996,z0:-12051,x1:2074,z1:-7957},landmark:{name:'Big Ben',x:180,z:-9185,face:-1.587,radius:800,activities:['photo','eat','boat'],photo:{cx:180,cz:-9185,camH:2,lx:240,lz:-9184,lookH:40}}} /* London (2026-10-19): OSM extract radius 2 km on Trafalgar Square (51.50804, -0.12807), 13,911 buildings; spawn = local (0, 0), the square's centre between the fountains at the anchor itself, 22.5 m clear of every footprint (offline scan of the shipped district records); most London footprints carry no OSM height tag (86% in the default band), so the skyline reads flatter than the real city - height enrichment is future work */
     };
     function espilCityKey(){ var k=window.__espilCityKey||'vancouver'; return ESPIL_CITIES[k]?k:'vancouver'; }
     function espilCityCfg(){ return ESPIL_CITIES[espilCityKey()]; }
+    /* NAME-ONLY ENTRY (Han 2026-11-24): the landmark village.
+       Every bundled city carries a landmark record (name / x / z /
+       face / radius / activities [/ boatArea] / photo) on its
+       ESPIL_CITIES entry above - world coordinates, radius the one
+       800 m draft for all six cities. The village rules bind the
+       ENTRANT population only: no espil_session_v1 record, the
+       same code fact espilGuestNow() tests, so the village rules
+       and the guest rules can never drift apart. An account
+       session appearing in place lifts every village rule on the
+       same signal (espilVillageActive re-reads the record every
+       call). Place-space child windows are outside the rules (the
+       mark test) - their own safeguard is the entry backstop in
+       __espilPlaceEnterSpace. One entry is exempt by design: the
+       landmark arena handoff (espilVillageSuspended, set when
+       espilEntryStart consumes the handoff mark) is an ordinary
+       gallery entry for that page load. */
+    var espilVillageSuspended=false;
+    function espilLandmark(){ var cfg=espilCityCfg(); return (cfg&&cfg.landmark)?cfg.landmark:null; }
+    function espilVillageActive(){
+      if(espilVillageSuspended)return false;
+      if(!espilGuestNow())return false;
+      if(!espilLandmark())return false;
+      try{ var mk=JSON.parse(sessionStorage.getItem('espil_store_space_v1')||'null'); if(mk&&mk.city&&mk.slug)return false; }catch(e){}
+      return true;
+    }
+    function espilVillageDist(x,z){ var lm=espilLandmark(); if(!lm)return 0; var dx=x-lm.x,dz=z-lm.z; return Math.sqrt(dx*dx+dz*dz); }
+    var ESPIL_VILLAGE_CLOSED_MSG='이 건물은 마을 밖에 있어 들어갈 수 없습니다. 계정을 만들면 도시 전체를 다닐 수 있습니다';
+    var ESPIL_VILLAGE_EDGE_MSG='마을의 경계입니다. 계정을 만들면 도시 전체를 다닐 수 있습니다';
+    function espilVillageNotice(msg){
+      if(window.__espilToast){ window.__espilToast(msg); return; }
+      var t=document.getElementById('toast');
+      if(t){ t.textContent=msg; t.classList.add('show'); clearTimeout(t._vt); t._vt=setTimeout(function(){ t.classList.remove('show'); },2600); }
+    }
+    function espilVillageClamp(p){
+      if(!espilVillageActive())return;
+      var lm=espilLandmark();
+      var dx=p.pos.x-lm.x, dz=p.pos.z-lm.z;
+      var d=Math.sqrt(dx*dx+dz*dz);
+      if(d>lm.radius){
+        var s=lm.radius/d;
+        p.pos.x=lm.x+dx*s; p.pos.z=lm.z+dz*s;
+        var nowV=performance.now();
+        if(p.moving&&nowV-(p._espilVillageNoteAt||0)>8000){ p._espilVillageNoteAt=nowV; espilVillageNotice(ESPIL_VILLAGE_EDGE_MSG); }
+      }
+    }
+    /* ---- Landmark activities (NAME-ONLY ENTRY, Han 2026-11-24) ----
+       Offered at the landmark, in the landing's list grammar (one
+       row per activity, the account line always last), to the
+       entrant population while it stands within 60 m of the
+       landmark centre. PHOTO and EAT exist at every landmark;
+       SWIM is a guidance row (the mechanic is the patched water
+       itself - no new code); the ARENA row (Vancouver) is the
+       handoff of design section 5.2. The BOAT is package 2: the
+       registry keeps its field, no row is rendered here. */
+    var espilPhotoMode=null;
+    function espilLmGroundY(x,z){
+      var y=null;
+      try{ y=(typeof espilOwnSurfaceY==='function')?espilOwnSurfaceY(x,z):null; }catch(e){}
+      if(y===null||y===undefined)y=(typeof walkPlayer!=='undefined'&&walkPlayer&&walkPlayer.pos)?walkPlayer.pos.y:0;
+      return y;
+    }
+    function espilPhotoStart(){
+      var lm=espilLandmark(); if(!lm||!lm.photo)return;
+      var gy=espilLmGroundY(lm.photo.cx,lm.photo.cz);
+      espilPhotoMode={cx:lm.photo.cx,cy:gy+lm.photo.camH,cz:lm.photo.cz,lx:lm.photo.lx,ly:gy+lm.photo.lookH,lz:lm.photo.lz};
+      var bar=document.getElementById('espil-photo-bar');
+      if(bar)bar.style.display='flex';
+    }
+    function espilPhotoEnd(){
+      espilPhotoMode=null;
+      var bar=document.getElementById('espil-photo-bar');
+      if(bar)bar.style.display='none';
+    }
+    function espilPhotoCapture(){
+      var finish=function(){
+        try{
+          var map=(typeof espilP1!=='undefined'&&espilP1)?espilP1.map:null;
+          var src=(map&&map.getCanvas)?map.getCanvas():null;
+          var over=(typeof renderer!=='undefined'&&renderer&&renderer.domElement)?renderer.domElement:null;
+          /* The overlay canvas is captured in the same task as a
+             forced render with the photo framing (its drawing
+             buffer is not preserved between tasks). When the P1
+             custom layer is live the map canvas already carries
+             the world; both are composited in draw order. */
+          if(over){ try{ renderer.render(mapScene,mapCamera); }catch(e){} }
+          if(!src&&!over)return;
+          var w=(src||over).width, h=(src||over).height;
+          var c=document.createElement('canvas'); c.width=w; c.height=h;
+          var g=c.getContext('2d');
+          if(src)g.drawImage(src,0,0,w,h);
+          if(over)g.drawImage(over,0,0,w,h);
+          c.toBlob(function(b){
+            if(!b)return;
+            var a=document.createElement('a');
+            a.href=URL.createObjectURL(b);
+            a.download='espil-photo.png';
+            document.body.appendChild(a); a.click();
+            setTimeout(function(){ URL.revokeObjectURL(a.href); if(a.parentNode)a.parentNode.removeChild(a); },4000);
+          },'image/png');
+        }catch(e){}
+      };
+      var map=(typeof espilP1!=='undefined'&&espilP1)?espilP1.map:null;
+      if(map&&typeof map.once==='function'){
+        var done=false;
+        var go=function(){ if(done)return; done=true; finish(); };
+        try{ map.once('idle',go); if(map.triggerRepaint)map.triggerRepaint(); }catch(e){ go(); }
+        setTimeout(go,1200);
+      } else finish();
+    }
+    function espilLandmarkEat(){
+      /* The existing held-food path, opened at the landmark: one
+         unit of the first held food leaves espil_owned_items and
+         the 'espil-item-used' event fires - panels' own listener
+         applies the RECOVERY table through __espilApplyRecovery,
+         exactly as the bag's Use button does. No new effects, no
+         new tables. */
+      var table=window.__espilFoodRestore;
+      var owned=[];
+      try{ owned=JSON.parse(localStorage.getItem('espil_owned_items')||'[]'); if(!Array.isArray(owned))owned=[]; }catch(e){ owned=[]; }
+      if(table){
+        for(var i=0;i<owned.length;i++){
+          if(table[owned[i]]){
+            var item=owned[i];
+            owned.splice(i,1);
+            try{ localStorage.setItem('espil_owned_items',JSON.stringify(owned)); }catch(e){}
+            try{ window.dispatchEvent(new CustomEvent('espil-item-used',{detail:{item:item}})); }catch(e){}
+            return;
+          }
+        }
+      }
+      espilVillageNotice('먹을 것이 없습니다 - 마을 안 가게에서 음식을 살 수 있습니다');
+    }
+    function espilLandmarkArena(){
+      /* Design section 5.2: the gallery geography does not move -
+         the row writes the handoff mark and reloads; the street
+         page consumes the mark at the next arrival (espilEntryStart)
+         and that one entry is an ordinary gallery entry. */
+      try{ sessionStorage.setItem('espil_arena_handoff_v1',JSON.stringify({city:espilCityKey(),at:Date.now()})); }catch(e){}
+      location.reload();
+    }
+    function espilLmUiBuild(){
+      if(document.getElementById('espil-lm-btn'))return;
+      var st=document.createElement('style');
+      st.textContent='#espil-lm-btn{position:fixed;left:14px;bottom:118px;z-index:26;display:none;padding:8px 14px;border-radius:10px;background:linear-gradient(180deg,rgba(84,56,31,.93),rgba(36,22,8,.95));border:1.5px solid #a97e46;color:#f5e6c8;font:700 13px Manrope,"Segoe UI",sans-serif;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.45)}'
+        +'#espil-lm-panel{position:fixed;left:14px;bottom:162px;z-index:26;display:none;flex-direction:column;gap:6px;padding:10px;border-radius:12px;background:rgba(24,16,7,.94);border:1.5px solid #a97e46;box-shadow:0 6px 18px rgba(0,0,0,.5);min-width:210px}'
+        +'#espil-lm-panel .espil-lm-title{color:#ffd97a;font:700 12px Manrope,"Segoe UI",sans-serif;letter-spacing:.04em;padding:0 2px 2px}'
+        +'#espil-lm-panel button{display:block;width:100%;text-align:left;padding:8px 12px;border-radius:8px;background:rgba(84,56,31,.55);border:1px solid rgba(169,126,70,.65);color:#f5e6c8;font:600 13px Manrope,"Segoe UI",sans-serif;cursor:pointer}'
+        +'#espil-lm-panel button:hover{border-color:#ffd97a}'
+        +'#espil-photo-bar{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:27;display:none;gap:8px}'
+        +'#espil-photo-bar button{padding:9px 18px;border-radius:10px;background:linear-gradient(180deg,rgba(84,56,31,.93),rgba(36,22,8,.95));border:1.5px solid #ffd97a;color:#f5e6c8;font:700 13px Manrope,"Segoe UI",sans-serif;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.45)}';
+      document.head.appendChild(st);
+      var btn=document.createElement('button');
+      btn.id='espil-lm-btn'; btn.type='button'; btn.textContent='랜드마크 활동';
+      btn.addEventListener('click',function(){
+        var panel=document.getElementById('espil-lm-panel');
+        if(panel)panel.style.display=(panel.style.display==='flex')?'none':'flex';
+      });
+      document.body.appendChild(btn);
+      var panel=document.createElement('div');
+      panel.id='espil-lm-panel';
+      document.body.appendChild(panel);
+      var bar=document.createElement('div');
+      bar.id='espil-photo-bar';
+      var cap=document.createElement('button');
+      cap.type='button'; cap.textContent='사진 찍기';
+      cap.addEventListener('click',espilPhotoCapture);
+      var close=document.createElement('button');
+      close.type='button'; close.textContent='닫기';
+      close.addEventListener('click',espilPhotoEnd);
+      bar.appendChild(cap); bar.appendChild(close);
+      document.body.appendChild(bar);
+    }
+    function espilLmPanelFill(){
+      var panel=document.getElementById('espil-lm-panel');
+      var lm=espilLandmark();
+      if(!panel||!lm)return;
+      panel.innerHTML='';
+      var title=document.createElement('div');
+      title.className='espil-lm-title';
+      title.textContent=lm.name;
+      panel.appendChild(title);
+      var acts=lm.activities||[];
+      function row(label,fn){
+        var b=document.createElement('button');
+        b.type='button'; b.textContent=label;
+        b.addEventListener('click',function(){ panel.style.display='none'; fn(); });
+        panel.appendChild(b);
+      }
+      if(acts.indexOf('photo')>=0)row('사진 찍기',espilPhotoStart);
+      if(acts.indexOf('eat')>=0)row('음식 먹기',espilLandmarkEat);
+      if(acts.indexOf('swim')>=0)row('수영하기',function(){ espilVillageNotice('부두 가장자리에서 물로 들어갈 수 있습니다'); });
+      if(acts.indexOf('arena')>=0)row('아레나 가기',espilLandmarkArena);
+      /* The account line is always the last row (the upgrade door). */
+      row('계정이 있으면 로그인',function(){
+        if(typeof window.__espilOpenAuth==='function'){ window.__espilOpenAuth(); }
+        else espilVillageNotice('계정을 만들면 도시 전체를 다닐 수 있습니다');
+      });
+    }
+    setInterval(function(){
+      try{
+        if(!document.body||!document.body.classList.contains('in-map'))return;
+        espilLmUiBuild();
+        var btn=document.getElementById('espil-lm-btn');
+        var panel=document.getElementById('espil-lm-panel');
+        var p=(typeof walkPlayer!=='undefined')?walkPlayer:null;
+        var near=!!(espilVillageActive()&&p&&p.pos&&espilVillageDist(p.pos.x,p.pos.z)<=60);
+        if(btn)btn.style.display=near?'block':'none';
+        if(!near){
+          if(panel)panel.style.display='none';
+          if(espilPhotoMode)espilPhotoEnd();
+        } else if(panel&&panel.style.display==='flex'){ /* rows already filled */ }
+        if(near&&panel){
+          var key=espilCityKey()+'|'+((espilLandmark()||{}).activities||[]).join(',');
+          if(panel._lmKey!==key){ panel._lmKey=key; espilLmPanelFill(); }
+        }
+      }catch(e){}
+    },1000);
     var ESPIL_CITY_KEYS={'Vancouver':'vancouver','Auckland':'auckland','Tokyo':'tokyo','New York':'newyork','Paris':'paris','London':'london'};
     var ESPIL_CITY_DISPLAY={vancouver:'Vancouver Downtown',auckland:'Auckland',tokyo:'Tokyo',newyork:'New York',paris:'Paris',london:'London'};
     /* EARLY DISTRICT FETCH (tiles loading package component 3,
@@ -2908,6 +3131,27 @@
       var last=null; try{ last=loadLastPos(); }catch(e){}
       var target=null;
       var locPick=null; try{ locPick=window.__espilSpawnPick||null; window.__espilSpawnPick=null; }catch(e){}
+      /* NAME-ONLY ENTRY (Han 2026-11-24): an entrant summons at the
+         entered city's landmark on EVERY entry (Play and Shop
+         alike - both dive through here): the saved-position resume
+         and the location-options pick are account geography and
+         are set aside for the entrant population. Account spawns
+         are untouched. The one exemption is the landmark arena
+         handoff: the activity list's arena row reloads with the
+         handoff mark, and this entry is then an ordinary gallery
+         entry (spawn at cfg.spawn, village rules suspended for
+         this page load) so the portal 8 m away is reachable. */
+      var lmTarget=null;
+      if(espilGuestNow()){
+        var arenaHandoff=false;
+        try{
+          var hm=JSON.parse(sessionStorage.getItem('espil_arena_handoff_v1')||'null');
+          if(hm){ sessionStorage.removeItem('espil_arena_handoff_v1'); if(hm.city===espilCityKey()&&Date.now()-(hm.at||0)<5*60*1000)arenaHandoff=true; }
+        }catch(e){}
+        espilVillageSuspended=arenaHandoff;
+        if(arenaHandoff){ last=null; locPick=null; lmTarget={x:cfg.spawn.x,z:cfg.spawn.z}; }
+        else if(cfg.landmark){ last=null; locPick=null; lmTarget={x:cfg.landmark.x,z:cfg.landmark.z}; }
+      }
       if(last&&!locPick){
         /* Returning player INSIDE the downtown boundary: resume at the
            saved spot, no descent (unchanged). The loader still covers
@@ -2952,7 +3196,7 @@
            (geolocation pre-prompt included) over it. */
         target=espilResolveSpawn({x:last.x,z:last.z});
       } else {
-        target=locPick?{x:locPick.x,z:locPick.z}:(cfg.core?{x:p.pos.x,z:p.pos.z}:{x:cfg.spawn.x,z:cfg.spawn.z}); /* Han 2026-10-28: an explicit arrival pick beats the default spawn */
+        target=lmTarget?lmTarget:(locPick?{x:locPick.x,z:locPick.z}:(cfg.core?{x:p.pos.x,z:p.pos.z}:{x:cfg.spawn.x,z:cfg.spawn.z})); /* Han 2026-10-28: an explicit arrival pick beats the default spawn; NAME-ONLY ENTRY (2026-11-24): the landmark target beats both, for the entrant population only */
       }
       /* Han 2026-10-15: on a cold first load the descent scene was
          over before the world had finished loading (the character and
@@ -2962,6 +3206,10 @@
       espilInjectStyle();
       document.body.classList.add('espil-ui-pre');
       p.pos.x=target.x; p.pos.z=target.z; p.pos.y=0;
+      /* NAME-ONLY ENTRY: a landmark summon lands facing the
+         landmark subject (the registry's face yaw); the handoff
+         entry keeps the gallery's ordinary facing. */
+      if(lmTarget&&cfg.landmark&&lmTarget.x===cfg.landmark.x&&lmTarget.z===cfg.landmark.z&&typeof cfg.landmark.face==='number')walkCamYaw=cfg.landmark.face;
       espilEntrySpawn={x:target.x,z:target.z};
       espilShowMapLoader();
       var tries=0;
@@ -4344,9 +4592,16 @@
        The presence join frame carries the choice as `body`
        (Worker-sanitised) so peers render the chosen body. ---- */
     var ESPIL_BODY_CHOICES=['master','style1','style2','style3','style4'];
+    /* NAME-ONLY ENTRY (Han 2026-11-24): the entrant uniform's
+       interim binding - see the neutral branch in
+       buildPlayerAvatar. NOT a body choice: 'neutral' stands
+       outside ESPIL_BODY_CHOICES (the customizer-once five) and
+       is accepted only on the entrant paths. */
+    var ESPIL_NEUTRAL_INTERIM_STYLE=1;
     function espilBodyChoiceSaved(){
       try{var s=JSON.parse(window.localStorage.getItem('espil_character')||'null');
-        if(s&&ESPIL_BODY_CHOICES.indexOf(s.bodyChoice)>=0)return s.bodyChoice;}catch(e){}
+        if(s&&ESPIL_BODY_CHOICES.indexOf(s.bodyChoice)>=0)return s.bodyChoice;
+        if(s&&s.bodyChoice==='neutral')return 'neutral';}catch(e){}
       return null;
     }
     function espilBodyChoice(){
@@ -4389,6 +4644,7 @@
       if(espilDesignatedBody()==='lunaris')return 'lunaris';
       var mode=espilGuestBodyMode();
       if(espilGuestNow()){
+        if(espilBodyChoice()==='neutral')return 'neutral'; /* NAME-ONLY ENTRY: the entrant slot's own key */
         if(mode==='chibi')return 'chibi:'+espilBodyChoice();
         if(mode==='kaykit')return 'kaykit';
         return 'sprite';
@@ -6542,6 +6798,18 @@
       if(typeof ESPIL_P1!=='undefined'&&ESPIL_P1){
         var _la=espilNearestLabelAnchor(walkPlayer.pos.x,walkPlayer.pos.z);
         if(!_la){espilSpaceTooFar();return;}
+        /* NAME-ONLY ENTRY (Han 2026-11-24): layered BEHIND the
+           anchor judgement above - the prompt was presented and
+           the press resolved exactly as today; only now, for an
+           entrant, a building whose centre sits outside the
+           village radius answers with the closed notice instead
+           of opening its panel. The anchor judgement itself is
+           untouched; in-village buildings behave exactly as
+           today. */
+        if(espilVillageActive()&&espilVillageDist(_la.rec.cx,_la.rec.cz)>espilLandmark().radius){
+          espilVillageNotice(ESPIL_VILLAGE_CLOSED_MSG);
+          return;
+        }
         if(walkPlayer.av&&walkPlayer.av.playOneShot){
           walkPlayer.av.playOneShot(Math.random()>.5?'checkout':'chat');
         }
@@ -8774,6 +9042,22 @@
     }
     window.__espilPlaceEnterSpace=function(info){
       var p=walkPlayer; if(!p||!info)return null;
+      /* NAME-ONLY ENTRY backstop (Han 2026-11-24): the child-window
+         safeguard - this runs in the place child too, so a composed
+         or directly-addressed child for an out-of-village building
+         refuses the summon with the closed notice for the entrant
+         population (no session record in this origin). Account
+         sessions are never judged here. (An opener-less direct
+         entry is the design's stated v1 limit: the child still
+         boots its street arrival, it simply never enters the
+         space.) */
+      if(info.street&&espilGuestNow()){
+        var cfgB=espilCityCfg();
+        if(cfgB&&cfgB.landmark&&Math.hypot(info.street.x-cfgB.landmark.x,info.street.z-cfgB.landmark.z)>cfgB.landmark.radius){
+          espilVillageNotice(ESPIL_VILLAGE_CLOSED_MSG);
+          return null;
+        }
+      }
       if(p.flying||p._fall)espilFlyClear(); /* fly state clears on space entry, as on interior entry */
       /* The routed interior's entry framing: the FPV street zoom,
          restored on the same-window exit below. */
@@ -9921,6 +10205,16 @@
          style, exactly as they do for the local player. */
       var peerBody=(info&&typeof info.body==='string'&&ESPIL_BODY_CHOICES.indexOf(info.body)>=0)?info.body:null;
       var mode=espilGuestBodyMode();
+      if(info&&info.body==='neutral'){
+        /* NAME-ONLY ENTRY (Han 2026-11-24): an entrant peer wears
+           the neutral slot - the same interim binding as the local
+           builder (the chibi template at
+           ESPIL_NEUTRAL_INTERIM_STYLE) until the monk asset lands;
+           the id does not change. */
+        if(mode==='chibi')return __espilBuildChibiRemote(gender,ESPIL_NEUTRAL_INTERIM_STYLE);
+        if(mode==='kaykit')return __espilBuildKaykitRemote(gender);
+        return __espilBuildSpriteRemote(gender);
+      }
       if(peerBody&&peerBody!=='master'){
         if(mode==='chibi')return __espilBuildChibiRemote(gender,espilCbStyleNum(peerBody));
         if(mode==='kaykit')return __espilBuildKaykitRemote(gender);
@@ -11425,7 +11719,20 @@
         av=buildLunarisAvatar(gender);
       }else if(espilGuestNow()){
         var mode=espilGuestBodyMode();
-        if(mode==='chibi')av=buildChibiAvatar(gender,espilCbStyleNum(espilBodyChoice()));
+        if(espilBodyChoice()==='neutral'){
+          /* NAME-ONLY ENTRY (Han 2026-11-24): the neutral slot.
+             INTERIM BINDING, stated plainly: the monk GLB does not
+             exist yet (the asset line is producing it), so until
+             it lands the slot renders through the chibi builder at
+             ESPIL_NEUTRAL_INTERIM_STYLE - the design's own
+             proportion family (its section 4.3 puts the monk in
+             the chibi family) and today's guest default. This is
+             NOT the monk body. When the asset lands, THIS branch
+             swaps to the monk builder; the 'neutral' id, the join
+             frame and the body key do not change. */
+          av=buildChibiAvatar(gender,ESPIL_NEUTRAL_INTERIM_STYLE);
+        }
+        else if(mode==='chibi')av=buildChibiAvatar(gender,espilCbStyleNum(espilBodyChoice()));
         else if(mode==='kaykit')av=buildKaykitAvatar(gender);
         else av=buildSpriteAvatar(gender);
       }else{
@@ -13633,6 +13940,7 @@
         if(fwant.y<1.4)fwant.y=1.4;
         mapCamera.position.lerp(fwant,Math.min(1,dt*7));
         mapCamera.lookAt(p.pos.x,p.pos.y+1.7,p.pos.z);
+        espilVillageClamp(p); /* NAME-ONLY ENTRY: the village ring binds flight too */
         return;
       }
       /* Batch G: a scripted arrival/landing takes the body - a fall
@@ -13659,6 +13967,7 @@
       if(p._espilClimb){ix=0;iz=0;} /* ESPIL CLIMB: the climb step owns movement while attached */
       if(espilDead){ix=0;iz=0;} /* SURVIVAL S1: input frozen while the death choice is open */
       if(espilDistrictHold(p)){ix=0;iz=0;} /* FIX BATCH 9: no movement while no collision judge exists (cold-load window, diagnosis 2c) */
+      if(espilPhotoMode){ix=0;iz=0;} /* NAME-ONLY ENTRY: the photo framing holds the body still while photo mode is open */
       var il=Math.sqrt(ix*ix+iz*iz);
       if(il>1){ix/=il;iz/=il;}
       var fx=-Math.sin(walkCamYaw),fz=-Math.cos(walkCamYaw);
@@ -13705,6 +14014,7 @@
           p.pos.x*=s;p.pos.z*=s;
         }
       }
+      espilVillageClamp(p); /* NAME-ONLY ENTRY (Han 2026-11-24): the village ring - radial clamp + slide at the landmark radius, cadence-limited notice, no rendered wall (the helper carries the population + exemption tests) */
       espilPlayerCollide(p); /* player-player collision (2026-10-27) */
       espilInsideTick(p); /* IN-PLACE INTERIOR (Han batch 5 #1): footprint clamp + door state while inside a building */
       espilTimeStoneCollide(p);
@@ -13896,7 +14206,14 @@
       p.av.shadow.position.set(p.pos.x,support+.03,p.pos.z);
       p.av.shadow.material.opacity=Math.max(.08,.26-Math.max(0,p.pos.y-support)*.05);
       /* --- follow camera --- */
-      if(espilKbFpvActive()){
+      if(espilPhotoMode){
+        /* NAME-ONLY ENTRY photo framing (Han 2026-11-24): while
+           photo mode is open the camera sits at the registry's
+           photo point looking at the landmark subject; the follow
+           camera resumes on the frame photo mode closes. */
+        mapCamera.position.set(espilPhotoMode.cx,espilPhotoMode.cy,espilPhotoMode.cz);
+        mapCamera.lookAt(espilPhotoMode.lx,espilPhotoMode.ly,espilPhotoMode.lz);
+      }else if(espilKbFpvActive()){
         /* KONBINIYA FPV (overlay path): the camera sits at the
            player's own eye (1.6 m - the standalone store page's EYE)
            and looks along the view yaw; the avatar group and its
