@@ -155,13 +155,52 @@
      lock, the sharing seam and the interim visual are v1's,
      unchanged. Worker: NO change - every state here is
      client-local memory, as measured for P2.
+   V3 AMENDMENT - BOAT OWNERSHIP (Han 2026-11-25, via the
+   boat-ownership JUNCTION): the boat is now something the
+   PLAYER HAS. The v1/v2 headers above stand as the record of
+   the fixture grammar; this block names what ownership
+   replaces:
+   - The population gate is RETIRED: the old entrant test
+     no longer decides who gets a boat. ownsBoat() - the Harbour Boat
+     item in the player's bag (panels DB, kind 'tool', bound,
+     granted free to accounts and guests alike) - is the only
+     gate, and in v1 every player carries it.
+   - The standing craft is RETIRED: no boat waits in the
+     world. Modes are 'undeployed' | 'arriving' (the dormant
+     course) | 'driving' | 'deployed' (afloat, owner in the
+     water, not aboard) | 'beached' (the ~1 s beaching fade).
+     The mooring survives only as the dormant course's
+     approach reference and the harbour marker's old home.
+   - DEPLOY: the swim-state transition itself summons the
+     boat - it appears at the swimming player's position,
+     bow along their heading, and they are aboard as driver
+     in the same beat. Wading (not swimming) never deploys.
+   - RELEASE ("나오면 해제"): beaching steps the rider
+     ashore and the craft despawns into possession after a
+     short fade; a bail-out leaves the craft deployed while
+     the owner swims (re-boardable at BOARD_RANGE), and it
+     despawns the moment they leave the water unaboard;
+     death and interiors return it to possession at once.
+     flipLastRide and the whole in-place-flip machinery are
+     RETIRED - an upgrade changes nothing about the boat.
+   - The guest boat ARRIVAL retires as the entry path
+     (directive 3: the first summon is never on water - the
+     monolith's entrant branch now summons at the land
+     point). startArrival() and its course stay in this file
+     DORMANT, with no caller: the deploy is their successor.
+   - The model is the asset line's delivered boat.glb
+     (BOAT_GLB below); the primitives craft is the loader's
+     fallback only. Sharing stays local-only (section: the
+     seam above), Worker unchanged, boatArea confinement
+     stays Vancouver's; in cities without one the water
+     body itself confines, through the same nose probe.
    Module sources are TAGLESS (house rule) - no script tags. */
 (function () {
   'use strict';
   if (window.__espilBoat) return;
 
   /* ================= constants ================= */
-  var BOAT_GLB = null;             /* asset-line seam: 'assets/vehicles/boat.glb' when delivered */
+  var BOAT_GLB = 'assets/vehicles/boat.glb';   /* V3: the asset line's delivered model - the owned boat's model */
   var BOAT_LENGTH_M = 5.2;         /* small open harbour boat */
   var BOAT_HALF_LEN_M = BOAT_LENGTH_M / 2;
   var NOSE_PROBE_M = BOAT_HALF_LEN_M + 0.45;   /* water-stop nose probe reach (the car's shape) */
@@ -171,6 +210,8 @@
   var TURN_RATE = 2.2;             /* rad/s - a boat turns slower than the car */
   var BOARD_RANGE = 4.6;           /* player-to-centre boarding range, from the water */
   var COURSE_SPEED = 4;            /* m/s - the assisted arrival course (the retired empty glide's speed) */
+  var BOAT_ITEM = 'Harbour Boat';  /* V3: the panels DB name of the owned boat (kind 'tool', bound) */
+  var BEACH_FADE_MS = 1000;        /* V3: a beached craft holds its pose this long, then despawns into possession */
   var SWIM_BASE = 4;               /* moveSpeeds().swim - the lever's divisor */
   /* Mooring points, world coordinates (the vehicles DEALER
      precedent: a place this module owns). Vancouver's was
@@ -218,7 +259,24 @@
       return !!(s && s.id && s.server === true);
     } catch (e) { return false; }
   }
-  function entrantNow() { return !signedIn(); }
+  /* V3: the population gate is retired - ownsBoat() is the
+     only gate. It reads the bag through panels' gear hook,
+     with the bag's own storage key as the fallback (the
+     signedIn() read pattern above). */
+  function ownsBoat() {
+    try {
+      var g = window.__espilGear;
+      if (g && typeof g.owned === 'function') {
+        var o = g.owned();
+        for (var i = 0; i < o.length; i++) if (o[i].name === BOAT_ITEM) return o[i].n > 0;
+        return false;
+      }
+    } catch (e) {}
+    try {
+      var a = JSON.parse(localStorage.getItem('espil_owned_items') || '[]');
+      return Array.isArray(a) && a.indexOf(BOAT_ITEM) >= 0;
+    } catch (e) { return false; }
+  }
   function notice(msg) {
     try { if (window.__espilToast) { window.__espilToast(msg); return; } } catch (e) {}
     var t = $('toast');
@@ -232,16 +290,30 @@
     var r = probe(x, z);
     return !!(r && (r.cls === 'water' || r.swimmable));
   }
+  /* The swim read the deploy/release transitions use: the
+     monolith's own isWaterAt grid branch mirrored on the
+     same probe authority (the centre cell, else the four
+     half-body offsets of its shoreline-forgiveness rule),
+     so the transitions flip exactly where the game's
+     swimming state flips (junction 3.2). */
+  function swimRead(x, z) {
+    if (isWater(x, z)) return true;
+    var offs = [[1.5, 0], [-1.5, 0], [0, 1.5], [0, -1.5]];
+    for (var i = 0; i < 4; i++) if (isWater(x + offs[i][0], z + offs[i][1])) return true;
+    return false;
+  }
   function landmarkInfo() {
     try { return window.__espilLandmarkInfo ? window.__espilLandmarkInfo() : null; } catch (e) { return null; }
   }
-  /* V2 state grammar: 'arriving' is a driving state (the
-     course drives the same walk pipeline, levers, combat
-     lock and hidden rider as the helm); the boardable rest
-     states are the mooring rest and the two stays-put forms
-     the arrival grammar leaves behind. */
+  /* V3 state grammar: 'arriving' is a driving state (the
+     dormant course drives the same walk pipeline, levers,
+     combat lock and hidden rider as the helm); the one
+     boardable state is 'deployed' - the owner's craft
+     afloat while they swim. There is no moored rest and no
+     stays-put form: out of the water, there is no boat in
+     the world at all. */
   function drivingState() { return craft.mode === 'driving' || craft.mode === 'arriving'; }
-  function boardableState() { return craft.mode === 'moored' || craft.mode === 'beached' || craft.mode === 'anchored'; }
+  function boardableState() { return craft.mode === 'deployed'; }
   function probeWalkable(x, z) {
     var r = probe(x, z);
     return !!(r && r.walkable);
@@ -313,7 +385,7 @@
      here: mode, pose, speed, who drives, who rides. v1 keeps it
      local; the relay named in the header fills the same shape. */
   var craft = {
-    mode: 'moored',                /* 'moored' (armed rest) | 'arriving' | 'driving' | 'beached' | 'anchored' | 'gone' */
+    mode: 'undeployed',            /* V3: 'undeployed' | 'arriving' | 'driving' | 'deployed' | 'beached' (the fade) */
     x: 0, z: 0, face: 0,           /* craft pose (module-owned while moored/returning; follows the driver while driving) */
     speed: 0,                      /* the boat's own speed state, m/s */
     driver: null,                  /* 'me' in v1; a peer session id once the relay lands */
@@ -323,9 +395,10 @@
   var armedArea = null;            /* the registry boatArea of that city */
   var armedMooring = null;         /* MOORINGS[armedKey] */
   var armedSpawn = null;           /* the registry arrivalSpawn while the landmark carries arrival:'boat' */
-  var wasEntrant = false;          /* this page has been entrant-populated (the flip test's memory) */
-  var course = null;               /* the assisted arrival course {legs:[{x,z}], i} while 'arriving' */
-  var flipLastRide = false;        /* a session appeared mid-drive: the next release vanishes the boat */
+  var course = null;               /* the assisted arrival course {legs:[{x,z}], i} while 'arriving' (dormant in V3) */
+  var beachedAt = 0;               /* V3: when the current beaching settled (the fade timer) */
+  var prevSwim = false;            /* V3: the previous tick's swim read (the deploy/release transitions) */
+  var beachLatch = false;          /* V3 fix (verification 2026-11-25): a beaching whose rider stands in the shoreline-forgiveness margin - the release stands; the deploy re-fires only when the owner reaches centre-cell water or makes a fresh swim entry */
   var lastAfloat = null;           /* the last driving pose that read water (the dry valve's beach pose) */
   var guideUntil = 0;              /* guideToBoat(): the marker re-point window's end (performance.now ms) */
   var heading = 0;                 /* driving heading; vector = (sin h, cos h) */
@@ -506,9 +579,14 @@
   }
   function syncBoatVisual(force) {
     if (!boatGroup) return;
-    var show = !!armedMooring && entrantNow() && craft.mode !== 'gone';
+    /* V3: a craft is in the world exactly while it is
+       deployed - driving, on the dormant course, afloat
+       undeployed-owner-swimming ('deployed'), or in its
+       beaching fade. The marker accompanies only a deployed
+       craft: there is no dock fixture left to signpost. */
+    var show = craft.mode === 'driving' || craft.mode === 'arriving' || craft.mode === 'deployed' || craft.mode === 'beached';
     boatGroup.visible = show;
-    if (markerGroup) markerGroup.visible = show;
+    if (markerGroup) markerGroup.visible = (craft.mode === 'deployed');
     if (!show) return;
     var t = performance.now() / 1000;
     if (drivingState()) {
@@ -519,17 +597,11 @@
       boatGroup.position.set(craft.x, 0.27 + Math.sin(t * 0.9) * 0.035, craft.z);
       boatGroup.rotation.set(Math.sin(t * 0.7) * 0.012, craft.face, Math.sin(t * 0.55) * 0.012);
     }
-    if (markerGroup && armedMooring) {
-      /* the marker rests at the mooring (the harbour's fixed
-         point); while a guideToBoat() window runs it stands
-         at the craft itself, wherever the guest left it */
-      if (performance.now() < guideUntil && !drivingState()) {
-        markerGroup.position.set(craft.x, 0.26 + Math.sin(t * 0.9) * 0.03, craft.z);
-        markerGroup.scale.set(1.35, 1, 1.35);
-      } else {
-        markerGroup.position.set(armedMooring.x, 0.26 + Math.sin(t * 0.9) * 0.03, armedMooring.z);
-        markerGroup.scale.set(1, 1, 1);
-      }
+    if (markerGroup && craft.mode === 'deployed') {
+      /* the marker stands at the deployed craft, so its
+         owner can find it again across the harbour */
+      markerGroup.position.set(craft.x, 0.26 + Math.sin(t * 0.9) * 0.03, craft.z);
+      markerGroup.scale.set(1.35, 1, 1.35);
     }
   }
 
@@ -622,24 +694,31 @@
     craft.speed = 0; measured = 0;
     course = null;
   }
-  /* Every way a ride ends lands here: the craft settles into
-     its stays-put form - unless a session appeared mid-drive,
-     in which case this release is the boat's last and it
-     vanishes instead of anchoring (design 5). The caller has
-     already set the craft's final pose. */
-  function finishRide(mode) {
-    releaseDrive();
-    craft.driver = null;
-    if (flipLastRide) { vanishCraft(); return; }
-    craft.mode = mode;
-    publishState();
-  }
-  function vanishCraft() {
-    releaseDrive();
+  /* V3 settles - every way a ride ends returns the boat to
+     its owner. despawnToPossession() is the state half (the
+     craft leaves the world; the item simply stays in the
+     bag); releaseToPossession() adds the drive release for
+     callers who are still driving. settleBeached() is the
+     beaching form: the ride is over, the craft holds its
+     beached pose for the fade (BEACH_FADE_MS, in the tick),
+     then despawns - it does not stay. */
+  function despawnToPossession() {
     craft.driver = null;
     craft.passengers = [];
-    flipLastRide = false;
-    craft.mode = 'gone';
+    course = null;
+    craft.mode = 'undeployed';
+    publishState();
+    syncBoatVisual(true);
+  }
+  function releaseToPossession() {
+    releaseDrive();
+    despawnToPossession();
+  }
+  function settleBeached() {
+    releaseDrive();
+    craft.driver = null;
+    craft.mode = 'beached';
+    beachedAt = performance.now();
     publishState();
     syncBoatVisual(true);
   }
@@ -668,10 +747,42 @@
     publishState();
     syncBoatVisual(true);
   }
+  /* THE DEPLOY (ownership 3.2): the swim transition itself
+     is the summon. The craft appears at the swimming
+     player's position, bow along their heading, and
+     engageDrive() puts them aboard as its driver in the
+     same beat - no key, no trip to a mooring. The deploy
+     never places the PLAYER anywhere: it puts the boat
+     under a player who is already legally swimming, so it
+     cannot strand anyone. The gate is the drive code's own
+     state checks: owner, alive, not flying, not inside,
+     not already in a vehicle. */
+  function canDeploy() {
+    if (!ownsBoat()) return false;
+    if (window.__espilInside) return false;
+    if (flyActive()) return false;
+    if (playerDead()) return false;
+    try { var vs = window.__espilVehicles && window.__espilVehicles.state(); if (vs && vs.mode === 'driving') return false; } catch (e) {}
+    return true;
+  }
+  function deployBoat(p) {
+    craft.x = p.x; craft.z = p.z;
+    /* the pose angle's forward is (-sin a, -cos a) (the
+       camForward fallback's convention); the bow reads
+       (sin h, cos h), so the two align at h = a + PI */
+    heading = (typeof p.a === 'number' && isFinite(p.a)) ? p.a + Math.PI : heading;
+    craft.face = heading;
+    engageDrive();
+    craft.driver = 'me';
+    craft.mode = 'driving';
+    publishState();
+    toast('배가 나왔습니다 (Space: 내리기)');
+    syncBoatVisual(true);
+  }
   function board() {
     if (drivingState()) return { ok: true, already: true };
     if (!boardableState()) return { ok: false, why: 'away' };
-    if (!armedMooring || !entrantNow()) return { ok: false, why: 'population' };
+    if (!ownsBoat()) return { ok: false, why: 'notowned' };
     /* one body, one vehicle: never board over a live car drive
        (the two modules steer the same walk pipeline) */
     try { var vs = window.__espilVehicles && window.__espilVehicles.state(); if (vs && vs.mode === 'driving') return { ok: false, why: 'vehicle' }; } catch (e) {}
@@ -703,7 +814,16 @@
     var p = playerPos();
     if (!p) return { ok: false, why: 'nopose' };
     craft.x = p.x; craft.z = p.z; craft.face = heading;
-    finishRide('anchored');
+    /* V3: the bail-out leaves the craft DEPLOYED - afloat
+       where it floats while its owner swims, re-boardable
+       at BOARD_RANGE; it despawns into possession when
+       they leave the water unaboard (the tick's swim-exit
+       transition). */
+    releaseDrive();
+    craft.driver = null;
+    craft.mode = 'deployed';
+    publishState();
+    syncBoatVisual(true);
     toast('배에서 내렸습니다');
     return { ok: true };
   }
@@ -719,18 +839,22 @@
     return { ok: false, why: 'norelay' };
   }
   function guideToBoat() {
-    /* V2 guidance: the landmark row guides to the guest's
-       boat WHEREVER IT WAS LEFT (design 2/4) - the marker
-       leaves the mooring and stands at the craft for the
-       guide window (syncBoatVisual), with the distance in
-       the notice. */
-    if (!armedMooring || craft.mode === 'gone') { notice('부두 가장자리에서 물로 들어갈 수 있습니다'); return; }
+    /* V3 guidance (junction 4): there is usually no boat in
+       the world to find - the row's meaning is instruction.
+       The boat is the entrant's own and comes out by itself
+       in the water; only a currently deployed craft (left
+       afloat by a bail-out) is something to point at, and
+       the marker already stands on it while it floats. */
     if (drivingState()) { notice('배를 타고 있습니다'); return; }
-    var p = playerPos();
-    if (p) notice('배는 마지막으로 내린 곳에 있습니다 (약 ' + Math.round(Math.hypot(p.x - craft.x, p.z - craft.z)) + ' m)');
-    else notice('배는 마지막으로 내린 곳에 있습니다');
-    guideUntil = performance.now() + 4000;
-    syncBoatVisual(true);
+    if (craft.mode === 'deployed') {
+      var p = playerPos();
+      if (p) notice('배가 물에 떠 있습니다 (약 ' + Math.round(Math.hypot(p.x - craft.x, p.z - craft.z)) + ' m)');
+      else notice('배가 물에 떠 있습니다');
+      guideUntil = performance.now() + 4000;
+      syncBoatVisual(true);
+      return;
+    }
+    notice('배는 물에 들어가면 자동으로 나옵니다');
   }
   /* The v1 name, kept as an alias: the shipped landmark row
      called guideMooring(); the re-pointed row prefers
@@ -751,7 +875,7 @@
         alight();
         return;
       }
-      if (boardableState() && armedMooring && entrantNow() && !window.__espilInside) {
+      if (boardableState() && ownsBoat() && !window.__espilInside) {
         var p = playerPos();
         if (p && Math.hypot(p.x - craft.x, p.z - craft.z) <= BOARD_RANGE) {
           e.stopPropagation(); e.preventDefault();
@@ -775,41 +899,30 @@
 
   /* ================= arming ================= */
   function armCheck() {
+    /* V3 arming: the module now lives in EVERY city - the
+       deploy needs no harbour, only water. Vancouver's
+       surveyed facts (boatArea confinement, the mooring
+       table, the dormant arrival spawn) arm where the
+       registry carries them; anywhere else the water body
+       itself is the confinement (junction 3.4). A city
+       change releases any craft in the water back into
+       possession and re-arms on the new city's facts. */
     var info = landmarkInfo();
     var key = cityKey();
-    var area = (info && info.boatArea) ? info.boatArea : null;
-    var moor = mooringFor(key);
-    if (area && moor && info && info.key === key) {
-      if (armedKey !== key) {
-        armedKey = key; armedArea = area; armedMooring = moor;
-        /* the arrival opt-in rides the registry read: only a
-           landmark carrying arrival:'boat' AND its surveyed
-           spawn arms the arrival; the spawn is re-read on
-           every arm so the flag consumption below always
-           steers at the registry's current point */
-        armedSpawn = (info.arrival === 'boat' && info.arrivalSpawn && isFinite(info.arrivalSpawn.x) && isFinite(info.arrivalSpawn.z))
-          ? { x: info.arrivalSpawn.x, z: info.arrivalSpawn.z } : null;
-        craft.mode = 'moored';
-        craft.x = moor.x; craft.z = moor.z; craft.face = moor.face;
-        craft.driver = null; craft.passengers = []; craft.speed = 0;
-        course = null; flipLastRide = false; lastAfloat = null; guideUntil = 0;
-        heading = moor.face;
-        builtScene = null;   /* rebuild the world dressing for this city */
-        markerGroup = null; boatGroup = null;
-        publishState();
-      }
-    } else if (armedKey !== null) {
-      /* a city with no surveyed mooring (or no boatArea):
-         no craft stands here. Leaving the harbour city
-         VANISHES the boat (design 5) - the levers release
-         and nothing glides anywhere. */
+    var area = (info && info.key === key && info.boatArea) ? info.boatArea : null;
+    var moor = area ? mooringFor(key) : null;
+    if (armedKey !== key) {
       if (drivingState()) releaseDrive();
-      craft.mode = 'gone';
+      craft.mode = 'undeployed';
       craft.driver = null; craft.passengers = []; craft.speed = 0;
-      course = null; flipLastRide = false;
-      armedKey = null; armedArea = null; armedMooring = null; armedSpawn = null;
-      if (boatGroup) boatGroup.visible = false;
-      if (markerGroup) markerGroup.visible = false;
+      course = null; lastAfloat = null; guideUntil = 0; prevSwim = false; beachLatch = false;
+      armedKey = key; armedArea = area; armedMooring = moor;
+      /* the arrival opt-in still reads the registry (the
+         dormant course's spawn), re-read on every arm */
+      armedSpawn = (moor && info && info.arrival === 'boat' && info.arrivalSpawn && isFinite(info.arrivalSpawn.x) && isFinite(info.arrivalSpawn.z))
+        ? { x: info.arrivalSpawn.x, z: info.arrivalSpawn.z } : null;
+      builtScene = null;   /* rebuild the world dressing for this city */
+      markerGroup = null; boatGroup = null;
       publishState();
     }
   }
@@ -836,52 +949,52 @@
     if (!inMap()) { lastPose = null; return; }
     ensureDom();
     armCheck();
-    if (!armedMooring) { if (promptEl) promptEl.classList.remove('show'); return; }
     buildWorld();
     wrapSkills();
     var p = playerPos();
-    if (!p) return;
-    var entrant = entrantNow();
-    if (entrant) wasEntrant = true;
+    if (!p) { prevSwim = false; return; }
 
-    /* THE ARRIVAL (design 3.1): the monolith's entrant branch
-       left its flag for this entry and placed the guest at
-       the registry spawn. Consume it exactly once - start
-       aboard when the guest is at the spawn (the dive put
-       them there); a flag whose guest is nowhere near the
-       spawn is stale and is simply dropped. */
-    if (armedSpawn && entrant && craft.mode === 'moored') {
-      var pend = null;
-      try { pend = window.__espilBoatArrival || null; } catch (e) {}
-      if (pend) {
-        try { window.__espilBoatArrival = null; } catch (e) {}
-        if (Math.hypot(p.x - armedSpawn.x, p.z - armedSpawn.z) <= 12 && !playerDead() && !flyActive() && !window.__espilInside) startArrival();
-      }
+    /* An interior takes the body out of the water, and
+       death respawns it on land: either way the ride is
+       over and the boat returns to possession at once (the
+       arrival grammar's anchor-at-the-spot is superseded
+       by Han's release clause). */
+    if (drivingState() && window.__espilInside) releaseToPossession();
+    if (drivingState() && playerDead()) releaseToPossession();
+    else if (craft.mode === 'deployed' && playerDead()) despawnToPossession();
+
+    /* THE SWIM TRANSITIONS (ownership 3.2/3.3): entering
+       the swim state deploys the owned boat under the
+       swimmer; leaving it unaboard releases a deployed
+       craft into possession. The read mirrors the game's
+       own swimming test, so the flips are the game's. */
+    var swimNow = swimRead(p.x, p.z) && p.y < 1.5;
+    if (!swimNow) beachLatch = false;
+    if (swimNow && !prevSwim && craft.mode === 'undeployed' && canDeploy()) deployBoat(p);
+    else if (!swimNow && prevSwim && craft.mode === 'deployed') despawnToPossession();
+    else if (beachLatch && swimNow && isWater(p.x, p.z) && craft.mode === 'undeployed' && canDeploy()) { beachLatch = false; deployBoat(p); }
+    prevSwim = swimNow;
+
+    /* The beaching fade: a beached craft holds its pose
+       for a breath, then despawns into possession. (If its
+       owner is somehow already back in centre-cell water,
+       the deploy re-fires on the spot - the seam cannot
+       strand them. An owner standing only in the shoreline-
+       forgiveness margin - the disembark resolver's usual
+       standable point at a quay - has LEFT the water in
+       every sense the exit means: the release stands, the
+       latch above carries their next step into open water,
+       and a fresh swim entry re-deploys as always.) */
+    if (craft.mode === 'beached' && nowMs - beachedAt > BEACH_FADE_MS) {
+      despawnToPossession();
+      if (swimNow && isWater(p.x, p.z) && canDeploy()) deployBoat(p);
+      else if (swimNow) beachLatch = true;
     }
-
-    /* the in-place account flip (design 5): this page WAS a
-       guest's and now carries a session. Ashore, the boat
-       vanishes on the spot; mid-drive the drive is not cut
-       (v1's rule) but finishRide() makes the next release
-       the boat's last. A born-account page never sets
-       wasEntrant, so its armed rest state is v1's exactly. */
-    if (armedMooring && wasEntrant && !entrant) {
-      if (boardableState()) vanishCraft();
-      else if (drivingState()) flipLastRide = true;
-    }
-
-    /* an interior takes the body: the craft anchors where it
-       floats (v1 emptied it home; the arrival grammar has no
-       home - design 2). Death is the same shape and never a
-       disappearance: the craft anchors AT THE DEATH SPOT and
-       the respawned guest walks back to it (design 5). */
-    if (drivingState() && window.__espilInside) { craft.x = p.x; craft.z = p.z; craft.face = heading; finishRide('anchored'); }
-    if (drivingState() && playerDead()) { craft.x = p.x; craft.z = p.z; craft.face = heading; finishRide('anchored'); }
 
     /* prompt chip */
     if (promptEl) {
       var txt = '';
-      if (entrant && !window.__espilInside) {
+      if (!window.__espilInside) {
         if (boardableState() && Math.hypot(p.x - craft.x, p.z - craft.z) <= BOARD_RANGE && isWater(p.x, p.z)) txt = 'Space · 배 타기';
         else if (drivingState()) txt = 'Space · 내리기';
       }
@@ -890,14 +1003,6 @@
     }
 
     if (!drivingState()) {
-      /* moored: ease the face back to the mooring face (the
-         glide home ends looking along its last travel line) */
-      if (craft.mode === 'moored' && armedMooring) {
-        var mdf = armedMooring.face - craft.face;
-        while (mdf > Math.PI) mdf -= Math.PI * 2;
-        while (mdf < -Math.PI) mdf += Math.PI * 2;
-        if (Math.abs(mdf) > 0.001) craft.face += Math.max(-TURN_RATE * wallDt, Math.min(TURN_RATE * wallDt, mdf));
-      }
       syncBoatVisual(false); prevPose = { x: p.x, y: p.y, z: p.z }; lastPose = prevPose; return;
     }
 
@@ -980,7 +1085,7 @@
       if (dryTime > 0.5) {
         if (lastAfloat) { craft.x = lastAfloat.x; craft.z = lastAfloat.z; craft.face = lastAfloat.face; }
         else { craft.x = p.x; craft.z = p.z; craft.face = heading; }
-        finishRide('beached');
+        settleBeached();
         syncBoatVisual(true);
         prevPose = { x: p.x, y: p.y, z: p.z }; lastPose = prevPose;
         return;
@@ -1013,7 +1118,10 @@
          reads 0 and the body stalls at the waterline. (Fix
          found by the P2 verification rig: the harbour's north
          edge is a shoreline, and the craft beached there.) */
-      var probeWet = isWater(nx, nz), probeIn = inArea(armedArea, nx, nz);
+      /* in a city with no boatArea the water body itself
+         confines (junction 3.4): the probe counts as inside,
+         so a dry probe is the beaching test there too */
+      var probeWet = isWater(nx, nz), probeIn = armedArea ? inArea(armedArea, nx, nz) : true;
       if (!probeWet && probeIn) {
         /* LANDFALL (design 3.3): a dry probe INSIDE the
            harbour is the beaching trigger, not a wall. When
@@ -1027,7 +1135,7 @@
         var dp = resolveDisembark(nx, nz);
         if (dp) {
           craft.x = p.x; craft.z = p.z; craft.face = heading;
-          finishRide('beached');
+          settleBeached();
           placeRider(dp.x, dp.z);
           toast('배가 해안에 닿았습니다');
           syncBoatVisual(true);
@@ -1107,7 +1215,8 @@
   window.__espilBoat = {
     state: function () {
       return {
-        armed: !!armedMooring,
+        armed: armedKey !== null,
+        owned: ownsBoat(),
         city: armedKey,
         mode: craft.mode,
         x: Math.round(craft.x * 100) / 100, z: Math.round(craft.z * 100) / 100,

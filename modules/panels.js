@@ -132,7 +132,14 @@
     { name: 'Ruby Bead', kr: '루비 구슬', slot: null, kind: 'mat', grade: '영웅', matLine: 'accessory', matGrade: 'red', def: 0, mdef: 0, price: 140, app: { shape: 'bead', c1: '#e04b4b', c2: '#4a4238' }, desc: '장신구 제작 재료 (red).' },
     { name: 'Topaz Bead', kr: '토파즈 구슬', slot: null, kind: 'mat', grade: '전설', matLine: 'accessory', matGrade: 'gold', def: 0, mdef: 0, price: 220, app: { shape: 'bead', c1: '#f2b63c', c2: '#4a4238' }, desc: '장신구 제작 재료 (gold).' },
     { name: 'Lunaris Bead', kr: '루나리스 구슬', slot: null, kind: 'mat', grade: '전설', matLine: 'accessory', matGrade: 'pink', def: 0, mdef: 0, price: 350, app: { shape: 'bead', c1: '#f28ad0', c2: '#4a4238' }, desc: '장신구 제작 재료 (pink).' },
-    { name: 'Revival Potion', kr: '부활 포션', slot: null, kind: 'use', grade: '캐시', cash: true, def: 0, mdef: 0, price: 0, app: { shape: 'drink', c1: '#e86a8a', c2: '#ffd23c' }, desc: '캐시 아이템 (10개에 $1). 쓰러졌을 때 그 자리에서 HP/MP 50%로 부활합니다. 캐시상점에서 구매할 수 있습니다.' }
+    { name: 'Revival Potion', kr: '부활 포션', slot: null, kind: 'use', grade: '캐시', cash: true, def: 0, mdef: 0, price: 0, app: { shape: 'drink', c1: '#e86a8a', c2: '#ffd23c' }, desc: '캐시 아이템 (10개에 $1). 쓰러졌을 때 그 자리에서 HP/MP 50%로 부활합니다. 캐시상점에서 구매할 수 있습니다.' },
+    /* BOAT OWNERSHIP (Han 2026-11-25): kind 'tool' is introduced
+       by this entry - a bound capability, not an economy good.
+       The fishing rod (fishing/DESIGN.md section 7) is the second
+       'tool' and reuses this same kind value; 'tool' entries are
+       never listable on a stall (the refusal lives in stall2.js),
+       never equippable (slot null) and never consumed. */
+    { name: 'Harbour Boat', kr: '항구 보트', slot: null, kind: 'tool', grade: '일반', def: 0, mdef: 0, price: 0, app: { shape: 'boat', c1: '#7ec8d8', c2: '#8a5a2b' }, desc: '늘 지니고 다니는 작은 배. 물에 들어가면 자동으로 나와 탈 수 있고, 물에서 나오면 다시 품으로 돌아옵니다. 팔거나 건넬 수 없습니다.' }
   ];
   var DB_LOOKUP = {};
   DB.forEach(function (it) { DB_LOOKUP[it.name.toLowerCase()] = it; });
@@ -187,6 +194,16 @@
       desc: isFood ? '먹으면 기운이 나는 음식.' : '' };
   }
   var STARTER = ['Worn Wooden Sword', 'Cloth Cap', 'Traveler Top', 'Traveler Bottom', 'Leather Shoes'];
+  /* BOAT OWNERSHIP (Han 2026-11-25): the Harbour Boat is
+     granted free at entry - the check is simply "bag has no
+     boat -> add it", run beside the starter seed, so accounts
+     keep it across entries on the device and a guest on any
+     device (fresh bag or not) always has it. Bound: it is a
+     capability the player carries, never a purchase. */
+  function grantBoat() {
+    var a = ownedList();
+    if (a.indexOf('Harbour Boat') < 0) { a.push('Harbour Boat'); saveOwned(a); }
+  }
   function seedStarter() {
     try { if (localStorage.getItem(LS_SEED)) return; } catch (e) { return; }
     var a = ownedList(), have = {};
@@ -476,6 +493,7 @@
       case 'shard': b = P('M18 3 L24 14 L20 30 L13 26 L10 12 Z', c1) + P('M18 3 L20 30', 'none', ' stroke="' + c2 + '" stroke-width="1.6"'); break;
       case 'plate': b = P('M8 7 L28 7 L26 29 L10 29 Z', c1) + '<rect x="12" y="12" width="12" height="3" fill="' + c2 + '"/><rect x="12" y="19" width="12" height="3" fill="' + c2 + '"/>'; break;
       case 'bead': b = '<circle cx="18" cy="18" r="10" fill="' + c1 + '"/><circle cx="14.6" cy="14" r="3.2" fill="#ffffff" opacity=".55"/><circle cx="18" cy="18" r="3.4" fill="' + c2 + '"/>'; break;
+      case 'boat': b = P('M5 20 L31 20 L27 29 L9 29 Z', c1) + P('M18 20 L18 8 L26 17 L18 17 Z', c2) + P('M4 31.4 L32 31.4', 'none', ' stroke="' + c1 + '" stroke-width="1.8" stroke-linecap="round"'); break;
       default: b = '<rect x="8" y="9" width="20" height="18" rx="2.6" fill="' + c1 + '"/><rect x="8" y="15" width="20" height="3" fill="' + c2 + '"/>';
     }
     return '<svg viewBox="0 0 36 36" width="' + s + '" height="' + s + '" aria-hidden="true">' + b + '</svg>';
@@ -947,7 +965,7 @@
   }
   function renderProfile() {
     var g = document.getElementById('char-grid'); if (!g) return;
-    ensureStyle(); seedStarter();
+    ensureStyle(); seedStarter(); grantBoat();
     var info = myInfo();
     var map = profTab === 'look' ? lookMap() : equippedMap();
     var st = computeStats();
@@ -1045,14 +1063,18 @@
   }
   function renderBag() {
     var g = document.getElementById('inv-grid'); if (!g) return;
-    ensureStyle(); seedStarter();
+    ensureStyle(); seedStarter(); grantBoat();
     var panel = invPanel();
     if (panel) { var h2 = panel.querySelector('.st-head h2'); if (h2) h2.textContent = '가방'; }
     var counts = ownedCounts();
     var eq = equippedMap(), lk = lookMap();
     var eqNames = {}; Object.keys(eq).forEach(function (s) { eqNames[eq[s]] = s; });
     var lkNames = {}; Object.keys(lk).forEach(function (s) { lkNames[lk[s]] = s; });
-    var items = counts.filter(function (c) { return itemOf(c.name).kind === bagTab; });
+    /* kind 'tool' (the Harbour Boat, the fishing rod) renders
+       in the etc tab - the bag gains no new tab in v1
+       (fishing/DESIGN.md section 7's build detail, set here
+       by the build that introduces the kind). */
+    var items = counts.filter(function (c) { var k = itemOf(c.name).kind; return (k === 'tool' ? 'etc' : k) === bagTab; });
     if (bagSel && !items.some(function (c) { return c.name === bagSel; })) bagSel = null;
     if (!bagSel && items.length) bagSel = items[0].name;
     var wrap = document.createElement('div');
@@ -1071,7 +1093,7 @@
       var sit = itemOf(bagSel);
       var lines = itemStatLines(sit);
       var meta = (sit.kind === 'equip' ? SLOT_KR[resolveSlot(bagSel)] + ' · ' : '') +
-        BAG_TABS.filter(function (t) { return t[0] === sit.kind; }).map(function (t) { return t[1]; })[0] + ' · ' + sit.grade;
+        BAG_TABS.filter(function (t) { return t[0] === (sit.kind === 'tool' ? 'etc' : sit.kind); }).map(function (t) { return t[1]; })[0] + ' · ' + sit.grade;
       detail = '<div class="bag-dicon">' + iconSVG(sit, 38) + '</div><div class="bag-dbody">' +
         '<div class="bag-dname">' + esc(sit.kr || sit.name) + '</div>' +
         '<div class="bag-dmeta">' + esc(meta) + ' · 판매 가격: ' + sit.price + ' Leo</div>' +
@@ -1330,5 +1352,5 @@
     state: function () { return { equipped: equippedMap(), look: lookMap(), stats: computeStats(), bagTab: bagTab, profTab: profTab,
       avatar: avStateHook() }; }
   };
-  seedStarter();
+  seedStarter(); grantBoat();
 })();

@@ -188,7 +188,10 @@
       stallName: stallName,
       city: String(city),
       name: stallName,
-      posts: s.posts.map(function (p) { return normalisePost(p); })
+      /* bound 'tool' posts never publish (the BOAT OWNERSHIP
+         rule's third surface: even a hand-written record does
+         not reach other clients) */
+      posts: s.posts.filter(function (p) { var it = listingDbItem(p.title); return !(it && it.kind === 'tool'); }).map(function (p) { return normalisePost(p); })
     };
   }
   window.__espilListingModel = {
@@ -250,7 +253,12 @@
     if (!sel) return;
     var counts = {}; owned().forEach(function (n) { counts[n] = (counts[n] || 0) + 1; });
     var cur = sel.value;
-    sel.innerHTML = '<option value="">From inventory…</option>' + Object.keys(counts).map(function (n) {
+    /* BOAT OWNERSHIP bound rule: kind 'tool' items (the
+       Harbour Boat, the fishing rod) are bound capabilities -
+       the picker never offers them for listing. */
+    sel.innerHTML = '<option value="">From inventory…</option>' + Object.keys(counts).filter(function (n) {
+      var it = listingDbItem(n); return !(it && it.kind === 'tool');
+    }).map(function (n) {
       return '<option value="' + esc(n) + '">' + esc(n) + ' ×' + counts[n] + '</option>';
     }).join('');
     sel.value = cur;
@@ -275,6 +283,19 @@
       var s = load(); if (!s || !s.posts) return;
       var best = null;
       s.posts.forEach(function (p) { if (p.title === pp.title) best = p; });
+      if (best) {
+        /* BOAT OWNERSHIP bound rule, the record-level half:
+           a 'tool' item can never become a listing - a title
+           typed by hand (past the picker) is refused here and
+           the post is removed before it can be published. */
+        var bit = listingDbItem(best.title);
+        if (bit && bit.kind === 'tool') {
+          s.posts = s.posts.filter(function (p) { return p !== best; });
+          save(s); pushStall(true);
+          toast('이 아이템은 판매할 수 없습니다');
+          return;
+        }
+      }
       if (best) {
         best.count = pp.count;
         /* phase 0: the saved post is written in the listing
