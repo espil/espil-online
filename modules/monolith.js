@@ -2635,7 +2635,7 @@
        loads per page session; the landing sets window.__espilCityKey
        at entry and a city switch reloads (see startCityEntry). --- */
     var ESPIL_CITIES={
-      vancouver:{district:'assets/osm/vancouver_district_sample.json',collision:'assets/osm/vancouver_collision.json',ox:0,oz:0,core:true,bounds:{x0:-1799,z0:-2028,x1:2027,z1:1956},spawn:{x:3,z:31},landmark:{name:'Canada Place',x:694,z:-560,face:0,radius:800,activities:['photo','eat','swim','boat','arena'],boatArea:{x0:600,x1:840,z0:-800,z1:-575},photo:{cx:694,cz:-560,camH:2,lx:694,lz:-649.8,lookH:16}}}, /* bounds = the district extent, added 2026-10-19 for the last-place resume rule (Han PC verdict #9): resume judges the full playable extent, not the smaller downtown boundary polygon. First-summon place (Han 2026-10-18): the Vancouver Art Gallery's Robson Square plaza - gallery record bbox x[-46.9..52.9] z[-57.6..16.8], the point sits 14.2 m south of its south face on its centre axis, inside no footprint */
+      vancouver:{district:'assets/osm/vancouver_district_sample.json',collision:'assets/osm/vancouver_collision.json',ox:0,oz:0,core:true,bounds:{x0:-1799,z0:-2028,x1:2027,z1:1956},spawn:{x:3,z:31},landmark:{name:'Canada Place',x:694,z:-560,face:0,radius:800,activities:['photo','eat','swim','boat','arena'],boatArea:{x0:600,x1:840,z0:-800,z1:-575},arrival:'boat',arrivalSpawn:{x:694,z:-795},photo:{cx:694,cz:-560,camH:2,lx:694,lz:-649.8,lookH:16}}}, /* bounds = the district extent, added 2026-10-19 for the last-place resume rule (Han PC verdict #9): resume judges the full playable extent, not the smaller downtown boundary polygon. First-summon place (Han 2026-10-18): the Vancouver Art Gallery's Robson Square plaza - gallery record bbox x[-46.9..52.9] z[-57.6..16.8], the point sits 14.2 m south of its south face on its centre axis, inside no footprint */
       auckland:{district:'assets/osm/auckland_district.json',collision:'assets/osm/auckland_collision.json',ox:10000,oz:0,core:false,spawn:{x:10302.9,z:-1001.9},bounds:{x0:9243,z0:-1595,x1:11024,z1:1080},harbour:{w:3600,d:1750,dx:140,dz:-1865},landmark:{name:'Sky Tower',x:9904,z:-406,face:0.795,radius:800,activities:['photo','eat'],photo:{cx:9904,cz:-406,camH:2,lx:9882.8,lz:-426.8,lookH:110}}},
       tokyo:{district:'assets/osm/tokyo_district.json',collision:'assets/osm/tokyo_collision.json',ox:5000,oz:0,core:false,spawn:{x:4870,z:0},bounds:{x0:3010,z0:-2032,x1:7034,z1:2011},landmark:{name:'Tokyo Station',x:4870,z:0,face:-1.571,radius:800,activities:['photo','eat'],photo:{cx:4870,cz:0,camH:2,lx:5000,lz:0,lookH:12}}}, /* Tokyo (built 2026-10-18, restored to this tree 2026-10-19 after the production-mirror reset): OSM extract radius 2 km on Tokyo Station (35.68124, 139.76714), 18,002 buildings; spawn = local (-130, 0), the Marunouchi plaza in front of the station, 15.5 m clear of every footprint */
       newyork:{district:'assets/osm/newyork_district.json',collision:'assets/osm/newyork_collision.json',ox:-5000,oz:0,core:false,spawn:{x:-5000,z:0},bounds:{x0:-6906,z0:-2063,x1:-2972,z1:2058},landmark:{name:'Central Park South',x:-4701,z:-919,face:-1.700,radius:800,activities:['photo','eat'],photo:{cx:-4701,cz:-919,camH:2,lx:-4214,lz:-855,lookH:6}}}, /* New York (2026-10-19): OSM extract radius 2 km on Times Square (40.75800, -73.98554), 9,020 buildings; spawn = local (0, 0), the Times Square pedestrian plaza at the anchor itself, 17.8 m clear of every footprint (offline scan of the shipped district records) */
@@ -2668,7 +2668,25 @@
     window.__espilLandmarkInfo=function(){
       var lm=espilLandmark(); if(!lm)return null;
       return {key:espilCityKey(),name:lm.name,x:lm.x,z:lm.z,face:lm.face,radius:lm.radius,
-        activities:(lm.activities||[]).slice(),boatArea:lm.boatArea?{x0:lm.boatArea.x0,x1:lm.boatArea.x1,z0:lm.boatArea.z0,z1:lm.boatArea.z1}:null};
+        activities:(lm.activities||[]).slice(),boatArea:lm.boatArea?{x0:lm.boatArea.x0,x1:lm.boatArea.x1,z0:lm.boatArea.z0,z1:lm.boatArea.z1}:null,
+        arrival:lm.arrival||null,arrivalSpawn:lm.arrivalSpawn?{x:lm.arrivalSpawn.x,z:lm.arrivalSpawn.z}:null};
+    };
+    /* GUEST BOAT ARRIVAL (Han 2026-11-24): the placement hook
+       the boat module steps the rider ashore through at a
+       beaching. The walk player is owned here; a lazy module
+       cannot move it without a seam, and the beaching rule
+       needs exactly one: put the player at a world point on
+       the surface there, standing, with any arrival fall
+       cancelled. Returns false when there is no player. */
+    window.__espilPlacePlayerAt=function(x,z){
+      var p=walkPlayer; if(!p||!p.pos)return false;
+      var base=espilTileBase(x,z);
+      if(base===null||base===undefined)base=espilOwnSurfaceY(x,z);
+      if(base===null||base===undefined)base=p.pos.y;
+      p.pos.x=x; p.pos.z=z; p.pos.y=base;
+      p.velY=0; p.onGround=true; p.jumps=0;
+      if(p._espilArrive)p._espilArrive=null;
+      return true;
     };
     function espilVillageActive(){
       if(espilVillageSuspended)return false;
@@ -2848,8 +2866,12 @@
       if(acts.indexOf('eat')>=0)row('음식 먹기',espilLandmarkEat);
       if(acts.indexOf('swim')>=0)row('수영하기',function(){ espilVillageNotice('부두 가장자리에서 물로 들어갈 수 있습니다'); });
       if(acts.indexOf('boat')>=0&&lm.boatArea)row('배 타기',function(){
-        if(window.__espilBoat&&typeof window.__espilBoat.guideMooring==='function'){ window.__espilBoat.guideMooring(); }
-        else espilVillageNotice('부두 끝 계류지에서 배에 오를 수 있습니다');
+        /* GUEST BOAT ARRIVAL: guidance points at the boat
+           wherever the guest left it (guideToBoat); the v1
+           name and the mooring wording stay as fallbacks. */
+        if(window.__espilBoat&&typeof window.__espilBoat.guideToBoat==='function'){ window.__espilBoat.guideToBoat(); }
+        else if(window.__espilBoat&&typeof window.__espilBoat.guideMooring==='function'){ window.__espilBoat.guideMooring(); }
+        else espilVillageNotice('배는 마지막으로 내린 해안에 있습니다');
       });
       if(acts.indexOf('arena')>=0)row('아레나 가기',espilLandmarkArena);
       /* The account line is always the last row (the upgrade door). */
@@ -3300,6 +3322,18 @@
         }catch(e){}
         espilVillageSuspended=arenaHandoff;
         if(arenaHandoff){ last=null; locPick=null; lmTarget={x:cfg.spawn.x,z:cfg.spawn.z}; }
+        else if(cfg.landmark&&cfg.landmark.arrival==='boat'&&cfg.landmark.boatArea&&cfg.landmark.arrivalSpawn){
+          /* GUEST BOAT ARRIVAL (Han 2026-11-24): a boat-arrival
+             city's guest does not summon on land - the dive
+             lands at the registry's arrivalSpawn, in the water
+             off the quay, and the boat module (armed on the
+             arrival event) starts the guest aboard there. The
+             flag is the hand-off: boat.js consumes it on arm.
+             The arena handoff above stays exempt - that entry
+             is an ordinary gallery entry, not an arrival. */
+          last=null; locPick=null; lmTarget={x:cfg.landmark.arrivalSpawn.x,z:cfg.landmark.arrivalSpawn.z};
+          try{ window.__espilBoatArrival={city:espilCityKey(),x:cfg.landmark.arrivalSpawn.x,z:cfg.landmark.arrivalSpawn.z,at:Date.now()}; }catch(e){}
+        }
         else if(cfg.landmark){ last=null; locPick=null; lmTarget={x:cfg.landmark.x,z:cfg.landmark.z}; }
       }
       if(last&&!locPick){

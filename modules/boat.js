@@ -1,7 +1,16 @@
-/* __espilBoat v1 - the landmark activity boat (espil.online room,
-   NAME-ONLY ENTRY package 2, 2026-11-24). Design:
+/* __espilBoat v2 - the landmark activity boat (espil.online room,
+   NAME-ONLY ENTRY package 2, 2026-11-24; GUEST BOAT ARRIVAL
+   amendment the same day). Designs:
    espil-online-room/name-entry/DESIGN.md section 6.5 (Han's
-   decisions of 2026-11-24, via the deploy order of the same day).
+   decisions of 2026-11-24, via the deploy order of the same day)
+   and espil-online-room/guest-arrival/DESIGN.md (Han's direct
+   ruling: guests start RIDING A BOAT; the boat beaches on
+   landfall and the rider steps off automatically; the
+   disembarked boat does NOT return empty - it stays anchored
+   at the last disembarkation spot; when the guest disappears,
+   the boat VANISHES; Q1 assisted course + instant manual
+   takeover and Q2 re-boardable all session decided by Han's
+   delegation, recorded in guest-arrival/DESIGN-LOG.md).
 
    WHAT THIS MODULE OWNS
    - The ONE shared moored activity craft of a boatArea city
@@ -93,6 +102,59 @@
 
    Hooks: window.__espilBoat = { state(), board(), alight(),
    guideMooring(), mooring() }.
+
+   V2 AMENDMENT - THE ARRIVAL GRAMMAR (guest-arrival/DESIGN.md
+   sections 2-5; the v1 header above stands as the record of
+   the shipped P2 grammar, and this block names what the
+   amendment replaces):
+   - A Vancouver guest's entry no longer summons on land: the
+     monolith's entrant branch hands the dive the registry's
+     arrivalSpawn and leaves window.__espilBoatArrival; this
+     module consumes the flag on arm and starts the guest
+     ABOARD the craft at the spawn, mode 'arriving', driver
+     'me', on an assisted course (the mooring table's channel
+     waypoint, then its landing aim) at COURSE_SPEED. ANY
+     movement input cancels the course the same tick and the
+     craft is the guest's to drive (mode 'driving').
+   - LANDFALL = BEACHING: while arriving or driving, a nose
+     probe that reads NOT WATER inside the boatArea resolves
+     a disembark point (the probe point if walkable, else the
+     nearest walkable cell within ~4 m); the craft stops
+     afloat where it floated, the rider is placed at that
+     point through the monolith's __espilPlacePlayerAt hook,
+     no key pressed. No resolution (building cell, non-
+     standable edge) or a probe outside the boatArea keeps
+     the v1 blocked-stop - the area's open-sea edges beach
+     NEVER, by the area test, whatever the bake beyond them
+     reads. The dry-land valve's consequence is re-read the
+     same way: stop and beach at the last afloat pose, never
+     empty.
+   - DISEMBARK otherwise = BAIL-OUT: Use while driving,
+     anywhere, steps off into the water; the craft ANCHORS
+     where it floats (mode 'anchored'). The v1 mooring-only
+     alight rule and its refusal notice are dead.
+   - The empty-return glide is DEAD outright: modes
+     'returning' and its tick, the face-ease home and the
+     re-mooring are removed. After any disembark the craft
+     holds its exact pose indefinitely - 'beached' off a
+     shore, 'anchored' afloat - and the same guest re-boards
+     it all session under the v1 water-boarding grammar.
+   - VANISHING: page/city leave ends the module state as in
+     v1 (a fresh entry is a fresh arrival). Death NEVER moves
+     the boat: death while driving anchors the craft at the
+     death spot. An in-place account flip ashore vanishes
+     the boat on the spot; a flip mid-drive does not cut the
+     drive, but the next release is the boat's last (it
+     vanishes instead of anchoring and cannot be re-boarded).
+   - The mooring (730, -764) is no longer home: it survives
+     as the course's final-approach reference and the harbour
+     marker's rest point. guideMooring() is re-pointed at the
+     live craft wherever it lies and renamed guideToBoat()
+     (the old name stays as an alias for the v1 caller).
+   - Population, confinement, the swim lever, the combat
+     lock, the sharing seam and the interim visual are v1's,
+     unchanged. Worker: NO change - every state here is
+     client-local memory, as measured for P2.
    Module sources are TAGLESS (house rule) - no script tags. */
 (function () {
   'use strict';
@@ -108,19 +170,29 @@
   var DECEL = 3.2;                 /* m/s^2 coast-down */
   var TURN_RATE = 2.2;             /* rad/s - a boat turns slower than the car */
   var BOARD_RANGE = 4.6;           /* player-to-centre boarding range, from the water */
-  var ALIGHT_RANGE = 7;            /* disembark only within this of the mooring point */
-  var RETURN_SPEED = 4;            /* m/s - the empty glide home */
+  var COURSE_SPEED = 4;            /* m/s - the assisted arrival course (the retired empty glide's speed) */
   var SWIM_BASE = 4;               /* moveSpeeds().swim - the lever's divisor */
   /* Mooring points, world coordinates (the vehicles DEALER
      precedent: a place this module owns). Vancouver's was
      surveyed on the shipped collision grid (build report P2):
      open water ~5.4 m off the Canada Place quay's north-west
      edge, bow lying parallel to the quay; the channel waypoint
-     keeps the empty return in open water. A city with a
-     registry boatArea but no mooring here gets no craft -
-     the two facts are surveyed together or not at all. */
+     keeps the arrival course in open water. V2: the mooring
+     is the course's final-approach reference, no longer home;
+     the table gains the LANDING AIM - a walkable quay-edge
+     point (746, -759), surveyed on the shipped grid by the
+     P2 probe method (guest-arrival build survey: steering
+     waypoint -> aim, the nose probe first reads land at the
+     aim's own cell with the centre still ~3 m afloat, and
+     the disembark resolution lands on the probe point
+     itself). The arrival SPAWN lives in the registry (the
+     monolith's entrant branch must read it before this lazy
+     module exists): landmark.arrivalSpawn, read back through
+     __espilLandmarkInfo. A city with a registry boatArea but
+     no mooring here gets no craft - the two facts are
+     surveyed together or not at all. */
   var MOORINGS = {
-    vancouver: { x: 730, z: -764, face: 1.711, channel: { x: 700, z: -770 } }
+    vancouver: { x: 730, z: -764, face: 1.711, channel: { x: 700, z: -770 }, landing: { x: 746, z: -759 } }
   };
   /* Seat offsets in craft space (bow = +Z): the driver at the
      stern helm, four passenger places on the two benches. */
@@ -162,6 +234,41 @@
   }
   function landmarkInfo() {
     try { return window.__espilLandmarkInfo ? window.__espilLandmarkInfo() : null; } catch (e) { return null; }
+  }
+  /* V2 state grammar: 'arriving' is a driving state (the
+     course drives the same walk pipeline, levers, combat
+     lock and hidden rider as the helm); the boardable rest
+     states are the mooring rest and the two stays-put forms
+     the arrival grammar leaves behind. */
+  function drivingState() { return craft.mode === 'driving' || craft.mode === 'arriving'; }
+  function boardableState() { return craft.mode === 'moored' || craft.mode === 'beached' || craft.mode === 'anchored'; }
+  function probeWalkable(x, z) {
+    var r = probe(x, z);
+    return !!(r && r.walkable);
+  }
+  /* The beaching resolution (design 3.3): the probe point
+     itself when it is standable, else the nearest standable
+     cell within ~4 m of it - the game's own walkable read
+     (the __espilCollisionProbe palette flag espilNavWalkable
+     uses), so a beaching can never place the guest on water,
+     inside a building, or on a non-standable edge. */
+  function resolveDisembark(x, z) {
+    if (probeWalkable(x, z)) return { x: x, z: z };
+    for (var r = 0.75; r <= 4.01; r += 0.75) {
+      for (var k = 0; k < 16; k++) {
+        var a = (2 * Math.PI * k) / 16;
+        var px = x + r * Math.cos(a), pz = z + r * Math.sin(a);
+        if (probeWalkable(px, pz)) return { x: px, z: pz };
+      }
+    }
+    return null;
+  }
+  /* The rider steps ashore through the monolith's placement
+     hook (the walk player is monolith-owned). A missing hook
+     answers false and the caller leaves the rider swimming
+     at the waterline - degraded, never stranded mid-air. */
+  function placeRider(x, z) {
+    try { return !!(window.__espilPlacePlayerAt && window.__espilPlacePlayerAt(x, z)); } catch (e) { return false; }
   }
   function cityKey() {
     var k = window.__espilCityKey;
@@ -206,7 +313,7 @@
      here: mode, pose, speed, who drives, who rides. v1 keeps it
      local; the relay named in the header fills the same shape. */
   var craft = {
-    mode: 'moored',                /* 'moored' | 'driving' | 'returning' */
+    mode: 'moored',                /* 'moored' (armed rest) | 'arriving' | 'driving' | 'beached' | 'anchored' | 'gone' */
     x: 0, z: 0, face: 0,           /* craft pose (module-owned while moored/returning; follows the driver while driving) */
     speed: 0,                      /* the boat's own speed state, m/s */
     driver: null,                  /* 'me' in v1; a peer session id once the relay lands */
@@ -215,6 +322,12 @@
   var armedKey = null;             /* the city key the craft currently stands in */
   var armedArea = null;            /* the registry boatArea of that city */
   var armedMooring = null;         /* MOORINGS[armedKey] */
+  var armedSpawn = null;           /* the registry arrivalSpawn while the landmark carries arrival:'boat' */
+  var wasEntrant = false;          /* this page has been entrant-populated (the flip test's memory) */
+  var course = null;               /* the assisted arrival course {legs:[{x,z}], i} while 'arriving' */
+  var flipLastRide = false;        /* a session appeared mid-drive: the next release vanishes the boat */
+  var lastAfloat = null;           /* the last driving pose that read water (the dry valve's beach pose) */
+  var guideUntil = 0;              /* guideToBoat(): the marker re-point window's end (performance.now ms) */
   var heading = 0;                 /* driving heading; vector = (sin h, cos h) */
   var measured = 0;                /* smoothed measured body speed */
   var boostCorr = 1;               /* feedback correction on (speed / SWIM_BASE) */
@@ -226,7 +339,6 @@
   var joyInjected = null;
   var lastPose = null, prevPose = null;
   var dryTime = 0;                 /* seconds the driving body has read not-over-water (safety valve) */
-  var returnLeg = null;            /* current glide target {x, z, final} */
   var publishThrottle = 0;
 
   /* The sharing seam: called on every state transition and at
@@ -394,12 +506,12 @@
   }
   function syncBoatVisual(force) {
     if (!boatGroup) return;
-    var show = !!armedMooring && entrantNow();
+    var show = !!armedMooring && entrantNow() && craft.mode !== 'gone';
     boatGroup.visible = show;
     if (markerGroup) markerGroup.visible = show;
     if (!show) return;
     var t = performance.now() / 1000;
-    if (craft.mode === 'driving') {
+    if (drivingState()) {
       var p = playerPos();
       if (p) boatGroup.position.set(p.x, p.y + 0.02, p.z);
       boatGroup.rotation.set(0, heading, 0);
@@ -407,7 +519,18 @@
       boatGroup.position.set(craft.x, 0.27 + Math.sin(t * 0.9) * 0.035, craft.z);
       boatGroup.rotation.set(Math.sin(t * 0.7) * 0.012, craft.face, Math.sin(t * 0.55) * 0.012);
     }
-    if (markerGroup && armedMooring) markerGroup.position.set(armedMooring.x, 0.26 + Math.sin(t * 0.9) * 0.03, armedMooring.z);
+    if (markerGroup && armedMooring) {
+      /* the marker rests at the mooring (the harbour's fixed
+         point); while a guideToBoat() window runs it stands
+         at the craft itself, wherever the guest left it */
+      if (performance.now() < guideUntil && !drivingState()) {
+        markerGroup.position.set(craft.x, 0.26 + Math.sin(t * 0.9) * 0.03, craft.z);
+        markerGroup.scale.set(1.35, 1, 1.35);
+      } else {
+        markerGroup.position.set(armedMooring.x, 0.26 + Math.sin(t * 0.9) * 0.03, armedMooring.z);
+        markerGroup.scale.set(1, 1, 1);
+      }
+    }
   }
 
   /* ================= rider avatar (vehicles pattern) ====== */
@@ -466,7 +589,7 @@
     if (!sk || typeof sk.move !== 'function') return;
     var orig = sk.move;
     var wrapped = function (id) {
-      if (craft.mode === 'driving') {
+      if (drivingState()) {
         var now = Date.now();
         if (now - moveToastAt > 2500) { moveToastAt = now; toast('항해 중에는 공격할 수 없습니다'); }
         return;
@@ -477,10 +600,77 @@
     try { sk.move = wrapped; skillsWrapped = true; } catch (e) {}
   }
 
-  /* ================= board / alight / return ============= */
+  /* ================= board / alight / arrival ============ */
+  /* The drive's two lever halves, shared by board() (the
+     guest steps in) and startArrival() (the entry puts the
+     guest in): engage takes the swim lever and the combat
+     lock; release gives them back. The rider avatar hides
+     for the whole of either. */
+  function engageDrive() {
+    craft.speed = 0; measured = 0; boostCorr = 1; stallTime = 0; blockedByWater = false; dryTime = 0;
+    lastPose = null; prevPose = null; lastAfloat = null;
+    priorSwimBoost = window.__espilSwimBoost;
+    boostOwned = true;
+    swimBoost = null;
+    wrapSkills();
+    hideAvatar();
+  }
+  function releaseDrive() {
+    clearJoy();
+    clearSwimBoost();
+    showAvatar();
+    craft.speed = 0; measured = 0;
+    course = null;
+  }
+  /* Every way a ride ends lands here: the craft settles into
+     its stays-put form - unless a session appeared mid-drive,
+     in which case this release is the boat's last and it
+     vanishes instead of anchoring (design 5). The caller has
+     already set the craft's final pose. */
+  function finishRide(mode) {
+    releaseDrive();
+    craft.driver = null;
+    if (flipLastRide) { vanishCraft(); return; }
+    craft.mode = mode;
+    publishState();
+  }
+  function vanishCraft() {
+    releaseDrive();
+    craft.driver = null;
+    craft.passengers = [];
+    flipLastRide = false;
+    craft.mode = 'gone';
+    publishState();
+    syncBoatVisual(true);
+  }
+  /* The arrival itself: the monolith's entrant branch left
+     window.__espilBoatArrival and placed the guest at the
+     registry spawn; the tick consumes the flag and calls
+     this. The craft stands at the spawn with the guest as
+     its driver from the module's first armed frame, bow on
+     the first course leg (the channel waypoint, then the
+     landing aim - the retired glide's route shape at its
+     speed, now carrying the rider through the drive pipeline
+     instead of moving an empty hull). */
+  function startArrival() {
+    var sp = armedSpawn, m = armedMooring;
+    if (!sp || !m || !m.landing) return;
+    var legs = [];
+    if (m.channel) legs.push({ x: m.channel.x, z: m.channel.z });
+    legs.push({ x: m.landing.x, z: m.landing.z });
+    craft.x = sp.x; craft.z = sp.z;
+    heading = Math.atan2(legs[0].x - sp.x, legs[0].z - sp.z);
+    craft.face = heading;
+    engageDrive();
+    craft.driver = 'me';
+    course = { legs: legs, i: 0 };
+    craft.mode = 'arriving';
+    publishState();
+    syncBoatVisual(true);
+  }
   function board() {
-    if (craft.mode === 'driving') return { ok: true, already: true };
-    if (craft.mode !== 'moored') return { ok: false, why: 'away' };
+    if (drivingState()) return { ok: true, already: true };
+    if (!boardableState()) return { ok: false, why: 'away' };
     if (!armedMooring || !entrantNow()) return { ok: false, why: 'population' };
     /* one body, one vehicle: never board over a live car drive
        (the two modules steer the same walk pipeline) */
@@ -495,77 +685,25 @@
     if (!isWater(p.x, p.z)) { notice('배 옆 물에서 탈 수 있습니다'); return { ok: false, why: 'dry' }; }
     craft.mode = 'driving';
     craft.driver = 'me';
-    craft.speed = 0; measured = 0; boostCorr = 1; stallTime = 0; blockedByWater = false; dryTime = 0;
     heading = craft.face;
-    lastPose = null; prevPose = null;
-    priorSwimBoost = window.__espilSwimBoost;
-    boostOwned = true;
-    swimBoost = null;
-    wrapSkills();
-    hideAvatar();
+    engageDrive();
     publishState();
-    toast('배에 올랐습니다 (계류지에서 Space: 내리기)');
+    toast('배에 올랐습니다 (Space: 내리기)');
     syncBoatVisual(true);
     return { ok: true };
   }
-  function startReturn() {
-    /* The empty craft goes home: direct when the sampled
-       segment is all water, else via the channel waypoint. */
-    craft.driver = null;
-    craft.passengers = [];
-    craft.speed = 0;
-    var m = armedMooring;
-    if (!m) { craft.mode = 'moored'; publishState(); return; }
-    var d = Math.hypot(craft.x - m.x, craft.z - m.z);
-    if (d <= 0.4) {
-      craft.x = m.x; craft.z = m.z; craft.face = m.face;
-      craft.mode = 'moored'; returnLeg = null;
-      publishState();
-      return;
-    }
-    if (segmentAllWater(craft.x, craft.z, m.x, m.z)) {
-      returnLeg = { x: m.x, z: m.z, final: true };
-    } else if (m.channel && segmentAllWater(craft.x, craft.z, m.channel.x, m.channel.z)) {
-      returnLeg = { x: m.channel.x, z: m.channel.z, final: false };
-    } else if (m.channel) {
-      returnLeg = { x: m.channel.x, z: m.channel.z, final: false };
-    } else {
-      returnLeg = { x: m.x, z: m.z, final: true };
-    }
-    craft.mode = 'returning';
-    publishState();
-  }
-  function segmentAllWater(x0, z0, x1, z1) {
-    var d = Math.hypot(x1 - x0, z1 - z0);
-    var n = Math.max(1, Math.ceil(d / 2));
-    for (var i = 0; i <= n; i++) {
-      var x = x0 + (x1 - x0) * (i / n), z = z0 + (z1 - z0) * (i / n);
-      if (!isWater(x, z)) return false;
-      if (armedArea && !inArea(armedArea, x, z)) return false;
-    }
-    return true;
-  }
-  function emptyCraft() {
-    /* The driver leaves the craft wherever it floats (alight
-       at the mooring, death, an interior): levers are released,
-       the rider returns, and the empty craft goes home. */
-    clearJoy();
-    clearSwimBoost();
-    showAvatar();
-    craft.speed = 0; measured = 0;
-    startReturn();
-  }
   function alight() {
-    if (craft.mode !== 'driving') return { ok: false, why: 'notdriving' };
+    /* V2: the bail-out. Use while driving (or on the course),
+       anywhere in the harbour - the rider steps off into the
+       water and swims; the craft anchors where it floats.
+       There is no home point left to restrict this to, and
+       the beaching form (automatic, on landfall) is the
+       other disembark - see the probe block in the tick. */
+    if (!drivingState()) return { ok: false, why: 'notdriving' };
     var p = playerPos();
-    var m = armedMooring;
-    if (!p || !m) return { ok: false, why: 'nopose' };
-    var d = Math.hypot(p.x - m.x, p.z - m.z);
-    if (d > ALIGHT_RANGE) { notice('계류지에서만 내릴 수 있습니다'); return { ok: false, why: 'notmooring' }; }
-    /* the craft takes the driver's last pose as its float point,
-       then the empty return carries it the last metres home */
+    if (!p) return { ok: false, why: 'nopose' };
     craft.x = p.x; craft.z = p.z; craft.face = heading;
-    emptyCraft();
+    finishRide('anchored');
     toast('배에서 내렸습니다');
     return { ok: true };
   }
@@ -580,11 +718,24 @@
     if (craft.passengers.length >= SEATS.passengers.length) return { ok: false, why: 'full' };
     return { ok: false, why: 'norelay' };
   }
-  function guideMooring() {
-    if (!armedMooring) { notice('부두 가장자리에서 물로 들어갈 수 있습니다'); return; }
-    notice('부두 끝 계류지에서 배에 오를 수 있습니다');
-    if (markerGroup) { markerGroup.scale.set(1.35, 1, 1.35); setTimeout(function () { if (markerGroup) markerGroup.scale.set(1, 1, 1); }, 1600); }
+  function guideToBoat() {
+    /* V2 guidance: the landmark row guides to the guest's
+       boat WHEREVER IT WAS LEFT (design 2/4) - the marker
+       leaves the mooring and stands at the craft for the
+       guide window (syncBoatVisual), with the distance in
+       the notice. */
+    if (!armedMooring || craft.mode === 'gone') { notice('부두 가장자리에서 물로 들어갈 수 있습니다'); return; }
+    if (drivingState()) { notice('배를 타고 있습니다'); return; }
+    var p = playerPos();
+    if (p) notice('배는 마지막으로 내린 곳에 있습니다 (약 ' + Math.round(Math.hypot(p.x - craft.x, p.z - craft.z)) + ' m)');
+    else notice('배는 마지막으로 내린 곳에 있습니다');
+    guideUntil = performance.now() + 4000;
+    syncBoatVisual(true);
   }
+  /* The v1 name, kept as an alias: the shipped landmark row
+     called guideMooring(); the re-pointed row prefers
+     guideToBoat() and falls back to this. */
+  function guideMooring() { guideToBoat(); }
 
   /* ================= input ================= */
   var myArrows = { arrowup: false, arrowdown: false, arrowleft: false, arrowright: false };
@@ -595,12 +746,12 @@
     if (!inMap() || typingNow()) return;
     var kb = keybinds();
     if (e.key === kb.interact && !e.repeat) {
-      if (craft.mode === 'driving') {
+      if (drivingState()) {
         e.stopPropagation(); e.preventDefault();
         alight();
         return;
       }
-      if (craft.mode === 'moored' && armedMooring && entrantNow() && !window.__espilInside) {
+      if (boardableState() && armedMooring && entrantNow() && !window.__espilInside) {
         var p = playerPos();
         if (p && Math.hypot(p.x - craft.x, p.z - craft.z) <= BOARD_RANGE) {
           e.stopPropagation(); e.preventDefault();
@@ -612,7 +763,7 @@
     }
     /* driving: combat inputs and jump stay silent (the
        vehicles rule). The interact key is handled above. */
-    if (craft.mode === 'driving' && (SKILL_KEYS[lk] || lk === 'shift')) {
+    if (drivingState() && (SKILL_KEYS[lk] || lk === 'shift')) {
       e.stopPropagation();
       e.preventDefault();
     }
@@ -631,9 +782,17 @@
     if (area && moor && info && info.key === key) {
       if (armedKey !== key) {
         armedKey = key; armedArea = area; armedMooring = moor;
+        /* the arrival opt-in rides the registry read: only a
+           landmark carrying arrival:'boat' AND its surveyed
+           spawn arms the arrival; the spawn is re-read on
+           every arm so the flag consumption below always
+           steers at the registry's current point */
+        armedSpawn = (info.arrival === 'boat' && info.arrivalSpawn && isFinite(info.arrivalSpawn.x) && isFinite(info.arrivalSpawn.z))
+          ? { x: info.arrivalSpawn.x, z: info.arrivalSpawn.z } : null;
         craft.mode = 'moored';
         craft.x = moor.x; craft.z = moor.z; craft.face = moor.face;
         craft.driver = null; craft.passengers = []; craft.speed = 0;
+        course = null; flipLastRide = false; lastAfloat = null; guideUntil = 0;
         heading = moor.face;
         builtScene = null;   /* rebuild the world dressing for this city */
         markerGroup = null; boatGroup = null;
@@ -641,11 +800,17 @@
       }
     } else if (armedKey !== null) {
       /* a city with no surveyed mooring (or no boatArea):
-         no craft stands here */
-      if (craft.mode === 'driving') emptyCraft();
-      armedKey = null; armedArea = null; armedMooring = null;
+         no craft stands here. Leaving the harbour city
+         VANISHES the boat (design 5) - the levers release
+         and nothing glides anywhere. */
+      if (drivingState()) releaseDrive();
+      craft.mode = 'gone';
+      craft.driver = null; craft.passengers = []; craft.speed = 0;
+      course = null; flipLastRide = false;
+      armedKey = null; armedArea = null; armedMooring = null; armedSpawn = null;
       if (boatGroup) boatGroup.visible = false;
       if (markerGroup) markerGroup.visible = false;
+      publishState();
     }
   }
 
@@ -677,25 +842,54 @@
     var p = playerPos();
     if (!p) return;
     var entrant = entrantNow();
+    if (entrant) wasEntrant = true;
 
-    /* an interior takes the body: the craft empties where it
-       floats and goes home (the car's auto-park, on water) */
-    if (craft.mode === 'driving' && window.__espilInside) { craft.x = p.x; craft.z = p.z; craft.face = heading; emptyCraft(); }
-    if (craft.mode === 'driving' && playerDead()) { craft.x = p.x; craft.z = p.z; craft.face = heading; emptyCraft(); toast('배가 계류지로 돌아갑니다'); }
+    /* THE ARRIVAL (design 3.1): the monolith's entrant branch
+       left its flag for this entry and placed the guest at
+       the registry spawn. Consume it exactly once - start
+       aboard when the guest is at the spawn (the dive put
+       them there); a flag whose guest is nowhere near the
+       spawn is stale and is simply dropped. */
+    if (armedSpawn && entrant && craft.mode === 'moored') {
+      var pend = null;
+      try { pend = window.__espilBoatArrival || null; } catch (e) {}
+      if (pend) {
+        try { window.__espilBoatArrival = null; } catch (e) {}
+        if (Math.hypot(p.x - armedSpawn.x, p.z - armedSpawn.z) <= 12 && !playerDead() && !flyActive() && !window.__espilInside) startArrival();
+      }
+    }
+
+    /* the in-place account flip (design 5): this page WAS a
+       guest's and now carries a session. Ashore, the boat
+       vanishes on the spot; mid-drive the drive is not cut
+       (v1's rule) but finishRide() makes the next release
+       the boat's last. A born-account page never sets
+       wasEntrant, so its armed rest state is v1's exactly. */
+    if (armedMooring && wasEntrant && !entrant) {
+      if (boardableState()) vanishCraft();
+      else if (drivingState()) flipLastRide = true;
+    }
+
+    /* an interior takes the body: the craft anchors where it
+       floats (v1 emptied it home; the arrival grammar has no
+       home - design 2). Death is the same shape and never a
+       disappearance: the craft anchors AT THE DEATH SPOT and
+       the respawned guest walks back to it (design 5). */
+    if (drivingState() && window.__espilInside) { craft.x = p.x; craft.z = p.z; craft.face = heading; finishRide('anchored'); }
+    if (drivingState() && playerDead()) { craft.x = p.x; craft.z = p.z; craft.face = heading; finishRide('anchored'); }
 
     /* prompt chip */
     if (promptEl) {
       var txt = '';
       if (entrant && !window.__espilInside) {
-        if (craft.mode === 'moored' && Math.hypot(p.x - craft.x, p.z - craft.z) <= BOARD_RANGE && isWater(p.x, p.z)) txt = 'Space · 배 타기';
-        else if (craft.mode === 'driving' && armedMooring && Math.hypot(p.x - armedMooring.x, p.z - armedMooring.z) <= ALIGHT_RANGE) txt = 'Space · 내리기';
+        if (boardableState() && Math.hypot(p.x - craft.x, p.z - craft.z) <= BOARD_RANGE && isWater(p.x, p.z)) txt = 'Space · 배 타기';
+        else if (drivingState()) txt = 'Space · 내리기';
       }
       if (txt) { promptEl.textContent = txt; promptEl.classList.add('show'); }
       else promptEl.classList.remove('show');
     }
 
-    if (craft.mode === 'returning') { tickReturn(Math.max(0.004, Math.min(0.05, wallDt))); syncBoatVisual(false); prevPose = { x: p.x, y: p.y, z: p.z }; lastPose = prevPose; return; }
-    if (craft.mode !== 'driving') {
+    if (!drivingState()) {
       /* moored: ease the face back to the mooring face (the
          glide home ends looking along its last travel line) */
       if (craft.mode === 'moored' && armedMooring) {
@@ -733,6 +927,35 @@
     var mx = 0, mz = 0;
     if (manual) { mx = F.x * (-iz) + R.x * ix; mz = F.z * (-iz) + R.z * ix; var ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml; }
 
+    /* THE COURSE (design 3.2): while 'arriving', the craft
+       steers itself at the current leg - spawn -> channel
+       waypoint -> landing aim - as an auto-input in the same
+       shape as a driver's. ANY manual input cancels the
+       course on this very tick and the mode becomes plain
+       'driving': no prompt, no confirm, the helm is the
+       guest's from that position and heading. The steering
+       waits while the dive envelope still holds the body
+       above the surface (pose y is the only read of it this
+       module needs). */
+    var autoDir = null;
+    if (craft.mode === 'arriving' && course) {
+      if (manual) {
+        course = null;
+        craft.mode = 'driving';
+        publishState();
+      } else if (p.y < 2.5) {
+        var leg = course.legs[course.i];
+        var ldx = leg.x - p.x, ldz = leg.z - p.z;
+        var ld = Math.hypot(ldx, ldz);
+        if (ld < 3 && course.i < course.legs.length - 1) {
+          course.i++;
+          leg = course.legs[course.i];
+          ldx = leg.x - p.x; ldz = leg.z - p.z; ld = Math.hypot(ldx, ldz);
+        }
+        if (ld > 0.01) autoDir = { x: ldx / ld, z: ldz / ld };
+      }
+    }
+
     /* heading follows the measured travel direction, turned
        at a limited rate (the car's smoothed rotation feel) */
     if (dist > 0.03 && lastPose) {
@@ -747,16 +970,30 @@
 
     /* safety valve: a driving body that reads dry land for
        over half a second has left the water by some other
-       system's hand - the craft empties and goes home */
-    if (!isWater(p.x, p.z)) { dryTime += dt; if (dryTime > 0.5) { craft.x = p.x; craft.z = p.z; craft.face = heading; emptyCraft(); syncBoatVisual(true); return; } }
-    else dryTime = 0;
+       system's hand. V1 emptied the craft home; the arrival
+       grammar re-reads the consequence (design 2): stop, do
+       not empty - the ride ends as a beaching at the LAST
+       AFLOAT pose (the hull never climbs onto the land) and
+       the rider, already ashore, simply stands there. */
+    if (!isWater(p.x, p.z)) {
+      dryTime += dt;
+      if (dryTime > 0.5) {
+        if (lastAfloat) { craft.x = lastAfloat.x; craft.z = lastAfloat.z; craft.face = lastAfloat.face; }
+        else { craft.x = p.x; craft.z = p.z; craft.face = heading; }
+        finishRide('beached');
+        syncBoatVisual(true);
+        prevPose = { x: p.x, y: p.y, z: p.z }; lastPose = prevPose;
+        return;
+      }
+    }
+    else { dryTime = 0; lastAfloat = { x: p.x, z: p.z, face: heading }; }
 
     /* water stops the boat: the nose probe reads the grid
        ahead of the bow - not water, or outside the harbour
        area, is the boat's building. The stall detector is the
        robust backstop, exactly as the car learned it. */
     blockedByWater = false;
-    if (craft.speed > 0 || manual) {
+    if (craft.speed > 0 || manual || autoDir) {
       /* probe along the INTENDED motion - the input direction
          while the driver steers, the heading while coasting.
          Probing only along the heading deadlocks a stalled
@@ -765,7 +1002,7 @@
          nosed into the edge could never steer clear. With the
          input-direction probe, steering away clears the bow
          and motion resumes (the car's escape, made real). */
-      var pvx = manual ? mx : hv.x, pvz = manual ? mz : hv.z;
+      var pvx = manual ? mx : (autoDir ? autoDir.x : hv.x), pvz = manual ? mz : (autoDir ? autoDir.z : hv.z);
       var nx = p.x + pvx * NOSE_PROBE_M, nz = p.z + pvz * NOSE_PROBE_M;
       /* the latch must not wait for the body to slow: at a
          shoreline edge the walk pipeline carries the body
@@ -776,9 +1013,38 @@
          reads 0 and the body stalls at the waterline. (Fix
          found by the P2 verification rig: the harbour's north
          edge is a shoreline, and the craft beached there.) */
-      if (!isWater(nx, nz) || !inArea(armedArea, nx, nz)) { blockedByWater = true; craft.speed = 0; }
+      var probeWet = isWater(nx, nz), probeIn = inArea(armedArea, nx, nz);
+      if (!probeWet && probeIn) {
+        /* LANDFALL (design 3.3): a dry probe INSIDE the
+           harbour is the beaching trigger, not a wall. When
+           a standable disembark point resolves, the ride
+           ends here: the craft stops afloat at the body's
+           pose (the hull does not climb), and the rider is
+           placed ashore at the resolved point - reaching
+           land IS the disembark, no key at any point. No
+           resolution (a building cell, a non-standable
+           edge) falls through to the v1 blocked-stop. */
+        var dp = resolveDisembark(nx, nz);
+        if (dp) {
+          craft.x = p.x; craft.z = p.z; craft.face = heading;
+          finishRide('beached');
+          placeRider(dp.x, dp.z);
+          toast('배가 해안에 닿았습니다');
+          syncBoatVisual(true);
+          prevPose = { x: p.x, y: p.y, z: p.z }; lastPose = prevPose;
+          return;
+        }
+        blockedByWater = true; craft.speed = 0;
+      } else if (!probeWet || !probeIn) {
+        /* a wet probe outside the area, or a dry probe
+           outside it (the bake's patch edges beyond the
+           north/west bounds read as land): the v1 blocked
+           stop, exactly - the area bound decides those
+           edges, never the class beyond them (design 2) */
+        blockedByWater = true; craft.speed = 0;
+      }
     }
-    if (!blockedByWater && manual && craft.speed > 3 && measured < 0.8) {
+    if (!blockedByWater && (manual || autoDir) && craft.speed > 3 && measured < 0.8) {
       stallTime += dt;
       if (stallTime > 1.0) { blockedByWater = true; craft.speed = 0; stallTime = 0; }
     } else {
@@ -788,6 +1054,18 @@
     if (manual && !blockedByWater) {
       if (joyInjected) clearJoy();
       craft.speed = Math.min(TOP_SPEED, craft.speed + ACCEL * dt);
+    } else if (autoDir && !blockedByWater) {
+      /* the course's own input: the camera-relative joy
+         vector in the leg's direction, injected exactly as
+         the coast injection below injects the heading - the
+         walk pipeline swims the body along it and the lever
+         (derived from the speed state further down) holds
+         the course at COURSE_SPEED */
+      var aix = autoDir.x * R.x + autoDir.z * R.z;
+      var aiz = -(autoDir.x * F.x + autoDir.z * F.z);
+      window.__joyVec = { x: aix, y: aiz };
+      joyInjected = { x: aix, y: aiz };
+      craft.speed = Math.min(COURSE_SPEED, craft.speed + ACCEL * dt);
     } else if (craft.speed > 0) {
       craft.speed = Math.max(0, craft.speed - DECEL * dt);
       if (craft.speed > 0) {
@@ -823,32 +1101,6 @@
     prevPose = { x: p.x, y: p.y, z: p.z };
     lastPose = prevPose;
   }
-  function tickReturn(dt) {
-    if (!returnLeg || !armedMooring) { craft.mode = 'moored'; return; }
-    var dx = returnLeg.x - craft.x, dz = returnLeg.z - craft.z;
-    var d = Math.hypot(dx, dz);
-    var step = RETURN_SPEED * dt;
-    if (d <= Math.max(0.4, step)) {
-      craft.x = returnLeg.x; craft.z = returnLeg.z;
-      if (returnLeg.final) {
-        returnLeg = null;
-        craft.mode = 'moored';
-        publishState();
-      } else {
-        returnLeg = { x: armedMooring.x, z: armedMooring.z, final: true };
-      }
-      return;
-    }
-    var vx = dx / d, vz = dz / d;
-    craft.x += vx * step; craft.z += vz * step;
-    var want = Math.atan2(vx, vz);
-    var dh = want - craft.face;
-    while (dh > Math.PI) dh -= Math.PI * 2;
-    while (dh < -Math.PI) dh += Math.PI * 2;
-    craft.face += Math.max(-TURN_RATE * dt, Math.min(TURN_RATE * dt, dh));
-    publishThrottle += dt;
-    if (publishThrottle > 1) { publishThrottle = 0; publishState(); }
-  }
   requestAnimationFrame(tick);
 
   /* ================= public hook ================= */
@@ -868,6 +1120,9 @@
         driver: craft.driver,
         passengers: craft.passengers.slice(),
         seats: { driver: SEATS.driver, passengers: SEATS.passengers },
+        arrival: craft.mode === 'arriving',
+        courseLeg: course ? course.i : null,
+        arrivalSpawn: armedSpawn ? { x: armedSpawn.x, z: armedSpawn.z } : null,
         mooring: armedMooring ? { x: armedMooring.x, z: armedMooring.z, face: armedMooring.face } : null,
         area: armedArea ? { x0: armedArea.x0, x1: armedArea.x1, z0: armedArea.z0, z1: armedArea.z1 } : null,
         model: BOAT_GLB ? 'glb' : 'primitives-interim'
@@ -875,6 +1130,7 @@
     },
     board: board,
     alight: alight,
+    guideToBoat: guideToBoat,
     guideMooring: guideMooring,
     mooring: function () { return armedMooring ? { x: armedMooring.x, z: armedMooring.z, face: armedMooring.face } : null; },
     /* the sharing seam's receiving half (v1: no relay calls it) */
