@@ -25,6 +25,25 @@
   function chatState() { try { return window.__espilChatState ? window.__espilChatState() : null; } catch (e) { return null; } }
   function send(obj) { try { return window.__espilSocialSend ? window.__espilSocialSend(obj) : false; } catch (e) { return false; } }
   function owned() { try { var a = JSON.parse(localStorage.getItem('espil_owned_items') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+
+  /* Comm-center phase 2 counters (comm-center DESIGN §6): when a
+     trade settles, the BUYER side fires exactly one aggregate
+     beacon - trade_center when the sold frame rode the center
+     (via), trade_direct otherwise - so the two routes are counted
+     separately and never merged. The body is exactly {event}:
+     no user, item, price or city rides it (Profit counter
+     taxonomy). Fire-and-forget, the store-video beacon shape: a
+     failed count never touches the trade. */
+  var API_BASE = window.__espilAuthApiBase || 'https://api.espil.online';
+  function centerBeacon(event) {
+    try {
+      var body = JSON.stringify({ event: event });
+      var url = API_BASE + '/center/event';
+      var sent = false;
+      if (navigator.sendBeacon) { try { sent = navigator.sendBeacon(url, new Blob([body], { type: 'text/plain;charset=UTF-8' })); } catch (e) {} }
+      if (!sent) { fetch(url, { method: 'POST', body: body, headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, keepalive: true }).catch(function () {}); }
+    } catch (e) {}
+  }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
   /* ---------- shared listing model - comm-center phase 0 -------
@@ -408,9 +427,27 @@
   });
 
   /* ---------- trade settlement ----------------------------------- */
+  /* Comm-center phase 2: a center buy carries a nonce across two
+     rooms, so a retransmitted buy frame can reach this seller
+     twice. Settled nonces are remembered (last 50, memory only)
+     with the reply that was sent; a repeat buy with a known nonce
+     replays that reply WITHOUT settling again - no second count
+     drop, no second Leo credit. At-stall frames carry no nonce
+     and keep the exact pre-center behaviour. */
+  var settledNonces = {};
+  var settledNonceOrder = [];
+  function rememberSettled(nonce, reply) {
+    if (!nonce) return;
+    if (!settledNonces[nonce]) {
+      settledNonceOrder.push(nonce);
+      if (settledNonceOrder.length > 50) { var old = settledNonceOrder.shift(); delete settledNonces[old]; }
+    }
+    settledNonces[nonce] = reply;
+  }
   window.addEventListener('espil-party-frame', function (e) {
     var m = e && e.detail; if (!m || !m.t) return;
     if (m.t === 'stall_buy' && m.from) {
+      if (m.nonce && settledNonces[m.nonce]) { send(settledNonces[m.nonce]); return; }
       var s = load(); if (!s || !s.posts) { replySold(m, null, false); return; }
       var post = null;
       s.posts.forEach(function (p) { if (p.id === m.postId) post = p; });
@@ -425,6 +462,7 @@
     }
     if (m.t === 'stall_sold' && m.from) {
       if (!m.ok) { toast('That trade could not be completed'); if (boardEl) { var u = boardUserId; closeBoard(); if (u) openBoard(u); } return; }
+      centerBeacon(m.via === 'center' ? 'trade_center' : 'trade_direct');
       var price = parseInt(m.price, 10) || 0;
       leoSet(Math.max(0, leoBalance() - price));
       if (m.kind === 'service') toast('Service purchased (TESTING): ' + m.title + ' - arrange delivery with the seller. Files: ' + SERVICE_FILES + '.');
@@ -436,7 +474,17 @@
     }
   });
   function replySold(m, post, ok) {
-    send({ t: 'stall_sold', to: m.from.id, postId: m.postId, title: post ? post.title : '', price: post ? (parseInt(post.price, 10) || 0) : 0, ok: !!ok, kind: post ? post.kind : 'item' });
+    var reply = { t: 'stall_sold', to: m.from.id, postId: m.postId, title: post ? post.title : '', price: post ? (parseInt(post.price, 10) || 0) : 0, ok: !!ok, kind: post ? post.kind : 'item' };
+    /* Comm-center phase 2: echo the center routing fields the buy
+       frame carried - via + nonce so the buyer's room can route
+       the reply home and the buyer can match it, and replyCity
+       (stamped by the buyer's room, never by a client) as the
+       return address the seller's room routes on. */
+    if (m.via === 'center') reply.via = 'center';
+    if (m.nonce) reply.nonce = m.nonce;
+    if (m.replyCity) reply.replyCity = m.replyCity;
+    rememberSettled(m.nonce, reply);
+    send(reply);
   }
 
   /* ---------- main tick ------------------------------------------ */
