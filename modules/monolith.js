@@ -1502,6 +1502,128 @@
         rec._espilLblBusy=false;
       }).catch(function(){ rec._espilLblName=null; rec._espilLblBusy=false; });
     }
+    /* STORE ENTRANCE INDICATORS (Han 2026-11-24): for the
+       name-entrant population only, a small gold ground disc at the
+       anchor of every building record that (a) passes BOTH village
+       judgements (footprint centre and baked centre, tested live with
+       the shipped espilVillageDist), (b) carries at least one baked
+       store (via __espilBakedFor), and (c) is reachable under today's
+       anchor judgement - reachability class R-open or R-notch from
+       the lazy sidecar assets/osm/<city>_reachability.json, generated
+       offline on the shipped collision grid. The marker and the
+       restriction read the same source: the live espilVillageActive()
+       gate plus espilVillageDist. Accounts see no discs, and a city
+       without a sidecar (or without baked data) marks nothing, by
+       construction. The disc is the entry glow's radial-gradient
+       family at ~9 m, without beams; it carries no name - when the
+       record's name label presents (inside the 3.5 m Use range) the
+       label IS the indicator and the disc hides. */
+    var ESPIL_MARK_CULL=80, ESPIL_MARK_SIZE=9;
+    var espilMarkSidecar={status:'idle',recs:null};
+    var espilMarkGroup=null, espilMarkPool=[], espilMarkTex=null, espilMarkVisible=[];
+    function espilMarkSidecarLoad(){
+      if(espilMarkSidecar.status!=='idle')return;
+      espilMarkSidecar.status='loading';
+      fetch('assets/osm/'+espilCityKey()+'_reachability.json').then(function(r){
+        if(!r.ok)throw new Error('no sidecar');
+        return r.json();
+      }).then(function(doc){
+        espilMarkSidecar.recs=(doc&&doc.rec)||{};
+        espilMarkSidecar.status='ready';
+      }).catch(function(){ espilMarkSidecar.recs={}; espilMarkSidecar.status='absent'; });
+    }
+    function espilMarkResolve(rec){
+      if(rec._espilMark!==undefined||rec._espilMarkBusy)return;
+      if(espilMarkSidecar.status==='idle')espilMarkSidecarLoad();
+      if(espilMarkSidecar.status!=='ready'&&espilMarkSidecar.status!=='absent')return; /* retry on a later refresh */
+      if(typeof window.__espilBakedFor!=='function'){rec._espilMark=null;return;}
+      rec._espilMarkBusy=true;
+      window.__espilBakedFor({x:rec.cx,z:rec.cz,w:rec.x1-rec.x0,d:rec.z1-rec.z0}).then(function(bp){
+        rec._espilMarkBusy=false;
+        var out=null;
+        try{
+          var stores=(bp&&bp.stores)||[];
+          if(stores.length&&espilMarkSidecar.recs){
+            var m=/^baked:(\d+):/.exec(String(stores[0].id||''));
+            var e=m?espilMarkSidecar.recs[m[1]]:null;
+            if(e)out={cls:e[0],bx:e[1],bz:e[2]};
+          }
+        }catch(err){ out=null; }
+        rec._espilMark=out;
+      }).catch(function(){ rec._espilMarkBusy=false; rec._espilMark=null; });
+    }
+    function espilMarkMarked(rec){
+      if(!espilVillageActive())return false;
+      var mk=rec._espilMark;
+      if(!mk)return false;
+      if(mk.cls!=='o'&&mk.cls!=='n')return false;
+      var lm=espilLandmark(); if(!lm)return false;
+      if(espilVillageDist(rec.cx,rec.cz)>lm.radius)return false;
+      if(espilVillageDist(mk.bx,mk.bz)>lm.radius)return false;
+      return true;
+    }
+    function espilMarkEnsurePool(){
+      if(espilMarkGroup)return true;
+      var sc=(typeof mapScene!=='undefined'&&mapScene)?mapScene:null;
+      if(!sc||typeof THREE==='undefined')return false;
+      var cv=document.createElement('canvas'); cv.width=cv.height=128;
+      var cx2=cv.getContext('2d');
+      var gr=cx2.createRadialGradient(64,64,2,64,64,64);
+      gr.addColorStop(0,'rgba(255,236,170,0.9)'); gr.addColorStop(0.4,'rgba(255,205,92,0.35)'); gr.addColorStop(1,'rgba(255,190,60,0)');
+      cx2.fillStyle=gr; cx2.fillRect(0,0,128,128);
+      espilMarkTex=new THREE.CanvasTexture(cv);
+      espilMarkGroup=new THREE.Group();
+      sc.add(espilMarkGroup);
+      return true;
+    }
+    function espilMarkDisc(i){
+      var m=espilMarkPool[i];
+      if(!m){
+        m=new THREE.Mesh(new THREE.PlaneGeometry(ESPIL_MARK_SIZE,ESPIL_MARK_SIZE),
+          new THREE.MeshBasicMaterial({map:espilMarkTex,transparent:true,opacity:.55,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+        m.rotation.x=-Math.PI/2; m.renderOrder=3; m.visible=false;
+        espilMarkGroup.add(m); espilMarkPool[i]=m;
+      }
+      return m;
+    }
+    function espilStoreMarksRefresh(px,pz,uiOpen,labelEntries){
+      var vis=[];
+      var on=false;
+      try{ on=espilVillageActive(); }catch(e){ on=false; }
+      if(on&&espilMarkSidecar.status==='idle')espilMarkSidecarLoad();
+      if(on&&!uiOpen&&espilPolyHash&&espilMarkEnsurePool()){
+        var recs=espilCollectRecsNear(px,pz,ESPIL_MARK_CULL);
+        for(var i=0;i<recs.length;i++){
+          var rec=recs[i];
+          espilMarkResolve(rec);
+          if(!espilMarkMarked(rec))continue;
+          var a=espilLabelAnchor(rec);
+          var d=Math.hypot(px-a.x,pz-a.z);
+          if(d>ESPIL_MARK_CULL)continue;
+          var lab=false;
+          if(labelEntries)for(var li=0;li<labelEntries.length;li++){ if(labelEntries[li].rec===rec){ lab=true; break; } }
+          if(lab)continue; /* the presented name label IS the indicator inside the Use range */
+          vis.push({rec:rec,ax:a.x,az:a.z,d:d});
+        }
+        vis.sort(function(p,q){return p.d-q.d;});
+      }
+      if(espilMarkGroup){
+        var s=0.5+0.5*Math.sin(Date.now()/1400);
+        for(var vi=0;vi<vis.length;vi++){
+          var m=espilMarkDisc(vi);
+          m.position.set(vis[vi].ax,0.25,vis[vi].az);
+          m.material.opacity=0.45+0.18*s;
+          m.visible=true;
+        }
+        for(var k=vis.length;k<espilMarkPool.length;k++){ if(espilMarkPool[k])espilMarkPool[k].visible=false; }
+      }
+      espilMarkVisible=vis;
+    }
+    window.__espilStoreMarksState=function(){
+      var on=false; try{ on=espilVillageActive(); }catch(e){}
+      return { gate:on, sidecar:espilMarkSidecar.status, cull:ESPIL_MARK_CULL, size:ESPIL_MARK_SIZE,
+        discs:espilMarkVisible.map(function(v){ return {x:+v.ax.toFixed(1),z:+v.az.toFixed(1),d:+v.d.toFixed(1)}; }) };
+    };
     function espilLabelLayerGet(){
       if(espilLabelLayer)return espilLabelLayer;
       var st=document.createElement('style');
@@ -1557,6 +1679,7 @@
         if(espilLabelPool[k])espilLabelPool[k].style.display='none';
       }
       espilLabelEntries=entries;
+      espilStoreMarksRefresh(px,pz,uiOpen,entries);
     }
     var espilLabelV=null;
     function espilStoreLabelsTick(){
@@ -8119,6 +8242,7 @@
               var rec=recs[i];
               espilLabelResolveName(rec);
               if(!rec._espilLblName)continue;
+              if(espilVillageActive()){ espilMarkResolve(rec); if(!espilMarkMarked(rec))continue; } /* entrants: the glow follows the marked set; accounts unchanged */
               var a=espilLabelAnchor(rec);
               var d=Math.hypot(walkPlayer.pos.x-a.x,walkPlayer.pos.z-a.z);
               if(d<bestD){bestD=d;ax=a.x;az=a.z;nm=rec._espilLblName;}
