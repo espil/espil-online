@@ -7831,6 +7831,32 @@
     /* Han 2026-10-14: Settings panel — city selection lives in Options, with
        the current city as the default selected value. */
     var settingsOpen=false;
+    /* ESC OPTIONS (Han 2026-11-25, Package E): the settings
+       panel's auth row is state-aware. Signed in, it is the
+       existing Log out (label from the language dictionary;
+       social.js owns its click - server revoke + local record
+       removal). As a guest it reads Log in and its click opens
+       the auth surface in place (the settings wiring below
+       intercepts the click before social.js's handler, which
+       would otherwise only toast). Painted on every open, so the
+       label always matches the session that opened the panel.
+       The login label is not a dictionary key; the four strings
+       follow the dictionary's own logout row. */
+    var ESPIL_LOGIN_LABEL={ko:'로그인',en:'Log in',fr:'Se connecter',zh:'登录'};
+    function espilPaintAuthRow(){
+      var lo=document.getElementById('set-logout');
+      if(!lo)return;
+      var s=null;
+      try{ s=JSON.parse(localStorage.getItem('espil_session_v1')||'null'); }catch(e){}
+      if(s&&s.server&&s.id){
+        lo.setAttribute('data-i18n','logout');
+        lo.textContent=(window.__espilT?window.__espilT('logout'):'Log out');
+      }else{
+        lo.removeAttribute('data-i18n');
+        var lg=(window.__espilLang?window.__espilLang():'en');
+        lo.textContent=ESPIL_LOGIN_LABEL[lg]||ESPIL_LOGIN_LABEL.en;
+      }
+    }
     function toggleSettingsPanel(force){
       var panel=document.getElementById('settings-panel');
       if(!panel)return;
@@ -7839,6 +7865,7 @@
       panel.classList.toggle('open',open);
       panel.setAttribute('aria-hidden',String(!open));
       if(open){
+        espilPaintAuthRow();
         var sel=document.getElementById('opt-city');
         if(sel){
           if(!sel.children.length&&typeof markers!=='undefined'){
@@ -7853,6 +7880,27 @@
         }
       }
     }
+    /* ESC OPTIONS (Han 2026-11-25, Package E): window.__espilOpenAuth
+       is DEFINED here for the first time. entry-flow's login step
+       and the landmark panel's account row already call it behind
+       typeof guards and fell back to a notice / a direct modal
+       flip; this is the in-place opening they meant. Presentation
+       is the product's own signal pair - the same two writes
+       openLoginGate and landing-auth's openModal make: flip
+       #signin-modal's aria-hidden to 'false' (landing-auth
+       mirrors the signal into #city-status.auth-open, which is
+       what renders #signin-div, and entry-flow re-claims the auth
+       zone on the same flip) and mark the readout gate-hidden.
+       No gate is armed and no flow step is touched: social.js's
+       completion hides the modal after a sign-in, and the modal's
+       own close paths (the x button, ESC - both landing-auth's)
+       unwind the pair. */
+    window.__espilOpenAuth=function(){
+      var m=document.getElementById('signin-modal');
+      if(m)m.setAttribute('aria-hidden','false');
+      var cs=document.getElementById('city-status');
+      if(cs)cs.classList.add('gate-hidden');
+    };
     /* Settings menu wiring (Han batch 5 #3, 2026-10-20): gear,
        Return to Earth, button settings (rebindable Jump / Interact /
        Stall, persisted), sound settings (music volume + mute,
@@ -7904,6 +7952,24 @@
       if(gear)gear.addEventListener('click',function(){ toggleSettingsPanel(); });
       var ret=document.getElementById('set-return');
       if(ret)ret.addEventListener('click',function(){ if(window.__ESPIL_GAME_PAGE){ location.href='index.html'; return; } toggleSettingsPanel(false); if(window.__espilInside)espilLeaveBuilding(); clearSelection(true); });
+      /* ESC OPTIONS (Han 2026-11-25, Package E): the auth row's
+         guest half. This listener is registered at parse, before
+         social.js (a lazy module) binds its own #set-logout
+         handler, so for a guest it can stand in front of that
+         handler: the press opens the auth surface in place
+         instead of ending in the 'Sign in first' toast. The
+         session is re-read at click time; a signed-in press
+         returns at once and social.js's handler runs the logout
+         exactly as before. */
+      var lo=document.getElementById('set-logout');
+      if(lo)lo.addEventListener('click',function(e){
+        var s=null;
+        try{ s=JSON.parse(localStorage.getItem('espil_session_v1')||'null'); }catch(_){}
+        if(s&&s.server&&s.id)return;
+        e.preventDefault(); e.stopImmediatePropagation();
+        toggleSettingsPanel(false);
+        if(typeof window.__espilOpenAuth==='function')window.__espilOpenAuth();
+      });
       [['kb-jump','jump'],['kb-interact','interact'],['kb-stall','stall']].forEach(function(pair){
         var b=document.getElementById(pair[0]);
         if(b)b.addEventListener('click',function(){ espilKbArm=pair[1]; espilKbPaint(); });
@@ -13670,9 +13736,26 @@
       var k=window.__espilNormKey?window.__espilNormKey(e):e.key; /* IME fix (2026-11-23): normalized AFTER the typing guard above - text fields never reach this line */
       if(k==='Enter'&&!e.repeat){setChatTyping(true);return;}
       /* Han 2026-10-14 #1: ESC in-map closes panels ONLY — never exits to landing.
-         (Re-applied 2026-10-14 after the working-copy overwrite.) */
+         (Re-applied 2026-10-14 after the working-copy overwrite.)
+         Amended 2026-11-25 (Han, Package E): a press that closes
+         nothing opens the options surface (the settings panel)
+         instead of doing nothing - see the branch. The 2026-10-14
+         rule stands in form: ESC never exits to landing by itself;
+         leaving is the panel's own Return row, a deliberate
+         second step. */
       if(k==='Escape'&&!e.repeat){
         e.preventDefault();
+        /* The snapshot reads every state this branch closes, plus
+           three surfaces closed by their own listeners on the same
+           press (the notice panel, the dive guide, the auth
+           modal), so one press never both closes one of those and
+           opens the options. */
+        var _escAny=!!(skillTreeOpen||inventoryOpen||characterOpen||friendsOpen||stallOpen||espilBldgPanelRec||settingsOpen||window.__espilNoticeOpen);
+        if(!_escAny){ var _bo=document.getElementById('bldg-opts'); if(_bo&&_bo.classList.contains('open'))_escAny=true; }
+        if(!_escAny){ var _sh=document.getElementById('shop-ui'); if(_sh&&_sh.classList.contains('open'))_escAny=true; }
+        if(!_escAny){ var _sm0=document.getElementById('store-modal'); if(_sm0&&!_sm0.classList.contains('hidden'))_escAny=true; }
+        if(!_escAny){ var _am=document.getElementById('signin-modal'); if(_am&&_am.getAttribute('aria-hidden')==='false')_escAny=true; }
+        if(!_escAny){ var _dg=document.getElementById('espil-diveguide'); if(_dg&&!_dg.hidden)_escAny=true; }
         if(skillTreeOpen)toggleSkillTree(false);
         if(inventoryOpen)toggleInventory(false);
         if(characterOpen)toggleCharacterPanel(false);
@@ -13685,6 +13768,7 @@
         if(settingsOpen)toggleSettingsPanel(false);
         var _sm=document.getElementById('store-modal');
         if(_sm&&!_sm.classList.contains('hidden'))_sm.classList.add('hidden');
+        if(!_escAny)toggleSettingsPanel(true);
         return;
       }
       if(k===' '||k==='ArrowUp'||k==='ArrowDown'||k==='ArrowLeft'||k==='ArrowRight')e.preventDefault();

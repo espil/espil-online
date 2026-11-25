@@ -536,6 +536,17 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
           </div>
           <button class="st-close" id="set-close" type="button" aria-label="Close settings">&#10005;</button>
         </div>
+        <!-- Settings menu (Han batch 5 #3, 2026-10-20): Return to
+             Earth, button settings, sound settings, log out,
+             developer info. Moved to the panel top 2026-11-25
+             (Han, ESC options): the panel opens as the options
+             menu - Return first, then the auth row (state-aware:
+             Log out signed in, Log in as a guest - monolith paints
+             it), then the settings below. -->
+        <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;">
+          <button class="pill-btn" id="set-return" type="button" data-i18n="setReturn" style="min-height:48px;">Return to Earth</button>
+          <button class="pill-btn" id="set-logout" type="button" data-i18n="logout" style="min-height:48px;">Log out</button>
+        </div>
         <label for="opt-city" data-i18n="citySelect">CITY SELECT</label>
         <select id="opt-city"></select>
         <label for="opt-lang" style="margin-top:16px;" data-i18n="langLabel">LANGUAGE</label>
@@ -546,12 +557,6 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
           <option value="zh">中文</option>
         </select>
         <p class="set-note">Choosing a city returns you to the globe, on approach to that city. The current city is selected by default.</p>
-        <!-- Settings menu (Han batch 5 #3, 2026-10-20): Return to
-             Earth, button settings, sound settings, log out
-             (disabled in the guest build), developer info. -->
-        <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;">
-          <button class="pill-btn" id="set-return" type="button" data-i18n="setReturn">Return to Earth</button>
-        </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
         </div>
         <label style="margin-top:16px;" data-i18n="buttonSettings">BUTTON SETTINGS</label>
@@ -569,7 +574,6 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
           <label style="display:flex;align-items:center;gap:4px;"><input id="set-mute" type="checkbox"> <span data-i18n="mute">Mute</span></label>
         </div>
         <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;">
-          <button class="pill-btn" id="set-logout" type="button" data-i18n="logout">Log out</button>
           <button class="pill-btn" id="set-devinfo-btn" type="button" data-i18n="devInfo">Developer info</button>
           <div id="set-devinfo" style="display:none;text-align:left;">
             <p class="set-note" style="line-height:1.7;">Espil Online - an MMORPG in real cities, beginning as a mall.<br>Developed by Han (quadclipse), Espil.<br>Contact: han@espil.online<br>Web: espil.online</p>
