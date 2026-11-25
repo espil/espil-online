@@ -122,6 +122,17 @@
   function accounts() { try { var o = JSON.parse(localStorage.getItem(LS_ACCOUNTS) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (_) { return {}; } }
   function saveAccounts(o) { try { localStorage.setItem(LS_ACCOUNTS, JSON.stringify(o)); } catch (_) {} }
   function session() { try { var s = JSON.parse(localStorage.getItem(LS_SESSION) || 'null'); return s && s.id ? s : null; } catch (_) { return null; } }
+  function isLoggedIn() {
+    var ses = session();
+    /* S0 activation (flip step 1): the basis is the SERVER
+       session - espil_session_v1 as written from the Worker's
+       /auth/session response (server:true). espil_accounts_v1
+       is retired as an authority: records stay in place, never
+       deleted, never read for auth. This is the swap PLAN.md S0
+       names - the restore branch above goes live on it with no
+       further spawn changes. */
+    return !!(ses && ses.server === true && ses.id);
+  }
   /* S0 activation (flip step 1): refresh the local session record
      from the Worker's server session at boot, so a Google return
      (the session arrives as a cookie) becomes the espil_session_v1
@@ -522,17 +533,6 @@
        startSession.) The account stage only has to enable
        sign-in and the restore branch goes live with no further
        spawn changes. */
-    function isLoggedIn() {
-      var ses = session();
-      /* S0 activation (flip step 1): the basis is the SERVER
-         session - espil_session_v1 as written from the Worker's
-         /auth/session response (server:true). espil_accounts_v1
-         is retired as an authority: records stay in place, never
-         deleted, never read for auth. This is the swap PLAN.md S0
-         names - the restore branch above goes live on it with no
-         further spawn changes. */
-      return !!(ses && ses.server === true && ses.id);
-    }
     var loggedIn = isLoggedIn();
     var directGamePage = false;
     try { directGamePage = window.__ESPIL_GAME_PAGE === true && !document.documentElement.classList.contains('espil-handoff'); } catch (_) {}
