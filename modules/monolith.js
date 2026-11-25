@@ -3144,9 +3144,20 @@
       try{ placeMark=JSON.parse(sessionStorage.getItem('espil_store_space_v1')||'null'); }catch(e){}
       if(placeMark&&placeMark.city&&placeMark.slug){ espilPlaceEntryStart(); return; }
       var cfg=espilCityCfg();
-      var last=null; try{ last=loadLastPos(); }catch(e){}
       var target=null;
       var locPick=null; try{ locPick=window.__espilSpawnPick||null; window.__espilSpawnPick=null; }catch(e){}
+      /* ENTRY FLOW V2 (Han 2026-11-24, entry-v2/DESIGN.md 6.3):
+         entry never reads espil_last_pos. The location gate now
+         hands every account entry an explicit city-centre pick,
+         and the entrant branch below summons guests at the
+         landmark without one - so the saved-position read runs
+         only on the no-pick fallback (the gate module absent),
+         where the pre-v2 resume stands exactly as before. The
+         in-game WRITE (saveLastPos) is kept: the build-time
+         census (entry-v2/BUILD-REPORT.md) found no other reader,
+         and the design leaves a write-only record's retirement
+         to a later cycle rather than this package. */
+      var last=null; if(!locPick&&!espilGuestNow()){ try{ last=loadLastPos(); }catch(e){} }
       /* NAME-ONLY ENTRY (Han 2026-11-24): an entrant summons at the
          entered city's landmark on EVERY entry (Play and Shop
          alike - both dive through here): the saved-position resume
@@ -6430,8 +6441,16 @@
     /* ================= END 5km CHUNKED CITY ================= */
     function resetWalkPlayer(){
       if(!walkPlayer)return;
-      /* QA #6: restore last position if available, else default spawn. */
-      var last=loadLastPos();
+      /* QA #6: restore last position if available, else default spawn.
+         ENTRY FLOW V2 (Han 2026-11-24, entry-v2/DESIGN.md 6.3): on a
+         gated entry the saved position is not read at all - an
+         account carries the gate's explicit centre pick and a guest
+         is summoned by espilEntryStart's landmark branch, and both
+         override this reset position in espilEntryStart, which runs
+         immediately after. The read survives only for the no-pick
+         fallback (the gate module absent). */
+      var last=null;
+      try{ if(!window.__espilSpawnPick&&!espilGuestNow()) last=loadLastPos(); }catch(e){}
       if(last){
         walkPlayer.pos.set(last.x,last.y,last.z);
         if(typeof last.yaw==='number')walkCamYaw=last.yaw;

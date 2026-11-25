@@ -361,6 +361,14 @@
   }, true);
   setInterval(function () {
     if (guestNumbered || session()) return;
+    /* ENTRY FLOW V2 (Han 2026-11-24): an auto-named guest's name is
+       never adopted into espil_username - the v2 guest path neither
+       reads nor writes that key (entry-v2/DESIGN.md 7). The tab's
+       v2 handoff (the sessionStorage name key, or the window flag
+       the game page's name-once pass sets when it consumes it) is
+       the signal to stay out. Direct game-page guests with no v2
+       handoff keep the adoption below exactly as before. */
+    try { if (sessionStorage.getItem('espil_entry_v2_guest_name') || window.__espilEntryV2GuestName) return; } catch (_) {}
     var st = null;
     try { st = window.__espilChatState && window.__espilChatState(); } catch (_) {}
     if (!st || !st.joined || !st.myId) return;
@@ -788,26 +796,37 @@
     var placeMark = null;
     try { placeMark = JSON.parse(sessionStorage.getItem('espil_store_space_v1') || 'null'); } catch (_) {}
     if (placeMark && placeMark.city && placeMark.slug) { espilGateUsual(n); return; }
-    var pref = locPref();
-    if (pref === 'never') { espilGateUsual(n); return; }
-    if (pref === 'always') {
-      locSummonTry(function (r) {
-        if (r.ok) {
-          if (r.kind === 'clamped') locToast(t('geoClamped'));
-          locFinishPick(r.point, n);
-          return;
-        }
-        if (r.why === 'denied') setLocPref(null); /* permission revoked since the choice: unset, so the next dive asks honestly (design 3.7) */
-        else locToast(locFailNotice(r.why, r.city));
-        espilGateUsual(n);
-      });
+    /* ENTRY FLOW V2 (Han 2026-11-24, entry-v2/DESIGN.md 6): the
+       entry-place ASK is retired for every population - the gate
+       never asks, never reads espil_last_pos, and no preference
+       is consulted or written here anymore. The ask machinery
+       (buildLocAsk, locPref, locSummonTry) stays in the file
+       dormant and unreachable from this gate, the way the Batch
+       D3 picker was left dormant before it.
+       - ACCOUNT: the city-centre pick (__espilCityCentre()),
+         unconditionally. If the seam is somehow absent the
+         usual judgement stands as the fail-soft, as before.
+       - GUEST: NO pick is set. The monolith's entrant branch
+         (espilEntryStart's espilGuestNow branch) summons at
+         the entered city's landmark - that branch is the ONE
+         isolated seam carrying the guest landing decision
+         (design 6.2, draft reading (b): the landmark is the
+         entrant's centre). If Han answers Q1 with reading (a),
+         the flip is that monolith branch alone; this gate does
+         not change. Any stale pick is cleared so nothing from
+         an earlier flow can outrank the summon. */
+    if (isLoggedIn()) {
+      var c = null;
+      try { if (typeof window.__espilCityCentre === 'function') c = window.__espilCityCentre(); } catch (_) {}
+      if (c && typeof c.x === 'number' && isFinite(c.x) && typeof c.z === 'number' && isFinite(c.z)) {
+        locFinishPick(c, n);
+        return;
+      }
+      espilGateUsual(n);
       return;
     }
-    /* Unset: ask - unless the question could never resolve (no
-       seam in the monolith, or no geolocation in the browser),
-       in which case the usual judgement stands alone. */
-    if (typeof window.__espilGeoJudge !== 'function' || !navigator.geolocation) { espilGateUsual(n); return; }
-    buildLocAsk(n);
+    try { window.__espilSpawnPick = null; } catch (_) {}
+    n();
   };
 
 
@@ -903,6 +922,16 @@
     '#espil-city-back{display:none}' +
     '#city-status.city-step:not(.flow-open) #espil-city-back{display:flex}' +
     '#city-status.is-city #espil-city-back{display:none !important}' +
+    /* ENTRY FLOW V2 (Han 2026-11-24, entry-v2/DESIGN.md 5): the
+       enter control is a real full-width button directly under
+       the city list - the city step's one primary action, at
+       the button standard's 48px touch height, shown only
+       while a bundled city stands selected. */
+    '#espil-city-enter{display:none;width:100%;min-height:48px;margin-top:6px;padding:12px;' +
+      'border:2px solid #d97f10;border-radius:12px;background:linear-gradient(180deg,#ffb84d,#f08c1a);' +
+      'color:#fff;text-shadow:0 1px 2px rgba(120,60,0,.5);font-weight:800;cursor:pointer}' +
+    '#espil-city-enter.on{display:block}' +
+    '#espil-city-enter:active{filter:brightness(.92)}' +
     /* Fix batch 8 item 4 (Han 2026-11-14): the menu and guidance
        views carry their choices in a reel with the city-list
        treatment AS-IS - the pair.css .city-list declarations
@@ -920,7 +949,15 @@
       'mask-image:linear-gradient(to bottom,transparent 0,#000 24%,#000 76%,transparent 100%);' +
       '-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 24%,#000 76%,transparent 100%);' +
       'overscroll-behavior:contain;touch-action:pan-y}' +
-    '.espil-flow-reel::-webkit-scrollbar{display:none}';
+    '.espil-flow-reel::-webkit-scrollbar{display:none}' +
+    /* ENTRY FLOW V2 AMENDMENT B (Han 2026-11-24 20:47): keyboard-only
+       operability is a HARD requirement - every interactive element
+       of the entry flow carries a VISIBLE focus indicator, drawn by
+       the flow itself (never left to browser defaults against the
+       landing art). */
+    '#signin-div button:focus,#signin-div input:focus,#signin-div select:focus,#signin-div textarea:focus,' +
+    '#city-status button:focus,#city-list .espil-city-btn:focus,#espil-city-enter:focus,#auth-mode-switch:focus,' +
+    '#signin-div button:focus-visible,#city-status button:focus-visible{outline:3px solid #ffcf4d !important;outline-offset:2px !important;box-shadow:0 0 0 5px rgba(255,207,77,.35) !important}';
   document.head.appendChild(css);
 
   /* ---------------- DOM: menu + panels ---------------- */
@@ -1008,6 +1045,7 @@
 
     $('espil-menu-play').addEventListener('click', function () { chooseMode('play'); });
     $('espil-menu-shop').addEventListener('click', function () { chooseMode('shop'); });
+    (function () { var sr = $('espil-menu-shop'); if (sr) { sr.setAttribute('data-destination', ESPIL_SHOP_DESTINATION.id); sr.setAttribute('data-destination-route', ESPIL_SHOP_DESTINATION.route); sr.setAttribute('data-destination-arrival', ESPIL_SHOP_DESTINATION.arrival); } })(); /* Amendment A: the destination of record rides the row; the click behaviour above is the interim city path until the cauldron window ships. */
     $('espil-menu-zealandia').addEventListener('click', function () { presentFlowView($('espil-zealandia-panel')); });
     $('espil-menu-about').addEventListener('click', function () { presentFlowView($('espil-about-panel')); });
     $('espil-menu-back').addEventListener('click', function () { backToLogin(); });
@@ -1110,8 +1148,68 @@
   function backToMenu() {
     if (step !== 'city') return;
     step = 'menu';
+    clearCitySelection();
     var cs = $('city-status'); if (cs) cs.classList.remove('city-step');
     presentFlowView($('espil-mainmenu'));
+  }
+
+  /* ---------------- ENTRY FLOW V2: the enter button (design 5) --
+     Selecting a bundled city MARKS it; nothing dives until the
+     enter button (or the Enter key) fires. The button sits
+     directly under the city list, ahead of the Back row, carries
+     the draft copy, and is the city step's one primary action.
+     Bundle-less cities never show it: their pick opens the
+     preparation panel and clears any mark. */
+  var selectedBundleCity = null;
+  var flowOrigCityBtns = null; /* monolith's own reel buttons, harvested by the city layer below */
+  function buildCityEnter() {
+    if ($('espil-city-enter')) return;
+    var list = $('city-list');
+    if (!list || !list.parentNode) return;
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.id = 'espil-city-enter';
+    b.textContent = 'Press Enter - 눌러서 들어가기';
+    b.setAttribute('aria-label', 'Enter the selected city');
+    var ref = $('espil-city-back') || list.nextSibling;
+    list.parentNode.insertBefore(b, ref);
+    b.addEventListener('click', function () { diveSelectedCity(); });
+  }
+  function selectBundleCity(name) {
+    selectedBundleCity = name;
+    buildCityEnter();
+    var b = $('espil-city-enter');
+    if (b) b.classList.add('on');
+  }
+  function clearCitySelection() {
+    selectedBundleCity = null;
+    var b = $('espil-city-enter');
+    if (b) b.classList.remove('on');
+  }
+  function diveSelectedCity() {
+    if (step !== 'city' || !selectedBundleCity) return;
+    var name = selectedBundleCity;
+    /* Delegate to monolith's own reel button for the marked
+       city (its selection and info panel run exactly as
+       before), then press the panel's DIVE in the SAME
+       synchronous turn: the popup never paints, and the dive
+       that follows is monolith's own startCityEntry,
+       unchanged. A missing button (build race) falls back to
+       the preparation panel - today's behaviour for an
+       undelegatable pick. */
+    var delegated = false;
+    if (flowOrigCityBtns) {
+      for (var k = 0; k < flowOrigCityBtns.length; k++) {
+        if ((flowOrigCityBtns[k].textContent || '').trim() === name) { flowOrigCityBtns[k].click(); delegated = true; break; }
+      }
+    }
+    var enter = $('city-info-enter');
+    if (delegated && enter) {
+      enter.click();
+      step = 'done';
+      return;
+    }
+    openPrep(name);
   }
   /* loginHold: the flow stays at the login/guest step until that
      step's own controls complete the gate. It is set by the
@@ -1135,10 +1233,15 @@
     step = 'login';
     /* Restructure (Han 2026-11-11): the step opened on the
        three-entry list; a live session keeps the combined form.
-       NAME-ONLY ENTRY (Han 2026-11-24): the step now opens on the
-       NAME step - no login wall; the account forms branch off it
-       and return via Back. */
-    presentAuthStep(sessionRecord() ? null : 'name');
+       NAME-ONLY ENTRY (Han 2026-11-24): the step opened on the
+       NAME step - no login wall; the account forms branched off
+       it and returned via Back.
+       ENTRY FLOW V2 (Han 2026-11-24, entry-v2/DESIGN.md 1): the
+       step opens on the TWO-DOOR choice (게스트로 들어가기 /
+       로그인) - the name step is retired, and sign-up lives
+       inside the login door behind the form's switch. A live
+       session keeps the combined form, exactly as before. */
+    presentAuthStep(sessionRecord() ? null : 'choice');
     if (typeof window.__espilOpenAuth === 'function') { window.__espilOpenAuth(); return; }
     var m = $('signin-modal');
     if (m) {
@@ -1230,6 +1333,7 @@
     return out;
   }
   function openPrep(name) {
+    clearCitySelection(); /* a bundle-less pick offers no entry: the enter button leaves with the mark (design 5) */
     buildUI();
     var n = $('espil-cityprep-name'); if (n) n.textContent = name;
     presentFlowView($('espil-cityprep-panel'));
@@ -1256,6 +1360,7 @@
         orig.push(list.children[i]);
         list.children[i].style.display = 'none';
       }
+      flowOrigCityBtns = orig; /* ENTRY FLOW V2: the enter button delegates through these (design 5) */
       cities.forEach(function (c) {
         var b = document.createElement('button');
         b.type = 'button';
@@ -1268,15 +1373,14 @@
           for (var j = 0; j < btns.length; j++) btns[j].classList.toggle('is-centered', btns[j] === b);
           faceFlowCity(c.name); /* item 5: a click centres the city too - face it */
           if (BUNDLE_CITIES[c.name]) {
-            /* Wave 0 (Han 2026-11-18, all cities open): a bundle
-               city delegates to monolith's own reel button, exactly
-               as Vancouver always has - its button exists because
-               ESPIL_SELECTABLE_CITIES now carries the six bundle
-               cities. A missing button (build race) falls through
-               to the preparation panel, today's behaviour. */
-            for (var k = 0; k < orig.length; k++) {
-              if ((orig[k].textContent || '').trim() === c.name) { orig[k].click(); return; }
-            }
+            /* ENTRY FLOW V2 (Han 2026-11-24, entry-v2/DESIGN.md
+               5): a bundle city is only MARKED here - the dive
+               waits for the enter button under the list (or the
+               Enter key). The Wave 0 delegation to monolith's
+               own reel button now happens inside
+               diveSelectedCity, at the click that enters. */
+            selectBundleCity(c.name);
+            return;
           }
           openPrep(c.name);
         });
@@ -1334,9 +1438,26 @@
       var pin = t && t.closest ? t.closest('.city-pin') : null;
       if (!pin) return;
       var name = (pin.getAttribute('aria-label') || '').split(',')[0].trim();
-      if (!name || BUNDLE_CITIES[name]) return;
+      if (!name) return;
       e.stopPropagation();
       e.preventDefault();
+      if (BUNDLE_CITIES[name]) {
+        /* ENTRY FLOW V2 (design 5): a bundle city's pin marks it,
+           exactly like its list row - monolith's native pin flow
+           (which would open the retired dive popup) no longer
+           runs at the city step. The corresponding list row takes
+           the centred treatment so the mark reads in the list. */
+        faceFlowCity(name);
+        var cityListEl = $('city-list');
+        var btns = cityListEl ? cityListEl.querySelectorAll('.espil-city-btn') : [];
+        for (var j = 0; j < btns.length; j++) {
+          var on = btns[j].getAttribute('data-city') === name;
+          btns[j].classList.toggle('is-centered', on);
+          if (on && btns[j].scrollIntoView) { try { btns[j].scrollIntoView({ block: 'center' }); } catch (err) {} }
+        }
+        selectBundleCity(name);
+        return;
+      }
       openPrep(name);
     }, true);
   }
@@ -1414,13 +1535,49 @@
      the one neutral body; there is nothing to pick), the guest
      Back hidden (the name step is the root step), and the account
      line as a first-class row under the enter button. Returning
-     entrants get their stored name prefilled. Prepared once. */
+     entrants get their stored name prefilled. Prepared once.
+     ENTRY FLOW V2 (Han 2026-11-24): the name step is retired -
+     no state of presentAuthStep presents it anymore (the guest
+     door is the auto-name entry in wireAuthSteps below), and
+     the prefill is gone with it: the v2 guest path never reads
+     espil_username. This prep survives only as the dormant
+     body of the retired step. */
+  /* ENTRY FLOW V2 (Han 2026-11-24, entry-v2/DESIGN.md 1): the
+     first screen is exactly two doors. The choice box's three
+     static rows are re-cut in place: the sign-up row leaves the
+     first screen (sign-up lives inside the login door now, behind
+     the form's switch), the guest row moves first and carries
+     the door copy, and the login row carries its door copy.
+     Prepared once; the rows' click wiring is in wireAuthSteps
+     below. */
+  var espilTwoDoorReady = false;
+  function espilTwoDoorPrep() {
+    if (espilTwoDoorReady) return;
+    var goGuest = document.getElementById('auth-go-guest');
+    var goLogin = document.getElementById('auth-go-login');
+    var goSignup = document.getElementById('auth-go-signup');
+    if (!goGuest || !goLogin) return;
+    espilTwoDoorReady = true;
+    if (goSignup) goSignup.style.display = 'none';
+    goGuest.textContent = '게스트로 들어가기';
+    goLogin.textContent = '로그인';
+    if (goGuest.parentNode) goGuest.parentNode.insertBefore(goGuest, goGuest.parentNode.firstChild);
+  }
+  /* ENTRY FLOW V2 AMENDMENT A (Han 2026-11-24 20:47): the menu's
+     Shop choice has a FIXED destination of record - the MROS
+     Center (the cauldron space, child window /cauldron), arriving
+     at the CHERRY-BLOSSOM PLAZA. Until the cauldron window ships
+     (cauldron stage 1), Shop keeps the interim behaviour exactly:
+     chooseMode('shop') and today's city-shopping path. The
+     destination lives here as structure only - when stage 1
+     lands, flipping `live` to true and routing chooseMode's shop
+     branch to this target is the whole change, not a redesign.
+     The row is NEVER pointed at the route before it exists. */
+  var ESPIL_SHOP_DESTINATION = { id: 'mros-center', label: 'MROS Center', route: '/cauldron', arrival: 'cherry-blossom-plaza', live: false };
+  window.__espilShopDestination = ESPIL_SHOP_DESTINATION;
+
   var espilNameStepReady = false;
   function espilNameStepPrep() {
-    var gName = document.getElementById('guest-name');
-    if (gName && !gName.value) {
-      try { gName.value = (localStorage.getItem('espil_username') || '').trim(); } catch (e) {}
-    }
     if (espilNameStepReady) return;
     espilNameStepReady = true;
     var gMale = document.getElementById('guest-char-male');
@@ -1479,6 +1636,7 @@
        the base 12.16px, none centred). The rows are pair.css
        .city-name buttons, so the centred treatment is the same
        .is-centered enlargement the reels use. */
+    if (name === 'choice') espilTwoDoorPrep();
     if (name === 'choice' && choiceBox) {
       var cItems = choiceBox.querySelectorAll('.auth-choice-item');
       for (var ci = 0; ci < cItems.length; ci++) {
@@ -1511,6 +1669,33 @@
       }
       var focusEl = isLogin ? idInput : nameInput;
       if (focusEl) { try { focusEl.focus({ preventScroll: true }); } catch (e) {} }
+      /* ENTRY FLOW V2 (Han 2026-11-24, entry-v2/DESIGN.md 1):
+         sign-up lives inside the login door - this switch is the
+         way across: in the login state it offers 회원가입, in the
+         sign-up state 로그인. It only re-cuts the presentation
+         through presentAuthStep; social.js's submit wiring, the
+         post-register name claim and its hold are untouched. */
+      var modeSwitch = document.getElementById('auth-mode-switch');
+      if (!modeSwitch && authBox) {
+        modeSwitch = document.createElement('button');
+        modeSwitch.type = 'button';
+        modeSwitch.id = 'auth-mode-switch';
+        modeSwitch.className = 'city-name';
+        modeSwitch.style.minHeight = '48px';
+        modeSwitch.addEventListener('click', function () {
+          var cur = authDiv ? authDiv.getAttribute('data-authmode') : '';
+          presentAuthStep(cur === 'login' ? 'signup' : 'login');
+        });
+        authBox.appendChild(modeSwitch);
+      }
+      if (modeSwitch) {
+        modeSwitch.style.display = '';
+        modeSwitch.textContent = isLogin ? '회원가입' : '로그인';
+      }
+    }
+    if (!formMode) {
+      var msOff = document.getElementById('auth-mode-switch');
+      if (msOff) msOff.style.display = 'none';
     }
     if (name === 'name') {
       espilNameStepPrep();
@@ -1526,23 +1711,22 @@
     if (goLogin) goLogin.addEventListener('click', function () { presentAuthStep('login'); });
     if (goSignup) goSignup.addEventListener('click', function () { presentAuthStep('signup'); });
     if (goGuest) goGuest.addEventListener('click', function () {
-      /* NAME-ONLY ENTRY (Han 2026-11-24): the old Guest row lands
-         on the name step like everything else - entry is ONE
-         explicit click on the name step's enter button (the
-         2026-11-17 returning-guest fast path below is retired
-         with the guest step; its records are the same ones the
-         name step pre-fills and rewrites). */
-      presentAuthStep('name');
+      /* ENTRY FLOW V2 (Han 2026-11-24, entry-v2/DESIGN.md 2): the
+         guest row IS the guest door - one tap, no step after it.
+         The auto-name entry below rolls a name, checks it
+         silently, writes the entrant records and drives the
+         existing #guest-enter path onto the menu. */
+      espilGuestDoorEnter();
     });
     var toBack = document.getElementById('auth-toback');
-    if (toBack) toBack.addEventListener('click', function () { presentAuthStep('name'); });
+    if (toBack) toBack.addEventListener('click', function () { presentAuthStep('choice'); });
     var guestBack = document.getElementById('guest-back');
-    if (guestBack) guestBack.addEventListener('click', function () { presentAuthStep('name'); });
+    if (guestBack) guestBack.addEventListener('click', function () { presentAuthStep('choice'); });
     /* The name-claim Back (#auth-back, social.js's abandon control)
-       also returns the presentation to the name step; its
+       also returns the presentation to the two-door choice; its
        claim semantics stay with social.js's own listener. */
     var claimBack = document.getElementById('auth-back');
-    if (claimBack) claimBack.addEventListener('click', function () { presentAuthStep('name'); });
+    if (claimBack) claimBack.addEventListener('click', function () { presentAuthStep('choice'); });
     /* Apple / Facebook have no backend yet: on the landing the
        items are selectable and answer with an honest notice in the
        form's message line (the Google 503 pattern) instead of a
@@ -1558,32 +1742,12 @@
         if (msg) msg.textContent = (pn === 'apple' ? 'Apple' : 'Facebook') + ' sign-in is not available yet.';
       }
     }, true);
-    /* Returning guest fast path (Han 2026-11-17): the records
-       guestGo itself writes - espil_username (the name) and
-       espil_character (gender + style) - are the guest's saved
-       character and name. When both stand complete on this
-       device, the Guest entry re-issues this tab's named stamp
-       (the game page's name-once pass keys off it, exactly as
-       after a form submit) and drives the EXISTING #guest-enter
-       path, so the park + step completion semantics stay
-       identical. The character record is NOT rewritten here:
-       the form's wholesale overwrite dropped the record's
-       other fields and could flip a returning guest's saved
-       gender to the form's male default on a click-through. */
-    function espilReturningGuestEnter() {
-      var name = '', rec = null;
-      try { name = (localStorage.getItem('espil_username') || '').trim(); } catch (e) {}
-      try { rec = JSON.parse(localStorage.getItem('espil_character') || 'null'); } catch (e) {}
-      if (!name) return false;
-      if (!rec || (rec.gender !== 'male' && rec.gender !== 'female')) return false;
-      var bc = rec.bodyChoice;
-      if (bc != null && bc !== '' && !/^style[1-4]$/.test(bc)) return false;
-      try { sessionStorage.setItem('espil_guest_named_v1', name); } catch (e) {}
-      var ge = document.getElementById('guest-enter');
-      if (!ge) return false;
-      ge.click();
-      return true;
-    }
+    /* Returning guest fast path (Han 2026-11-17): RETIRED by
+       ENTRY FLOW V2 (Han 2026-11-24, entry-v2/DESIGN.md 7).
+       Guests are always refreshed - there is no returning-guest
+       identity to fast-path. The function that re-issued the
+       named stamp from espil_username is gone; every guest
+       entry goes through the auto-name door below. */
     /* Guest step: name (session-local only) + character choice.
        The reserved list mirrors the Worker's account-name rule as
        a display sanity; nothing here writes to any account store. */
@@ -1622,38 +1786,74 @@
     }
     gStyleBtns.forEach(function (b, i) { if (b) b.addEventListener('click', function () { setGuestStyle(i + 1); }); });
     setGuestStyle(guestStyle);
-    var GUEST_RESERVED = ['espil', '에스필', 'lunaris', '루나리스', 'leo', '레오', 'admin', '어드민', 'official', 'system', 'guest'];
-    var guestNameEl = document.getElementById('guest-name');
-    var guestMsg = document.getElementById('guest-msg');
-    /* NAME-ONLY ENTRY (Han 2026-11-24): the name step's enter -
-       this replaces the guest step's guestGo. The reserved check
-       mirrors the Worker's isReservedName (reduced form: lowercase,
-       letters/digits only; a reserved word, or a reserved word
-       followed only by digits). The registered-name pre-check asks
-       the Worker (GET /auth/name/available) - a courtesy layer
-       that fails OPEN on any network trouble, because the CityRoom
-       join re-checks both rules for session-less sockets. On entry
-       the records are the guest machinery's own (espil_username +
-       the tab's named stamp, fix batch 7 item 2), with the
-       character record carrying the ONE neutral body and a fixed
-       gender - entrants never see a picker. */
-    var nameCheckInFlight = false;
-    function nameGo() {
-      if (nameCheckInFlight) return;
-      var v = guestNameEl ? (guestNameEl.value || '').trim() : '';
-      if (!v) { if (guestMsg) guestMsg.textContent = 'Please enter a name.'; return; }
-      var reduced = v.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
-      var reducedBase = reduced.replace(/[0-9]+$/, '');
-      if (GUEST_RESERVED.indexOf(reduced) >= 0 || (reducedBase !== reduced && GUEST_RESERVED.indexOf(reducedBase) >= 0)) {
-        if (guestMsg) guestMsg.textContent = 'That name is reserved - please choose another.';
-        return;
-      }
-      nameCheckInFlight = true;
-      if (guestMsg) guestMsg.textContent = '';
-      var proceed = function () {
-        nameCheckInFlight = false;
-        try { localStorage.setItem('espil_username', v); } catch (e) {}
-        try { sessionStorage.setItem('espil_guest_named_v1', v); } catch (e) {}
+    /* ENTRY FLOW V2 - THE GUEST DOOR (Han 2026-11-24,
+       entry-v2/DESIGN.md 2+3): one tap on the guest door and
+       the guest is in the flow. There is no name form, no
+       typing and no error a guest can ever see: the client
+       rolls a name from the shared pools (the __espilEntryV2Name
+       block near the end of this file), asks the shipped
+       availability endpoint about it silently (design 3.2
+       layer 1), falls back to a numeric suffix if the loop
+       exhausts (layer 2), writes the P1 entrant records, and
+       drives the existing #guest-enter path onto the menu.
+       The CityRoom join backstop (layer 3) is read by the game
+       page's name-once pass as a silent re-roll signal - see
+       that block.
+
+       ALWAYS REFRESHED (design 3.3 + 7): the name is rolled
+       fresh on EVERY guest entry and is written to no
+       persistent store. The guest path neither reads nor
+       writes espil_username - a stale value from an older
+       build is removed here so no downstream fallback (the
+       presence join's stored-name fallback above all) can
+       resurrect a previous guest's identity - and the retired
+       espil_guest_named_v1 stamp is removed, never written.
+       The one carry across the dive is the tab-session
+       handoff (sessionStorage espil_entry_v2_guest_name):
+       the game page's name-once pass reads it once, fills the
+       character gate's name input with it and removes it. It
+       is how the rolled name reaches the join, not a record:
+       it dies with the tab and is re-rolled at the next entry
+       regardless. espil_character is written fresh with the
+       fixed neutral values, exactly as the P1 name step wrote
+       it (gender 'male', bodyChoice 'neutral', a pending look
+       carried when one stands). */
+    function espilAutoName() {
+      if (typeof window.__espilEntryV2RollName === 'function') return window.__espilEntryV2RollName();
+      return '조용한마을'; /* pool-shaped fallback; the shared roller is defined later in this file and always lands before any tap */
+    }
+    /* The availability courtesy layer: the shipped endpoint
+       (GET /auth/name/available), asked exactly as the retired
+       name step asked it - fail OPEN on any network trouble,
+       because the CityRoom join re-checks both rules for
+       session-less sockets. cb(true) = the name may be worn. */
+    function espilNameAvailable(name, cb) {
+      if (typeof window.__espilEntryV2NameAvailable === 'function') { window.__espilEntryV2NameAvailable(name, cb); return; }
+      try {
+        var apiBase = (typeof window.__espilAuthApiBase === 'string' && window.__espilAuthApiBase) || 'https://api.espil.online';
+        var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+        var to = ctl ? setTimeout(function () { try { ctl.abort(); } catch (e) {} }, 2500) : 0;
+        fetch(apiBase + '/auth/name/available?name=' + encodeURIComponent(name), ctl ? { signal: ctl.signal } : {})
+          .then(function (r) { return r.json(); })
+          .then(function (j) {
+            if (to) clearTimeout(to);
+            cb(!(j && j.available === false));
+          })
+          .catch(function () { if (to) clearTimeout(to); cb(true); });
+      } catch (e) { cb(true); }
+    }
+    var guestDoorInFlight = false;
+    function espilGuestDoorEnter() {
+      if (guestDoorInFlight) return;
+      guestDoorInFlight = true;
+      /* Fresh entry, fresh identity: the legacy name key and
+         the retired stamp leave before anything rolls, so no
+         stale guest identity can be read by any path. */
+      try { localStorage.removeItem('espil_username'); } catch (e) {}
+      try { sessionStorage.removeItem('espil_guest_named_v1'); } catch (e) {}
+      var proceed = function (name) {
+        guestDoorInFlight = false;
+        try { sessionStorage.setItem('espil_entry_v2_guest_name', name); } catch (e) {}
         try {
           var rec = { gender: 'male', ts: Date.now(), bodyChoice: 'neutral' };
           if (window.__espilPendingLook && typeof window.__espilPendingLook === 'object') rec.look = window.__espilPendingLook;
@@ -1662,35 +1862,37 @@
         var ge = document.getElementById('guest-enter');
         if (ge) ge.click();
       };
-      var refuse = function (reason) {
-        nameCheckInFlight = false;
-        if (!guestMsg) return;
-        guestMsg.textContent = reason === 'taken'
-          ? '이미 계정으로 등록된 이름입니다'
-          : 'That name is reserved - please choose another.';
+      var tries = 0;
+      var attempt = function () {
+        tries++;
+        var cand = espilAutoName();
+        espilNameAvailable(cand, function (ok) {
+          if (ok) { proceed(cand); return; }
+          if (tries < 5) { attempt(); return; }
+          /* Suffix fallback (design 3.2 layer 2): the loop
+             exhausted its bound - the candidate gains a 3-digit
+             suffix, still inside the 16-char cap, and is checked
+             once more. If that somehow exhausts too, the suffix
+             loops again, as the design rules. */
+          var suffixed = function () {
+            var suffix = String(100 + Math.floor(Math.random() * 900));
+            var cand2 = (cand + suffix).slice(0, 16);
+            espilNameAvailable(cand2, function (ok2) {
+              if (ok2) { proceed(cand2); return; }
+              suffixed();
+            });
+          };
+          suffixed();
+        });
       };
-      try {
-        /* The API base is resolved here, not read from the auth
-           module's scope (its API_BASE is private to that IIFE):
-           the same window override it honours, else production. */
-        var apiBase = (typeof window.__espilAuthApiBase === 'string' && window.__espilAuthApiBase) || 'https://api.espil.online';
-        var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-        var to = ctl ? setTimeout(function () { try { ctl.abort(); } catch (e) {} }, 2500) : 0;
-        fetch(apiBase + '/auth/name/available?name=' + encodeURIComponent(v), ctl ? { signal: ctl.signal } : {})
-          .then(function (r) { return r.json(); })
-          .then(function (j) {
-            if (to) clearTimeout(to);
-            if (j && j.available === false) refuse(j.reason === 'taken' ? 'taken' : 'reserved');
-            else proceed();
-          })
-          .catch(function () { if (to) clearTimeout(to); proceed(); });
-      } catch (e) { proceed(); }
+      attempt();
     }
+    /* The retired name step's own controls carry no behaviour
+       in v2 - its box is never presented. Its go button is wired
+       to the same door, so no stray path can resurrect the
+       form's semantics. */
     var guestGoBtn = document.getElementById('guest-go');
-    if (guestGoBtn) guestGoBtn.addEventListener('click', nameGo);
-    if (guestNameEl) guestNameEl.addEventListener('keydown', function (ev) {
-      if (ev.key === 'Enter') { ev.preventDefault(); nameGo(); }
-    });
+    if (guestGoBtn) guestGoBtn.addEventListener('click', function () { espilGuestDoorEnter(); });
   })();
   setInterval(function () {
     if (step !== 'login') return;
@@ -1722,6 +1924,16 @@
     if (t) {
       var tag = t.tagName || '';
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      /* ENTRY FLOW V2 (keyboard amendment): at the menu step a
+         key on a menu row must activate that row ONLY - the pass
+         below would also hand it to monolith's reel keys, whose
+         Enter opens the retired city info popup over the flow.
+         Stop the propagation but keep the default action, so the
+         focused row still activates natively. */
+      if (step === 'menu' && t.closest && t.closest('#espil-mainmenu')) {
+        e.stopPropagation();
+        return;
+      }
       if (t.closest && (t.closest('#signin-div') || t.closest('#espil-mainmenu') ||
           t.closest('#espil-zealandia-panel') || t.closest('#espil-about-panel') ||
           t.closest('#espil-cityprep-panel'))) return;
@@ -1735,12 +1947,55 @@
      flies the camera and the city info panel follows) - swallow
      canvas clicks until the city step. Orbit dragging is driven
      by pointer movement, not by the click event, so the start
-     presentation's globe stays orbitable. */
+     presentation's globe stays orbitable.
+     ENTRY FLOW V2 (design 5): the swallow now covers the city
+     step too - the raycast path ends at the city info panel,
+     which is the retired dive popup; at the city step cities
+     are picked by list row or pin only, and the enter button
+     dives. Orbit dragging is unaffected (pointer movement, not
+     the click event), exactly as before. */
   document.addEventListener('click', function (e) {
-    if (step === 'city' || step === 'done') return;
+    if (step === 'done') return;
     if (window.__espilIntroActive) return;
     var t = e.target;
     if (t && t.tagName === 'CANVAS') e.stopPropagation();
+  }, true);
+
+  /* ENTRY FLOW V2 (design 5, draft): the physical Enter key
+     fires the enter button while the city step stands with a
+     bundled city marked - the button's copy says "Press Enter",
+     so pressing Enter works. Capture-phase, so the flow's own
+     order guard above (which passes keys at the city step) and
+     monolith's reel keys never turn the key into a second,
+     different selection: the dive goes to the MARKED city via
+     the same delegation the button uses. Form fields keep
+     their own Enter behaviour. */
+  /* ENTRY FLOW V2 (keyboard amendment): while the bundle-less
+     preparation panel stands at the city step, an Enter belongs
+     to the panel's focused Back row alone - monolith's reel keys
+     would otherwise also spend it on the retired city info
+     popup. Stop the propagation only; the Back row still
+     activates by its native default action. */
+  document.addEventListener('keydown', function (e) {
+    if (step !== 'city' || e.key !== 'Enter') return;
+    if (window.__espilIntroActive) return;
+    var prep = document.getElementById('espil-cityprep-panel');
+    if (prep && prep.getAttribute('aria-hidden') === 'false') e.stopPropagation();
+  }, true);
+
+  document.addEventListener('keydown', function (e) {
+    if (step !== 'city' || !selectedBundleCity) return;
+    if (e.key !== 'Enter') return;
+    if (window.__espilIntroActive) return;
+    var t = e.target;
+    if (t) {
+      var tag = t.tagName || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (t.id === 'espil-city-enter') return; /* Amendment B: the focused enter button fires by its own native Enter/Space activation - one dive, not two. */
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    diveSelectedCity();
   }, true);
 
   /* All cities OPEN from first presentation (Han 2026-11-10:
@@ -1885,30 +2140,92 @@
   } catch (e) {}
 })();
 
-/* __espilGuestNameOnce v1 - GUEST NAME ASKED ONCE (Han 2026-11-12,
-   fix batch 7 item 2). The landing Guest step already collected the
-   name (and the character choice): guestGo() stores the name in
-   espil_username and stamps this tab's sessionStorage with
-   espil_guest_named_v1. But the game page's character gate still
-   presented its own #char-name input, empty - so the guest was
-   asked for the name a second time (measured on the rig: input
-   visible + empty while espil_username already held the name).
-   On a handoff arrival carrying that stamp, and only there, the
-   input is pre-filled with the landing name (its consumers -
-   presence's join name above all - read the input first) and
-   hidden, so it is never presented as a question. The gender
-   cards keep their landing pre-selection untouched. Signed-in
-   arrivals (a server-marked session record) and direct game-page
-   arrivals (no handoff mark, no stamp) keep today's behaviour
-   exactly, including a returning guest's freedom to type a new
-   name at the gate. The stamp is consumed on application. */
+/* __espilEntryV2Name v1 - THE AUTO-NAME ROLLER (Han 2026-11-24,
+   entry-v2/DESIGN.md 3.1). One shared roller + availability
+   check for the landing's guest door and the game page's
+   backstop re-roll (the name-once pass below). The grammar is
+   a Korean adjective + noun combination in the village's
+   grain, from curated pools (40 adjectives x 60 nouns):
+   every combination is pronounceable and village-shaped by
+   construction, and the reserved law holds BY CONSTRUCTION -
+   no pool word is a reserved word (espil/에스필, lunaris/
+   루나리스, leo/레오, admin/어드민, official, system, guest),
+   no combination of pool words reduces to one, and no pool
+   word carries a digit, so the digit-collapsed reserved
+   variants cannot occur either. Combinations run 4-7
+   characters, inside cleanName's 16-char cap with room for
+   the design's numeric-suffix fallback. Codes are never the
+   primary form (design 3.1). */
+(function () {
+  'use strict';
+  if (window.__espilEntryV2RollName) return;
+  var ADJ = ['조용한', '빠른', '느린', '밝은', '어두운', '따뜻한', '시원한', '포근한', '맑은', '흐린', '가벼운', '무거운', '작은', '커다란', '둥근', '네모난', '긴', '짧은', '깊은', '얕은', '높은', '낮은', '푸른', '붉은', '하얀', '노란', '초록', '보라', '분홍', '은빛', '금빛', '새벽', '한낮', '저녁', '밤중', '이른', '늦은', '먼', '가까운', '싱그러운'];
+  var NOUN = ['마을', '구름', '바람', '강물', '호수', '바다', '섬', '산', '언덕', '들판', '숲', '나무', '꽃', '잎', '돌', '모래', '눈', '비', '달', '별', '해', '하늘', '노을', '길', '다리', '집', '창', '문', '배', '기차', '자전거', '우체통', '등대', '시장', '학교', '도서관', '공원', '정원', '연못', '폭포', '동굴', '사막', '초원', '늪', '절벽', '항구', '골목', '지붕', '굴뚝', '우물', '샘', '방앗간', '농장', '목장', '온실', '탑', '성', '광장', '연주'];
+  window.__espilEntryV2RollName = function () {
+    return ADJ[Math.floor(Math.random() * ADJ.length)] + NOUN[Math.floor(Math.random() * NOUN.length)];
+  };
+  /* The shipped availability endpoint (GET /auth/name/available),
+     fail-open on any network trouble - the CityRoom join
+     re-checks both rules for session-less sockets. cb(true) =
+     the name may be worn. */
+  window.__espilEntryV2NameAvailable = function (name, cb) {
+    try {
+      var apiBase = (typeof window.__espilAuthApiBase === 'string' && window.__espilAuthApiBase) || 'https://api.espil.online';
+      var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      var to = ctl ? setTimeout(function () { try { ctl.abort(); } catch (e) {} }, 2500) : 0;
+      fetch(apiBase + '/auth/name/available?name=' + encodeURIComponent(name), ctl ? { signal: ctl.signal } : {})
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          if (to) clearTimeout(to);
+          cb(!(j && j.available === false));
+        })
+        .catch(function () { if (to) clearTimeout(to); cb(true); });
+    } catch (e) { cb(true); }
+  };
+})();
+
+/* __espilGuestNameOnce v2 - THE AUTO-NAME HANDOFF (Han
+   2026-11-24, entry-v2/DESIGN.md 2+3; supersedes the v1
+   name-stamp pass of fix batch 7 item 2). The landing's guest
+   door rolls the name (no form, no typing) and carries it
+   across the dive in this tab's sessionStorage under
+   espil_entry_v2_guest_name - a handoff, not a record: this
+   pass reads it once, fills the game page's #char-name input
+   with it (its consumers - presence's join name above all -
+   read the input first) and removes it, so the name is
+   presented nowhere and asked nowhere. The retired
+   espil_guest_named_v1 stamp is removed on sight, never read.
+   The rolled name is also published as
+   window.__espilEntryV2GuestName for this page's life: the
+   auth module's adoption interval keys off it to keep
+   espil_username untouched for v2 guests, and the session's
+   current name - the in-place upgrade's claim candidate -
+   stays readable from the same places it always was (the
+   input, the roster).
+   JOIN BACKSTOP, READ AS A RE-ROLL (design 3.2 layer 3): if
+   the CityRoom join refuses the name (name_reserved /
+   name_taken, close 1008 - the seconds-wide race between the
+   door's pre-check and the join), presence retries on its
+   own backoff and re-reads the input on every attempt. If
+   this tab stands in the map and has still never joined
+   after a generous window, the refusal is the likely cause:
+   a fresh name is rolled into the input, silently (checked
+   against the availability endpoint first, fail-open), so
+   the next retry rejoins under it. Capped at 3 re-rolls; a
+   tab that has joined is never renamed, and a slow network
+   alone costs at most a pre-join name change nobody has
+   seen yet.
+   Signed-in arrivals (a server-marked session record) and
+   direct game-page arrivals (no handoff mark, no handoff
+   key) keep today's behaviour exactly. */
 (function () {
   'use strict';
   try {
     if (window.__ESPIL_GAME_PAGE !== true) return;
     if (!document.documentElement.classList.contains('espil-handoff')) return;
+    try { sessionStorage.removeItem('espil_guest_named_v1'); } catch (e) {}
     var named = '';
-    try { named = (sessionStorage.getItem('espil_guest_named_v1') || '').trim(); } catch (e) {}
+    try { named = (sessionStorage.getItem('espil_entry_v2_guest_name') || '').trim(); } catch (e) {}
     if (!named) return;
     var signedIn = false;
     try {
@@ -1916,13 +2233,14 @@
       signedIn = !!(rec && rec.id && rec.server === true);
     } catch (e) {}
     if (signedIn) return;
+    window.__espilEntryV2GuestName = named;
     function apply() {
       var inp = document.getElementById('char-name');
       if (!inp) return false;
       inp.value = named;
       inp.style.display = 'none';
       inp.setAttribute('data-espil-guest-named', '1');
-      try { sessionStorage.removeItem('espil_guest_named_v1'); } catch (e) {}
+      try { sessionStorage.removeItem('espil_entry_v2_guest_name'); } catch (e) {}
       return true;
     }
     if (!apply()) {
@@ -1943,6 +2261,37 @@
         }).observe(panel, { attributes: true, attributeFilter: ['aria-hidden'] });
       } catch (e) {}
     }
+    /* The backstop re-roll watch (see the header): ticks count
+       only while the tab stands in the map, which is when a
+       join can actually be in flight. */
+    var rerolls = 0, watchTicks = 0;
+    var watch = setInterval(function () {
+      var joined = false;
+      try {
+        var st = window.__espilChatState && window.__espilChatState();
+        joined = !!(st && st.joined);
+      } catch (e) {}
+      if (joined) { clearInterval(watch); return; }
+      if (!document.body || !document.body.classList.contains('in-map')) { watchTicks = 0; return; }
+      watchTicks++;
+      if (watchTicks >= 30 && rerolls < 3) {
+        watchTicks = 0;
+        rerolls++;
+        var fresh = null;
+        try { fresh = window.__espilEntryV2RollName && window.__espilEntryV2RollName(); } catch (e) {}
+        if (!fresh) return;
+        var swap = function () {
+          named = fresh;
+          window.__espilEntryV2GuestName = fresh;
+          var inp = document.getElementById('char-name');
+          if (inp) inp.value = fresh;
+        };
+        if (typeof window.__espilEntryV2NameAvailable === 'function') {
+          window.__espilEntryV2NameAvailable(fresh, function (ok) { if (ok) swap(); });
+        } else swap();
+      }
+      if (watchTicks > 240 && rerolls >= 3) clearInterval(watch);
+    }, 500);
   } catch (e) {}
 })();
 
@@ -2208,3 +2557,154 @@
   } catch (e) {}
 })();
 
+
+/* __espilEntryV2Keys v1 - KEYBOARD-ONLY OPERABILITY (Han
+   2026-11-24 20:47, entry-v2 amendment B - a HARD requirement):
+   the whole entry flow completes with the keyboard alone, Enter
+   + arrow keys sufficient. The pieces: (1) focus lands on the
+   step's primary control at every step change (this pass watches
+   the flow's step + visible view + auth sub-state and focuses
+   accordingly - the doors' guest door, the form's first field,
+   the menu's Play row, the city step's marked row); (2) arrow
+   keys move within the doors, the menu/panel reels, and the
+   CITY LIST - in the list an arrow moves the SELECTION itself
+   (the same .sel marking a click makes, so the visible
+   selection state and the focus ring travel together), and a
+   bundle-less row reached by arrows opens its preparation
+   panel exactly as a click does; (3) the enter button is a
+   real button - focused, Enter and Space fire it natively
+   (the flow's global Enter handler steps aside for it), and
+   away from the button the physical Enter still dives the
+   marked city (design 5 draft). The visible focus ring itself
+   is drawn by the flow's own stylesheet (see the
+   espil-landing-flow-css block). Nothing here changes any
+   click behaviour. */
+(function () {
+  'use strict';
+  try {
+    function flowStep() {
+      try { return window.__espilLandingFlow ? window.__espilLandingFlow.step() : null; } catch (e) { return null; }
+    }
+    function visibleViewId() {
+      var views = document.querySelectorAll('.espil-flow-view');
+      for (var i = 0; i < views.length; i++) {
+        if (views[i].getAttribute('aria-hidden') === 'false') return views[i].id;
+      }
+      return null;
+    }
+    function authSub() {
+      var box = document.getElementById('auth-box');
+      if (box && box.offsetParent !== null && box.style.display !== 'none') return 'form';
+      return 'choice';
+    }
+    function focusTarget() {
+      var step = flowStep();
+      /* Panels present over either the menu or the city step (the
+         preparation panel opens from the city list): their row is
+         the step's primary control while they stand. */
+      var vv = visibleViewId();
+      if (vv === 'espil-cityprep-panel') return document.getElementById('espil-cityprep-back');
+      if (vv === 'espil-zealandia-panel') return document.getElementById('espil-zealandia-back');
+      if (vv === 'espil-about-panel') return document.getElementById('espil-about-back');
+      if (step === 'login') {
+        if (authSub() === 'form') {
+          var inputs = document.querySelectorAll('#auth-box input');
+          for (var i = 0; i < inputs.length; i++) {
+            if (inputs[i].offsetParent !== null && inputs[i].type !== 'hidden') return inputs[i];
+          }
+          var sw = document.getElementById('auth-mode-switch');
+          if (sw) return sw;
+        }
+        return document.getElementById('auth-go-guest');
+      }
+      if (step === 'menu') {
+        return document.getElementById('espil-menu-play');
+      }
+      if (step === 'city') {
+        /* The list's visible selection state is the centred row
+           (the treatment a click and the centre tracker share);
+           the marked city itself lives in the enter button's .on. */
+        var cen = document.querySelector('#city-list .espil-city-btn.is-centered');
+        if (cen) return cen;
+        var eb = document.getElementById('espil-city-enter');
+        if (eb && eb.classList.contains('on')) return eb;
+        return document.querySelector('#city-list .espil-city-btn');
+      }
+      return null;
+    }
+    var lastSig = null;
+    setInterval(function () {
+      try {
+        if (window.__espilIntroActive) return;
+        var sig = flowStep() + '|' + visibleViewId() + '|' + (flowStep() === 'login' ? authSub() : '');
+        if (sig === lastSig) return;
+        var t = focusTarget();
+        if (!t) return; /* the step's controls are still building (the city rows land async) - retry next tick */
+        lastSig = sig;
+        if (document.activeElement !== t) t.focus();
+      } catch (e) {}
+    }, 400);
+
+    function formTarget(e) {
+      var t = e.target;
+      if (!t || !t.tagName) return false;
+      return t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT';
+    }
+    document.addEventListener('keydown', function (e) {
+      try {
+        if (window.__espilIntroActive) return;
+        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') return;
+        if (formTarget(e)) return;
+        var step = flowStep();
+        if (step === 'city') {
+          var rows = Array.prototype.slice.call(document.querySelectorAll('#city-list .espil-city-btn'));
+          if (!rows.length) return;
+          var cur = -1;
+          for (var i = 0; i < rows.length; i++) {
+            if (rows[i].classList.contains('is-centered') || rows[i] === document.activeElement) cur = i;
+          }
+          var next;
+          if (e.key === 'Home') next = 0;
+          else if (e.key === 'End') next = rows.length - 1;
+          else if (e.key === 'ArrowDown') next = cur < 0 ? 0 : Math.min(rows.length - 1, cur + 1);
+          else next = cur < 0 ? rows.length - 1 : Math.max(0, cur - 1);
+          e.preventDefault();
+          e.stopPropagation();
+          var row = rows[next];
+          row.click(); /* the row's own handler: a bundle city marks, a bundle-less city opens its preparation panel - exactly the click behaviour */
+          if (visibleViewId() === 'espil-cityprep-panel') {
+            /* The panel took the screen: focus follows to its row
+               (the focus poll would land it within a tick; doing
+               it here keeps the keypress and the focus together). */
+            var pb = document.getElementById('espil-cityprep-back');
+            if (pb) pb.focus();
+          } else if (row.offsetParent !== null) {
+            row.focus();
+            try { row.scrollIntoView({ block: 'nearest' }); } catch (err) {}
+          }
+          return;
+        }
+        /* Doors + menu/panel reels: arrows move FOCUS among the
+           container's visible buttons; Enter/Space activate. */
+        var t = e.target;
+        var container = null;
+        if (t && t.closest) container = t.closest('#auth-choice') || t.closest('.espil-flow-view');
+        if (!container) return;
+        var btns = Array.prototype.slice.call(container.querySelectorAll('button')).filter(function (b) {
+          return b.offsetParent !== null && b.style.display !== 'none';
+        });
+        if (btns.length < 2) return;
+        var idx = btns.indexOf(t);
+        if (idx < 0) return;
+        var nidx;
+        if (e.key === 'Home') nidx = 0;
+        else if (e.key === 'End') nidx = btns.length - 1;
+        else if (e.key === 'ArrowDown') nidx = Math.min(btns.length - 1, idx + 1);
+        else nidx = Math.max(0, idx - 1);
+        e.preventDefault();
+        e.stopPropagation();
+        btns[nidx].focus();
+      } catch (err) {}
+    }, true);
+  } catch (e) {}
+})();
