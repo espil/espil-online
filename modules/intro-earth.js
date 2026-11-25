@@ -132,6 +132,7 @@
     (function(){
       var name=null;
       try{ name=sessionStorage.getItem('espil_pending_city'); if(name)sessionStorage.removeItem('espil_pending_city'); }catch(e){}
+      if(name)window.__espilHandoffCity=name; /* LANDING PACKAGE item 3: the direct-entry attempt below defers to a pending switch through this - its sessionStorage read alone always came back empty, the key already consumed here */
       if(!name)return;
       var tries=0;
       (function poll(){
@@ -160,21 +161,30 @@
     })();
     function boot(){
       if(!intro)return;
-      /* #6 (Han 2nd QA): Path routing. /vancouver skips landing → direct map entry.
+      /* #6 (Han 2nd QA): Path routing. A playable city path (/vancouver,
+         /Paris, /NewYork, ...) skips landing → direct map entry for that city.
          /vancouver/store/{placeId} → map + center on store + open panel (#17). */
-      var pathMatch=null,storePlaceId=null;
+      var pathMatch=null,pathCity=null,storePlaceId=null;
       try{
         var pth=window.location.pathname;
-        if(pth==='/vancouver'||pth==='/vancouver/'){
-          pathMatch='vancouver';
-        }else{
-          var sm=pth.match(/^\/vancouver\/store\/([A-Za-z0-9_-]+)/);
-          if(sm){pathMatch='vancouver';storePlaceId=sm[1];}
+        var sm=pth.match(/^\/vancouver\/store\/([A-Za-z0-9_-]+)/);
+        if(sm){pathMatch='vancouver';pathCity='Vancouver';storePlaceId=sm[1];}
+        else{
+          /* LANDING PACKAGE (Han 2026-11-25, item 3): the first path
+             segment, lowercased with punctuation stripped, names the
+             city. '/vancouver.html' (the pair file's own name) matches
+             nothing, exactly as before - the pending-city handoff
+             drives that arrival. A bundle-less segment (e.g. /Seoul)
+             matches nothing either: that path serves the landing,
+             whose flow preselects the city (entry-flow). */
+          var CITY_PATHS={vancouver:'Vancouver',auckland:'Auckland',tokyo:'Tokyo',newyork:'New York',paris:'Paris',london:'London'};
+          var seg=(pth.split('/')[1]||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+          if(CITY_PATHS[seg]){pathMatch=seg;pathCity=CITY_PATHS[seg];}
         }
       }catch(e){}
-      if(pathMatch==='vancouver'){
-        /* Direct city entry: hide landing, auto-select Vancouver */
-        window.__directCityEntry={city:'Vancouver',storePlaceId:storePlaceId};
+      if(pathMatch){
+        /* Direct city entry: hide landing, auto-select the path's city */
+        window.__directCityEntry={city:pathCity,storePlaceId:storePlaceId};
         /* Skip intro — go straight to map flow */
         if(document.body)document.body.classList.add('direct-entry');
         /* Auto-trigger after markers are ready. The original was a
@@ -187,11 +197,11 @@
             /* A pending city switch (Auckland phase 1) owns the
                selection on this load - do not fight it. The hook
                consumes the flag, so polling simply resumes after. */
-            var pending=null;
-            try{pending=sessionStorage.getItem('espil_pending_city');}catch(e){}
+            var pending=window.__espilHandoffCity||null;
+            try{ if(!pending)pending=sessionStorage.getItem('espil_pending_city'); }catch(e){}
             var ee=document.getElementById('city-entry');
             if(ee&&ee.getAttribute('aria-hidden')==='false')return; /* entry already started */
-            if(!pending&&window.__espilSelectCityByName&&window.__espilSelectCityByName('Vancouver')){
+            if(!pending&&window.__espilSelectCityByName&&window.__espilSelectCityByName(pathCity)){
               /* Auto-click ENTER CITY after info panel shows */
               setTimeout(function(){
                 var btn=document.getElementById('city-info-enter');

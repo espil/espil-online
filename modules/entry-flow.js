@@ -900,6 +900,24 @@
      lands on the preparation panel. */
   var BUNDLE_CITIES = { 'Vancouver': 1, 'Auckland': 1, 'Tokyo': 1, 'New York': 1, 'Paris': 1, 'London': 1 };
 
+  /* LANDING PACKAGE (Han 2026-11-25, item 3): a bundle-less city
+     path (/Seoul, /SanFrancisco, ...) serves THIS landing by
+     Vercel rewrite, and the path's city is preselected: when the
+     city step's layer completes, its preparation panel opens at
+     its own address (see activateCityLayer). The slug is the
+     city name normalised - lowercase, diacritics stripped,
+     spaces and punctuation removed - matched against the
+     harvested city names the same way. A playable city's path
+     never serves the landing (its rewrite serves the game
+     page), and a bundle-city match here is ignored regardless. */
+  var pathCitySlug = '';
+  try {
+    pathCitySlug = (location.pathname.split('/')[1] || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+  } catch (e) {}
+  function citySlug(name) {
+    try { return String(name).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, ''); } catch (e) { return ''; }
+  }
+
   /* ---------------- styling (own style element) ---------------- */
   var css = document.createElement('style');
   css.id = 'espil-landing-flow-css';
@@ -922,16 +940,6 @@
     '#espil-city-back{display:none}' +
     '#city-status.city-step:not(.flow-open) #espil-city-back{display:flex}' +
     '#city-status.is-city #espil-city-back{display:none !important}' +
-    /* ENTRY FLOW V2 (Han 2026-11-24, entry-v2/DESIGN.md 5): the
-       enter control is a real full-width button directly under
-       the city list - the city step's one primary action, at
-       the button standard's 48px touch height, shown only
-       while a bundled city stands selected. */
-    '#espil-city-enter{display:none;width:100%;min-height:48px;margin-top:6px;padding:12px;' +
-      'border:2px solid #d97f10;border-radius:12px;background:linear-gradient(180deg,#ffb84d,#f08c1a);' +
-      'color:#fff;text-shadow:0 1px 2px rgba(120,60,0,.5);font-weight:800;cursor:pointer}' +
-    '#espil-city-enter.on{display:block}' +
-    '#espil-city-enter:active{filter:brightness(.92)}' +
     /* Fix batch 8 item 4 (Han 2026-11-14): the menu and guidance
        views carry their choices in a reel with the city-list
        treatment AS-IS - the pair.css .city-list declarations
@@ -956,7 +964,7 @@
        the flow itself (never left to browser defaults against the
        landing art). */
     '#signin-div button:focus,#signin-div input:focus,#signin-div select:focus,#signin-div textarea:focus,' +
-    '#city-status button:focus,#city-list .espil-city-btn:focus,#espil-city-enter:focus,#auth-mode-switch:focus,' +
+    '#city-status button:focus,#city-list .espil-city-btn:focus,#auth-mode-switch:focus,' +
     '#signin-div button:focus-visible,#city-status button:focus-visible{outline:3px solid #ffcf4d !important;outline-offset:2px !important;box-shadow:0 0 0 5px rgba(255,207,77,.35) !important}';
   document.head.appendChild(css);
 
@@ -1148,55 +1156,28 @@
   function backToMenu() {
     if (step !== 'city') return;
     step = 'menu';
-    clearCitySelection();
     var cs = $('city-status'); if (cs) cs.classList.remove('city-step');
     presentFlowView($('espil-mainmenu'));
   }
 
-  /* ---------------- ENTRY FLOW V2: the enter button (design 5) --
-     Selecting a bundled city MARKS it; nothing dives until the
-     enter button (or the Enter key) fires. The button sits
-     directly under the city list, ahead of the Back row, carries
-     the draft copy, and is the city step's one primary action.
-     Bundle-less cities never show it: their pick opens the
-     preparation panel and clears any mark. */
-  var selectedBundleCity = null;
+  /* ---------------- LANDING PACKAGE: the dive (Han 2026-11-25,
+     item 2b) --------------------------------------------------
+     A bundled city's row (or pin) click dives IMMEDIATELY: the
+     Press Enter button, its marking step (selectBundleCity /
+     clearCitySelection) and its Enter-key handler are removed
+     on Han's order, superseding the entry-v2 design 5 shape.
+     The dive itself is unchanged: delegate to monolith's own
+     reel button for the picked city (its selection and info
+     panel run exactly as before), then press the panel's DIVE
+     in the SAME synchronous turn - the popup never paints, and
+     what follows is monolith's own startCityEntry. A missing
+     button (build race) falls back to the preparation panel -
+     the behaviour for an undelegatable pick. The rows are
+     buttons, so Enter/Space on a focused row dives by native
+     activation; no key handler replaces the removed one. */
   var flowOrigCityBtns = null; /* monolith's own reel buttons, harvested by the city layer below */
-  function buildCityEnter() {
-    if ($('espil-city-enter')) return;
-    var list = $('city-list');
-    if (!list || !list.parentNode) return;
-    var b = document.createElement('button');
-    b.type = 'button';
-    b.id = 'espil-city-enter';
-    b.textContent = 'Press Enter - 눌러서 들어가기';
-    b.setAttribute('aria-label', 'Enter the selected city');
-    var ref = $('espil-city-back') || list.nextSibling;
-    list.parentNode.insertBefore(b, ref);
-    b.addEventListener('click', function () { diveSelectedCity(); });
-  }
-  function selectBundleCity(name) {
-    selectedBundleCity = name;
-    buildCityEnter();
-    var b = $('espil-city-enter');
-    if (b) b.classList.add('on');
-  }
-  function clearCitySelection() {
-    selectedBundleCity = null;
-    var b = $('espil-city-enter');
-    if (b) b.classList.remove('on');
-  }
-  function diveSelectedCity() {
-    if (step !== 'city' || !selectedBundleCity) return;
-    var name = selectedBundleCity;
-    /* Delegate to monolith's own reel button for the marked
-       city (its selection and info panel run exactly as
-       before), then press the panel's DIVE in the SAME
-       synchronous turn: the popup never paints, and the dive
-       that follows is monolith's own startCityEntry,
-       unchanged. A missing button (build race) falls back to
-       the preparation panel - today's behaviour for an
-       undelegatable pick. */
+  function dive(name) {
+    if (step !== 'city' || !name) return;
     var delegated = false;
     if (flowOrigCityBtns) {
       for (var k = 0; k < flowOrigCityBtns.length; k++) {
@@ -1333,7 +1314,6 @@
     return out;
   }
   function openPrep(name) {
-    clearCitySelection(); /* a bundle-less pick offers no entry: the enter button leaves with the mark (design 5) */
     buildUI();
     var n = $('espil-cityprep-name'); if (n) n.textContent = name;
     presentFlowView($('espil-cityprep-panel'));
@@ -1360,7 +1340,7 @@
         orig.push(list.children[i]);
         list.children[i].style.display = 'none';
       }
-      flowOrigCityBtns = orig; /* ENTRY FLOW V2: the enter button delegates through these (design 5) */
+      flowOrigCityBtns = orig; /* LANDING PACKAGE: dive() delegates through these (the enter button's path before item 2b) */
       cities.forEach(function (c) {
         var b = document.createElement('button');
         b.type = 'button';
@@ -1373,13 +1353,12 @@
           for (var j = 0; j < btns.length; j++) btns[j].classList.toggle('is-centered', btns[j] === b);
           faceFlowCity(c.name); /* item 5: a click centres the city too - face it */
           if (BUNDLE_CITIES[c.name]) {
-            /* ENTRY FLOW V2 (Han 2026-11-24, entry-v2/DESIGN.md
-               5): a bundle city is only MARKED here - the dive
-               waits for the enter button under the list (or the
-               Enter key). The Wave 0 delegation to monolith's
-               own reel button now happens inside
-               diveSelectedCity, at the click that enters. */
-            selectBundleCity(c.name);
+            /* LANDING PACKAGE (Han 2026-11-25, item 2b): a bundle
+               city's row click dives at once - the Press Enter
+               button and its marking step are removed on Han's
+               order. The Wave 0 delegation to monolith's own reel
+               button happens inside dive(), at this click. */
+            dive(c.name);
             return;
           }
           openPrep(c.name);
@@ -1427,6 +1406,18 @@
       }, { passive: true });
       requestAnimationFrame(updateFlowReelCenter);
       setTimeout(updateFlowReelCenter, 350);
+      /* LANDING PACKAGE (Han 2026-11-25, item 3): a bundle-less
+         city path (e.g. /Seoul) serves this landing by rewrite and
+         preselects its city - the moment the city step's layer
+         stands, that city's preparation panel opens at its own
+         address. Consumed once; the panel's Back returns to the
+         city list as for any bundle-less pick. */
+      if (pathCitySlug) {
+        var pslug = pathCitySlug; pathCitySlug = '';
+        for (var pi = 0; pi < cities.length; pi++) {
+          if (!BUNDLE_CITIES[cities[pi].name] && citySlug(cities[pi].name) === pslug) { openPrep(cities[pi].name); break; }
+        }
+      }
     }, 300);
     /* pin picks for bundle-less cities: capture-phase, so
        monolith's own pin handler (which would refuse them) never
@@ -1442,11 +1433,12 @@
       e.stopPropagation();
       e.preventDefault();
       if (BUNDLE_CITIES[name]) {
-        /* ENTRY FLOW V2 (design 5): a bundle city's pin marks it,
-           exactly like its list row - monolith's native pin flow
-           (which would open the retired dive popup) no longer
-           runs at the city step. The corresponding list row takes
-           the centred treatment so the mark reads in the list. */
+        /* LANDING PACKAGE (Han 2026-11-25, item 2b): a bundle city's
+           pin dives at once, exactly like its list row - monolith's
+           native pin flow (which would open the retired dive popup)
+           no longer runs at the city step. The corresponding list
+           row takes the centred treatment first so the pick reads
+           in the list during the dive. */
         faceFlowCity(name);
         var cityListEl = $('city-list');
         var btns = cityListEl ? cityListEl.querySelectorAll('.espil-city-btn') : [];
@@ -1455,7 +1447,7 @@
           btns[j].classList.toggle('is-centered', on);
           if (on && btns[j].scrollIntoView) { try { btns[j].scrollIntoView({ block: 'center' }); } catch (err) {} }
         }
-        selectBundleCity(name);
+        dive(name);
         return;
       }
       openPrep(name);
@@ -1961,15 +1953,6 @@
     if (t && t.tagName === 'CANVAS') e.stopPropagation();
   }, true);
 
-  /* ENTRY FLOW V2 (design 5, draft): the physical Enter key
-     fires the enter button while the city step stands with a
-     bundled city marked - the button's copy says "Press Enter",
-     so pressing Enter works. Capture-phase, so the flow's own
-     order guard above (which passes keys at the city step) and
-     monolith's reel keys never turn the key into a second,
-     different selection: the dive goes to the MARKED city via
-     the same delegation the button uses. Form fields keep
-     their own Enter behaviour. */
   /* ENTRY FLOW V2 (keyboard amendment): while the bundle-less
      preparation panel stands at the city step, an Enter belongs
      to the panel's focused Back row alone - monolith's reel keys
@@ -1983,20 +1966,6 @@
     if (prep && prep.getAttribute('aria-hidden') === 'false') e.stopPropagation();
   }, true);
 
-  document.addEventListener('keydown', function (e) {
-    if (step !== 'city' || !selectedBundleCity) return;
-    if (e.key !== 'Enter') return;
-    if (window.__espilIntroActive) return;
-    var t = e.target;
-    if (t) {
-      var tag = t.tagName || '';
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-      if (t.id === 'espil-city-enter') return; /* Amendment B: the focused enter button fires by its own native Enter/Space activation - one dive, not two. */
-    }
-    e.preventDefault();
-    e.stopPropagation();
-    diveSelectedCity();
-  }, true);
 
   /* All cities OPEN from first presentation (Han 2026-11-10:
      every city is open - the selection must not LOOK locked
@@ -2113,7 +2082,7 @@
           done = true;
           return true;
         }
-      } catch (e) {}
+      } catch (e) { console.error('[Espil] AUTH ONCE gate pass failed:', e); }
       return false;
     }
     function watch() {
@@ -2622,12 +2591,9 @@
       }
       if (step === 'city') {
         /* The list's visible selection state is the centred row
-           (the treatment a click and the centre tracker share);
-           the marked city itself lives in the enter button's .on. */
+           (the treatment a click and the centre tracker share). */
         var cen = document.querySelector('#city-list .espil-city-btn.is-centered');
         if (cen) return cen;
-        var eb = document.getElementById('espil-city-enter');
-        if (eb && eb.classList.contains('on')) return eb;
         return document.querySelector('#city-list .espil-city-btn');
       }
       return null;
@@ -2659,28 +2625,25 @@
         if (step === 'city') {
           var rows = Array.prototype.slice.call(document.querySelectorAll('#city-list .espil-city-btn'));
           if (!rows.length) return;
-          var cur = -1;
-          for (var i = 0; i < rows.length; i++) {
-            if (rows[i].classList.contains('is-centered') || rows[i] === document.activeElement) cur = i;
-          }
-          var next;
-          if (e.key === 'Home') next = 0;
-          else if (e.key === 'End') next = rows.length - 1;
-          else if (e.key === 'ArrowDown') next = cur < 0 ? 0 : Math.min(rows.length - 1, cur + 1);
-          else next = cur < 0 ? rows.length - 1 : Math.max(0, cur - 1);
+          var list = document.getElementById('city-list');
+          if (!list) return;
           e.preventDefault();
           e.stopPropagation();
-          var row = rows[next];
-          row.click(); /* the row's own handler: a bundle city marks, a bundle-less city opens its preparation panel - exactly the click behaviour */
-          if (visibleViewId() === 'espil-cityprep-panel') {
-            /* The panel took the screen: focus follows to its row
-               (the focus poll would land it within a tick; doing
-               it here keeps the keypress and the focus together). */
-            var pb = document.getElementById('espil-cityprep-back');
-            if (pb) pb.focus();
-          } else if (row.offsetParent !== null) {
-            row.focus();
-            try { row.scrollIntoView({ block: 'nearest' }); } catch (err) {}
+          /* LANDING PACKAGE (Han 2026-11-25, item 2a): arrows behave
+             exactly like scrolling - the press scrolls the list by
+             one row height and the list's own scroll event drives
+             the centre tracker (updateFlowReelCenter), precisely
+             the wheel/touch path. No click is fired: an arrow press
+             can never mark a city, open a preparation panel or dive
+             (item 2b makes a row click dive, so this scroll form is
+             its precondition), and the globe's facing follows the
+             centred row exactly as it does for a scroll. Home/End
+             scroll to the list's ends. */
+          if (e.key === 'Home') list.scrollTop = 0;
+          else if (e.key === 'End') list.scrollTop = list.scrollHeight;
+          else {
+            var rowH = rows[0] && rows[0].offsetHeight ? rows[0].offsetHeight : 44;
+            list.scrollTop += (e.key === 'ArrowDown' ? rowH : -rowH);
           }
           return;
         }

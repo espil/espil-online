@@ -2642,7 +2642,29 @@
       paris:{district:'assets/osm/paris_district.json',collision:'assets/osm/paris_collision.json',ox:-10000,oz:0,core:false,spawn:{x:-10000,z:0},bounds:{x0:-12016,z0:-2049,x1:-7946,z1:2042},landmark:{name:'Eiffel Tower',x:-9492,z:590,face:0,radius:800,activities:['photo','eat'],photo:{cx:-9492,cz:686,camH:2,lx:-9491.7,lz:496.4,lookH:130}}}, /* Paris (2026-10-19): OSM extract radius 2 km on the Trocadero (48.86272, 2.28756), 11,957 buildings; spawn = local (0, 0), the Trocadero parvis at the anchor itself, 42.8 m clear of every footprint (offline scan of the shipped district records); about half of Paris footprints carry no OSM height tag, so many fall back to the default height */
       london:{district:'assets/osm/london_district.json',collision:'assets/osm/london_collision.json',ox:0,oz:-10000,core:false,spawn:{x:0,z:-10000},bounds:{x0:-1996,z0:-12051,x1:2074,z1:-7957},landmark:{name:'Big Ben',x:180,z:-9185,face:-1.587,radius:800,activities:['photo','eat','boat'],photo:{cx:180,cz:-9185,camH:2,lx:240,lz:-9184,lookH:40}}} /* London (2026-10-19): OSM extract radius 2 km on Trafalgar Square (51.50804, -0.12807), 13,911 buildings; spawn = local (0, 0), the square's centre between the fountains at the anchor itself, 22.5 m clear of every footprint (offline scan of the shipped district records); most London footprints carry no OSM height tag (86% in the default band), so the skyline reads flatter than the real city - height enrichment is future work */
     };
-    function espilCityKey(){ var k=window.__espilCityKey||'vancouver'; return ESPIL_CITIES[k]?k:'vancouver'; }
+    function espilCityKeyFromPath(){
+      /* LANDING PACKAGE (Han 2026-11-25, item 3): every playable
+         city has its own path (/Paris, /NewYork, ...) - the first
+         path segment, lowercased with punctuation stripped, IS
+         the city key when it names a playable city. '/vancouver'
+         and the /vancouver/store/<id> form resolve to vancouver
+         by that same segment; '/vancouver.html' (the pair file's
+         own name) resolves to nothing here, exactly as before. */
+      try{
+        var seg=(location.pathname.split('/')[1]||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+        return ESPIL_CITIES[seg]?seg:null;
+      }catch(e){ return null; }
+    }
+    function espilCityKey(){
+      /* The live entry decision (window.__espilCityKey, set by
+         startCityEntry from the stored selection) wins once an
+         entry has run; before any entry the PATH decides, so a
+         direct arrival at /Paris is a Paris arrival. With no
+         entry and no city path, the historical default stands. */
+      var k=window.__espilCityKey;
+      if(ESPIL_CITIES[k])return k;
+      return espilCityKeyFromPath()||'vancouver';
+    }
     function espilCityCfg(){ return ESPIL_CITIES[espilCityKey()]; }
     /* NAME-ONLY ENTRY (Han 2026-11-24): the landmark village.
        Every bundled city carries a landmark record (name / x / z /
@@ -2900,6 +2922,12 @@
       }catch(e){}
     },1000);
     var ESPIL_CITY_KEYS={'Vancouver':'vancouver','Auckland':'auckland','Tokyo':'tokyo','New York':'newyork','Paris':'paris','London':'london'};
+    /* LANDING PACKAGE (Han 2026-11-25, item 3): the canonical
+       capitalised path segment per playable city key - the form
+       Han wrote ('/Seoul'). startCityEntry navigates to the
+       chosen city's own path; a Vercel rewrite serves this pair
+       page there. */
+    var ESPIL_CITY_PATHS={'vancouver':'Vancouver','auckland':'Auckland','tokyo':'Tokyo','newyork':'NewYork','paris':'Paris','london':'London'};
     var ESPIL_CITY_DISPLAY={vancouver:'Vancouver Downtown',auckland:'Auckland',tokyo:'Tokyo',newyork:'New York',paris:'Paris',london:'London'};
     /* EARLY DISTRICT FETCH (tiles loading package component 3,
        2026-11-20): the district + collision payloads (about
@@ -2915,8 +2943,8 @@
        load will enter: the landing handoff's pending city
        when one is set (read here, before intro-earth's boot
        poller consumes it - this classic script executes
-       before that module), else the direct /vancouver
-       entry's Vancouver (the same paths intro-earth's boot
+       before that module), else the direct city-path
+       entry's city (the same paths intro-earth's boot
        auto-enters). When neither holds, the city is not
        decided yet on this load and nothing starts early -
        the dive click starts the fetch exactly as before.
@@ -2932,10 +2960,7 @@
         if(pendingName&&ESPIL_CITY_KEYS[pendingName]&&ESPIL_CITIES[ESPIL_CITY_KEYS[pendingName]])key=ESPIL_CITY_KEYS[pendingName];
       }catch(e){}
       if(!key){
-        try{
-          var pth=location.pathname;
-          if(pth==='/vancouver'||pth==='/vancouver/'||/^\/vancouver\/store\/[A-Za-z0-9_-]+/.test(pth))key='vancouver';
-        }catch(e){}
+        try{ key=espilCityKeyFromPath(); }catch(e){}
       }
       if(!key)return;
       var started=espilDistrictFetchAll(ESPIL_CITIES[key]);
@@ -14611,6 +14636,24 @@
     }
     cityList.addEventListener('scroll',function(){if(!reelFrame)reelFrame=requestAnimationFrame(updateReelCenter);},{passive:true});
     cityList.addEventListener('wheel',function(event){event.stopPropagation();},{passive:true});
+    /* Landing arrows = reel scroll (Han 2026-11-25, item 2a,
+       monolith half): an arrow press scrolls the city reel by
+       one row - exactly what a wheel tick does - and the reel's
+       own scroll listener runs updateReelCenter, so the centre,
+       the facing and the readout follow precisely as they do
+       for scrolling. stepCity's discrete step (clearSelection +
+       instant facing snap onto the next selectable city) is no
+       longer what the arrow keys drive. stepCity stays defined
+       (nothing calls it after this change) so the seam is a
+       one-line revert if Han ever wants the step back. */
+    function scrollReelStep(dir){
+      if(window.__espilNoticeOpen)return; /* notice panel open: no reel motion either */
+      if(window.__espilIntroActive||cityPhaseActive||entryActive)return;
+      var rowH=44;
+      var b=cityList?cityList.querySelector('button'):null;
+      if(b&&b.offsetHeight)rowH=b.offsetHeight;
+      cityList.scrollTop+=dir*rowH;
+    }
     /* Arrow / joystick city navigation: recenter on the city at the CURRENT zoom, no zoom change. */
     var navIndex=0;
     function stepCity(dir){
@@ -14653,8 +14696,8 @@
       }
       /* This scene takes Up/Down + Enter only (Han 2026-10-29):
          Left/Right do nothing here. */
-      if(e.key==='ArrowDown'){e.preventDefault();stepCity(1);}
-      else if(e.key==='ArrowUp'){e.preventDefault();stepCity(-1);}
+      if(e.key==='ArrowDown'){e.preventDefault();scrollReelStep(1);}
+      else if(e.key==='ArrowUp'){e.preventDefault();scrollReelStep(-1);}
       else if(e.key==='Enter'){
         if(infoShown||cityPhaseActive)return;
         var m=centeredMarker||markers[navIndex];
@@ -15105,7 +15148,8 @@
       var newCityKey=ESPIL_CITY_KEYS[selected.userData.name]||'vancouver';
       if(!window.__ESPIL_GAME_PAGE){
         /* Page split (Han 2026-10-20 #9): the landing page hands
-           entry to the game page (vancouver.html) - a real
+           entry to the game page (served at the chosen city's
+           own path - LANDING PACKAGE, Han 2026-11-25 item 3) - a real
            navigation, so the browser Back key returns to the
            landing as a page instead of stacking it over the game.
            The game page's boot poller re-selects this city and
@@ -15128,7 +15172,7 @@
             var t=Math.min(1,(performance.now()-startT)/2600);
             targetDistance=fromD+(1.15-fromD)*t*t;
             if(t<1){ requestAnimationFrame(diveTick); return; }
-            location.href='vancouver.html';
+            location.href='/'+(ESPIL_CITY_PATHS[newCityKey]||'Vancouver'); /* LANDING PACKAGE item 3: the chosen city's own path (was the hardcoded 'vancouver.html' for every city) */
           })();
         })();
         return;
