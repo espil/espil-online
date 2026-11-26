@@ -27,6 +27,7 @@ tabIssues:{en:'Known Issues & Bug Reports',ko:'알려진 문제와 버그 제보
 introContinue:{en:'TAP OR PRESS ANY KEY TO CONTINUE',ko:'탭하거나 아무 키나 눌러 계속',fr:'TOUCHEZ OU APPUYEZ SUR UNE TOUCHE POUR CONTINUER',zh:'点按或按任意键继续'},
 skip:{en:'Skip',ko:'건너뛰기',fr:'Passer',zh:'跳过'},
 guestDoor:{en:'Enter as guest',ko:'게스트로 들어가기',fr:'Entrer en invité',zh:'以访客身份进入'},
+pressEnterCity:{en:'Press Enter',ko:'눌러서 들어가기',fr:'Appuyez sur Entrée',zh:'按 Enter 进入'},
 loginDoor:{en:'Log in',ko:'로그인',fr:'Se connecter',zh:'登录'},
 nameEnter:{en:'Enter',ko:'들어가기',fr:'Entrer',zh:'进入'},
 nameAccount:{en:'Have an account? Log in',ko:'계정이 있으면 로그인',fr:'Vous avez un compte ? Se connecter',zh:'已有账户？登录'},

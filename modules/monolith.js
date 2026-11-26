@@ -15278,6 +15278,7 @@
       return best;
     }
     function clearSelection(returnToOrbit){
+      window.__espilZoomEnterArmed=false; /* ENTRY CONFIRMATION (Han 2026-11-26): any native clear cancels a pending zoom-entry */
       var direction=camera.position.clone().normalize();
       yaw=targetYaw=Math.atan2(direction.x,direction.z);
       pitch=targetPitch=Math.asin(Math.max(-1,Math.min(1,direction.y)));
@@ -15533,6 +15534,7 @@
       entryTimers.push(setTimeout(step,600));
     }
     function startCityEntry(){
+      window.__espilZoomEnterArmed=false; /* ENTRY CONFIRMATION (Han 2026-11-26): an entry begun by any path spends the arm */
       if(!selected||entryActive||cityPhaseActive)return;
       if(!espilPlayableCity(selected.userData.name))return;
       var newCityKey=ESPIL_CITY_KEYS[selected.userData.name]||'vancouver';
@@ -15990,7 +15992,14 @@
       updateCityPins(); /* HTML pins follow the markers (2026-10-06, per Han) */
       if(entryActive)maybeShowEntrySub();
       if(selected&&!cityPhaseActive&&!infoShown&&!gateActive&&!entryActive&&performance.now()-cityApproachStarted>1200&&(Math.abs(orbitDistance-targetDistance)<.09||performance.now()-cityApproachStarted>9000)){
-        showCityInfo(selected);
+        /* ENTRY CONFIRMATION (Han 2026-11-26, directive 1): when the
+           entry flow has armed a confirmed zoom-in, the approach's
+           arrival IS the entry - spend the arm on startCityEntry
+           instead of painting the info panel. Unarmed arrivals keep
+           the panel exactly as before (native reel picks, the
+           direct-entry and handoff paths). */
+        if(window.__espilZoomEnterArmed){ window.__espilZoomEnterArmed=false; startCityEntry(); }
+        else showCityInfo(selected);
       }
       renderer.render(scene,camera);
     }
@@ -16041,6 +16050,15 @@
        the flow's centre tracker: same marker-direction math, same
        targets, same guards (no facing while a city is selected /
        entering), same intro-safe zoom. It selects nothing. */
+    /* ENTRY CONFIRMATION (Han 2026-11-26, directive 1): the entry
+       flow's zoom-phase cancel. Disarms the pending zoom-entry and
+       returns the globe to orbit through the native clear - the
+       same path the info panel's Back row takes. Inert when no
+       selection stands or an entry / city phase is already live. */
+    window.__espilGlobeCancelZoomEnter=function(){
+      window.__espilZoomEnterArmed=false;
+      if(selected&&!cityPhaseActive&&!entryActive)clearSelection(true);
+    };
     window.__espilGlobeFaceCity=function(name){
       if(typeof markers==='undefined'||!markers.length)return false;
       if(selected||entryActive||cityPhaseActive)return false;

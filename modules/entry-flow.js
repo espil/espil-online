@@ -949,6 +949,23 @@
     '#espil-city-back{display:none}' +
     '#city-status.city-step:not(.flow-open) #espil-city-back{display:flex}' +
     '#city-status.is-city #espil-city-back{display:none !important}' +
+    /* ENTRY CONFIRMATION RESTORED (Han 2026-11-26, directive 1 -
+       the COO broadcast reverses BOTH landing-package changes):
+       the enter control is a real full-width button directly
+       under the city list - the city step's one primary action,
+       at the button standard's 48px touch height, shown only
+       while a bundled city stands selected. Form recovered
+       verbatim from the pre-landing bytes (entry-flow
+       d8a8d55a); the .zooming treatment is this package's
+       addition in the same idiom (the border pulses while the
+       confirmed zoom-in runs; the button is disabled then). */
+    '#espil-city-enter{display:none;width:100%;min-height:48px;margin-top:6px;padding:12px;' +
+      'border:2px solid #d97f10;border-radius:12px;background:linear-gradient(180deg,#ffb84d,#f08c1a);' +
+      'color:#fff;text-shadow:0 1px 2px rgba(120,60,0,.5);font-weight:800;cursor:pointer}' +
+    '#espil-city-enter.on{display:block}' +
+    '#espil-city-enter:active{filter:brightness(.92)}' +
+    '#espil-city-enter.zooming{cursor:default;animation:espilCityEnterPulse 1s ease-in-out infinite}' +
+    '@keyframes espilCityEnterPulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.18)}}' +
     /* Fix batch 8 item 4 (Han 2026-11-14): the menu and guidance
        views carry their choices in a reel with the city-list
        treatment AS-IS - the pair.css .city-list declarations
@@ -975,7 +992,7 @@
        the box stays; its colour leaves yellow for the pair's
        signal teal (--signal #86eee4). */
     '#signin-div button:focus,#signin-div input:focus,#signin-div select:focus,#signin-div textarea:focus,' +
-    '#city-status button:focus,#city-list .espil-city-btn:focus,#auth-mode-switch:focus,' +
+    '#city-status button:focus,#city-list .espil-city-btn:focus,#espil-city-enter:focus,#auth-mode-switch:focus,' +
     '#signin-div button:focus-visible,#city-status button:focus-visible{outline:3px solid #86eee4 !important;outline-offset:2px !important;box-shadow:0 0 0 5px rgba(134,238,228,.35) !important}';
   document.head.appendChild(css);
 
@@ -993,6 +1010,7 @@
   }
   function buildUI() {
     buildCityBack();
+    buildCityEnter(); /* ENTRY CONFIRMATION RESTORED (Han 2026-11-26): the enter button stands under the list, ahead of the Back row */
     if ($('espil-mainmenu')) return;
     var cs = $('city-status');
     if (!cs) return;
@@ -1163,27 +1181,136 @@
   }
   function backToMenu() {
     if (step !== 'city') return;
+    cancelZoom(); /* ENTRY CONFIRMATION: leaving the city step spends any running zoom-in */
+    clearCitySelection();
     step = 'menu';
     var cs = $('city-status'); if (cs) cs.classList.remove('city-step');
     presentFlowView($('espil-mainmenu'));
   }
 
-  /* ---------------- LANDING PACKAGE: the dive (Han 2026-11-25,
-     item 2b) --------------------------------------------------
-     A bundled city's row (or pin) click dives IMMEDIATELY: the
-     Press Enter button, its marking step (selectBundleCity /
-     clearCitySelection) and its Enter-key handler are removed
-     on Han's order, superseding the entry-v2 design 5 shape.
-     The dive itself is unchanged: delegate to monolith's own
-     reel button for the picked city (its selection and info
-     panel run exactly as before), then press the panel's DIVE
-     in the SAME synchronous turn - the popup never paints, and
-     what follows is monolith's own startCityEntry. A missing
-     button (build race) falls back to the preparation panel -
-     the behaviour for an undelegatable pick. The rows are
-     buttons, so Enter/Space on a focused row dives by native
-     activation; no key handler replaces the removed one. */
+  /* ---------------- ENTRY CONFIRMATION (Han 2026-11-26,
+     directive 1; the COO's canonical broadcast reverses BOTH
+     2026-11-25 landing-package changes) -----------------------
+     Selecting a bundled city only MARKS it - the Press Enter
+     button restored below (its pre-landing form, recovered from
+     entry-flow d8a8d55a) stands under the list while a bundled
+     city is marked. Entry needs a CONFIRM: the Enter key, the
+     Press Enter button, or a second click on the already-marked
+     row/pin. A confirm starts monolith's own approach ZOOM-IN
+     (selectCity, delegated through its reel button as before);
+     the flow arms window.__espilZoomEnterArmed first, so the
+     approach's arrival spends itself on startCityEntry - the
+     info panel never paints and no second confirm exists.
+     MOVING THE SELECTION during the zoom (arrows, scroll, a
+     click on another city, Escape, Back) CANCELS it: the arm
+     is spent, monolith returns to orbit, and the new city is
+     merely marked. dive() below survives for the paths that
+     still delegate a whole entry in one turn (the direct-entry
+     and handoff machinery does not come through here). */
+  var selectedBundleCity = null;
+  var zoomPhase = null; /* { name: <city> } while a confirmed zoom-in runs */
   var flowOrigCityBtns = null; /* monolith's own reel buttons, harvested by the city layer below */
+  function flowAudio(name) {
+    try { if (window.EspilAudio && typeof window.EspilAudio[name] === 'function') window.EspilAudio[name](); } catch (e) {}
+  }
+  function buildCityEnter() {
+    if ($('espil-city-enter')) return;
+    var list = $('city-list');
+    if (!list || !list.parentNode) return;
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.id = 'espil-city-enter';
+    /* The recovered copy, dictionary-routed per the correction:
+       language.js's pressEnterCity key (en/ko are the two halves
+       of the pre-landing bilingual literal, verbatim); the
+       data-i18n attribute lets language.js's apply() re-render
+       the label on every language switch. */
+    b.setAttribute('data-i18n', 'pressEnterCity');
+    b.textContent = efT('pressEnterCity');
+    b.setAttribute('aria-label', 'Enter the selected city');
+    var ref = $('espil-city-back') || list.nextSibling;
+    list.parentNode.insertBefore(b, ref);
+    b.addEventListener('click', function () { confirmZoom(selectedBundleCity); });
+  }
+  function selectBundleCity(name) {
+    if (!name) { clearCitySelection(); return; }
+    selectedBundleCity = name;
+    buildCityEnter();
+    var b = $('espil-city-enter');
+    if (b) b.classList.add('on');
+  }
+  function clearCitySelection() {
+    selectedBundleCity = null;
+    var b = $('espil-city-enter');
+    if (b) { b.classList.remove('on'); b.classList.remove('zooming'); b.disabled = false; }
+  }
+  /* The confirm: arm monolith, then delegate its reel button -
+     selectCity runs the approach zoom (with its stage labels
+     and its own select audio) and the armed arrival branch
+     enters. A missing button (build race) falls back to the
+     preparation panel - the behaviour for an undelegatable
+     pick, with the arm and the phase spent first. */
+  function confirmZoom(name) {
+    if (step !== 'city' || !name || zoomPhase) return;
+    if (!BUNDLE_CITIES[name]) return;
+    zoomPhase = { name: name };
+    selectBundleCity(name);
+    var b = $('espil-city-enter');
+    if (b) { b.classList.add('zooming'); b.disabled = true; }
+    window.__espilZoomEnterArmed = true;
+    var delegated = false;
+    if (flowOrigCityBtns) {
+      for (var k = 0; k < flowOrigCityBtns.length; k++) {
+        if ((flowOrigCityBtns[k].textContent || '').trim() === name) { flowOrigCityBtns[k].click(); delegated = true; break; }
+      }
+    }
+    if (!delegated) {
+      zoomPhase = null;
+      window.__espilZoomEnterArmed = false;
+      if (b) { b.classList.remove('zooming'); b.disabled = false; }
+      openPrep(name);
+    }
+  }
+  /* The cancel (Han 2026-11-26: moving to another city during
+     the zoom-in cancels it): spend the arm, return the globe to
+     orbit through monolith's hook, pop() - the surface's
+     back-out sound (infoBack's idiom). The standing selection
+     is untouched: whoever moved it owns the mark now. */
+  function cancelZoom() {
+    if (!zoomPhase) return;
+    zoomPhase = null;
+    window.__espilZoomEnterArmed = false;
+    if (typeof window.__espilGlobeCancelZoomEnter === 'function') {
+      try { window.__espilGlobeCancelZoomEnter(); } catch (e) {}
+    }
+    var b = $('espil-city-enter');
+    if (b) { b.classList.remove('zooming'); b.disabled = false; }
+    flowAudio('pop');
+  }
+  /* Monolith's entry actually beginning (its landing path
+     dispatches espil-dive-start from startCityEntry) ends the
+     flow's part: the step is done, the phase is spent. */
+  window.addEventListener('espil-dive-start', function () {
+    if (step === 'city') { zoomPhase = null; step = 'done'; }
+  });
+  /* Cross-IIFE seam: the Amendment B keyboard IIFE below drives
+     the city list's arrows from outside this scope - it cancels
+     a running zoom and ticks through this hook (the same window
+     crossing __espilLandingFlow already makes for step/mode).
+     state() doubles as the rig seam (read-only). */
+  window.__espilEntryConfirm = {
+    state: function () {
+      return {
+        step: step,
+        selected: selectedBundleCity,
+        zoom: zoomPhase ? zoomPhase.name : null,
+        armed: !!window.__espilZoomEnterArmed
+      };
+    },
+    cancel: function () { cancelZoom(); },
+    tick: function () { flowAudio('tick'); }
+  };
+  window.__espilEntryConfirmState = window.__espilEntryConfirm.state;
   function dive(name) {
     if (step !== 'city' || !name) return;
     var delegated = false;
@@ -1323,6 +1450,7 @@
   }
   function openPrep(name) {
     buildUI();
+    clearCitySelection(); /* ENTRY CONFIRMATION: a bundle-less pick offers no entry - the enter button leaves with the mark */
     var n = $('espil-cityprep-name'); if (n) n.textContent = name;
     presentFlowView($('espil-cityprep-panel'));
   }
@@ -1357,16 +1485,26 @@
         b.setAttribute('data-city', c.name);
         b.setAttribute('aria-label', c.pin.getAttribute('aria-label') || c.name);
         b.addEventListener('click', function () {
+          /* ENTRY CONFIRMATION (Han 2026-11-26, directive 1): a
+             click SELECTS - it never enters by itself. A click on
+             the already-marked row is the confirm (the "click
+             once more" of the directive). During a zoom-in, a
+             click on another city cancels the zoom and selects
+             that city instead; a click on the zoom's own row is
+             inert (the zoom already owns it). */
+          if (zoomPhase) {
+            if (c.name === zoomPhase.name) return;
+            cancelZoom();
+          } else if (BUNDLE_CITIES[c.name] && selectedBundleCity === c.name) {
+            confirmZoom(c.name);
+            return;
+          }
           var btns = list.querySelectorAll('.espil-city-btn');
           for (var j = 0; j < btns.length; j++) btns[j].classList.toggle('is-centered', btns[j] === b);
           faceFlowCity(c.name); /* item 5: a click centres the city too - face it */
+          flowAudio('tick'); /* feedback: the selection tick (stepCity's idiom) */
           if (BUNDLE_CITIES[c.name]) {
-            /* LANDING PACKAGE (Han 2026-11-25, item 2b): a bundle
-               city's row click dives at once - the Press Enter
-               button and its marking step are removed on Han's
-               order. The Wave 0 delegation to monolith's own reel
-               button happens inside dive(), at this click. */
-            dive(c.name);
+            selectBundleCity(c.name);
             return;
           }
           openPrep(c.name);
@@ -1405,6 +1543,24 @@
         for (var m = 0; m < btns.length; m++) {
           btns[m].classList.toggle('is-centered', btns[m] === closest);
         }
+        /* ENTRY CONFIRMATION (Han 2026-11-26, directive 1): the
+           centred row IS the selection, so the mark follows it -
+           a centred bundle city shows the Press Enter button, a
+           centred bundle-less city hides it. The tracker does NOT
+           cancel a running zoom: monolith's own delegation scroll
+           (selectCity centres its hidden reel button, which
+           scrolls this list to the top) would read as a centre
+           change and kill the zoom it just started. Cancelling
+           is therefore keyed to the player's own moves - the
+           arrow keys, row/pin clicks, and the wheel/touch
+           listeners registered beside this tracker. */
+        var prepPanelEl = document.getElementById('espil-cityprep-panel');
+        var prepStanding = !!(prepPanelEl && prepPanelEl.getAttribute('aria-hidden') === 'false');
+        if (closest && !zoomPhase && !prepStanding) {
+          var centredName = closest.getAttribute('data-city');
+          if (BUNDLE_CITIES[centredName]) { if (selectedBundleCity !== centredName) selectBundleCity(centredName); }
+          else if (selectedBundleCity !== null) clearCitySelection();
+        }
         /* I18N GUESTBTN PACKAGE (Han 2026-11-25 14:30, directive
            2): selection IS the centred row - DOM focus moves with
            it, so the focused row (and its visible focus box) and
@@ -1424,6 +1580,14 @@
       list.addEventListener('scroll', function () {
         if (!flowReelFrame) flowReelFrame = requestAnimationFrame(updateFlowReelCenter);
       }, { passive: true });
+      /* ENTRY CONFIRMATION (Han 2026-11-26, directive 1): a wheel
+         or touch scroll of the list during a confirmed zoom-in is
+         the player moving the selection - it cancels the zoom
+         (the scroll itself then proceeds exactly as normal).
+         Programmatic scrolls (monolith's delegation centring)
+         fire neither event, so the zoom it starts is safe. */
+      list.addEventListener('wheel', function () { if (zoomPhase) cancelZoom(); }, { passive: true });
+      list.addEventListener('touchmove', function () { if (zoomPhase) cancelZoom(); }, { passive: true });
       requestAnimationFrame(updateFlowReelCenter);
       setTimeout(updateFlowReelCenter, 350);
       /* LANDING PACKAGE (Han 2026-11-25, item 3): a bundle-less
@@ -1453,12 +1617,22 @@
       e.stopPropagation();
       e.preventDefault();
       if (BUNDLE_CITIES[name]) {
-        /* LANDING PACKAGE (Han 2026-11-25, item 2b): a bundle city's
-           pin dives at once, exactly like its list row - monolith's
-           native pin flow (which would open the retired dive popup)
-           no longer runs at the city step. The corresponding list
-           row takes the centred treatment first so the pick reads
-           in the list during the dive. */
+        /* ENTRY CONFIRMATION (Han 2026-11-26, directive 1): a
+           bundle city's pin SELECTS it, exactly like its list
+           row - monolith's native pin flow (which would open
+           the retired dive popup) no longer runs at the city
+           step. The corresponding list row takes the centred
+           treatment so the mark reads in the list. A pin click
+           on the already-marked city is the confirm; during a
+           zoom-in, a pin click on another city cancels the zoom
+           and selects that city instead. */
+        if (zoomPhase) {
+          if (name === zoomPhase.name) return;
+          cancelZoom();
+        } else if (selectedBundleCity === name) {
+          confirmZoom(name);
+          return;
+        }
         faceFlowCity(name);
         var cityListEl = $('city-list');
         var btns = cityListEl ? cityListEl.querySelectorAll('.espil-city-btn') : [];
@@ -1467,9 +1641,11 @@
           btns[j].classList.toggle('is-centered', on);
           if (on && btns[j].scrollIntoView) { try { btns[j].scrollIntoView({ block: 'center' }); } catch (err) {} }
         }
-        dive(name);
+        flowAudio('tick');
+        selectBundleCity(name);
         return;
       }
+      if (zoomPhase) cancelZoom(); /* a bundle-less pin pick during a zoom-in spends the zoom, then opens its panel */
       openPrep(name);
     }, true);
   }
@@ -2000,6 +2176,45 @@
     if (window.__espilIntroActive) return;
     var prep = document.getElementById('espil-cityprep-panel');
     if (prep && prep.getAttribute('aria-hidden') === 'false') e.stopPropagation();
+  }, true);
+
+  /* ENTRY CONFIRMATION (Han 2026-11-26, directive 1): the
+     physical Enter key at the city step confirms the MARKED
+     city - it starts the zoom-in (confirmZoom). Selection alone
+     (arrows, scrolling, a first click) never enters. Guards
+     follow the pre-landing handler's shape: a form control
+     keeps its Enter, the focused Press Enter button fires by
+     its own native activation (one confirm, not two), and
+     while the preparation panel stands the mark is cleared so
+     there is nothing to confirm. The capture phase + stop
+     keep monolith's landing Enter (selectCity on its centred
+     marker) from spending the same press on the old path. */
+  document.addEventListener('keydown', function (e) {
+    if (step !== 'city' || !selectedBundleCity || zoomPhase) return;
+    if (e.key !== 'Enter') return;
+    if (window.__espilIntroActive) return;
+    var t = e.target;
+    if (t) {
+      var tag = t.tagName || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (t.id === 'espil-city-enter') return; /* the focused enter button fires by its own native Enter/Space activation - one confirm, not two. */
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    confirmZoom(selectedBundleCity);
+  }, true);
+
+  /* ENTRY CONFIRMATION: Escape during the zoom-in cancels it
+     (the surface's standing idiom - "Enter confirms, ESC
+     exits"). Inert at every other moment: the prep panel and
+     the panels above own their Escapes exactly as before. */
+  document.addEventListener('keydown', function (e) {
+    if (step !== 'city' || !zoomPhase) return;
+    if (e.key !== 'Escape') return;
+    if (window.__espilIntroActive) return;
+    e.preventDefault();
+    e.stopPropagation();
+    cancelZoom();
   }, true);
 
 
@@ -2680,13 +2895,22 @@
              (item 2b makes a row click dive, so this scroll form is
              its precondition), and the globe's facing follows the
              centred row exactly as it does for a scroll. Home/End
-             scroll to the list's ends. */
+             scroll to the list's ends.
+             ENTRY CONFIRMATION (Han 2026-11-26, directive 1): the
+             scroll form stands - arrows only ever SELECT. Two
+             additions: a press during a confirmed zoom-in first
+             CANCELS the zoom (moving the selection is the
+             directive's cancel), and every press ticks - the
+             selection-move feedback (stepCity's old idiom). */
+          var ec = window.__espilEntryConfirm;
+          if (ec && ec.cancel) ec.cancel();
           if (e.key === 'Home') list.scrollTop = 0;
           else if (e.key === 'End') list.scrollTop = list.scrollHeight;
           else {
             var rowH = rows[0] && rows[0].offsetHeight ? rows[0].offsetHeight : 44;
             list.scrollTop += (e.key === 'ArrowDown' ? rowH : -rowH);
           }
+          if (ec && ec.tick) ec.tick();
           return;
         }
         /* Doors + menu/panel reels: arrows move FOCUS among the
