@@ -99,9 +99,36 @@
      controls here), car paint / wrapping (a cash-shop fashion
      candidate in the design, not built).
 
+   CAR FIRST-PERSON (Han 2026-11-25 17:27 item 5 + the 17:28
+   supplement; census + design: car-firstperson/CENSUS.md route B):
+   boarding STARTS the drive in first person, automatically,
+   every boarding; V (or the HUD view button) toggles to the
+   ordinary third-person follow camera mid-drive and back. The
+   view choice lives for ONE DRIVE only - page memory
+   (viewMode), set to 'fp' in board(), discarded in alight(),
+   never written to localStorage, so a remembered third person
+   can never silently repeal Han's board->FP default. The sedan
+   shell has no interior (its windows are paint in one opaque
+   texture), so first person rides a code-built COCKPIT OVERLAY
+   parented to the car group (dash, A-pillars, mirror, headrests,
+   hood lip, and a steering wheel in its own hub-pivot group
+   named 'wheel-steering' - the asset room's later GLB overlay
+   swaps in behind the same camera law and the same node name).
+   In first person the body mesh hides and the overlay shows
+   (the swap rides the monolith blend's ~0.5 threshold); in
+   third person the shell returns and the overlay hides. The
+   camera law itself lives in the monolith (one branch in the
+   follow camera, keyed on this module's state().viewMode); this
+   module owns the view state, the overlay, the wheel, the
+   FP input frame (the driving tick reads the CAR heading, not
+   the camera, while viewMode==='fp' - looking around never
+   steers), and the view hint / speed chip. Street follow
+   tuning, the interior FPV and the zoom-FPV law are untouched;
+   zoom-FPV stays force-off while driving, as before.
+
    Hooks: window.__espilVehicles = { state(), buy(),
    openDealership(), closeDealership(), pressB(), board(),
-   alight(), store(), summon(), dealership() }.
+   alight(), store(), summon(), dealership(), toggleView() }.
    Module sources are TAGLESS (house rule) - no script tags. */
 (function () {
   'use strict';
@@ -239,9 +266,21 @@
   var avatarGroupRef = null, avatarHidden = false;
   var saveThrottle = 0;
   var moveToastAt = 0;
+  /* CAR FIRST-PERSON state (route B): viewMode is page memory
+     only - 'fp' from board() until alight() clears it to null;
+     the toggle flips it mid-drive. wheelSteer is the overlay
+     wheel's current smoothed angle (rad). hintUntil is the
+     wall-clock end of the view hint's emphasis window. */
+  var viewMode = null;           /* null | 'fp' | 'tp' (null unless driving) */
+  var bodyInner = null;          /* the sedan GLB clone inside carGroup */
+  var cockpit = null;            /* the cockpit overlay group (carGroup child) */
+  var wheelNode = null;          /* the 'wheel-steering' group inside cockpit */
+  var wheelSteer = 0;
+  var hintUntil = 0;
 
   /* ================= DOM (dealership panel + prompt) ========= */
   var winEl = null, bodyEl = null, msgEl = null, balEl = null, promptEl = null;
+  var viewChipEl = null, viewBtnEl = null;
   function ensureDom() {
     if (winEl) return;
     var st = document.createElement('style');
@@ -271,7 +310,15 @@
       '#espil-veh-prompt{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);z-index:9000;display:none;' +
       'padding:7px 16px;border-radius:999px;border:1px solid #c9a227;background:rgba(20,14,8,.82);color:#ffe9bd;' +
       'font-family:sans-serif;font-size:13px;font-weight:700;letter-spacing:.4px;pointer-events:none}' +
-      '#espil-veh-prompt.show{display:block}';
+      '#espil-veh-prompt.show{display:block}' +
+      '#espil-veh-viewchip{position:fixed;left:50%;bottom:64px;transform:translateX(-50%);z-index:9000;display:none;' +
+      'padding:7px 16px;border-radius:999px;border:1px solid #8a6a44;background:rgba(20,14,8,.82);color:#ffe9bd;' +
+      'font-family:sans-serif;font-size:13px;font-weight:700;letter-spacing:.4px;pointer-events:none}' +
+      '#espil-veh-viewchip.show{display:block}' +
+      '#espil-veh-viewbtn{position:fixed;right:18px;bottom:196px;z-index:9000;display:none;width:52px;height:52px;' +
+      'border-radius:50%;border:1px solid #c9a227;background:rgba(20,14,8,.85);color:#ffe9bd;cursor:pointer;' +
+      'font-family:sans-serif;font-size:19px;font-weight:700;align-items:center;justify-content:center}' +
+      '#espil-veh-viewbtn.show{display:flex}';
     document.head.appendChild(st);
 
     winEl = document.createElement('div');
@@ -297,6 +344,17 @@
     promptEl = document.createElement('div');
     promptEl.id = 'espil-veh-prompt';
     document.body.appendChild(promptEl);
+
+    viewChipEl = document.createElement('div');
+    viewChipEl.id = 'espil-veh-viewchip';
+    document.body.appendChild(viewChipEl);
+    viewBtnEl = document.createElement('button');
+    viewBtnEl.id = 'espil-veh-viewbtn';
+    viewBtnEl.type = 'button';
+    viewBtnEl.textContent = '⇄';
+    viewBtnEl.setAttribute('aria-label', 'Toggle driving view');
+    viewBtnEl.addEventListener('click', function () { toggleView(); });
+    document.body.appendChild(viewBtnEl);
   }
   function setMsg(text, isErr) {
     if (!msgEl) return;
@@ -406,6 +464,126 @@
     });
     return g;
   }
+  /* ================= cockpit overlay (route B) ===============
+     Code-built primitives in the car group's own frame (world
+     metres at the group origin: front +z, driver on +x - LHD,
+     matching wheel-front-left). The eye the monolith uses sits
+     at (+0.62, 1.6, +0.18) in this same frame (the census eye:
+     local +0.34 / +0.10 scaled by the loader's ~1.81, height the
+     ESPIL_KB_EYE 1.6 m law), so the dash top (~1.1) stays below
+     the eye and the dash front edge (z 0.88) sits ~0.7 m ahead
+     of it, with the windshield area left open. The steering
+     wheel is its own group named 'wheel-steering' with the
+     pivot at its hub centre, so the asset room's GLB overlay
+     later swaps in behind the same camera law and node name. */
+  function beam(x1, y1, z1, x2, y2, z2, w, mat) {
+    var a = new THREE.Vector3(x1, y1, z1), b = new THREE.Vector3(x2, y2, z2);
+    var d = b.clone().sub(a);
+    var len = d.length();
+    var m = new THREE.Mesh(new THREE.BoxGeometry(w, len, w), mat);
+    m.position.copy(a).addScaledVector(d, 0.5);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
+    return m;
+  }
+  function buildCockpit() {
+    var dashMat = new THREE.MeshLambertMaterial({ color: 0x2e2a26 });
+    var padMat = new THREE.MeshLambertMaterial({ color: 0x3a352f });
+    var trimMat = new THREE.MeshLambertMaterial({ color: 0x4a423a });
+    var wheelMat = new THREE.MeshLambertMaterial({ color: 0x1f1c1a });
+    var glassMat = new THREE.MeshLambertMaterial({ color: 0x20262e });
+    var seatMat = new THREE.MeshLambertMaterial({ color: 0x54483c });
+    var hoodMat = new THREE.MeshLambertMaterial({ color: 0x466b7a });
+    function box(w, h, d, x, y, z, mat) {
+      var m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      m.position.set(x, y, z);
+      return m;
+    }
+    var g = new THREE.Group();
+    g.name = 'cockpit';
+    /* dash: main slab + top pad + knee panel + centre stack */
+    g.add(box(2.2, 0.18, 0.5, 0, 1.00, 0.63, dashMat));
+    g.add(box(2.2, 0.05, 0.44, 0, 1.11, 0.60, padMat));
+    g.add(box(2.2, 0.52, 0.10, 0, 0.68, 0.40, dashMat));
+    g.add(box(0.5, 0.34, 0.08, 0, 0.86, 0.47, padMat));
+    /* door top rails (window sills) */
+    g.add(box(0.08, 0.10, 1.5, 1.15, 0.98, 0.10, trimMat));
+    g.add(box(0.08, 0.10, 1.5, -1.15, 0.98, 0.10, trimMat));
+    /* A-pillars + header rail (the windshield frame; glass area open) */
+    g.add(beam(1.06, 1.02, 0.82, 0.90, 2.04, 0.30, 0.07, trimMat));
+    g.add(beam(-1.06, 1.02, 0.82, -0.90, 2.04, 0.30, 0.07, trimMat));
+    g.add(box(1.86, 0.09, 0.10, 0, 2.05, 0.29, trimMat));
+    /* rear-view mirror: stem + frame + dark glass (a shape, not a live mirror) */
+    g.add(box(0.04, 0.12, 0.04, 0, 1.97, 0.31, wheelMat));
+    g.add(box(0.36, 0.12, 0.03, 0, 1.88, 0.33, wheelMat));
+    g.add(box(0.32, 0.09, 0.012, 0, 1.88, 0.312, glassMat));
+    /* steering column + the wheel (hub-pivot group, name frozen) */
+    var col = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.34, 8), wheelMat);
+    col.position.set(0.62, 1.03, 0.41);
+    col.rotation.x = 1.05;
+    g.add(col);
+    var wheel = new THREE.Group();
+    wheel.name = 'wheel-steering';
+    wheel.position.set(0.62, 1.14, 0.54);
+    wheel.rotation.order = 'YXZ';   /* tilt on x, spin on z: the spin axis is the tilted column axis */
+    wheel.rotation.x = -0.42;
+    var rim = new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.024, 8, 22), wheelMat);
+    wheel.add(rim);
+    var hub = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.06, 10), wheelMat);
+    hub.rotation.x = Math.PI / 2;
+    wheel.add(hub);
+    wheel.add(box(0.34, 0.045, 0.03, 0, 0, 0, wheelMat));
+    wheel.add(box(0.045, 0.17, 0.03, 0, -0.085, 0, wheelMat));
+    g.add(wheel);
+    wheelNode = wheel;
+    /* seatbacks + headrests behind the eye */
+    g.add(box(0.52, 0.30, 0.10, 0.62, 0.92, -0.50, seatMat));
+    g.add(box(0.52, 0.30, 0.10, -0.62, 0.92, -0.50, seatMat));
+    g.add(box(0.05, 0.18, 0.05, 0.62, 1.12, -0.45, wheelMat));
+    g.add(box(0.05, 0.18, 0.05, -0.62, 1.12, -0.45, wheelMat));
+    g.add(box(0.34, 0.26, 0.09, 0.62, 1.32, -0.45, seatMat));
+    g.add(box(0.34, 0.26, 0.09, -0.62, 1.32, -0.45, seatMat));
+    /* hood lip: the road ahead still reads as "from a car" */
+    var hood = box(2.3, 0.05, 0.9, 0, 0.97, 1.55, hoodMat);
+    hood.rotation.x = 0.06;
+    g.add(hood);
+    g.visible = false;
+    return g;
+  }
+  function ensureCockpit() {
+    if (!carGroup) return;
+    /* a scene rebuild replaces carGroup - drop refs to the old
+       group so the overlay is rebuilt on the new one */
+    if (cockpit && cockpit.parent !== carGroup) { cockpit = null; wheelNode = null; bodyInner = null; }
+    if (cockpit || !carGroup.userData.ready) return;
+    for (var i = 0; i < carGroup.children.length; i++) { bodyInner = carGroup.children[i]; break; }
+    cockpit = buildCockpit();
+    carGroup.add(cockpit);
+    applyCockpitVis();
+  }
+  /* The FP/TP visibility swap rides the monolith blend's ~0.5
+     threshold (read through its state hook); with no hook yet
+     (early frames) the view state itself decides. */
+  function fpVisNow() {
+    if (mode !== 'driving' || viewMode !== 'fp') return false;
+    try {
+      var s = window.__espilCarFpvState && window.__espilCarFpvState();
+      if (s && typeof s.blend === 'number') return s.blend >= 0.5;
+    } catch (e) {}
+    return true;
+  }
+  function applyCockpitVis() {
+    var fp = fpVisNow();
+    if (cockpit) cockpit.visible = fp;
+    if (bodyInner) bodyInner.visible = (mode === 'driving') ? !fp : true;
+  }
+  function toggleView() {
+    if (mode !== 'driving') return { ok: false, why: 'notdriving' };
+    viewMode = (viewMode === 'fp') ? 'tp' : 'fp';
+    hintUntil = Date.now() + 4000;
+    applyCockpitVis();
+    return { ok: true, viewMode: viewMode };
+  }
+
   function makeLabel(lines) {
     var c = document.createElement('canvas'); c.width = 512; c.height = 192;
     var g2 = c.getContext('2d');
@@ -573,6 +751,11 @@
     if (mode === 'driving') return { ok: true, already: true };
     if (!rec.out || !rec.parked) { var s = summon(); if (!s.ok) return s; }
     mode = 'driving';
+    /* every boarding starts in first person (Han 2026-11-25
+       17:27 + 17:28); the choice lives for this drive only */
+    viewMode = 'fp';
+    hintUntil = Date.now() + 4000;
+    applyCockpitVis();
     speed = 0; measured = 0; blockedByBuilding = false;
     boostCorr = 1; stallTime = 0;
     lastPose = null; prevPose = null;
@@ -584,7 +767,7 @@
     if (rec.parked && typeof rec.parked.face === 'number') heading = rec.parked.face;
     wrapSkills();
     hideAvatar();
-    toast('씨엘로에 탑승했습니다 (B: 내리기)');
+    toast('씨엘로에 탑승했습니다 (B: 내리기 · V: 시점 전환)');
     syncCarVisual(true);
     return { ok: true };
   }
@@ -597,6 +780,12 @@
       rec.parked = { x: p.x, z: p.z, face: heading };
     }
     speed = 0; measured = 0;
+    /* the per-drive view choice is discarded here - the next
+       boarding starts in first person again, by the board() law */
+    viewMode = null;
+    wheelSteer = 0;
+    if (wheelNode) wheelNode.rotation.z = 0;
+    applyCockpitVis();
     clearJoy();
     clearBoost();
     showAvatar();
@@ -665,6 +854,15 @@
        key is NOT swallowed - using a building while driving is
        the organic path into an interior, and the interior watch
        in the tick auto-parks the car there. */
+    /* V toggles the driving view (first person <-> third
+       person) - free across every live module (census 4.4),
+       active only while driving, like the skill swallow */
+    if (lk === 'v' && !e.repeat) {
+      e.stopPropagation();
+      e.preventDefault();
+      toggleView();
+      return;
+    }
     if (SKILL_KEYS[lk] || lk === 'shift') {
       e.stopPropagation();
       e.preventDefault();
@@ -698,6 +896,7 @@
     if (!inMap()) { lastPose = null; return; }
     ensureDom();
     buildWorld();
+    ensureCockpit();
     wrapSkills();
     var p = playerPos();
     if (!p) return;
@@ -719,9 +918,24 @@
       if (txt) { promptEl.textContent = txt; promptEl.classList.add('show'); }
       else promptEl.classList.remove('show');
     }
+    /* view / speed chip + the mobile view button (driving only):
+       the speed readout rides the census Q4 draft (HUD chip);
+       the V hint shows for the first seconds after a board or a
+       toggle, then the chip settles to the speed alone */
+    if (viewChipEl) {
+      if (mode === 'driving') {
+        var hint = Date.now() < hintUntil ? (viewMode === 'fp' ? 'V · 3인칭으로 전환 · ' : 'V · 1인칭으로 전환 · ') : '';
+        viewChipEl.textContent = hint + Math.round(speed * 3.6) + ' km/h';
+        viewChipEl.classList.add('show');
+        if (viewBtnEl) viewBtnEl.classList.add('show');
+      } else {
+        viewChipEl.classList.remove('show');
+        if (viewBtnEl) viewBtnEl.classList.remove('show');
+      }
+    }
     if (markerGroup) { var s = 1 + Math.sin(nowMs / 600) * 0.05; markerGroup.scale.set(s, 1, s); }
 
-    if (mode !== 'driving') { prevPose = { x: p.x, y: p.y, z: p.z }; lastPose = prevPose; syncCarVisual(false); return; }
+    if (mode !== 'driving') { prevPose = { x: p.x, y: p.y, z: p.z }; lastPose = prevPose; syncCarVisual(false); applyCockpitVis(); return; }
 
     /* ---- driving ---- */
     var dt = Math.max(0.004, Math.min(0.05, wallDt));   /* the world's own dt clamp */
@@ -732,7 +946,13 @@
        it never enters the measurement or the feedback */
     if (instMeas > 70) instMeas = measured;
     measured = measured * 0.65 + instMeas * 0.35;
-    var F = camForward(p);
+    /* input frame: third person reads the camera, as always;
+       first person reads the CAR heading instead - the look
+       offset is camera-only state in the monolith and never
+       reaches this frame, so looking around cannot steer */
+    var F = (viewMode === 'fp')
+      ? { x: Math.sin(heading), z: Math.cos(heading) }
+      : camForward(p);
     var R = { x: -F.z, z: F.x };
     var ix = 0, iz = 0;
     if (myArrows.arrowup) iz -= 1;
@@ -749,6 +969,13 @@
     var il = Math.hypot(ix, iz);
     if (il > 1) { ix /= il; iz /= il; il = 1; }
     var manual = il > 0.12;
+    /* the overlay wheel turns from this same steering input
+       (ix after normalisation): ~2.2 rad of wheel at full lock,
+       smoothed; it eases back to centre when input stops */
+    var wheelTgt = -ix * 2.2;
+    wheelSteer += (wheelTgt - wheelSteer) * Math.min(1, dt * 10);
+    if (wheelNode) wheelNode.rotation.z = wheelSteer;
+    applyCockpitVis();
     var mx = 0, mz = 0;
     if (manual) { mx = F.x * (-iz) + R.x * ix; mz = F.z * (-iz) + R.z * ix; var ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml; }
 
@@ -858,6 +1085,15 @@
         blockedByBuilding: blockedByBuilding,
         avatarHidden: avatarHidden,
         driving: mode === 'driving',
+        viewMode: viewMode,
+        view: {
+          cockpitBuilt: !!cockpit,
+          cockpitVisible: !!(cockpit && cockpit.visible),
+          bodyVisible: bodyInner ? !!bodyInner.visible : null,
+          wheelNode: !!wheelNode,
+          wheel: Math.round(wheelSteer * 1000) / 1000,
+          chipShown: !!(viewChipEl && viewChipEl.classList.contains('show'))
+        },
         carScaleF: CAR_SCALE_F,
         carLengthM: CAR_LENGTH_M,
         player: p ? { x: p.x, y: p.y, z: p.z } : null,
@@ -872,6 +1108,7 @@
     closeDealership: closeDealership,
     pressB: pressB,
     board: board,
+    toggleView: toggleView,
     alight: function () { return alight(); },
     store: store,
     summon: summon,

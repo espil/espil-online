@@ -4418,6 +4418,8 @@
         }
         var ll=espilP1LngLat(_ccx,_ccz);
         var brg=-walkCamYaw*180/Math.PI;
+        var carFpvP1=espilCarFpvWanted();
+        if(carFpvP1){ var _cfYaw=espilCarFpvFrameYaw(); if(_cfYaw!==null)brg=-(_cfYaw+espilCarFpv.lookYaw)*180/Math.PI; } /* CAR FP (P1 path): the map bearing follows the car heading + look offset, not the follow yaw */
         /* ZOOM OPERATION (Han 2026-10-17, CarInMap scope): the map's own
            zoom level is the operated quantity. The wheel moves the zoom
            TARGET (espilP1.zoomT, set in mapZoom) and the view eases to
@@ -4436,6 +4438,20 @@
              updateWalkMap, so no character stands in frame. The
              user's outdoor zoom state is left untouched and the
              entry-saved zoom is restored on leave as before. */
+          espilP1.zoomT=ESPIL_KB_P1_ZOOM;
+          espilP1.zoom+=(espilP1.zoomT-espilP1.zoom)*0.35;
+          if(Math.abs(espilP1.zoomT-espilP1.zoom)<0.001)espilP1.zoom=espilP1.zoomT;
+        }else if(carFpvP1){
+          /* CAR FIRST-PERSON (P1 path): the Konbiniya device with
+             the car blend as the pitch sweep - the map camera
+             drops to street level at the player's own spot, zoom
+             at the FPV level, bearing on the car heading (set
+             above); the pitch follows 52 + 33 x blend so the
+             framing sweeps as the blend runs, reaching the
+             interior's 85 at blend 1. The player's zoom state is
+             restored by the ordinary branch when the drive view
+             leaves FP (zoomT returns to the follow default unless
+             the player holds the wheel). */
           espilP1.zoomT=ESPIL_KB_P1_ZOOM;
           espilP1.zoom+=(espilP1.zoomT-espilP1.zoom)*0.35;
           if(Math.abs(espilP1.zoomT-espilP1.zoom)<0.001)espilP1.zoom=espilP1.zoomT;
@@ -4461,7 +4477,7 @@
            fade; no blend is mixed into it), and the zoom source
            never writes espilP1.zoomT here or anywhere - the user's
            23 survives the whole first-person stay. */
-        try{ espilP1.map.jumpTo({center:ll,bearing:brg,pitch:kbFpv?ESPIL_KB_P1_PITCH:52+33*((typeof espilZoomFpv!=='undefined'&&espilZoomFpv)?espilZoomFpv.blend:0),zoom:zoom}); }catch(e){}
+        try{ espilP1.map.jumpTo({center:ll,bearing:brg,pitch:kbFpv?ESPIL_KB_P1_PITCH:(carFpvP1?52+33*espilCarFpv.blend:52+33*((typeof espilZoomFpv!=='undefined'&&espilZoomFpv)?espilZoomFpv.blend:0)),zoom:zoom}); }catch(e){}
         if(espilP1.layerLive){ try{ espilP1.map.triggerRepaint(); }catch(e){} } /* the map's render pass draws the game scene via the custom layer */
         /* AVATAR SCALE (Han 2026-10-17; SIZE HELD 2026-11-05): in
            layer mode the avatar draws at true map scale - about 11 px
@@ -9184,6 +9200,97 @@
         zoomT:(typeof espilP1!=='undefined'&&espilP1)?espilP1.zoomT:null,
         walkCamDist:(typeof walkCamDist==='number')?Math.round(walkCamDist*100)/100:null };
     };
+    /* CAR FIRST-PERSON (Han 2026-11-25 17:27 item 5 + the 17:28
+       supplement; census + design: car-firstperson/CENSUS.md
+       route B): while vehicles.js reports a drive whose viewMode
+       is 'fp', the follow camera blends (220 ms, the zoom-FPV
+       pattern) from the boom to the driver's eye - a point on the
+       CAR pose: the driver-side offset rotated by the car
+       heading, height the ESPIL_KB_EYE 1.6 m law - and looks
+       along the car heading plus a drag look offset (clamped to
+       +/-66 deg, springing back to centre in ~0.4 s once the drag
+       ends). In first person the movement input frame reads the
+       CAR heading (the input block below), never the look yaw,
+       so looking around never steers; vehicles.js mirrors the
+       same heading frame on its side. The toggle (V) and the
+       per-drive view state live in vehicles.js; this block owns
+       only the blend, the eye and the look offsets. Zoom input
+       is ignored while FP is wanted (mapZoom), the street follow
+       tuning is untouched, and third person resumes at the
+       player's own zoom because walkCamYaw / walkCamPitch /
+       walkCamDist are never written by this block. The own
+       nameplate needs no rule here: it already follows the
+       shared avatar-visibility predicate, and the avatar is
+       hidden for the whole drive. */
+    var ESPIL_CAR_EYE_X=0.62, ESPIL_CAR_EYE_Z=0.18; /* the census eye (sedan-local +0.34 / +0.10) in world metres at the loader's ~1.81 scale */
+    var espilCarFpv={blend:0,lookYaw:0,lookPitch:0};
+    function espilCarFpvWanted(){
+      try{
+        var V=window.__espilVehicles;
+        if(!V||typeof V.state!=='function')return false;
+        var s=V.state();
+        return !!(s&&s.driving&&s.viewMode==='fp');
+      }catch(e){ return false; }
+    }
+    function espilCarFpvHeading(){
+      try{ var s=window.__espilVehicles.state(); if(s&&typeof s.heading==='number')return s.heading; }catch(e){}
+      return null;
+    }
+    function espilCarFpvTick(dt){
+      var want=espilCarFpvWanted()?1:0;
+      if(dt>0){
+        var step=dt/0.220; /* the zoom-FPV transition constant */
+        if(espilCarFpv.blend<want)espilCarFpv.blend=Math.min(want,espilCarFpv.blend+step);
+        else if(espilCarFpv.blend>want)espilCarFpv.blend=Math.max(want,espilCarFpv.blend-step);
+        /* the look offset springs back to centre once no drag
+           is live (~0.4 s to settle - the census draft) */
+        var dragging=(typeof gameDragId!=='undefined'&&gameDragId!==null)||(typeof mapDragId!=='undefined'&&mapDragId!==null);
+        if(!dragging&&(espilCarFpv.lookYaw||espilCarFpv.lookPitch)){
+          var dec=Math.exp(-dt/0.13);
+          espilCarFpv.lookYaw*=dec; espilCarFpv.lookPitch*=dec;
+          if(Math.abs(espilCarFpv.lookYaw)<0.001)espilCarFpv.lookYaw=0;
+          if(Math.abs(espilCarFpv.lookPitch)<0.001)espilCarFpv.lookPitch=0;
+        }
+      }
+      if(!want&&espilCarFpv.blend<=0){ espilCarFpv.lookYaw=0; espilCarFpv.lookPitch=0; }
+    }
+    /* Drag routing: while car FP is wanted a drag feeds the look
+       offset instead of walkCamYaw / walkCamPitch (the same
+       rates and clamps the outdoor drag uses, the yaw clamp the
+       census's +/-66 deg). Returns true when the drag was taken. */
+    function espilCarLookDrag(dx,dy){
+      if(!espilCarFpvWanted())return false;
+      espilCarFpv.lookYaw=Math.max(-1.15,Math.min(1.15,espilCarFpv.lookYaw-dx*.0052));
+      espilCarFpv.lookPitch=Math.max(-1.2,Math.min(1.2,espilCarFpv.lookPitch-dy*.004));
+      return true;
+    }
+    function espilCarFpvEye(p){
+      var h=espilCarFpvHeading();
+      if(h===null)h=(typeof p.faceY==='number')?p.faceY:0;
+      var ch=Math.cos(h), sh=Math.sin(h);
+      var ex=p.pos.x+ESPIL_CAR_EYE_X*ch+ESPIL_CAR_EYE_Z*sh;
+      var ez=p.pos.z-ESPIL_CAR_EYE_X*sh+ESPIL_CAR_EYE_Z*ch;
+      var eye=new THREE.Vector3(ex,p.pos.y+ESPIL_KB_EYE,ez);
+      var ly=h+espilCarFpv.lookYaw, cp=Math.cos(espilCarFpv.lookPitch);
+      var tgt=new THREE.Vector3(eye.x+Math.sin(ly)*cp, eye.y+Math.sin(espilCarFpv.lookPitch), eye.z+Math.cos(ly)*cp);
+      return {eye:eye,tgt:tgt,heading:h};
+    }
+    /* The monolith forward for a yaw is (-sin, -cos); the car
+       forward for its heading is (sin, cos) - so the yaw whose
+       forward IS the car forward is heading + PI. Non-null only
+       while FP is wanted (the movement input frame). */
+    function espilCarFpvFrameYaw(){
+      if(!espilCarFpvWanted())return null;
+      var h=espilCarFpvHeading();
+      return (h===null)?null:h+Math.PI;
+    }
+    window.__espilCarFpvState=function(){
+      var cam=(typeof mapCamera!=='undefined'&&mapCamera&&mapCamera.position)?mapCamera.position:null;
+      return { wanted:espilCarFpvWanted(), blend:Math.round(espilCarFpv.blend*1000)/1000,
+        lookYaw:Math.round(espilCarFpv.lookYaw*1000)/1000, lookPitch:Math.round(espilCarFpv.lookPitch*1000)/1000,
+        heading:espilCarFpvHeading(),
+        camPos:cam?{x:Math.round(cam.x*100)/100,y:Math.round(cam.y*100)/100,z:Math.round(cam.z*100)/100}:null };
+    };
     /* ARENA PLACE follow-distance seam (Han 2026-11-18): set THIS
        document's default follow distance (fallback path:
        walkCamDist; Mapbox P1 path: the default zoom target the
@@ -13792,6 +13899,7 @@
       if(e.pointerId!==mapDragId)return;
       var dx=e.clientX-mapLastX,dy=e.clientY-mapLastY;
       mapLastX=e.clientX;mapLastY=e.clientY;
+      if(espilCarLookDrag(dx,dy))return; /* CAR FP: the drag is a look offset, the follow yaw stays put */
       walkCamYaw-=dx*.0052;
       walkCamPitch=Math.max(.12,Math.min(1.15,walkCamPitch+dy*.004));
     }
@@ -13838,6 +13946,7 @@
       if(e.pointerId!==gameDragId)return;
       var dx=e.clientX-gameDragX,dy=e.clientY-gameDragY;
       gameDragX=e.clientX;gameDragY=e.clientY;
+      if(espilCarLookDrag(dx,dy))return; /* CAR FP: the drag is a look offset, the follow yaw stays put */
       walkCamYaw-=dx*.0052;
       walkCamPitch=Math.max(.12,Math.min(1.15,walkCamPitch+dy*.004));
     });
@@ -13856,6 +13965,7 @@
          per wheel notch) - not a camera distance
          translated through a curve. Outside Mapbox mode the legacy
          distance behaviour is unchanged. */
+      if(espilCarFpvWanted())return; /* CAR FP: zoom input is ignored in first person (census 5.5) - the eye is fixed; third person resumes at the player's own zoom */
       if(ESPIL_P1&&typeof espilP1!=='undefined'&&espilP1&&espilP1.map&&espilP1.ready&&!espilP1.failed){
         if(espilP1.zoomT===null)espilP1.zoomT=20.39;
         /* ZOOM-FPV push (Han 2026-11-17): the part of a zoom-in
@@ -14391,6 +14501,7 @@
       if(!p)return;
       espilCamClampUpdate(dt); /* Batch 5 item 8: occlusion-capped camera distance for this frame */
       espilZoomFpvTick(dt); /* ZOOM-FPV (Han 2026-11-17): the state machine runs before EVERY camera path in this function, the flight branch included - its force-off for flight/driving/interior can only bite if it runs before those branches take the frame (the home is deliberately NOT a force-off - Han Q1 = ALLOW, 2026-11-17) */
+      espilCarFpvTick(dt); /* CAR FIRST-PERSON: the blend + look-offset spring ride the same pre-branch slot as the zoom-FPV machine */
       /* Fly/ride mode (Batch G): the flight update owns movement;
          the follow camera below uses the ground tail's own math (the
          updateWalkCamera this branch used to call never existed). */
@@ -14435,7 +14546,9 @@
       if(espilPhotoMode){ix=0;iz=0;} /* NAME-ONLY ENTRY: the photo framing holds the body still while photo mode is open */
       var il=Math.sqrt(ix*ix+iz*iz);
       if(il>1){ix/=il;iz/=il;}
-      var fx=-Math.sin(walkCamYaw),fz=-Math.cos(walkCamYaw);
+      var _carYaw=espilCarFpvFrameYaw(); /* CAR FP: the input frame reads the car heading, never the look yaw */
+      var _effYaw=(_carYaw===null)?walkCamYaw:_carYaw;
+      var fx=-Math.sin(_effYaw),fz=-Math.cos(_effYaw);
       var rx=-fz,rz=fx;
       var mx=fx*(-iz)+rx*ix,mz=fz*(-iz)+rz*ix;
       var joyMag=window.__joyVec?Math.sqrt(window.__joyVec.x*window.__joyVec.x+window.__joyVec.y*window.__joyVec.y):0;
@@ -14767,6 +14880,20 @@
           var zFwd=new THREE.Vector3(zEye.x-Math.sin(walkCamYaw)*zCp, zEye.y+Math.sin(zLp), zEye.z-Math.cos(walkCamYaw)*zCp);
           if(dt>0)mapCamera.position.lerp(zEye,espilZoomFpv.blend);
           _zTgt.lerp(zFwd,espilZoomFpv.blend);
+        }
+        /* CAR FIRST-PERSON: with the car blend > 0 the tracked
+           camera blends from the follow boom to the driver's eye
+           (car pose + driver offset, ESPIL_KB_EYE height) and the
+           look target to the car-heading forward point (heading +
+           look offset). The zoom source's blend is 0 while
+           driving (its forced-off law), so the two blends never
+           fight; at car blend 1 the framing is the eye law
+           exactly. On the P1 path espilP1Tick carries the same
+           blend into the Mapbox framing. */
+        if(espilCarFpv.blend>0){
+          var cFr=espilCarFpvEye(p);
+          if(dt>0)mapCamera.position.lerp(cFr.eye,espilCarFpv.blend);
+          _zTgt.lerp(cFr.tgt,espilCarFpv.blend);
         }
         mapCamera.lookAt(_zTgt);
       }
