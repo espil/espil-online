@@ -139,7 +139,30 @@
        'tool' and reuses this same kind value; 'tool' entries are
        never listable on a stall (the refusal lives in stall2.js),
        never equippable (slot null) and never consumed. */
-    { name: 'Harbour Boat', kr: '항구 보트', slot: null, kind: 'tool', grade: '일반', def: 0, mdef: 0, price: 0, app: { shape: 'boat', c1: '#7ec8d8', c2: '#8a5a2b' }, desc: '늘 지니고 다니는 작은 배. 물에 들어가면 자동으로 나와 탈 수 있고, 물에서 나오면 다시 품으로 돌아옵니다. 팔거나 건넬 수 없습니다.' }
+    { name: 'Harbour Boat', kr: '항구 보트', slot: null, kind: 'tool', grade: '일반', def: 0, mdef: 0, price: 0, app: { shape: 'boat', c1: '#7ec8d8', c2: '#8a5a2b' }, desc: '늘 지니고 다니는 작은 배. 물에 들어가면 자동으로 나와 탈 수 있고, 물에서 나오면 다시 품으로 돌아옵니다. 팔거나 건넬 수 없습니다.' },
+    /* FISHING (Han 2026-11-25, fishing/DESIGN.md sections 6-7 +
+       amendments A/B): the second 'tool' - the Bamboo Rod, bound
+       exactly like the Harbour Boat above (kind 'tool' is refused
+       by stall2.js, never equippable, never consumed), granted
+       free by fishing.js at the first passing cast test. Below it
+       the catch table as real DB entries: the 9 fish are kind
+       'use' with RECOVERY rows (they eat through the shipped
+       restore path), the 2 junk are kind 'mat' with no RECOVERY
+       row (they stack and list, they cannot be eaten). Rates and
+       difficulty live in fishing.js's table; the DB carries the
+       item facts only. */
+    { name: 'Bamboo Rod', kr: '대나무 낚싯대', slot: null, kind: 'tool', grade: '일반', def: 0, mdef: 0, price: 0, app: { shape: 'rod', c1: '#c9a86a', c2: '#8a5a2b' }, desc: '가볍고 질긴 대나무 낚싯대. 물가에서 찌를 던질 때 손에 들립니다. 팔거나 건넬 수 없습니다.' },
+    { name: 'Old Boot', kr: '낡은 장화', slot: null, kind: 'mat', grade: '일반', def: 0, mdef: 0, price: 1, app: { shape: 'boots', c1: '#6e5a44', c2: '#4a3a28' }, desc: '물속에서 오래 잠들어 있던 장화. 낚시의 오랜 친구입니다.' },
+    { name: 'Rusty Can', kr: '녹슨 깡통', slot: null, kind: 'mat', grade: '일반', def: 0, mdef: 0, price: 1, app: { shape: 'cup', c1: '#a86a4a', c2: '#6e4630' }, desc: '녹이 슬어 글자도 지워진 깡통. 무엇이 들었는지는 아무도 모릅니다.' },
+    { name: 'Small Sardine', kr: '작은 정어리', slot: null, kind: 'use', grade: '일반', def: 0, mdef: 0, price: 8, app: { shape: 'fish', c1: '#a8c8d8', c2: '#5d7d8c' }, desc: '손바닥만 한 정어리. 항구 어디서나 잘 잡힙니다.' },
+    { name: 'Harbour Perch', kr: '항구 농어', slot: null, kind: 'use', grade: '일반', def: 0, mdef: 0, price: 14, app: { shape: 'fish', c1: '#b8a888', c2: '#6e6250' }, desc: '부두 그늘에 모여 사는 농어. 구우면 고소합니다.' },
+    { name: 'Rockfish', kr: '볼락', slot: null, kind: 'use', grade: '고급', def: 0, mdef: 0, price: 26, app: { shape: 'fish', c1: '#c96a4a', c2: '#7a3a26' }, desc: '바위틈의 볼락. 회로도 구이로도 일품입니다.' },
+    { name: 'Mackerel', kr: '고등어', slot: null, kind: 'use', grade: '고급', def: 0, mdef: 0, price: 24, app: { shape: 'fish', c1: '#4a7a9e', c2: '#2a4a66' }, desc: '등이 푸른 고등어. 떼 지어 다니다 한 마리씩 걸립니다.' },
+    { name: 'Salmon', kr: '연어', slot: null, kind: 'use', grade: '희귀', def: 0, mdef: 0, price: 55, app: { shape: 'fish', c1: '#e88a6a', c2: '#a85a44' }, desc: '이 항구의 얼굴 같은 연어. 살이 단단하고 붉습니다.' },
+    { name: 'Halibut', kr: '광어', slot: null, kind: 'use', grade: '희귀', def: 0, mdef: 0, price: 70, app: { shape: 'fish', c1: '#c9b896', c2: '#8a7a5a' }, desc: '바닥에 붙어 기다리던 광어. 묵직한 한 마리입니다.' },
+    { name: 'Golden Koi', kr: '황금 잉어', slot: null, kind: 'use', grade: '영웅', def: 0, mdef: 0, price: 160, app: { shape: 'fish', c1: '#f2c94c', c2: '#e8862e' }, desc: '비늘이 금빛으로 빛나는 잉어. 바닷가에서도 가끔 모습을 보입니다.' },
+    { name: 'Moonlit Eel', kr: '달빛 장어', slot: null, kind: 'use', grade: '영웅', def: 0, mdef: 0, price: 190, app: { shape: 'fish', c1: '#7a86c9', c2: '#3a4470' }, desc: '달빛 아래서만 활발한 장어. 몸이 길고 힘이 셉니다.' },
+    { name: 'Lunaris Minnow', kr: '루나리스 미노우', slot: null, kind: 'use', grade: '전설', def: 0, mdef: 0, price: 400, app: { shape: 'fish', c1: '#f2b8e6', c2: '#c94fa0' }, desc: '이름만 거창한 아주 작은 물고기. 그 루나리스와는 아무 관계가 없습니다.' }
   ];
   var DB_LOOKUP = {};
   DB.forEach(function (it) { DB_LOOKUP[it.name.toLowerCase()] = it; });
@@ -171,7 +194,22 @@
     'Pizza Slice': { hp: 48 },
     'Hot Dog': { hp: 38 },
     'Milkshake': { hp: 22, mp: 10 },
-    'Salad': { hp: 28 }
+    'Salad': { hp: 28 },
+    /* FISHING (Han 2026-11-25, fishing/DESIGN.md section 6): the
+       caught fish restore through this same table - values sit
+       inside the existing food band, scaled by DB price the way
+       RECOVERY already scales with FOOD_PRICE. The two junk
+       catches (Old Boot, Rusty Can) are deliberately ABSENT:
+       no row, no use-restore action. */
+    'Small Sardine': { hp: 12 },
+    'Harbour Perch': { hp: 20 },
+    'Rockfish': { hp: 30 },
+    'Mackerel': { hp: 26 },
+    'Salmon': { hp: 45 },
+    'Halibut': { hp: 52 },
+    'Golden Koi': { hp: 70, mp: 20 },
+    'Moonlit Eel': { hp: 60, mp: 35 },
+    'Lunaris Minnow': { hp: 100, mp: 50 }
   };
   /* DRAFT - Han decision D4 pending. */
   window.__espilFoodRestore = RECOVERY;
@@ -494,6 +532,8 @@
       case 'plate': b = P('M8 7 L28 7 L26 29 L10 29 Z', c1) + '<rect x="12" y="12" width="12" height="3" fill="' + c2 + '"/><rect x="12" y="19" width="12" height="3" fill="' + c2 + '"/>'; break;
       case 'bead': b = '<circle cx="18" cy="18" r="10" fill="' + c1 + '"/><circle cx="14.6" cy="14" r="3.2" fill="#ffffff" opacity=".55"/><circle cx="18" cy="18" r="3.4" fill="' + c2 + '"/>'; break;
       case 'boat': b = P('M5 20 L31 20 L27 29 L9 29 Z', c1) + P('M18 20 L18 8 L26 17 L18 17 Z', c2) + P('M4 31.4 L32 31.4', 'none', ' stroke="' + c1 + '" stroke-width="1.8" stroke-linecap="round"'); break;
+      case 'fish': b = P('M3 18 Q11 8 20 10 Q29 12 33 18 Q29 24 20 26 Q11 28 3 18 Z', c1) + P('M20 10 Q24 18 20 26 Q27 21 33 18 Q27 15 20 10 Z', c2) + '<circle cx="10.5" cy="15.5" r="1.7" fill="#22303a"/>'; break;
+      case 'rod': b = P('M7 29 L27 7', 'none', ' stroke="' + c1 + '" stroke-width="2.6" stroke-linecap="round"') + '<circle cx="12.5" cy="23.5" r="3.1" fill="none" stroke="' + c2 + '" stroke-width="1.8"/>' + P('M27 7 L27 15', 'none', ' stroke="' + c2 + '" stroke-width="1.1"'); break;
       default: b = '<rect x="8" y="9" width="20" height="18" rx="2.6" fill="' + c1 + '"/><rect x="8" y="15" width="20" height="3" fill="' + c2 + '"/>';
     }
     return '<svg viewBox="0 0 36 36" width="' + s + '" height="' + s + '" aria-hidden="true">' + b + '</svg>';
@@ -1345,6 +1385,11 @@
              profileOpen: (charPanel() || {}).getAttribute ? charPanel().getAttribute('aria-hidden') === 'false' : false };
   };
   window.__espilOpenSelfProfile = function () { toggleProfile(true); };
+  /* FISHING (Han 2026-11-25): the icon painter is exported so
+     fishing.js draws its tracking-game glyph and its catch sprite
+     with this same shape + two-colours drawing (fishing/DESIGN.md
+     sections 8 + B6) instead of growing a second painter. */
+  window.__espilItemIconSVG = iconSVG;
   window.__espilGearWindow = {
     stats: computeStats, itemOf: itemOf, slots: SLOT_DEFS,
     openProfile: function () { toggleProfile(true); },

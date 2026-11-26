@@ -91,6 +91,11 @@
      boatArea, on its surveyed mooring table and on the
      entrant population, so arming it in every city costs
      nothing where no craft stands.
+   - fishing: the same seams as boat - the fishing loop (Han
+     2026-11-25, fishing/DESIGN.md) is a world feature whose
+     cast test reads the collision grid's water at any shore,
+     so it arms with the arrival bundle in every city; the
+     module self-gates on being in the map.
    Every import is fire-and-forget with a console warning on
    failure; a failed lazy load never breaks the page.
    __espilLazyState() reports what has landed (rig probes). */
@@ -183,7 +188,7 @@
   window.addEventListener('espil-dive-start', function () { load('tutorial.js'); });
   window.addEventListener('espil-guide', function (e) {
     var d = e && e.detail; if (!d) return;
-    if (d.type === 'arrival') { socialBundle(); load('npcs.js'); load('monsters.js'); load('tiles3d.js'); load('cashshop.js'); load('comm-portal.js'); load('arena.js'); load('story.js'); load('vehicles.js'); load('boat.js'); load('billboard-video.js'); }
+    if (d.type === 'arrival') { socialBundle(); load('npcs.js'); load('monsters.js'); load('tiles3d.js'); load('cashshop.js'); load('comm-portal.js'); load('arena.js'); load('story.js'); load('vehicles.js'); load('boat.js'); load('fishing.js'); load('billboard-video.js'); }
     if (d.type === 'interior') { storePair(); load('panels.js'); }
   });
   window.addEventListener('espil-party-frame', socialBundle);
@@ -251,7 +256,7 @@
      interception must be resident before the Enter click. 600 ms,
      and each arm is a no-op once loaded. */
   setInterval(function () {
-    if (document.body && document.body.classList.contains('in-map')) { socialBundle(); load('npcs.js'); load('monsters.js'); load('tiles3d.js'); load('cashshop.js'); load('comm-portal.js'); load('arena.js'); load('story.js'); load('vehicles.js'); load('boat.js'); load('billboard-video.js'); }
+    if (document.body && document.body.classList.contains('in-map')) { socialBundle(); load('npcs.js'); load('monsters.js'); load('tiles3d.js'); load('cashshop.js'); load('comm-portal.js'); load('arena.js'); load('story.js'); load('vehicles.js'); load('boat.js'); load('fishing.js'); load('billboard-video.js'); }
     if (window.__espilInside) storePair();
     var bp = document.getElementById('bldg-panel');
     if (bp && bp.getAttribute('aria-hidden') === 'false') load('store-page-link.js');

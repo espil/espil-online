@@ -2635,7 +2635,7 @@
        loads per page session; the landing sets window.__espilCityKey
        at entry and a city switch reloads (see startCityEntry). --- */
     var ESPIL_CITIES={
-      vancouver:{district:'assets/osm/vancouver_district_sample.json',collision:'assets/osm/vancouver_collision.json',ox:0,oz:0,core:true,bounds:{x0:-1799,z0:-2028,x1:2027,z1:1956},spawn:{x:3,z:31},landmark:{name:'Canada Place',x:694,z:-560,face:0,radius:800,activities:['photo','eat','swim','boat','arena'],boatArea:{x0:600,x1:840,z0:-800,z1:-575},arrival:'boat',arrivalSpawn:{x:694,z:-795},landSummon:{x:746,z:-752},photo:{cx:694,cz:-560,camH:2,lx:694,lz:-649.8,lookH:16}}}, /* bounds = the district extent, added 2026-10-19 for the last-place resume rule (Han PC verdict #9): resume judges the full playable extent, not the smaller downtown boundary polygon. First-summon place (Han 2026-10-18): the Vancouver Art Gallery's Robson Square plaza - gallery record bbox x[-46.9..52.9] z[-57.6..16.8], the point sits 14.2 m south of its south face on its centre axis, inside no footprint */
+      vancouver:{district:'assets/osm/vancouver_district_sample.json',collision:'assets/osm/vancouver_collision.json',ox:0,oz:0,core:true,bounds:{x0:-1799,z0:-2028,x1:2027,z1:1956},spawn:{x:3,z:31},landmark:{name:'Canada Place',x:694,z:-560,face:0,radius:800,activities:['photo','eat','swim','boat','fish','arena'],boatArea:{x0:600,x1:840,z0:-800,z1:-575},arrival:'boat',arrivalSpawn:{x:694,z:-795},landSummon:{x:746,z:-752},photo:{cx:694,cz:-560,camH:2,lx:694,lz:-649.8,lookH:16}}}, /* bounds = the district extent, added 2026-10-19 for the last-place resume rule (Han PC verdict #9): resume judges the full playable extent, not the smaller downtown boundary polygon. First-summon place (Han 2026-10-18): the Vancouver Art Gallery's Robson Square plaza - gallery record bbox x[-46.9..52.9] z[-57.6..16.8], the point sits 14.2 m south of its south face on its centre axis, inside no footprint */
       auckland:{district:'assets/osm/auckland_district.json',collision:'assets/osm/auckland_collision.json',ox:10000,oz:0,core:false,spawn:{x:10302.9,z:-1001.9},bounds:{x0:9243,z0:-1595,x1:11024,z1:1080},harbour:{w:3600,d:1750,dx:140,dz:-1865},landmark:{name:'Sky Tower',x:9904,z:-406,face:0.795,radius:800,activities:['photo','eat'],photo:{cx:9904,cz:-406,camH:2,lx:9882.8,lz:-426.8,lookH:110}}},
       tokyo:{district:'assets/osm/tokyo_district.json',collision:'assets/osm/tokyo_collision.json',ox:5000,oz:0,core:false,spawn:{x:4870,z:0},bounds:{x0:3010,z0:-2032,x1:7034,z1:2011},landmark:{name:'Tokyo Station',x:4870,z:0,face:-1.571,radius:800,activities:['photo','eat'],photo:{cx:4870,cz:0,camH:2,lx:5000,lz:0,lookH:12}}}, /* Tokyo (built 2026-10-18, restored to this tree 2026-10-19 after the production-mirror reset): OSM extract radius 2 km on Tokyo Station (35.68124, 139.76714), 18,002 buildings; spawn = local (-130, 0), the Marunouchi plaza in front of the station, 15.5 m clear of every footprint */
       newyork:{district:'assets/osm/newyork_district.json',collision:'assets/osm/newyork_collision.json',ox:-5000,oz:0,core:false,spawn:{x:-5000,z:0},bounds:{x0:-6906,z0:-2063,x1:-2972,z1:2058},landmark:{name:'Central Park South',x:-4701,z:-919,face:-1.700,radius:800,activities:['photo','eat'],photo:{cx:-4701,cz:-919,camH:2,lx:-4214,lz:-855,lookH:6}}}, /* New York (2026-10-19): OSM extract radius 2 km on Times Square (40.75800, -73.98554), 9,020 buildings; spawn = local (0, 0), the Times Square pedestrian plaza at the anchor itself, 17.8 m clear of every footprint (offline scan of the shipped district records) */
@@ -2895,6 +2895,14 @@
         if(window.__espilBoat&&typeof window.__espilBoat.guideToBoat==='function'){ window.__espilBoat.guideToBoat(); }
         else if(window.__espilBoat&&typeof window.__espilBoat.guideMooring==='function'){ window.__espilBoat.guideMooring(); }
         else espilVillageNotice('배는 물에 들어가면 자동으로 나옵니다');
+      });
+      if(acts.indexOf('fish')>=0)row('낚시하기',function(){
+        /* FISHING (Han 2026-11-25, fishing/DESIGN.md section 3):
+           the landmark row TEACHES the free action in the swim
+           row's guidance grammar - the mechanic itself is the
+           water at any shore, not this row. */
+        if(window.__espilFishing&&typeof window.__espilFishing.guide==='function'){ window.__espilFishing.guide(); }
+        else espilVillageNotice('물가에서 Space를 누르면 낚시를 시작합니다');
       });
       if(acts.indexOf('arena')>=0)row('아레나 가기',espilLandmarkArena);
       /* The account line is always the last row (the upgrade door). */
@@ -7030,7 +7038,17 @@
          stands. */
       if(typeof ESPIL_P1!=='undefined'&&ESPIL_P1){
         var _la=espilNearestLabelAnchor(walkPlayer.pos.x,walkPlayer.pos.z);
-        if(!_la){espilSpaceTooFar();return;}
+        if(!_la){
+          /* FISHING (Han 2026-11-25, fishing/DESIGN.md section 5.1):
+             the cast claims the Use press ONLY here, at the end of
+             the chain where the too-far answer would fire - if a
+             building anchor, the arena portal, a kiosk or the boat
+             claimed the press above, fishing never sees it. When
+             fishing's cast test also fails, tryUse() returns false
+             and the too-far notice shows exactly as before. */
+          if(!(window.__espilFishing&&window.__espilFishing.tryUse()))espilSpaceTooFar();
+          return;
+        }
         /* NAME-ONLY ENTRY (Han 2026-11-24): layered BEHIND the
            anchor judgement above - the prompt was presented and
            the press resolved exactly as today; only now, for an
