@@ -10349,6 +10349,116 @@
         hasMap:!!(espilOwnerChip.material&&espilOwnerChip.material.map)};
     };
 
+    /* LOCAL NAMEPLATE (Han 2026-11-25 17:27 item 1: names float
+       above characters' heads). Peers have carried a plate from
+       __espilMakeNameplate since 2026-10-24; the local player was
+       the one avatar without one. This block builds the SAME plate
+       for the local player from the SAME two inputs the peer path
+       uses (espil_username + the own outfit accent through
+       __espilOutfitHex), as a scene-level sprite - never parented
+       to the visual root, which is scaled/rotated per frame; the
+       owner chip above is the scene-level precedent. Positioned
+       per frame in the walk tick beside the owner-chip tick:
+         y = pos.y + 2.05 * F - espilGlobeDrop(x, z),
+         scale = (0.6 * F * 3.4, 0.6 * F, 1),
+       which is the remote law restated for a scene-level object
+       (the remote plate is a group child at local y 2.05 * F over
+       a group whose y already carries -drop). Occlusion matches
+       the factory's own material: depthTest default true,
+       depthWrite false, renderOrder 50.
+       Visibility follows ONE shared predicate, espilAvatarVisible():
+       every surface that hides the local avatar (interior FPV,
+       zoom FPV, vehicles) does it by writing av.group.visible, so
+       the plate reads that flag and hides with its avatar - the
+       car first-person view (item 5 of the same batch) inherits
+       the hide by construction, no per-mode checks here.
+       Own plate is SHOWN in third person: every other client
+       already draws this plate over this player, so the local
+       view matches theirs. Per-frame cost is one position write
+       and one scale write; the texture is built once per arrival
+       and rebuilt only when an input changes (the tick re-reads
+       the name/accent inputs at a throttled cadence and rebuilds
+       on a difference - the accent helper is lazy-loaded, and the
+       name input settles after the panel step).
+       NAME SOURCE (measured on current bytes, supersedes the
+       census's espil_username premise): v2 guests never write
+       espil_username - entry-flow removes the key and the v2 path
+       neither reads nor writes it. The name this player actually
+       wears (the roster name peers draw, the chat sender name) is
+       presence.myName(): the character panel's #char-name value
+       first, espil_username as the returning-browser fallback,
+       'Guest' as the floor. The plate mirrors that resolution
+       exactly, so all surfaces keep showing one string. */
+    var espilOwnPlate=null, espilOwnPlateName=null, espilOwnPlateAccentVal=null, espilOwnPlateCheckAt=0;
+    function espilAvatarVisible(){
+      var p=(typeof walkPlayer!=='undefined')?walkPlayer:null;
+      return !!(p&&p.av&&p.av.group&&p.av.group.visible&&document.body&&document.body.classList&&document.body.classList.contains('in-map'));
+    }
+    function espilOwnPlateNameRead(){
+      try{
+        var inp=document.getElementById('char-name');
+        var v=inp?String(inp.value||'').trim():'';
+        if(!v){ try{ v=String(localStorage.getItem('espil_username')||'').trim(); }catch(_){ v=''; } }
+        return (v||'Guest').slice(0,16);
+      }catch(_){ return 'Guest'; }
+    }
+    function espilOwnPlateAccent(){
+      try{
+        if(!window.__espilOutfitHex)return null;
+        var rec=JSON.parse(localStorage.getItem('espil_character')||'null');
+        return window.__espilOutfitHex(rec&&rec.look?rec.look.outfit:null);
+      }catch(_){ return null; }
+    }
+    function espilOwnPlateBuild(){
+      var scene=__espilMapScene();
+      if(!scene||typeof THREE==='undefined')return false;
+      if(espilOwnPlate){
+        try{ if(espilOwnPlate.parent)espilOwnPlate.parent.remove(espilOwnPlate); }catch(_){}
+        try{ espilOwnPlate.material.map.dispose(); espilOwnPlate.material.dispose(); }catch(_){}
+        espilOwnPlate=null;
+      }
+      espilOwnPlateName=espilOwnPlateNameRead();
+      espilOwnPlateAccentVal=espilOwnPlateAccent();
+      var sp=__espilMakeNameplate(espilOwnPlateName,espilOwnPlateAccentVal);
+      if(!sp)return false;
+      sp.visible=false; /* the tick decides from the next frame */
+      scene.add(sp);
+      espilOwnPlate=sp;
+      return true;
+    }
+    window.__espilNameplateRefresh=function(){
+      /* Rebuild after a name/accent change (a customizer re-colour
+         funnels here); before arrival it simply builds, and the
+         arrival build below covers the first entry. */
+      return espilOwnPlateBuild();
+    };
+    function espilOwnPlateTick(){
+      if(!espilOwnPlate){ if(!espilOwnPlateBuild())return; }
+      var nowMs=performance.now();
+      if(nowMs-espilOwnPlateCheckAt>700){
+        espilOwnPlateCheckAt=nowMs;
+        if(espilOwnPlateNameRead()!==espilOwnPlateName||espilOwnPlateAccent()!==espilOwnPlateAccentVal){
+          if(!espilOwnPlateBuild())return;
+        }
+      }
+      var p=(typeof walkPlayer!=='undefined')?walkPlayer:null;
+      if(!p||!p.pos){ espilOwnPlate.visible=false; return; }
+      var F=(typeof window.__espilAvatarScaleF==='number'&&window.__espilAvatarScaleF>0)?window.__espilAvatarScaleF:1;
+      var drop=(typeof espilGlobeDrop==='function')?espilGlobeDrop(p.pos.x,p.pos.z):0;
+      espilOwnPlate.position.set(p.pos.x,p.pos.y+2.05*F-drop,p.pos.z);
+      var ph=0.6*F; espilOwnPlate.scale.set(ph*3.4,ph,1);
+      espilOwnPlate.visible=espilAvatarVisible();
+    }
+    window.__espilNameplateState=function(){
+      if(!espilOwnPlate)return {exists:false,visible:false,name:null,accent:null,x:null,y:null,z:null,scaleY:null,inScene:null,hasMap:null};
+      var wp=new THREE.Vector3(); espilOwnPlate.getWorldPosition(wp);
+      return {exists:true, visible:espilOwnPlate.visible, name:espilOwnPlateName, accent:espilOwnPlateAccentVal,
+        x:wp.x, y:wp.y, z:wp.z, scaleY:espilOwnPlate.scale.y,
+        inScene:(typeof mapScene!=='undefined'&&mapScene)?mapScene.children.indexOf(espilOwnPlate)>=0:null,
+        hasMap:!!(espilOwnPlate.material&&espilOwnPlate.material.map)};
+    };
+    window.addEventListener('espil-arrival',function(){ espilOwnPlateBuild(); });
+
     /* ============ GEORGIA STREET BUSES + PLAYER COLLISION =========
        (Han's order, 2026-10-27, via COO.)
        Live buses: a JSON feed derived from TransLink GTFS-realtime
@@ -14665,6 +14775,7 @@
       }
       espilWaterFxTick(dt); /* WATER-ENTRY FEEL: pools, tint, muffle, shake */
       if(typeof espilOwnerChipTick==='function')espilOwnerChipTick(false);
+      if(typeof espilOwnPlateTick==='function')espilOwnPlateTick(); /* LOCAL NAMEPLATE (Han 2026-11-25): the local plate rides the same per-frame step as the owner chip */
       /* Building proximity: store-name labels + interact prompt. */
       updateBuildingProximity(p.pos.x,p.pos.z,performance.now());
       espilStoreLabelsTick();
