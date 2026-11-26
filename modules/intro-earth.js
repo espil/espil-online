@@ -222,13 +222,60 @@
       function startTyping(){
         setTimeout(typeStep,600);
       }
-      /* Don't let the typing play out in a hidden tab: wait until the page is visible. */
-      if(document.hidden){
-        var __visStart=function(){
-          if(!document.hidden){document.removeEventListener('visibilitychange',__visStart);startTyping();}
-        };
-        document.addEventListener('visibilitychange',__visStart);
-      }else startTyping();
+      /* Directive 0 hold (Han 2026-11-26): the typewriter IS the loading
+         sequence, but the 10 s intro video plays full-screen over this
+         overlay and the typing used to run out behind it (~4-5 s) -
+         invisible to anyone who did not skip the video. The typing now
+         starts only once the intro video has dismissed (it dismisses on
+         end / skip / error / stall - fail-open on every path), so the
+         order a viewer actually sees is: the video (plaza -> the kiosk's
+         Earth -> the real Earth) -> the landing globe -> the typewriter
+         over the Earth reveal. The wait consumes only intro-video's
+         published state surface plus the root element's presence (the
+         inline fail-open in index.html removes the root at 9 s if that
+         module never loads). If there is no video - or it already
+         dismissed - typing starts at once, exactly as before. The
+         wait is bounded by signs of life, not by the video alone:
+         15 s with no dismissal surface at all, or 15 s without the
+         playhead advancing, starts the typing anyway - so a lost or
+         wedged signal can never suppress the typewriter, while a
+         video that is genuinely still playing is never undercut.
+         Nothing else moves: the text, the
+         typing speed and the Earth reveal are untouched, and no entry
+         step waits on this - only the typer's start moves. */
+      var typingStarted=false;
+      function beginTyping(){
+        if(typingStarted)return;typingStarted=true;
+        /* Don't let the typing play out in a hidden tab: wait until the page is visible. */
+        if(document.hidden){
+          var __visStart=function(){
+            if(!document.hidden){document.removeEventListener('visibilitychange',__visStart);startTyping();}
+          };
+          document.addEventListener('visibilitychange',__visStart);
+        }else startTyping();
+      }
+      function introVideoGone(){
+        if(!document.getElementById('espil-intro-video'))return true;
+        try{
+          var st=window.__espilIntroVideo&&window.__espilIntroVideo.state();
+          return !!(st&&st.dismissed);
+        }catch(e){return false;}
+      }
+      if(introVideoGone())beginTyping();
+      else{
+        var videoWaitStart=Date.now();
+        var lastVidT=-1,lastAdvance=Date.now();
+        var videoPoll=setInterval(function(){
+          var st=null;
+          try{st=(window.__espilIntroVideo&&window.__espilIntroVideo.state())||null;}catch(e){}
+          var now=Date.now();
+          if(st&&typeof st.t==='number'&&st.t!==lastVidT){lastVidT=st.t;lastAdvance=now;}
+          if(introVideoGone()||(!st&&now-videoWaitStart>=15000)||(st&&now-lastAdvance>=15000)){
+            clearInterval(videoPoll);
+            beginTyping();
+          }
+        },200);
+      }
       if(window.__espilEarthReady){earthReady=true;maybeShowContinue();}
       else window.addEventListener('espil-earth-ready',function(){earthReady=true;maybeShowContinue();});
       setTimeout(function(){earthReady=true;maybeShowContinue();},45000);
