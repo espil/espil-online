@@ -9796,15 +9796,12 @@
         m.frustumCulled=false; g.add(m); return m;
       }
       function LM(c){ var m=new THREE.MeshLambertMaterial({color:c}); return m; }
-      /* the serving counter across the back wall, the house sign's
-         menu board above it, and the clerk behind the counter -
-         the classic shop arrangement, all original low-poly */
+      /* the serving counter across the back wall and the house
+         sign's menu board above it - the classic shop arrangement,
+         all original low-poly. (The clerk figure that stood behind
+         the counter was removed with the NPCs, Han 2026-11-25.) */
       M(new THREE.BoxGeometry(12,1.05,1.1),LM(0x8a6f4d),0,0.53,-6.9);
       M(new THREE.BoxGeometry(12,0.08,1.3),LM(0xd8d2c4),0,1.09,-6.9);
-      M(new THREE.CylinderGeometry(0.21,0.26,0.78,10),LM(0x3c6e91),0,1.5,-7.6);
-      M(new THREE.BoxGeometry(0.34,0.42,0.06),LM(0xf0ead8),0,1.48,-7.36);
-      M(new THREE.SphereGeometry(0.17,12,10),LM(0xd9a37e),0,2.06,-7.6);
-      M(new THREE.CylinderGeometry(0.18,0.19,0.07,12),LM(0xb3312c),0,2.22,-7.6);
       var mc=document.createElement('canvas'); mc.width=1024; mc.height=224;
       var mx2=mc.getContext('2d');
       mx2.fillStyle='#20242c'; mx2.fillRect(0,0,1024,224);
