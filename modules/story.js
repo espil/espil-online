@@ -16,14 +16,23 @@
        Q5 Granville night hunt (Jun) - 5 kills, night only
        Q6 Library Square lost item (Noah) - glowing pickup point
        Q7 Plaza defence finale (Mira) - two instance waves
-   • The five original NPCs as standing billboards on the
-     resident line (THREE.Sprite stills from
-     assets/plushy-residents/, name label, shadow blob, no
-     mirroring). Their art is PLACEHOLDER GRADE under the
-     standing sample-first rule - the sample verdict replaces
-     the textures later; positions and roles are the design's.
-     The Konbiniya clerk already exists as a store NPC, so Q2's
-     destination is the store purchase itself, per the design.
+   • PACKAGE B1 (Han 2026-11-26, NPC removal confirmed): the
+     five original NPCs NO LONGER STAND IN THE WORLD. Their
+     standing billboards (THREE.Sprite stills from
+     assets/plushy-residents/) are gone; the textures stay in
+     the tree dormant and are no longer loaded by this module.
+     Accept/turn-in re-pointed per npc-removal/B1-DESIGN-DRAFT:
+     a glowing quest marker + panel stands at each giver's
+     landmark spot (the dealership marker is the precedent),
+     the NPCs' dialogue text is preserved verbatim on that
+     panel (the board speaks their lines), and the Q1/Q2/Q4/Q6
+     turn-ins are AUTOMATIC the moment their final step
+     completes (Q3/Q5/Q7 already completed automatically).
+     The NPCS table survives as DATA only: positions anchor
+     the markers and Q5's hunt radius, and the giver field
+     keys the dialogue content. The Konbiniya clerk already
+     exists as a store NPC, so Q2's destination is the store
+     purchase itself, per the design.
    • Rewards through the EXISTING stores only, never a fork:
      Leo into the one espil_leo_balance key; items through the
      shared espil-guide monster-drop grant (panels.js writes
@@ -150,6 +159,24 @@
   ];
   function questById(id) { for (var i = 0; i < QUESTS.length; i++) if (QUESTS[i].id === id) return QUESTS[i]; return null; }
   function npcById(id) { for (var i = 0; i < NPCS.length; i++) if (NPCS[i].id === id) return NPCS[i]; return null; }
+
+  /* PACKAGE B1: the quest markers that replace the standing
+     NPCs. One marker per giver, at the giver's own landmark
+     spot (coordinates live in NPCS and are nudged walkable at
+     build, exactly as the bodies were). `place` is the name
+     the board/panel/prompt shows; the dialogue content still
+     keys off the giver id. */
+  var PLACE_BY_GIVER = {
+    mira: '아트 갤러리 광장',
+    sera: 'Gastown 스팀 시계',
+    walter: 'Waterfront',
+    jun: 'Granville 거리',
+    noah: 'Library Square'
+  };
+  var MARKERS = NPCS.map(function (n) {
+    return { giver: n.id, place: PLACE_BY_GIVER[n.id] || n.name, npc: n };
+  });
+  function markerByGiver(id) { for (var i = 0; i < MARKERS.length; i++) if (MARKERS[i].giver === id) return MARKERS[i]; return null; }
 
   /* ================= small helpers ================= */
   function $(id) { return document.getElementById(id); }
@@ -450,8 +477,11 @@
   function handleBought(item) {
     var p = loadProgress();
     if (p.active && p.active.id === 'q2' && p.active.step === 'buy' && String(item) === ERRAND_ITEM) {
+      /* B1: the purchase IS the turn-in - the step moves to
+         'return' and the step tick consumes the item and
+         completes the quest automatically (see tickSteps). */
       setStep('return');
-      banner('심부름 물품을 샀습니다. 미라에게 가져가세요');
+      banner('심부름 물품을 샀습니다');
     }
     signupPrompt('buy');
   }
@@ -565,9 +595,9 @@
   }
   setInterval(wrapCraft, 1500);
 
-  /* ================= NPC 3D (resident line, placeholder) ====== */
-  var npcObjs = {};   /* id -> {group, sprite, label, baseY, phase, x, z} */
-  var npcsBuilt = false;
+  /* ============ quest markers (PACKAGE B1, ex-NPC stands) ==== */
+  var markerObjs = {};   /* giver id -> {group, orb, phase, x, z} */
+  var markersBuilt = false;
   function climbToScene(obj) {
     var n = obj;
     while (n && n.parent) n = n.parent;
@@ -583,7 +613,7 @@
       return null;
     } catch (e) { return null; }
   }
-  function labelSprite(npc) {
+  function placeLabelSprite(place) {
     var c = document.createElement('canvas'); c.width = 512; c.height = 160;
     var g = c.getContext('2d');
     g.fillStyle = 'rgba(12,8,4,0.72)';
@@ -593,59 +623,67 @@
     g.strokeStyle = '#d9b45c'; g.lineWidth = 5; g.stroke();
     g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillStyle = '#ffe9b0'; g.font = '700 52px sans-serif';
-    g.fillText(npc.name, 256, 62);
+    g.fillText('퀘스트 안내판', 256, 62);
     g.fillStyle = '#c9b48a'; g.font = '34px sans-serif';
-    g.fillText(npc.role, 256, 116);
+    g.fillText(place, 256, 116);
     var tex = new THREE.CanvasTexture(c);
     var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
     sp.scale.set(3.4, 3.4 * 160 / 512, 1);
     sp.renderOrder = 30;
     return sp;
   }
-  function buildNpcs() {
-    if (npcsBuilt) return true;
+  function buildMarkers() {
+    if (markersBuilt) return true;
     if (typeof THREE === 'undefined') return false;
     var scene = sceneRoot();
     if (!scene) return false;
     try {
-      NPCS.forEach(function (npc, idx) {
+      MARKERS.forEach(function (mk, idx) {
+        var npc = mk.npc;
         var spot = nudge(npc.x, npc.z);
         npc.x = spot.x; npc.z = spot.z;
         var group = new THREE.Group();
         group.position.set(npc.x, 0, npc.z);
-        var mat = new THREE.SpriteMaterial({ transparent: true, depthWrite: false });
-        var sp = new THREE.Sprite(mat);
-        sp.position.y = 0.99;
-        sp.scale.set(1.1, 1.98, 1);
-        group.add(sp);
-        new THREE.TextureLoader().load('assets/plushy-residents/' + npc.tex, function (tex) {
-          mat.map = tex; mat.needsUpdate = true;
-          if (tex.image && tex.image.width) sp.scale.set(1.98 * tex.image.width / tex.image.height, 1.98, 1);
-        });
-        var label = labelSprite(npc);
-        label.position.y = 2.45;
-        group.add(label);
-        var shadow = new THREE.Mesh(
-          new THREE.CircleGeometry(0.55, 20),
-          new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false })
+        /* glowing marker in the Q6 pickup / dealership idiom:
+           a gold beam, a floating orb and a ground ring - no
+           figure, no face, nothing that reads as a person. */
+        var beam = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.32, 0.5, 3.2, 12, 1, true),
+          new THREE.MeshBasicMaterial({ color: 0xffd76e, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide })
         );
-        shadow.rotation.x = -Math.PI / 2;
-        shadow.position.y = 0.03;
-        group.add(shadow);
+        beam.position.y = 1.6;
+        group.add(beam);
+        var orb = new THREE.Mesh(
+          new THREE.SphereGeometry(0.3, 14, 12),
+          new THREE.MeshBasicMaterial({ color: 0xffe9a0 })
+        );
+        orb.position.y = 1.1;
+        orb.name = 'orb';
+        group.add(orb);
+        var ring = new THREE.Mesh(
+          new THREE.CircleGeometry(1.1, 24),
+          new THREE.MeshBasicMaterial({ color: 0xffd76e, transparent: true, opacity: 0.3, depthWrite: false })
+        );
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.y = 0.04;
+        group.add(ring);
+        var label = placeLabelSprite(mk.place);
+        label.position.y = 2.9;
+        group.add(label);
         scene.add(group);
-        npcObjs[npc.id] = { group: group, sprite: sp, phase: idx * 1.37, x: npc.x, z: npc.z };
+        markerObjs[mk.giver] = { group: group, orb: orb, phase: idx * 1.37, x: npc.x, z: npc.z };
       });
       var q6 = nudge(Q6_POINT.x, Q6_POINT.z);
       Q6_POINT.x = q6.x; Q6_POINT.z = q6.z;
       /* The Q1 loop points are design targets on the plaza; the
          east point as drafted sits inside the neighbouring
          block's collision, so resolve every point to its nearest
-         walkable ground at build, like the NPC stands. */
+         walkable ground at build, like the marker stands. */
       Q1_POINTS.forEach(function (pt) {
         var s = nudge(pt.x, pt.z);
         pt.x = s.x; pt.z = s.z;
       });
-      npcsBuilt = true;
+      markersBuilt = true;
       return true;
     } catch (e) { return false; }
   }
@@ -739,19 +777,19 @@
       var q = questById(p.active.id), step = p.active.step, d = p.active.data || {};
       if (q.id === 'q1') {
         if (step === 'loop') return '광장 한 바퀴: 동쪽 테라스, 남쪽 분수, 서쪽 벤치를 차례로 들르세요 (' + (d.point || 0) + '/3)';
-        if (step === 'return') return '미라에게 돌아가세요';
+        if (step === 'return') return '광장 한 바퀴를 마쳤습니다';
       }
       if (q.id === 'q2') {
         if (step === 'buy') return 'Konbiniya에서 ' + '바나나 우유(Banana Milk)를 사세요';
-        if (step === 'return') return '바나나 우유를 미라에게 가져가세요';
+        if (step === 'return') return '바나나 우유를 샀습니다';
       }
       if (q.id === 'q3') {
         if (step === 'stay') return '스팀 시계 앞에서 머무르세요 (' + Math.min(Q3_STAY_MS, Math.round(d.stayMs || 0)) / 1000 + '/' + (Q3_STAY_MS / 1000) + '초)';
         if (step === 'defend') return '스팀 시계를 지켜라: 몬스터 ' + (d.kills || 0) + '/3 처치';
       }
       if (q.id === 'q4') {
-        if (step === 'deliver') return '월터의 전언을 Canada Place까지 전하세요';
-        if (step === 'return') return '월터에게 돌아가세요';
+        if (step === 'deliver') return '전언을 Canada Place까지 전하세요';
+        if (step === 'return') return '전언을 전했습니다';
       }
       if (q.id === 'q5') {
         if (step === 'hunt') return isNight()
@@ -760,7 +798,7 @@
       }
       if (q.id === 'q6') {
         if (step === 'find') return 'Library Square 주변에서 빛나는 분실물을 찾으세요';
-        if (step === 'return') return '분실물을 노아에게 가져가세요';
+        if (step === 'return') return '분실물을 찾았습니다';
       }
       if (q.id === 'q7') {
         if (step === 'wave') return '광장을 지켜라: 웨이브 ' + Math.max(1, d.wave || 1) + '/2 - 남은 몬스터를 모두 처치하세요';
@@ -769,8 +807,7 @@
     }
     for (var i = 0; i < QUESTS.length; i++) {
       if (questStatus(QUESTS[i].id) === 'available') {
-        var g = npcById(QUESTS[i].giver);
-        return '새 퀘스트: ' + QUESTS[i].name + ' - ' + g.name + '(' + g.role + ')에게 말을 거세요';
+        return '새 퀘스트: ' + QUESTS[i].name + ' - ' + (PLACE_BY_GIVER[QUESTS[i].giver] || '') + ' 퀘스트 안내판에서 받을 수 있습니다';
       }
     }
     if (loadProgress().done.q7) return '다운타운 한 바퀴 완료 - 감사합니다';
@@ -860,7 +897,12 @@
     if (!panel || !openNpc) return;
     var npc = npcById(openNpc);
     var dlg = dialogueFor(npc);
-    var html = '<button class="x" data-a="close">✕</button><h3>' + esc(npc.name) + '</h3><div class="role">' + esc(npc.role) + '</div>'
+    /* B1: the panel is the landmark's quest board now - the
+       header names the place, and the giver survives only as
+       the notice's byline; the lines below are the giver's own
+       words, unchanged. */
+    var place = (markerByGiver(openNpc) || {}).place || npc.name;
+    var html = '<button class="x" data-a="close">✕</button><h3>' + esc(place) + ' 퀘스트 안내판</h3><div class="role">' + esc(npc.name) + '(' + esc(npc.role) + ')의 안내문</div>'
       + dlg.lines.map(function (ln) { return '<div class="row">' + esc(ln) + '</div>'; }).join('')
       + dlg.actions.map(function (a) {
           return '<button data-a="' + a.a + '"' + (a.qid ? ' data-q="' + a.qid + '"' : '') + '>' + esc(a.label) + '</button>';
@@ -895,11 +937,11 @@
     if (openNpc) renderPanel();
     return r;
   }
-  function nearestNpc() {
+  function nearestMarker() {
     var best = null, bd = 1e9;
-    NPCS.forEach(function (npc) {
-      var d = distTo(npc.x, npc.z);
-      if (d < bd) { bd = d; best = npc; }
+    MARKERS.forEach(function (mk) {
+      var d = distTo(mk.npc.x, mk.npc.z);
+      if (d < bd) { bd = d; best = mk; }
     });
     return bd <= TALK_RANGE ? best : null;
   }
@@ -909,15 +951,17 @@
   }
   function interact() {
     if (atPickup()) { pickupLostItem(); return { ok: true, what: 'pickup' }; }
-    var npc = nearestNpc();
-    if (npc) return talk(npc.id);
+    var mk = nearestMarker();
+    if (mk) return talk(mk.giver);
     return { ok: false, why: 'nobody-near' };
   }
   function pickupLostItem() {
     var p = loadProgress();
     if (!p.active || p.active.id !== 'q6' || p.active.step !== 'find') return { ok: false, why: 'not-active' };
+    /* B1: the pickup IS the turn-in - the step tick completes
+       the quest automatically from 'return' (see tickSteps). */
     setStep('return');
-    banner('분실물을 찾았습니다. 노아에게 가져가세요');
+    banner('분실물을 찾았습니다');
     return { ok: true };
   }
 
@@ -961,7 +1005,7 @@
     } else if (q.id === 'q4' && step === 'deliver') {
       if (distTo(CANADA_PLACE.x, CANADA_PLACE.z) <= Q4_RADIUS) {
         setStep('return');
-        banner('전언을 전했습니다. 월터에게 돌아가세요');
+        banner('전언을 전했습니다');
       }
     } else if (q.id === 'q5' && step === 'hunt') {
       if (isNight() && !shopMode() && (d.kills || 0) < Q5_KILLS) {
@@ -998,6 +1042,21 @@
         }
       }
     }
+    /* PACKAGE B1 auto turn-in: the 'return' step no longer
+       waits for a dialogue panel - the quest completes as soon
+       as its final step is done. Q1 (loop finished), Q4
+       (message delivered - completeQuest here is what sets
+       dealershipUnlocked, at the Canada Place moment, per the
+       B1 draft) and Q6 (item picked up) complete outright; Q2
+       completes once the errand item is in the bag, consumed
+       here exactly as the old panel turn-in consumed it. A
+       save sitting at 'return' on removal day therefore
+       finishes on the new surface instead of stranding. */
+    if (p.active && p.active.step === 'return') {
+      var rq = p.active.id;
+      if (rq === 'q1' || rq === 'q4' || rq === 'q6') completeQuest(rq);
+      else if (rq === 'q2' && ownedCount(ERRAND_ITEM) > 0 && consumeOwned(ERRAND_ITEM)) completeQuest('q2');
+    }
     /* Q6 pickup marker surface - guides off: the glowing marker
        never shows; the pickup itself (atPickup/interact) still
        works when the player reaches the point. */
@@ -1010,7 +1069,7 @@
     var ae = document.activeElement;
     if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
     if (!inMap()) return;
-    if (nearestNpc() || atPickup()) interact();
+    if (nearestMarker() || atPickup()) interact();
   });
 
   var promptFor = null;
@@ -1021,13 +1080,13 @@
       return;
     }
     buildDom();
-    buildNpcs();
+    buildMarkers();
     buildPickup();
-    /* idle sway (residents never mirror; a gentle bob only) */
+    /* marker idle motion: the orb bobs gently over its stand */
     var now = Date.now();
-    Object.keys(npcObjs).forEach(function (id) {
-      var o = npcObjs[id];
-      if (o && o.sprite) o.sprite.position.y = 0.99 + Math.sin(now / 900 + o.phase) * 0.02;
+    Object.keys(markerObjs).forEach(function (id) {
+      var o = markerObjs[id];
+      if (o && o.orb) o.orb.position.y = 1.1 + Math.sin(now / 900 + o.phase) * 0.12;
     });
     if (pickupGroup && pickupGroup.visible) {
       var orb = pickupGroup.children[1];
@@ -1038,11 +1097,11 @@
     /* proximity prompt */
     var prompt = $('espil-story-prompt');
     if (prompt) {
-      var npc = nearestNpc();
+      var mk = nearestMarker();
       var pk = atPickup();
       var label = null, key = null;
       if (pk) { label = '✦ 빛나는 분실물 - 클릭 또는 F 키로 줍기'; key = 'pickup'; }
-      else if (npc) { label = '💬 ' + npc.name + ' (' + npc.role + ') - 클릭 또는 F 키로 대화'; key = npc.id; }
+      else if (mk) { label = '✦ ' + mk.place + ' 퀘스트 안내판 - 클릭 또는 F 키로 확인'; key = 'marker-' + mk.giver; }
       if (label) {
         if (promptFor !== key) { prompt.textContent = label; promptFor = key; }
         prompt.classList.add('open');
@@ -1070,8 +1129,14 @@
       guestLevels: p.guestLevels || 0,
       skills: { dashStrike: dashLearned(), weaponArt: artLearned() },
       npcs: NPCS.map(function (n) {
+        /* B1: the NPCS table is data only - no body is ever
+           built, so `built` is honestly, permanently false */
         return { id: n.id, name: n.name, x: Math.round(n.x * 10) / 10, z: Math.round(n.z * 10) / 10,
-                 built: !!npcObjs[n.id], near: distTo(n.x, n.z) <= TALK_RANGE };
+                 built: false, near: distTo(n.x, n.z) <= TALK_RANGE };
+      }),
+      markers: MARKERS.map(function (mk) {
+        return { giver: mk.giver, place: mk.place, x: Math.round(mk.npc.x * 10) / 10, z: Math.round(mk.npc.z * 10) / 10,
+                 built: !!markerObjs[mk.giver], near: distTo(mk.npc.x, mk.npc.z) <= TALK_RANGE };
       }),
       pickup: { x: Q6_POINT.x, z: Q6_POINT.z, visible: !!(pickupGroup && pickupGroup.visible) },
       points: Q1_POINTS.map(function (p) { return { x: Math.round(p.x * 10) / 10, z: Math.round(p.z * 10) / 10 }; }),
