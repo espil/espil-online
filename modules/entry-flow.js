@@ -949,23 +949,13 @@
     '#espil-city-back{display:none}' +
     '#city-status.city-step:not(.flow-open) #espil-city-back{display:flex}' +
     '#city-status.is-city #espil-city-back{display:none !important}' +
-    /* ENTRY CONFIRMATION RESTORED (Han 2026-11-26, directive 1 -
-       the COO broadcast reverses BOTH landing-package changes):
-       the enter control is a real full-width button directly
-       under the city list - the city step's one primary action,
-       at the button standard's 48px touch height, shown only
-       while a bundled city stands selected. Form recovered
-       verbatim from the pre-landing bytes (entry-flow
-       d8a8d55a); the .zooming treatment is this package's
-       addition in the same idiom (the border pulses while the
-       confirmed zoom-in runs; the button is disabled then). */
-    '#espil-city-enter{display:none;width:100%;min-height:48px;margin-top:6px;padding:12px;' +
-      'border:2px solid #d97f10;border-radius:12px;background:linear-gradient(180deg,#ffb84d,#f08c1a);' +
-      'color:#fff;text-shadow:0 1px 2px rgba(120,60,0,.5);font-weight:800;cursor:pointer}' +
-    '#espil-city-enter.on{display:block}' +
-    '#espil-city-enter:active{filter:brightness(.92)}' +
-    '#espil-city-enter.zooming{cursor:default;animation:espilCityEnterPulse 1s ease-in-out infinite}' +
-    '@keyframes espilCityEnterPulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.18)}}' +
+    /* CITY DISPLAY (Han 2026-11-26, follow-up to directive 1):
+       the Press Enter button that stood under the city list is
+       REMOVED - no #espil-city-enter element, no CSS. The city
+       step's selection read is the centred row's own text, big
+       in the centre (the scoped .is-centered rule at the end of
+       this stylesheet); the confirm mechanics (Enter key, a
+       second click on the marked row/pin) are unchanged. */
     /* Fix batch 8 item 4 (Han 2026-11-14): the menu and guidance
        views carry their choices in a reel with the city-list
        treatment AS-IS - the pair.css .city-list declarations
@@ -992,8 +982,25 @@
        the box stays; its colour leaves yellow for the pair's
        signal teal (--signal #86eee4). */
     '#signin-div button:focus,#signin-div input:focus,#signin-div select:focus,#signin-div textarea:focus,' +
-    '#city-status button:focus,#city-list .espil-city-btn:focus,#espil-city-enter:focus,#auth-mode-switch:focus,' +
-    '#signin-div button:focus-visible,#city-status button:focus-visible{outline:3px solid #86eee4 !important;outline-offset:2px !important;box-shadow:0 0 0 5px rgba(134,238,228,.35) !important}';
+    '#city-status button:focus,#auth-mode-switch:focus,' +
+    '#signin-div button:focus-visible,#city-status button:focus-visible{outline:3px solid #86eee4 !important;outline-offset:2px !important;box-shadow:0 0 0 5px rgba(134,238,228,.35) !important}' +
+    /* CITY DISPLAY (Han 2026-11-26): the city step carries NO
+       focus indicator - the general #city-status selectors above
+       would still box the centred city row (DOM focus follows
+       the centre), so the row is carved out here, scoped to
+       #city-list; every other surface keeps its box. The
+       pair.css .is-active sparkle/blink ornaments are likewise
+       suppressed inside the city list (they are monolith's
+       globe-list treatment; the flow's rows never carry the
+       class, and no ornament may render in the list). And the
+       replacement for both removed elements: the centred city
+       name itself, big in the centre - the scoped enlargement
+       below overrides pair.css's .city-name.is-centered size
+       for the city step's rows only. */
+    '#city-list .espil-city-btn:focus,#city-list .espil-city-btn:focus-visible{outline:none !important;box-shadow:none !important}' +
+    '#city-list .city-name.is-active{animation:none}' +
+    '#city-list .city-name.is-active::before,#city-list .city-name.is-active::after{content:none}' +
+    '#city-list .espil-city-btn.is-centered{font-size:clamp(1.5rem,4.4vw,2rem)}';
   document.head.appendChild(css);
 
   /* ---------------- DOM: menu + panels ---------------- */
@@ -1010,7 +1017,7 @@
   }
   function buildUI() {
     buildCityBack();
-    buildCityEnter(); /* ENTRY CONFIRMATION RESTORED (Han 2026-11-26): the enter button stands under the list, ahead of the Back row */
+
     if ($('espil-mainmenu')) return;
     var cs = $('city-status');
     if (!cs) return;
@@ -1191,11 +1198,11 @@
   /* ---------------- ENTRY CONFIRMATION (Han 2026-11-26,
      directive 1; the COO's canonical broadcast reverses BOTH
      2026-11-25 landing-package changes) -----------------------
-     Selecting a bundled city only MARKS it - the Press Enter
-     button restored below (its pre-landing form, recovered from
-     entry-flow d8a8d55a) stands under the list while a bundled
-     city is marked. Entry needs a CONFIRM: the Enter key, the
-     Press Enter button, or a second click on the already-marked
+     Selecting a bundled city only MARKS it. (The Press Enter
+     button that stood under the list was removed again by
+     Han's display follow-up the same day - the mark is the
+     centred row's big text alone.) Entry needs a CONFIRM: the
+     Enter key, or a second click on the already-marked
      row/pin. A confirm starts monolith's own approach ZOOM-IN
      (selectCity, delegated through its reel button as before);
      the flow arms window.__espilZoomEnterArmed first, so the
@@ -1213,36 +1220,12 @@
   function flowAudio(name) {
     try { if (window.EspilAudio && typeof window.EspilAudio[name] === 'function') window.EspilAudio[name](); } catch (e) {}
   }
-  function buildCityEnter() {
-    if ($('espil-city-enter')) return;
-    var list = $('city-list');
-    if (!list || !list.parentNode) return;
-    var b = document.createElement('button');
-    b.type = 'button';
-    b.id = 'espil-city-enter';
-    /* The recovered copy, dictionary-routed per the correction:
-       language.js's pressEnterCity key (en/ko are the two halves
-       of the pre-landing bilingual literal, verbatim); the
-       data-i18n attribute lets language.js's apply() re-render
-       the label on every language switch. */
-    b.setAttribute('data-i18n', 'pressEnterCity');
-    b.textContent = efT('pressEnterCity');
-    b.setAttribute('aria-label', 'Enter the selected city');
-    var ref = $('espil-city-back') || list.nextSibling;
-    list.parentNode.insertBefore(b, ref);
-    b.addEventListener('click', function () { confirmZoom(selectedBundleCity); });
-  }
   function selectBundleCity(name) {
     if (!name) { clearCitySelection(); return; }
     selectedBundleCity = name;
-    buildCityEnter();
-    var b = $('espil-city-enter');
-    if (b) b.classList.add('on');
   }
   function clearCitySelection() {
     selectedBundleCity = null;
-    var b = $('espil-city-enter');
-    if (b) { b.classList.remove('on'); b.classList.remove('zooming'); b.disabled = false; }
   }
   /* The confirm: arm monolith, then delegate its reel button -
      selectCity runs the approach zoom (with its stage labels
@@ -1255,8 +1238,6 @@
     if (!BUNDLE_CITIES[name]) return;
     zoomPhase = { name: name };
     selectBundleCity(name);
-    var b = $('espil-city-enter');
-    if (b) { b.classList.add('zooming'); b.disabled = true; }
     window.__espilZoomEnterArmed = true;
     var delegated = false;
     if (flowOrigCityBtns) {
@@ -1267,7 +1248,6 @@
     if (!delegated) {
       zoomPhase = null;
       window.__espilZoomEnterArmed = false;
-      if (b) { b.classList.remove('zooming'); b.disabled = false; }
       openPrep(name);
     }
   }
@@ -1283,8 +1263,6 @@
     if (typeof window.__espilGlobeCancelZoomEnter === 'function') {
       try { window.__espilGlobeCancelZoomEnter(); } catch (e) {}
     }
-    var b = $('espil-city-enter');
-    if (b) { b.classList.remove('zooming'); b.disabled = false; }
     flowAudio('pop');
   }
   /* Monolith's entry actually beginning (its landing path
@@ -1545,8 +1523,8 @@
         }
         /* ENTRY CONFIRMATION (Han 2026-11-26, directive 1): the
            centred row IS the selection, so the mark follows it -
-           a centred bundle city shows the Press Enter button, a
-           centred bundle-less city hides it. The tracker does NOT
+           a centred bundle city becomes the mark, a centred
+           bundle-less city clears it. The tracker does NOT
            cancel a running zoom: monolith's own delegation scroll
            (selectCity centres its hidden reel button, which
            scrolls this list to the top) would read as a centre
@@ -2183,11 +2161,12 @@
      city - it starts the zoom-in (confirmZoom). Selection alone
      (arrows, scrolling, a first click) never enters. Guards
      follow the pre-landing handler's shape: a form control
-     keeps its Enter, the focused Press Enter button fires by
-     its own native activation (one confirm, not two), and
-     while the preparation panel stands the mark is cleared so
-     there is nothing to confirm. The capture phase + stop
-     keep monolith's landing Enter (selectCity on its centred
+     keeps its Enter, and while the preparation panel stands
+     the mark is cleared so there is nothing to confirm. The
+     handler's preventDefault keeps the focused row's native
+     button activation from spending the same press twice
+     (one confirm, not two). The capture phase + stop keep
+     monolith's landing Enter (selectCity on its centred
      marker) from spending the same press on the old path. */
   document.addEventListener('keydown', function (e) {
     if (step !== 'city' || !selectedBundleCity || zoomPhase) return;
@@ -2197,7 +2176,6 @@
     if (t) {
       var tag = t.tagName || '';
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-      if (t.id === 'espil-city-enter') return; /* the focused enter button fires by its own native Enter/Space activation - one confirm, not two. */
     }
     e.preventDefault();
     e.stopPropagation();
