@@ -245,6 +245,48 @@
     ]
   };
 
+  /* ================= language (I18N GUESTBTN PACKAGE, Han
+     2026-11-25 14:30; rebased onto the ownership rewrite,
+     2026-11-25) =================
+     This module carried no language mechanism: every prompt and
+     toast was a hardcoded Korean literal, so the first in-game
+     text a guest met (the boat prompt) rendered Korean in every
+     language. The table follows the house pattern (the monolith's
+     per-language tables): read window.__espilLang() at call time,
+     English fallback. Korean values are the exact strings that
+     ship today. REBASE NOTE: the ownership rewrite retired three
+     of the original package's strings (the dock-swim notice and
+     the two "where you last got off" guide notices); their keys
+     are gone. The rewrite's own new strings take new keys in the
+     same table: deployed (the deploy toast), boatAfloatDist /
+     boatAfloat (the deployed craft's guide notices - the direct
+     successors of the retired pair) and boatAutoDeploy (the
+     guide's instruction notice). Text routing only - no
+     behaviour in this module changes. */
+  var BOAT_T = {
+    rideLabel: { en: 'Ride the boat', ko: '배 타기', fr: 'Monter dans le bateau', zh: '乘船' },
+    noAttack: { en: 'You cannot attack while sailing', ko: '항해 중에는 공격할 수 없습니다', fr: 'Impossible d\u2019attaquer en naviguant', zh: '航行中无法攻击' },
+    boardFromWater: { en: 'You can board from the water beside the boat', ko: '배 옆 물에서 탈 수 있습니다', fr: 'Vous pouvez monter à bord depuis l\u2019eau, à côté du bateau', zh: '可以在船边的水里上船' },
+    boarded: { en: 'You boarded the boat (Space: get off)', ko: '배에 올랐습니다 (Space: 내리기)', fr: 'Vous êtes monté à bord (Espace : descendre)', zh: '已上船（Space：下船）' },
+    deployed: { en: 'Your boat is out (Space: get off)', ko: '배가 나왔습니다 (Space: 내리기)', fr: 'Votre bateau est sorti (Espace : descendre)', zh: '您的船已出现（Space：下船）' },
+    alighted: { en: 'You got off the boat', ko: '배에서 내렸습니다', fr: 'Vous êtes descendu du bateau', zh: '已下船' },
+    aboardNow: { en: 'You are on the boat', ko: '배를 타고 있습니다', fr: 'Vous êtes à bord du bateau', zh: '您正在船上' },
+    boatAfloatDist: { en: 'Your boat is floating on the water (about {d} m)', ko: '배가 물에 떠 있습니다 (약 {d} m)', fr: 'Votre bateau flotte sur l\u2019eau (à environ {d} m)', zh: '您的船漂在水面上（约 {d} 米）' },
+    boatAfloat: { en: 'Your boat is floating on the water', ko: '배가 물에 떠 있습니다', fr: 'Votre bateau flotte sur l\u2019eau', zh: '您的船漂在水面上' },
+    boatAutoDeploy: { en: 'Your boat comes out on its own when you enter the water', ko: '배는 물에 들어가면 자동으로 나옵니다', fr: 'Votre bateau sort tout seul quand vous entrez dans l\u2019eau', zh: '进入水中后，您的船会自动出现' },
+    promptRide: { en: 'Space · Ride the boat', ko: 'Space · 배 타기', fr: 'Espace · Monter à bord', zh: 'Space · 乘船' },
+    promptAlight: { en: 'Space · Get off', ko: 'Space · 내리기', fr: 'Espace · Descendre', zh: 'Space · 下船' },
+    beached: { en: 'The boat has reached the shore', ko: '배가 해안에 닿았습니다', fr: 'Le bateau a atteint la rive', zh: '船已靠岸' }
+  };
+  function bt(k, vars) {
+    var c = 'en';
+    try { c = window.__espilLang() || 'en'; } catch (e) {}
+    var row = BOAT_T[k] || {};
+    var s = row[c] || row.en || k;
+    if (vars) for (var key in vars) s = s.split('{' + key + '}').join(vars[key]);
+    return s;
+  }
+
   /* ================= small helpers (vehicles pattern) == */
   function $(id) { return document.getElementById(id); }
   function inMap() { return !!(document.body && document.body.classList.contains('in-map')); }
@@ -568,7 +610,7 @@
     );
     ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05;
     markerGroup.add(ring);
-    var label = makeLabel('배 타기');
+    var label = makeLabel(bt('rideLabel'));
     label.position.y = 2.6;
     markerGroup.add(label);
     scene.add(markerGroup);
@@ -663,7 +705,7 @@
     var wrapped = function (id) {
       if (drivingState()) {
         var now = Date.now();
-        if (now - moveToastAt > 2500) { moveToastAt = now; toast('항해 중에는 공격할 수 없습니다'); }
+        if (now - moveToastAt > 2500) { moveToastAt = now; toast(bt('noAttack')); }
         return;
       }
       return orig.apply(this, arguments);
@@ -776,7 +818,7 @@
     craft.driver = 'me';
     craft.mode = 'driving';
     publishState();
-    toast('배가 나왔습니다 (Space: 내리기)');
+    toast(bt('deployed'));
     syncBoatVisual(true);
   }
   function board() {
@@ -793,13 +835,13 @@
     if (!p) return { ok: false, why: 'nopose' };
     var d = Math.hypot(p.x - craft.x, p.z - craft.z);
     if (d > BOARD_RANGE) return { ok: false, why: 'range' };
-    if (!isWater(p.x, p.z)) { notice('배 옆 물에서 탈 수 있습니다'); return { ok: false, why: 'dry' }; }
+    if (!isWater(p.x, p.z)) { notice(bt('boardFromWater')); return { ok: false, why: 'dry' }; }
     craft.mode = 'driving';
     craft.driver = 'me';
     heading = craft.face;
     engageDrive();
     publishState();
-    toast('배에 올랐습니다 (Space: 내리기)');
+    toast(bt('boarded'));
     syncBoatVisual(true);
     return { ok: true };
   }
@@ -824,7 +866,7 @@
     craft.mode = 'deployed';
     publishState();
     syncBoatVisual(true);
-    toast('배에서 내렸습니다');
+    toast(bt('alighted'));
     return { ok: true };
   }
   function boardAsPassenger() {
@@ -845,16 +887,16 @@
        in the water; only a currently deployed craft (left
        afloat by a bail-out) is something to point at, and
        the marker already stands on it while it floats. */
-    if (drivingState()) { notice('배를 타고 있습니다'); return; }
+    if (drivingState()) { notice(bt('aboardNow')); return; }
     if (craft.mode === 'deployed') {
       var p = playerPos();
-      if (p) notice('배가 물에 떠 있습니다 (약 ' + Math.round(Math.hypot(p.x - craft.x, p.z - craft.z)) + ' m)');
-      else notice('배가 물에 떠 있습니다');
+      if (p) notice(bt('boatAfloatDist', { d: Math.round(Math.hypot(p.x - craft.x, p.z - craft.z)) }));
+      else notice(bt('boatAfloat'));
       guideUntil = performance.now() + 4000;
       syncBoatVisual(true);
       return;
     }
-    notice('배는 물에 들어가면 자동으로 나옵니다');
+    notice(bt('boatAutoDeploy'));
   }
   /* The v1 name, kept as an alias: the shipped landmark row
      called guideMooring(); the re-pointed row prefers
@@ -995,8 +1037,8 @@
     if (promptEl) {
       var txt = '';
       if (!window.__espilInside) {
-        if (boardableState() && Math.hypot(p.x - craft.x, p.z - craft.z) <= BOARD_RANGE && isWater(p.x, p.z)) txt = 'Space · 배 타기';
-        else if (drivingState()) txt = 'Space · 내리기';
+        if (boardableState() && Math.hypot(p.x - craft.x, p.z - craft.z) <= BOARD_RANGE && isWater(p.x, p.z)) txt = bt('promptRide');
+        else if (drivingState()) txt = bt('promptAlight');
       }
       if (txt) { promptEl.textContent = txt; promptEl.classList.add('show'); }
       else promptEl.classList.remove('show');
@@ -1137,7 +1179,7 @@
           craft.x = p.x; craft.z = p.z; craft.face = heading;
           settleBeached();
           placeRider(dp.x, dp.z);
-          toast('배가 해안에 닿았습니다');
+          toast(bt('beached'));
           syncBoatVisual(true);
           prevPose = { x: p.x, y: p.y, z: p.z }; lastPose = prevPose;
           return;

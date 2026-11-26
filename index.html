@@ -190,7 +190,7 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
   <!-- Start intro video (Han 2026-11-24): the 10 s cauldron reveal plays over the landing, skippable; modules/intro-video.js drives it, the inline timer is the fail-open if that module never loads. -->
   <div id="espil-intro-video" role="dialog" aria-label="Espil Online intro video">
     <video id="espil-intro-video-el" autoplay muted playsinline preload="auto" poster="assets/intro/cauldron-reveal-wide.jpg" src="assets/intro/cauldron-reveal-wide.mp4"></video>
-    <button id="espil-intro-video-skip" type="button">건너뛰기</button>
+    <button id="espil-intro-video-skip" type="button" data-i18n="skip">Skip</button>
   </div>
   <!-- Portrait screens get the 9:16 companion take of the same reveal (markup-side selection, so modules/intro-video.js stays byte-identical; any failure leaves the landscape master in place). -->
   <script>try{if(window.matchMedia&&window.matchMedia('(orientation: portrait)').matches){var v=document.getElementById('espil-intro-video-el');if(v){v.poster='assets/intro/cauldron-reveal-tall.jpg';v.src='assets/intro/cauldron-reveal-tall.mp4';}}}catch(e){}</script>

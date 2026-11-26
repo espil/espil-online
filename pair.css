@@ -92,23 +92,21 @@
       transition:color .18s ease,font-size .18s ease,text-shadow .18s ease,opacity .18s ease;
       white-space:nowrap;
     }
+    /* I18N GUESTBTN PACKAGE (Han 2026-11-25 14:30): the yellow
+       dressing of the selected row is REMOVED - the blinking
+       dots and the yellow glow are gone from every .city-name
+       reel (city list, menu/auth reels, doors). The centred row
+       keeps its enlargement and its bright warm-white colour;
+       the glow is now a soft white. cityBlink survives only for
+       the .is-active ornaments below (out of this package). */
     .city-name:hover,.city-name:focus-visible,.city-name.is-centered { color:#fff8e1; outline:none;
-      text-shadow:0 0 8px rgba(255,217,77,.95),0 0 26px rgba(255,180,40,.55); }
+      text-shadow:0 0 8px rgba(255,248,225,.5),0 0 24px rgba(255,248,225,.18); }
     .city-name.is-centered,.city-name.is-active {
       font-size:clamp(1rem,3.2vw,1.34rem);
       font-weight:800;
       letter-spacing:.16em;
     }
-    /* Blinking yellow lights on hover / centered (2026-10-06, per Han). */
     @keyframes cityBlink{0%,100%{opacity:1;}50%{opacity:.15;}}
-    .city-name:hover::before,.city-name:focus-visible::before,.city-name.is-centered::before,
-    .city-name:hover::after,.city-name:focus-visible::after,.city-name.is-centered::after {
-      content:"\25CF"; font-size:.55em; color:#ffd94d;
-      text-shadow:0 0 8px rgba(255,217,77,.95);
-      animation:cityBlink 1.1s ease-in-out infinite;
-    }
-    .city-name:hover::before,.city-name:focus-visible::before,.city-name.is-centered::before { margin-right:10px; }
-    .city-name:hover::after,.city-name:focus-visible::after,.city-name.is-centered::after { margin-left:10px; }
     /* Selected city (Han 2026-10-16 #2): sparkling yellow highlight on the
        chosen city's button in the text div. */
     @keyframes citySparkle{0%,100%{text-shadow:0 0 8px rgba(255,217,77,.95),0 0 26px rgba(255,180,40,.55);}50%{text-shadow:0 0 16px rgba(255,238,160,1),0 0 48px rgba(255,196,40,.95),0 0 76px rgba(255,170,30,.55);}}
@@ -2085,6 +2083,13 @@
     body #city-status #signin-div #auth-gueststep .city-name {
       margin:0 auto; max-width:340px; text-align:center;
     }
+    /* I18N GUESTBTN PACKAGE (Han 2026-11-25 14:30, directive 1b
+       shape B): the two entry doors are a matched pair of list-form
+       rows at the button standard's 48px height, same text size
+       and weight; the guest door - the first screen's primary -
+       keeps COLOUR emphasis only (bright text), no enlargement. */
+    body #city-status #signin-div #auth-choice .city-name { height:48px; }
+    body #city-status #signin-div #auth-choice #auth-go-guest { color:#fff8e1; }
     body #city-status #signin-div .auth-guest-char { color:rgba(232,220,192,.38); }
     body #city-status #signin-div .auth-guest-char.is-on {
       color:#fff8e1; font-weight:800;

@@ -887,6 +887,15 @@
   if (!plainLanding) return;
 
   var $ = function (id) { return document.getElementById(id); };
+  /* I18N GUESTBTN PACKAGE (Han 2026-11-25 14:30): this IIFE has
+     no access to the first IIFE's T table (closure-private), so
+     its localised copy reads through the language dictionary's
+     global accessor - the house channel for dynamic writers
+     (language.js header). The door copy, the mode switch, the
+     retired name step's copy and the About data-sources block
+     live in language.js's DICT under guestDoor / loginDoor /
+     signUp / signIn / nameEnter / nameAccount / aboutSources. */
+  function efT(k) { try { return window.__espilT ? window.__espilT(k) : k; } catch (e) { return k; } }
   var step = 'boot'; /* boot -> login -> menu -> city -> done */
   var chosenMode = null;
 
@@ -962,10 +971,12 @@
        operability is a HARD requirement - every interactive element
        of the entry flow carries a VISIBLE focus indicator, drawn by
        the flow itself (never left to browser defaults against the
-       landing art). */
+       landing art). I18N GUESTBTN PACKAGE (Han 2026-11-25 14:30):
+       the box stays; its colour leaves yellow for the pair's
+       signal teal (--signal #86eee4). */
     '#signin-div button:focus,#signin-div input:focus,#signin-div select:focus,#signin-div textarea:focus,' +
     '#city-status button:focus,#city-list .espil-city-btn:focus,#auth-mode-switch:focus,' +
-    '#signin-div button:focus-visible,#city-status button:focus-visible{outline:3px solid #ffcf4d !important;outline-offset:2px !important;box-shadow:0 0 0 5px rgba(255,207,77,.35) !important}';
+    '#signin-div button:focus-visible,#city-status button:focus-visible{outline:3px solid #86eee4 !important;outline-offset:2px !important;box-shadow:0 0 0 5px rgba(134,238,228,.35) !important}';
   document.head.appendChild(css);
 
   /* ---------------- DOM: menu + panels ---------------- */
@@ -1025,14 +1036,7 @@
       '<p class="espil-flow-copy">Espil Online is a digital replica of this world, based on the real world in real time - ' +
       'the sky, the weather and the alignment of the stars move with the real world. Vancouver is the first city; ' +
       'the destination is a map of the whole world, with the city chosen by where you are.</p>' +
-      '<p class="espil-flow-copy">데이터 출처 - 이 세계는 실제 세계의 데이터를 실시간으로 조합해 만들어집니다.<br>' +
-      'Mapbox - 지도<br>' +
-      'TomTom - 실시간 교통<br>' +
-      'Open-Meteo - 날씨<br>' +
-      'TransLink - 대중교통<br>' +
-      'Overture Maps + OpenStreetMap - 장소 데이터 (사전 구축)<br>' +
-      'Nominatim - 장소 검색<br>' +
-      'Overpass - 보조 조회</p>' +
+      '<p class="espil-flow-copy" id="espil-about-sources">' + efT('aboutSources') + '</p>' +
       '<div class="espil-flow-reel">' +
       flowItem('espil-about-back', 'Back', false) +
       '</div>';
@@ -1122,6 +1126,10 @@
       var vreel = view.querySelector('.espil-flow-reel');
       if (vreel) vreel.scrollTop = 0;
       centerFlowReel(view);
+      /* I18N GUESTBTN PACKAGE: the About data-sources block is
+         rendered from the T table - refresh it on presentation so
+         it follows the language in force when the panel opens. */
+      if (view.id === 'espil-about-panel') { var asrc = $('espil-about-sources'); if (asrc) asrc.innerHTML = efT('aboutSources'); }
     }
     var cs = $('city-status');
     if (cs) {
@@ -1397,6 +1405,18 @@
         for (var m = 0; m < btns.length; m++) {
           btns[m].classList.toggle('is-centered', btns[m] === closest);
         }
+        /* I18N GUESTBTN PACKAGE (Han 2026-11-25 14:30, directive
+           2): selection IS the centred row - DOM focus moves with
+           it, so the focused row (and its visible focus box) and
+           the centred row can never be two different rows. The
+           morning's arrow rule is untouched: arrows still only
+           scroll, and this tracker - driven by the scroll event,
+           exactly as for wheel/touch - settles selection, facing
+           and focus together. preventScroll keeps the focus move
+           from fighting the snap. */
+        if (closest && document.activeElement !== closest) {
+          try { closest.focus({ preventScroll: true }); } catch (e) {}
+        }
         /* item 5: the globe follows the centred city */
         if (closest) faceFlowCity(closest.getAttribute('data-city'));
       }
@@ -1551,9 +1571,20 @@
     if (!goGuest || !goLogin) return;
     espilTwoDoorReady = true;
     if (goSignup) goSignup.style.display = 'none';
-    goGuest.textContent = '게스트로 들어가기';
-    goLogin.textContent = '로그인';
+    /* I18N GUESTBTN PACKAGE: the door copy renders through the language
+       dictionary (guestDoor / loginDoor) in the selected
+       language - the hardcoded Korean overwrite is gone. */
+    goGuest.textContent = efT('guestDoor');
+    goLogin.textContent = efT('loginDoor');
     if (goGuest.parentNode) goGuest.parentNode.insertBefore(goGuest, goGuest.parentNode.firstChild);
+  }
+  /* The prep above runs once; the labels re-render on every
+     choice presentation so a language switch is honoured. */
+  function espilDoorLabels() {
+    var goGuest = document.getElementById('auth-go-guest');
+    var goLogin = document.getElementById('auth-go-login');
+    if (goGuest) goGuest.textContent = efT('guestDoor');
+    if (goLogin) goLogin.textContent = efT('loginDoor');
   }
   /* ENTRY FLOW V2 AMENDMENT A (Han 2026-11-24 20:47): the menu's
      Shop choice has a FIXED destination of record - the MROS
@@ -1582,14 +1613,14 @@
     var gBack = document.getElementById('guest-back');
     if (gBack) gBack.style.display = 'none';
     var gGo = document.getElementById('guest-go');
-    if (gGo) gGo.textContent = '들어가기';
+    if (gGo) gGo.textContent = efT('nameEnter');
     var guestBox = document.getElementById('auth-gueststep');
     if (guestBox && gGo && !document.getElementById('auth-name-account')) {
       var acct = document.createElement('button');
       acct.type = 'button';
       acct.id = 'auth-name-account';
       acct.className = 'city-name';
-      acct.textContent = '계정이 있으면 로그인';
+      acct.textContent = efT('nameAccount');
       acct.addEventListener('click', function () { presentAuthStep('login'); });
       if (gGo.nextSibling) guestBox.insertBefore(acct, gGo.nextSibling);
       else guestBox.appendChild(acct);
@@ -1621,18 +1652,21 @@
     if (provNote) provNote.style.display = formShown ? '' : 'none';
     authDiv.setAttribute('data-authstep', name || '');
     authDiv.setAttribute('data-authmode', formMode ? name : '');
-    /* Fix batch 8 item 2 (Han 2026-11-14): the three-entry choice
-       list is a city-list-styled list, so its FIRST row (Login)
-       starts in the active state on every presentation - before
-       this, no row carried the treatment (measured: all three at
-       the base 12.16px, none centred). The rows are pair.css
-       .city-name buttons, so the centred treatment is the same
-       .is-centered enlargement the reels use. */
-    if (name === 'choice') espilTwoDoorPrep();
+    /* Fix batch 8 item 2 (Han 2026-11-14) put the choice list's
+       FIRST row in the .is-centered enlargement on every
+       presentation - written when Login was first. Entry-v2 moved
+       the GUEST row first, so the enlargement landed on the guest
+       door and read as an oversized button (measured: its text at
+       1.76x the login door's). I18N GUESTBTN PACKAGE (Han
+       2026-11-25 14:30, directive 1b shape B): the choice step no
+       longer applies .is-centered at all - the two doors are a
+       matched pair of 48px list-form rows (pair.css), the guest
+       door keeping colour emphasis only. */
+    if (name === 'choice') { espilTwoDoorPrep(); espilDoorLabels(); }
     if (name === 'choice' && choiceBox) {
       var cItems = choiceBox.querySelectorAll('.auth-choice-item');
       for (var ci = 0; ci < cItems.length; ci++) {
-        cItems[ci].classList.toggle('is-centered', ci === 0);
+        cItems[ci].classList.remove('is-centered');
       }
     }
     if (formMode) {
@@ -1682,7 +1716,9 @@
       }
       if (modeSwitch) {
         modeSwitch.style.display = '';
-        modeSwitch.textContent = isLogin ? '회원가입' : '로그인';
+        /* I18N GUESTBTN PACKAGE: the switch offers the OTHER mode
+           through the dictionary's signUp / signIn keys. */
+        modeSwitch.textContent = isLogin ? efT('signUp') : efT('signIn');
       }
     }
     if (!formMode) {
@@ -1812,7 +1848,7 @@
        carried when one stands). */
     function espilAutoName() {
       if (typeof window.__espilEntryV2RollName === 'function') return window.__espilEntryV2RollName();
-      return '조용한마을'; /* pool-shaped fallback; the shared roller is defined later in this file and always lands before any tap */
+      return 'QuietVillage'; /* pool-shaped fallback (ADJ[0] + NOUN[0]); the shared roller is defined later in this file and always lands before any tap */
     }
     /* The availability courtesy layer: the shipped endpoint
        (GET /auth/name/available), asked exactly as the retired
@@ -2113,23 +2149,29 @@
    entry-v2/DESIGN.md 3.1). One shared roller + availability
    check for the landing's guest door and the game page's
    backstop re-roll (the name-once pass below). The grammar is
-   a Korean adjective + noun combination in the village's
-   grain, from curated pools (40 adjectives x 60 nouns):
-   every combination is pronounceable and village-shaped by
-   construction, and the reserved law holds BY CONSTRUCTION -
-   no pool word is a reserved word (espil/에스필, lunaris/
-   루나리스, leo/레오, admin/어드민, official, system, guest),
-   no combination of pool words reduces to one, and no pool
-   word carries a digit, so the digit-collapsed reserved
-   variants cannot occur either. Combinations run 4-7
-   characters, inside cleanName's 16-char cap with room for
-   the design's numeric-suffix fallback. Codes are never the
-   primary form (design 3.1). */
+   an adjective + noun combination in the village's grain,
+   from curated pools (40 adjectives x 59 nouns, measured in
+   the shipped bytes): every combination is pronounceable and
+   village-shaped by construction, and the reserved law holds
+   BY CONSTRUCTION - no pool word is a reserved word (espil,
+   lunaris, leo, admin, official, system, guest), no
+   combination of pool words reduces to one, and no pool word
+   carries a digit, so the digit-collapsed reserved variants
+   cannot occur either. ENGLISH POOLS (Han 2026-11-25 17:27,
+   superseding the Korean pools of the first ship): the pools
+   are the same words in English, word for word in the same
+   order, Titlecase-concatenated in the same bare draw - a
+   guest's name is a name, not UI copy, so the pools are
+   English for every guest whatever the UI language.
+   Combinations run 6-14 characters, inside cleanName's
+   16-char cap; the design's numeric-suffix fallback appends
+   3 digits and slices at the cap, as shipped. Codes are never
+   the primary form (design 3.1). */
 (function () {
   'use strict';
   if (window.__espilEntryV2RollName) return;
-  var ADJ = ['조용한', '빠른', '느린', '밝은', '어두운', '따뜻한', '시원한', '포근한', '맑은', '흐린', '가벼운', '무거운', '작은', '커다란', '둥근', '네모난', '긴', '짧은', '깊은', '얕은', '높은', '낮은', '푸른', '붉은', '하얀', '노란', '초록', '보라', '분홍', '은빛', '금빛', '새벽', '한낮', '저녁', '밤중', '이른', '늦은', '먼', '가까운', '싱그러운'];
-  var NOUN = ['마을', '구름', '바람', '강물', '호수', '바다', '섬', '산', '언덕', '들판', '숲', '나무', '꽃', '잎', '돌', '모래', '눈', '비', '달', '별', '해', '하늘', '노을', '길', '다리', '집', '창', '문', '배', '기차', '자전거', '우체통', '등대', '시장', '학교', '도서관', '공원', '정원', '연못', '폭포', '동굴', '사막', '초원', '늪', '절벽', '항구', '골목', '지붕', '굴뚝', '우물', '샘', '방앗간', '농장', '목장', '온실', '탑', '성', '광장', '연주'];
+  var ADJ = ['Quiet', 'Swift', 'Slow', 'Bright', 'Dark', 'Warm', 'Cool', 'Cozy', 'Clear', 'Cloudy', 'Light', 'Heavy', 'Small', 'Grand', 'Round', 'Square', 'Long', 'Short', 'Deep', 'Shallow', 'High', 'Low', 'Blue', 'Red', 'White', 'Yellow', 'Green', 'Violet', 'Pink', 'Silver', 'Golden', 'Dawn', 'Noon', 'Dusk', 'Night', 'Early', 'Late', 'Far', 'Near', 'Fresh'];
+  var NOUN = ['Village', 'Cloud', 'Wind', 'River', 'Lake', 'Sea', 'Isle', 'Peak', 'Hill', 'Field', 'Forest', 'Tree', 'Flower', 'Leaf', 'Stone', 'Sand', 'Snow', 'Rain', 'Moon', 'Star', 'Sun', 'Sky', 'Glow', 'Road', 'Bridge', 'House', 'Window', 'Door', 'Boat', 'Train', 'Bike', 'Mailbox', 'Beacon', 'Market', 'School', 'Library', 'Park', 'Garden', 'Pond', 'Falls', 'Cave', 'Desert', 'Meadow', 'Marsh', 'Cliff', 'Harbor', 'Alley', 'Roof', 'Chimney', 'Well', 'Spring', 'Mill', 'Farm', 'Ranch', 'Nursery', 'Tower', 'Castle', 'Plaza', 'Melody'];
   window.__espilEntryV2RollName = function () {
     return ADJ[Math.floor(Math.random() * ADJ.length)] + NOUN[Math.floor(Math.random() * NOUN.length)];
   };

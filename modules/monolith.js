@@ -1001,6 +1001,22 @@
       espilGateAdoptThenDecide();
       return true;
     }
+    /* I18N GUESTBTN PACKAGE (Han 2026-11-25 14:30): the arrival
+       tail joins the house language pattern (ESPIL_AUCK_STR /
+       ESPIL_LOGIN_LABEL above and below): the character-gate
+       lines, the village boundary messages and the landmark
+       panel were hardcoded Korean literals, so they rendered
+       Korean in every language - the landmark button is the
+       first in-game control a guest meets. Read at call time
+       through __espilLang(); Korean values are the exact strings
+       that shipped before this package. */
+    var ESPIL_TAIL_STR={
+      en:{charAlreadySet:'Your character is already set. Entering with your saved character.',lunarisDesignated:'Lunaris · The designated character for this account',bodyLockSuffix:' · Appearance changes are available with an Appearance Change Ticket from the shop',ticketBadge:'{n} Appearance Change Ticket(s) available - changing and confirming uses 1',firstSetupHint:'The first setup is free. Later appearance changes are available at the shop.',villageClosed:'This building is outside the village and cannot be entered. Create an account to roam the whole city.',villageEdge:'This is the edge of the village. Create an account to roam the whole city.',noFood:'You have nothing to eat - you can buy food at a shop in the village',lmButton:'Landmark activities',photoTake:'Take a photo',photoClose:'Close',lmEat:'Eat food',lmSwim:'Swim',swimNotice:'You can enter the water at the edge of the dock',lmBoat:'Ride the boat',boatAutoDeploy:'The boat comes out on its own when you enter the water',lmArena:'Go to the arena',lmLogin:'Have an account? Log in',accountFallback:'Create an account to roam the whole city',lmFish:'Go fishing',fishGuideNotice:'Press Space at the waterside to start fishing'},
+      ko:{charAlreadySet:'이미 설정된 캐릭터입니다. 저장된 캐릭터로 들어갑니다.',lunarisDesignated:'Lunaris · 이 계정의 지정 캐릭터입니다',bodyLockSuffix:' · 외형 변경은 상점의 \'외형 변경권\'으로 가능합니다',ticketBadge:'외형 변경권 {n}장 사용 가능 - 변경하고 확인하면 1장이 사용됩니다',firstSetupHint:'첫 설정은 무료입니다. 이후 외형 변경은 상점에서 가능합니다.',villageClosed:'이 건물은 마을 밖에 있어 들어갈 수 없습니다. 계정을 만들면 도시 전체를 다닐 수 있습니다',villageEdge:'마을의 경계입니다. 계정을 만들면 도시 전체를 다닐 수 있습니다',noFood:'먹을 것이 없습니다 - 마을 안 가게에서 음식을 살 수 있습니다',lmButton:'랜드마크 활동',photoTake:'사진 찍기',photoClose:'닫기',lmEat:'음식 먹기',lmSwim:'수영하기',swimNotice:'부두 가장자리에서 물로 들어갈 수 있습니다',lmBoat:'배 타기',boatAutoDeploy:'배는 물에 들어가면 자동으로 나옵니다',lmArena:'아레나 가기',lmLogin:'계정이 있으면 로그인',accountFallback:'계정을 만들면 도시 전체를 다닐 수 있습니다',lmFish:'낚시하기',fishGuideNotice:'물가에서 Space를 누르면 낚시를 시작합니다'},
+      fr:{charAlreadySet:'Votre personnage est déjà défini. Entrée avec votre personnage enregistré.',lunarisDesignated:'Lunaris · Le personnage désigné de ce compte',bodyLockSuffix:' · Les changements d\u2019apparence sont possibles avec un ticket de changement d\u2019apparence de la boutique',ticketBadge:'{n} ticket(s) de changement d\u2019apparence disponible(s) - un changement confirmé en utilise 1',firstSetupHint:'La première configuration est gratuite. Les changements d\u2019apparence suivants sont possibles à la boutique.',villageClosed:'Ce bâtiment est hors du village et ne peut pas être ouvert. Créez un compte pour parcourir toute la ville.',villageEdge:'C\u2019est la limite du village. Créez un compte pour parcourir toute la ville.',noFood:'Vous n\u2019avez rien à manger - vous pouvez acheter de la nourriture dans une boutique du village',lmButton:'Activités du lieu',photoTake:'Prendre une photo',photoClose:'Fermer',lmEat:'Manger',lmSwim:'Nager',swimNotice:'Vous pouvez entrer dans l\u2019eau au bord du quai',lmBoat:'Monter dans le bateau',boatAutoDeploy:'Le bateau sort tout seul quand vous entrez dans l\u2019eau',lmArena:'Aller à l\u2019arène',lmLogin:'Vous avez un compte ? Se connecter',accountFallback:'Créez un compte pour parcourir toute la ville',lmFish:'Aller pêcher',fishGuideNotice:'Appuyez sur Espace au bord de l\u2019eau pour commencer à pêcher'},
+      zh:{charAlreadySet:'您的角色已设置。将使用已保存的角色进入。',lunarisDesignated:'Lunaris · 此账户的指定角色',bodyLockSuffix:' · 可使用商店的"外形变更券"更改外形',ticketBadge:'有 {n} 张外形变更券可用 - 更改并确认将使用 1 张',firstSetupHint:'首次设置免费。之后可在商店更改外形。',villageClosed:'这座建筑在村庄之外，无法进入。创建账户即可游览整座城市。',villageEdge:'这里是村庄的边界。创建账户即可游览整座城市。',noFood:'没有可吃的东西 - 可以在村庄里的商店买食物',lmButton:'地标活动',photoTake:'拍照',photoClose:'关闭',lmEat:'吃东西',lmSwim:'游泳',swimNotice:'可以从码头边缘下水',lmBoat:'乘船',boatAutoDeploy:'进入水中后，船会自动出现',lmArena:'去竞技场',lmLogin:'已有账户？登录',accountFallback:'创建账户即可游览整座城市',lmFish:'去钓鱼',fishGuideNotice:'在水边按 Space 即可开始钓鱼'}
+    };
+    function espilTailT(k,vars){ var c='en'; try{ c=window.__espilLang()||'en'; }catch(e){} var l=ESPIL_TAIL_STR[c]||ESPIL_TAIL_STR.en; var s=l[k]||ESPIL_TAIL_STR.en[k]||k; if(vars)for(var key in vars)s=s.split('{'+key+'}').join(vars[key]); return s; }
     function espilCharServerSync(prev,gender,bodyChoice){
       if(espilGuestNow())return;
       /* Owner-only designated body (Han 2026-11-17): the
@@ -1018,7 +1034,7 @@
           }else if(res&&res.status===409&&res.body&&res.body.character){
             espilCharMirror(res.body.character);
             espilApplyAvatarGender(res.body.character.gender);
-            if(window.__espilToast)window.__espilToast('이미 설정된 캐릭터입니다. 저장된 캐릭터로 들어갑니다.');
+            if(window.__espilToast)window.__espilToast(espilTailT('charAlreadySet'));
           }else{
             espilCharPending();
           }
@@ -1070,7 +1086,7 @@
         var dlab=document.createElement('div'); dlab.className='char-body-label'; dlab.textContent='BODY';
         row.appendChild(dlab);
         var dlock=document.createElement('div'); dlock.className='char-body-lock';
-        dlock.textContent='Lunaris · 이 계정의 지정 캐릭터입니다';
+        dlock.textContent=espilTailT('lunarisDesignated');
         row.appendChild(dlock);
         return;
       }
@@ -1094,7 +1110,7 @@
         var llab=document.createElement('div'); llab.className='char-body-label'; llab.textContent='BODY';
         row.appendChild(llab);
         var lockEl=document.createElement('div'); lockEl.className='char-body-lock';
-        lockEl.textContent=espilBodyName(espilBodyChoice())+' · 외형 변경은 상점의 \'외형 변경권\'으로 가능합니다';
+        lockEl.textContent=espilBodyName(espilBodyChoice())+espilTailT('bodyLockSuffix');
         row.appendChild(lockEl);
         return;
       }
@@ -1107,7 +1123,7 @@
       row.appendChild(lab);
       if(!espilGuestNow()&&setUp&&held>0){
         var badge=document.createElement('div'); badge.className='char-body-badge';
-        badge.textContent='외형 변경권 '+held+'장 사용 가능 - 변경하고 확인하면 1장이 사용됩니다';
+        badge.textContent=espilTailT('ticketBadge',{n:held});
         row.appendChild(badge);
       }
       var grid=document.createElement('div'); grid.className='char-body-grid';
@@ -1124,7 +1140,7 @@
       row.appendChild(grid);
       if(!espilGuestNow()&&!setUp){
         var hint=document.createElement('div'); hint.className='char-body-note';
-        hint.textContent='첫 설정은 무료입니다. 이후 외형 변경은 상점에서 가능합니다.';
+        hint.textContent=espilTailT('firstSetupHint');
         row.appendChild(hint);
       }
     }
@@ -2718,8 +2734,10 @@
       return true;
     }
     function espilVillageDist(x,z){ var lm=espilLandmark(); if(!lm)return 0; var dx=x-lm.x,dz=z-lm.z; return Math.sqrt(dx*dx+dz*dz); }
-    var ESPIL_VILLAGE_CLOSED_MSG='이 건물은 마을 밖에 있어 들어갈 수 없습니다. 계정을 만들면 도시 전체를 다닐 수 있습니다';
-    var ESPIL_VILLAGE_EDGE_MSG='마을의 경계입니다. 계정을 만들면 도시 전체를 다닐 수 있습니다';
+    /* I18N GUESTBTN PACKAGE: the two village messages were
+       load-time constants in Korean; their call sites now read
+       espilTailT('villageClosed') / espilTailT('villageEdge')
+       at notice time, in the language then in force. */
     function espilVillageNotice(msg){
       if(window.__espilToast){ window.__espilToast(msg); return; }
       var t=document.getElementById('toast');
@@ -2734,7 +2752,7 @@
         var s=lm.radius/d;
         p.pos.x=lm.x+dx*s; p.pos.z=lm.z+dz*s;
         var nowV=performance.now();
-        if(p.moving&&nowV-(p._espilVillageNoteAt||0)>8000){ p._espilVillageNoteAt=nowV; espilVillageNotice(ESPIL_VILLAGE_EDGE_MSG); }
+        if(p.moving&&nowV-(p._espilVillageNoteAt||0)>8000){ p._espilVillageNoteAt=nowV; espilVillageNotice(espilTailT('villageEdge')); }
       }
     }
     /* ---- Landmark activities (NAME-ONLY ENTRY, Han 2026-11-24) ----
@@ -2826,7 +2844,7 @@
           }
         }
       }
-      espilVillageNotice('먹을 것이 없습니다 - 마을 안 가게에서 음식을 살 수 있습니다');
+      espilVillageNotice(espilTailT('noFood'));
     }
     function espilLandmarkArena(){
       /* Design section 5.2: the gallery geography does not move -
@@ -2848,7 +2866,7 @@
         +'#espil-photo-bar button{padding:9px 18px;border-radius:10px;background:linear-gradient(180deg,rgba(84,56,31,.93),rgba(36,22,8,.95));border:1.5px solid #ffd97a;color:#f5e6c8;font:700 13px Manrope,"Segoe UI",sans-serif;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.45)}';
       document.head.appendChild(st);
       var btn=document.createElement('button');
-      btn.id='espil-lm-btn'; btn.type='button'; btn.textContent='랜드마크 활동';
+      btn.id='espil-lm-btn'; btn.type='button'; btn.textContent=espilTailT('lmButton');
       btn.addEventListener('click',function(){
         var panel=document.getElementById('espil-lm-panel');
         if(panel)panel.style.display=(panel.style.display==='flex')?'none':'flex';
@@ -2860,10 +2878,10 @@
       var bar=document.createElement('div');
       bar.id='espil-photo-bar';
       var cap=document.createElement('button');
-      cap.type='button'; cap.textContent='사진 찍기';
+      cap.type='button'; cap.textContent=espilTailT('photoTake');
       cap.addEventListener('click',espilPhotoCapture);
       var close=document.createElement('button');
-      close.type='button'; close.textContent='닫기';
+      close.type='button'; close.textContent=espilTailT('photoClose');
       close.addEventListener('click',espilPhotoEnd);
       bar.appendChild(cap); bar.appendChild(close);
       document.body.appendChild(bar);
@@ -2884,31 +2902,31 @@
         b.addEventListener('click',function(){ panel.style.display='none'; fn(); });
         panel.appendChild(b);
       }
-      if(acts.indexOf('photo')>=0)row('사진 찍기',espilPhotoStart);
-      if(acts.indexOf('eat')>=0)row('음식 먹기',espilLandmarkEat);
-      if(acts.indexOf('swim')>=0)row('수영하기',function(){ espilVillageNotice('부두 가장자리에서 물로 들어갈 수 있습니다'); });
-      if(acts.indexOf('boat')>=0&&lm.boatArea)row('배 타기',function(){
+      if(acts.indexOf('photo')>=0)row(espilTailT('photoTake'),espilPhotoStart);
+      if(acts.indexOf('eat')>=0)row(espilTailT('lmEat'),espilLandmarkEat);
+      if(acts.indexOf('swim')>=0)row(espilTailT('lmSwim'),function(){ espilVillageNotice(espilTailT('swimNotice')); });
+      if(acts.indexOf('boat')>=0&&lm.boatArea)row(espilTailT('lmBoat'),function(){
         /* BOAT OWNERSHIP: the row's guidance is instruction -
            the boat is the entrant's own and comes out by
            itself in the water (guideToBoat); the module-absent
            fallback below says the same. */
         if(window.__espilBoat&&typeof window.__espilBoat.guideToBoat==='function'){ window.__espilBoat.guideToBoat(); }
         else if(window.__espilBoat&&typeof window.__espilBoat.guideMooring==='function'){ window.__espilBoat.guideMooring(); }
-        else espilVillageNotice('배는 물에 들어가면 자동으로 나옵니다');
+        else espilVillageNotice(espilTailT('boatAutoDeploy'));
       });
-      if(acts.indexOf('fish')>=0)row('낚시하기',function(){
+      if(acts.indexOf('fish')>=0)row(espilTailT('lmFish'),function(){
         /* FISHING (Han 2026-11-25, fishing/DESIGN.md section 3):
            the landmark row TEACHES the free action in the swim
            row's guidance grammar - the mechanic itself is the
            water at any shore, not this row. */
         if(window.__espilFishing&&typeof window.__espilFishing.guide==='function'){ window.__espilFishing.guide(); }
-        else espilVillageNotice('물가에서 Space를 누르면 낚시를 시작합니다');
+        else espilVillageNotice(espilTailT('fishGuideNotice'));
       });
-      if(acts.indexOf('arena')>=0)row('아레나 가기',espilLandmarkArena);
+      if(acts.indexOf('arena')>=0)row(espilTailT('lmArena'),espilLandmarkArena);
       /* The account line is always the last row (the upgrade door). */
-      row('계정이 있으면 로그인',function(){
+      row(espilTailT('lmLogin'),function(){
         if(typeof window.__espilOpenAuth==='function'){ window.__espilOpenAuth(); }
-        else espilVillageNotice('계정을 만들면 도시 전체를 다닐 수 있습니다');
+        else espilVillageNotice(espilTailT('accountFallback'));
       });
     }
     setInterval(function(){
@@ -2916,6 +2934,10 @@
         if(!document.body||!document.body.classList.contains('in-map'))return;
         espilLmUiBuild();
         var btn=document.getElementById('espil-lm-btn');
+        /* I18N GUESTBTN PACKAGE: the landmark button is built
+           once; its label re-renders here so a language switch
+           is honoured without a rebuild. */
+        if(btn)btn.textContent=espilTailT('lmButton');
         var panel=document.getElementById('espil-lm-panel');
         var p=(typeof walkPlayer!=='undefined')?walkPlayer:null;
         var near=!!(espilVillageActive()&&p&&p.pos&&espilVillageDist(p.pos.x,p.pos.z)<=60);
@@ -7058,7 +7080,7 @@
            untouched; in-village buildings behave exactly as
            today. */
         if(espilVillageActive()&&espilVillageDist(_la.rec.cx,_la.rec.cz)>espilLandmark().radius){
-          espilVillageNotice(ESPIL_VILLAGE_CLOSED_MSG);
+          espilVillageNotice(espilTailT('villageClosed'));
           return;
         }
         if(walkPlayer.av&&walkPlayer.av.playOneShot){
@@ -9372,7 +9394,7 @@
       if(info.street&&espilGuestNow()){
         var cfgB=espilCityCfg();
         if(cfgB&&cfgB.landmark&&Math.hypot(info.street.x-cfgB.landmark.x,info.street.z-cfgB.landmark.z)>cfgB.landmark.radius){
-          espilVillageNotice(ESPIL_VILLAGE_CLOSED_MSG);
+          espilVillageNotice(espilTailT('villageClosed'));
           return null;
         }
       }
