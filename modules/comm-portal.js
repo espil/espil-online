@@ -53,6 +53,33 @@
    population rule - anyone joined to a city room, guests and
    name entrants included, with device-local Leo.
 
+   Widget form (2026-11-25, Han 17:27 item 2; comm-widget/
+   DESIGN.md): the portal is no longer a centred modal - the
+   SAME window is now a right-side DOCK the player toggles from
+   a 48 px HUD button (mmo-hud.js owns the button and calls
+   toggle() below). No backdrop dim: the world stays visible
+   beside it and the game does not pause. There is still exactly
+   one surface, one state and one buy path; the book keeps
+   hosting this same node on coarse pointers. The market tab
+   speaks Marketplace grammar: a left rail (search, category
+   list, city list, price range - the one new filter, client-
+   side only - and the sell/buy split), a square card grid, and
+   a detail SHEET over the grid instead of the inline row
+   expand. Card images follow the design's 3-tier rule: an
+   exact panels-DB title match paints the item's real icon
+   (via the __espilGear.iconLookup seam in panels.js), anything
+   else gets an honest category glyph tile, and nothing else is
+   ever painted - listings carry no photo and none is invented.
+   The buy flow itself (confirm copy, nonce frame, 15 s wait,
+   stall_sold matching, stall2 settlement, the separate
+   counters, both beacons) is byte-for-byte the phase-2 flow;
+   only the vessel changed. The widget closes when a dive
+   starts; tab and filter state survive in-session, the open
+   state is never persisted. state() also reports the mount
+   (dock / book / sheet) and open()/close() broadcast an
+   'espil-portal-state' window event so the HUD toggle's
+   active face never forks from the real state.
+
    Module sources are TAGLESS (house rule) - no script tags here. */
 (function () {
   'use strict';
@@ -66,7 +93,7 @@
   try { placeMark = JSON.parse(sessionStorage.getItem('espil_store_space_v1') || 'null'); } catch (e) {}
   if (placeMark) {
     window.__espilPortal = {
-      open: function () {}, close: function () {},
+      open: function () {}, close: function () {}, toggle: function () {},
       state: function () { return { child: true, open: false }; }
     };
     return;
@@ -107,19 +134,22 @@
     var st = document.createElement('style');
     st.id = 'espil-portal-style';
     st.textContent =
-      '#espil-portal-window{position:fixed;inset:0;z-index:9990;display:none;align-items:center;justify-content:center;background:rgba(10,6,4,.55)}' +
-      '#espil-portal-window.open{display:flex}' +
+      '#espil-portal-window{position:fixed;top:174px;right:10px;width:min(920px,96vw);height:min(84vh,860px,calc(100vh - 184px));z-index:44;display:none}' +
+      '#espil-portal-window.open{display:block}' +
       '.epw-card{background:linear-gradient(180deg,#3a2a1c,#241a10);border:2px solid #8a6a44;border-radius:14px;' +
-      'width:min(680px,94vw);height:min(76vh,720px);max-height:88vh;display:flex;flex-direction:column;padding:18px 20px;color:#f2e3c2;font-family:sans-serif;' +
+      'width:100%;height:100%;box-sizing:border-box;display:flex;flex-direction:column;padding:18px 20px;color:#f2e3c2;font-family:sans-serif;' +
       'box-shadow:0 12px 40px rgba(0,0,0,.6)}' +
       '.epw-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}' +
       '.epw-title{font-size:21px;font-weight:800;color:#ffe9bd}' +
-      '.epw-close{border:1px solid #8a6a44;background:#57402a;color:#ffe9bd;border-radius:8px;padding:6px 12px;cursor:pointer;font-weight:700}' +
+      '.epw-close{border:1px solid #8a6a44;background:#57402a;color:#ffe9bd;border-radius:8px;padding:6px 12px;cursor:pointer;font-weight:700;min-width:48px;min-height:48px}' +
       '.epw-tabs{display:flex;gap:8px;border-bottom:1px solid #57402a;padding-bottom:10px;margin-bottom:10px}' +
       '.epw-tab{border:1px solid #6d5836;background:#2e2114;color:#d8c49a;border-radius:999px;padding:7px 16px;cursor:pointer;font-weight:700;font-size:13.5px}' +
       '.epw-tab.on{border-color:#c9a227;background:#6d5836;color:#ffe9bd}' +
       '.epw-pane{display:none;flex:1;min-height:0;overflow-y:auto}' +
       '.epw-pane.on{display:block}' +
+      '#ep-pane-feed>*{max-width:640px;margin-left:auto;margin-right:auto}' +
+      '#ep-pane-market{position:relative;overflow:hidden}' +
+      '#ep-market-root{height:100%}' +
       '.epw-city{font-size:15px;font-weight:800;color:#ffd76a;margin-bottom:8px}' +
       '.epf-post{border:1px solid #57402a;border-radius:10px;padding:9px 12px;background:rgba(0,0,0,.22);margin-bottom:8px}' +
       '.epf-meta{font-size:11.5px;color:#b8a888;margin-bottom:3px}' +
@@ -135,16 +165,52 @@
       '.epw-sale{font-size:12.5px;color:#d8c49a;display:flex;align-items:center;gap:5px;cursor:pointer}' +
       '.epw-note{font-size:12.5px;color:#b8a888;line-height:1.55}' +
       '.epw-market{font-size:14px;color:#d8c49a;line-height:1.65;padding:16px 4px}' +
-      '.epm-tools{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}' +
-      '.epm-chip{border:1px solid #6d5836;background:#2e2114;color:#d8c49a;border-radius:999px;padding:6px 14px;cursor:pointer;font-weight:700;font-size:13px;min-height:48px}' +
-      '.epm-chip.on{border-color:#c9a227;background:#6d5836;color:#ffe9bd}' +
-      '.epm-row2{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px}' +
+      '.epm-wrap{display:flex;gap:14px;height:100%}' +
+      '.epm-rail{width:220px;flex:none;overflow-y:auto;padding-right:2px}' +
+      '.epm-rail-h{font-size:11.5px;font-weight:800;color:#b8a888;letter-spacing:.06em;margin:14px 0 6px}' +
+      '.epm-rail-h:first-child{margin-top:0}' +
+      '.epm-cats{display:flex;flex-direction:column;gap:5px}' +
+      '.epm-catbtn{border:1px solid #6d5836;background:#2e2114;color:#d8c49a;border-radius:8px;padding:6px 12px;cursor:pointer;font-weight:700;font-size:13px;min-height:48px;text-align:left}' +
+      '.epm-catbtn.on{border-color:#c9a227;background:#6d5836;color:#ffe9bd}' +
+      '.epm-cities{display:flex;flex-direction:column;gap:5px;max-height:264px;overflow-y:auto}' +
+      '.epm-sides{display:flex;gap:5px}' +
+      '.epm-sides .epm-catbtn{flex:1;text-align:center;padding:6px 4px}' +
+      '.epm-prices{display:flex;gap:6px;align-items:center}' +
+      '.epm-prices span{color:#b8a888;font-size:13px}' +
+      '.epm-pin{flex:1;min-width:0;border:1px solid #6d5836;border-radius:8px;background:rgba(0,0,0,.3);color:#fff4cf;font:600 13px sans-serif;padding:6px 8px;min-height:48px;box-sizing:border-box}' +
+      '.epm-main{flex:1;min-width:0;min-height:0;overflow-y:auto;padding-right:2px}' +
+      '.epm-mainhead{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}' +
       '.epm-sel{border:1px solid #6d5836;background:#2e2114;color:#ffe9bd;border-radius:8px;padding:6px 8px;font-size:13px;font-weight:700;min-height:48px}' +
-      '.epm-q{flex:1;min-width:120px;border:1px solid #6d5836;border-radius:8px;background:rgba(0,0,0,.3);color:#fff4cf;font:600 13px sans-serif;padding:6px 10px;min-height:48px;box-sizing:border-box}' +
+      '.epm-q{width:100%;border:1px solid #6d5836;border-radius:8px;background:rgba(0,0,0,.3);color:#fff4cf;font:600 13px sans-serif;padding:6px 10px;min-height:48px;box-sizing:border-box}' +
       '.epm-leo{font-size:12.5px;color:#ffd76a;font-weight:700;margin-left:auto}' +
       '.epm-status{font-size:13px;color:#b8a888;line-height:1.6;padding:10px 2px}' +
       '.epm-note{font-size:12.5px;color:#ffd76a;line-height:1.55;margin-bottom:8px}' +
-      '.epm-row{border:1px solid #57402a;border-radius:10px;padding:9px 12px;background:rgba(0,0,0,.22);margin-bottom:8px;cursor:pointer}' +
+      '.epm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px}' +
+      '.epm-card{border:1px solid #57402a;border-radius:12px;background:rgba(0,0,0,.22);overflow:hidden;cursor:pointer;display:flex;flex-direction:column}' +
+      '.epm-card:active{filter:brightness(1.25)}' +
+      '.epm-img{position:relative;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.3)}' +
+      '.epm-img svg{width:64%;height:64%}' +
+      '.epm-glyph{font-size:64px;line-height:1}' +
+      '.epm-img .epm-badges{position:absolute;top:6px;left:6px;margin-bottom:0}' +
+      '.epm-adslot{height:0;overflow:hidden}' +
+      '.epm-card .epm-price{font-size:19px;font-weight:800;color:#ffe9a8;margin:8px 10px 0}' +
+      '.epm-card .epm-title{font-size:13.5px;font-weight:700;color:#f2e3c2;margin:3px 10px 0;line-height:1.35;min-height:2.7em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}' +
+      '.epm-card .epm-meta{font-size:11.5px;color:#b8a888;margin:3px 10px 0}' +
+      '.epm-card .epm-seller{font-size:11.5px;color:#d8c49a;margin:2px 10px 10px}' +
+      '.epm-sheet{position:absolute;inset:0;z-index:5;background:linear-gradient(180deg,#3a2a1c,#241a10);overflow-y:auto;padding:14px 16px}' +
+      '.epm-back{border:1px solid #c9a227;background:#6d5836;color:#ffe9bd;border-radius:8px;padding:7px 16px;cursor:pointer;font-weight:800;font-size:13.5px;min-width:48px;min-height:48px;margin-bottom:12px}' +
+      '.epm-sheet .epm-img{width:min(300px,80vw);border-radius:12px;margin-bottom:12px}' +
+      '.epm-sheet .epm-glyph{font-size:110px}' +
+      '.epm-sheet .epm-price{font-size:24px;font-weight:800;color:#ffe9a8}' +
+      '.epm-sheet .epm-title{font-size:17px;font-weight:800;color:#f2e3c2;margin-top:4px}' +
+      '.epm-sheet .epm-meta{font-size:12.5px;color:#b8a888;margin-top:5px;line-height:1.65}' +
+      '@media (max-width:820px){' +
+      '.epm-wrap{flex-direction:column}' +
+      '.epm-rail{width:auto;flex:none;overflow:visible;padding-right:0}' +
+      '.epm-cats{flex-direction:row;flex-wrap:wrap}' +
+      '.epm-cities{flex-direction:row;flex-wrap:wrap;max-height:none;overflow:visible}' +
+      '.epm-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}' +
+      '}' +
       '.epm-badges{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:4px}' +
       '.epm-badge{padding:1px 7px;border-radius:99px;font-size:10px;font-weight:800;color:#fff;background:rgba(90,110,140,.6)}' +
       '.epm-badge.sell{background:rgba(255,150,60,.55)}' +
@@ -152,10 +218,7 @@
       '.epm-badge.svc{background:rgba(150,110,255,.55)}' +
       '.epm-badge.cat{background:rgba(201,162,39,.45);color:#ffe9bd}' +
       '.epm-badge.mine{background:rgba(70,160,90,.55)}' +
-      '.epm-title{font-size:14px;font-weight:700;color:#f2e3c2}' +
-      '.epm-meta{font-size:12px;color:#b8a888;margin-top:2px}' +
-      '.epm-price{font-size:12.5px;color:#ffe9a8;margin-top:2px}' +
-      '.epm-detail{margin-top:8px;border-top:1px solid #57402a;padding-top:8px}' +
+      '.epm-detail{margin-top:10px;border-top:1px solid #57402a;padding-top:10px}' +
       '.epm-pnote{font-size:12.5px;color:#d8c49a;line-height:1.55;white-space:pre-wrap;word-break:break-word}' +
       '.epm-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}' +
       '.epm-btn{border:1px solid #c9a227;background:#6d5836;color:#ffe9bd;border-radius:8px;padding:7px 16px;cursor:pointer;font-weight:800;font-size:13.5px;min-height:48px}' +
@@ -195,7 +258,9 @@
     cityEl = winEl.querySelector('#ep-feed-city');
     mktRoot = winEl.querySelector('#ep-market-root');
     winEl.querySelector('#espil-portal-close').addEventListener('click', function () { close(); });
-    winEl.addEventListener('click', function (e) { if (e.target === winEl) close(); });
+    /* No backdrop click-to-close: the dock has no backdrop. The
+       window box IS the card now, so a click landing on winEl
+       itself is a click on the card's own padding, not on a dim. */
     Array.prototype.forEach.call(winEl.querySelectorAll('[data-ep-tab]'), function (b) {
       b.addEventListener('click', function () { selectTab(b.getAttribute('data-ep-tab')); });
     });
@@ -376,6 +441,16 @@
     /* a new city means a new room board */
     posts = []; seenIds = {};
     if (winEl && winEl.classList.contains('open') && curTab === 'feed') renderFeed();
+    /* The widget closes on a dive (comm-widget DESIGN section
+       3): the feed is bound to the old city and the market must
+       take a fresh snapshot in the new one. Tab and filter
+       state stay; only the open state ends. This listener is
+       registered when the module lands - the arrival bundle is
+       what loads it - so the entry dive itself never trips it. */
+    if (winEl && winEl.classList.contains('open')) close();
+  });
+  window.addEventListener('espil-dive-start', function () {
+    if (winEl && winEl.classList.contains('open')) close();
   });
 
   /* ---------------- market (phase 2) ----------------
@@ -396,6 +471,7 @@
   var mkt = {
     rows: null, fetchedAt: 0, loading: false, error: false,
     cat: 'all', side: 'all', city: 'all', q: '', sort: 'new',
+    minP: '', maxP: '',
     expanded: null, confirmKey: null, pending: null, notice: '', timer: null
   };
   function apiBase() { return window.__espilAuthApiBase || 'https://api.espil.online'; }
@@ -467,6 +543,14 @@
       if (mkt.cat !== 'all' && p.cat !== mkt.cat) return false;
       if (mkt.side !== 'all' && p.side !== mkt.side) return false;
       if (mkt.city !== 'all' && r.city !== mkt.city) return false;
+      /* Price range (the widget's one new filter, comm-widget
+         DESIGN section 6): client-side over the fetched
+         snapshot; the listings protocol is untouched. A
+         negotiated post (price 0) is not a number, so a
+         minimum drops it and a maximum keeps it. */
+      var mn = parseFloat(mkt.minP), mx = parseFloat(mkt.maxP);
+      if (!isNaN(mn) && !(p.price >= mn)) return false;
+      if (!isNaN(mx) && !(p.price <= mx)) return false;
       if (q) {
         var hay = (String(p.title || '') + ' ' + r.sellerName + ' ' + r.stallName).toLowerCase();
         if (hay.indexOf(q) < 0) return false;
@@ -480,29 +564,102 @@
     });
     return rows;
   }
+  /* Card images (comm-widget DESIGN section 5, the 3-tier
+     rule): tier 1 is an exact DB title match painted by
+     panels.js's own icon painter through the __espilGear
+     seam; tier 2 is an honest category glyph tile; there is
+     no tier 3 - no seller faces, no title guesses, no photos
+     (listings carry none and none is invented). */
+  var MKT_GLYPH = {
+    service: '🛠️', food: '🍙', furniture: '🪑', clothing: '👕',
+    equipment: '⚔️', books: '📚', consumables: '🧪',
+    materials: '🧱', misc: '📦'
+  };
+  function mktImageHtml(r, sheet) {
+    var p = r.post;
+    var badges =
+      '<div class="epm-badges">' +
+      '<span class="epm-badge ' + (p.side === 'buy' ? 'buy' : 'sell') + '">' + (p.side === 'buy' ? '매입' : '판매') + '</span>' +
+      (p.kind === 'service' ? '<span class="epm-badge svc">서비스 · TESTING</span>' : '') +
+      '<span class="epm-badge cat">' + esc(MKT_CAT_LABEL[p.cat] || '기타') + '</span>' +
+      (isMine(r) ? '<span class="epm-badge mine">내 게시</span>' : '') +
+      '</div>';
+    var look = null;
+    try { look = (p.kind === 'item' && window.__espilGear && window.__espilGear.iconLookup) ? window.__espilGear.iconLookup(p.title) : null; } catch (e) { look = null; }
+    var inner;
+    if (look && look.svg) {
+      inner = '<div class="epm-img" data-epm-img="icon" style="background:linear-gradient(135deg,' + esc(look.c1 || '#57402a') + ',' + esc(look.c2 || '#2e2114') + ')">' + look.svg + badges + '</div>';
+    } else {
+      var glyph = p.kind === 'service' ? MKT_GLYPH.service : (MKT_GLYPH[p.cat] || MKT_GLYPH.misc);
+      inner = '<div class="epm-img" data-epm-img="glyph"><span class="epm-glyph">' + glyph + '</span>' + badges + '</div>';
+    }
+    /* The labelled sponsor slot the design reserves under the
+       card image (section 5): present in the grammar at zero
+       height today; promoted listings are a Profit decision
+       that has not been made, so nothing is ever put in it. */
+    return inner + (sheet ? '' : '<div class="epm-adslot" aria-hidden="true"></div>');
+  }
+  function mktCardHtml(r) {
+    var p = r.post;
+    var priceLine = (p.price > 0 ? esc(p.price) + ' Leo' : '가격 협의');
+    var meta = esc(cityName(r.city)) + (r.stallName ? ' · ' + esc(r.stallName) : '');
+    var seller = esc(r.sellerName || 'Guest') + ' · ' + (p.count || 1) + '개 남음' + (p.ts ? ' · ' + tsLabel(p.ts) : '');
+    return '<div class="epm-card" data-epm-row="' + esc(r.key) + '" role="button" tabindex="0">' +
+      mktImageHtml(r, false) +
+      '<div class="epm-price">' + priceLine + '</div>' +
+      '<div class="epm-title">' + esc(p.title) + '</div>' +
+      '<div class="epm-meta">' + meta + '</div>' +
+      '<div class="epm-seller">' + seller + '</div>' +
+      '</div>';
+  }
+  function mktSheetHtml(r) {
+    var p = r.post;
+    var priceLine = (p.price > 0 ? esc(p.price) + ' Leo' : '가격 협의') + ' · ' + (p.count || 1) + '개 남음';
+    var meta = esc(cityName(r.city)) + (r.stallName ? ' · ' + esc(r.stallName) : '') +
+      '<br>' + esc(r.sellerName || 'Guest') + (p.ts ? ' · ' + tsLabel(p.ts) : '');
+    return '<div class="epm-sheet">' +
+      '<button class="epm-back" type="button" data-epm-back="1">‹ 목록으로</button>' +
+      mktImageHtml(r, true) +
+      '<div class="epm-price">' + priceLine + '</div>' +
+      '<div class="epm-title">' + esc(p.title) + '</div>' +
+      '<div class="epm-meta">' + meta + '</div>' +
+      mktDetailHtml(r) +
+      '</div>';
+  }
   function renderMarket() {
     if (!mktRoot) return;
-    var chips = MKT_CATS.map(function (c) {
-      return '<button class="epm-chip' + (mkt.cat === c[0] ? ' on' : '') + '" type="button" data-epm-cat="' + c[0] + '">' + c[1] + '</button>';
+    var catBtns = MKT_CATS.map(function (c) {
+      return '<button class="epm-catbtn' + (mkt.cat === c[0] ? ' on' : '') + '" type="button" data-epm-cat="' + c[0] + '">' + c[1] + '</button>';
     }).join('');
-    var cityOpts = '<option value="all">모든 도시</option>' + mktCities().map(function (c) {
-      return '<option value="' + esc(c) + '"' + (mkt.city === c ? ' selected' : '') + '>' + esc(cityName(c)) + '</option>';
+    var cityBtns = ['all'].concat(mktCities()).map(function (c) {
+      return '<button class="epm-catbtn' + (mkt.city === c ? ' on' : '') + '" type="button" data-epm-city="' + esc(c) + '">' + (c === 'all' ? '모든 도시' : esc(cityName(c))) + '</button>';
     }).join('');
-    var head =
-      '<div class="epm-tools">' + chips + '</div>' +
-      '<div class="epm-row2">' +
-      '<select class="epm-sel" id="epm-city">' + cityOpts + '</select>' +
-      '<select class="epm-sel" id="epm-side">' +
-      '<option value="all"' + (mkt.side === 'all' ? ' selected' : '') + '>전체</option>' +
-      '<option value="sell"' + (mkt.side === 'sell' ? ' selected' : '') + '>판매</option>' +
-      '<option value="buy"' + (mkt.side === 'buy' ? ' selected' : '') + '>매입</option>' +
-      '</select>' +
+    var rail =
+      '<div class="epm-rail">' +
+      '<input class="epm-q" id="epm-q" type="text" placeholder="제목 · 판매자 검색" value="' + esc(mkt.q) + '">' +
+      '<div class="epm-rail-h">카테고리</div>' +
+      '<div class="epm-cats">' + catBtns + '</div>' +
+      '<div class="epm-rail-h">도시</div>' +
+      '<div class="epm-cities">' + cityBtns + '</div>' +
+      '<div class="epm-rail-h">가격 (Leo)</div>' +
+      '<div class="epm-prices">' +
+      '<input class="epm-pin" id="epm-minp" type="number" min="0" inputmode="numeric" placeholder="최소" value="' + esc(mkt.minP) + '"><span>~</span>' +
+      '<input class="epm-pin" id="epm-maxp" type="number" min="0" inputmode="numeric" placeholder="최대" value="' + esc(mkt.maxP) + '">' +
+      '</div>' +
+      '<div class="epm-rail-h">거래</div>' +
+      '<div class="epm-sides">' +
+      '<button class="epm-catbtn' + (mkt.side === 'all' ? ' on' : '') + '" type="button" data-epm-side="all">전체</button>' +
+      '<button class="epm-catbtn' + (mkt.side === 'sell' ? ' on' : '') + '" type="button" data-epm-side="sell">판매</button>' +
+      '<button class="epm-catbtn' + (mkt.side === 'buy' ? ' on' : '') + '" type="button" data-epm-side="buy">매입</button>' +
+      '</div>' +
+      '</div>';
+    var mainHead =
+      '<div class="epm-mainhead">' +
       '<select class="epm-sel" id="epm-sort">' +
       '<option value="new"' + (mkt.sort === 'new' ? ' selected' : '') + '>최신순</option>' +
       '<option value="low"' + (mkt.sort === 'low' ? ' selected' : '') + '>가격 낮은순</option>' +
       '<option value="high"' + (mkt.sort === 'high' ? ' selected' : '') + '>가격 높은순</option>' +
       '</select>' +
-      '<input class="epm-q" id="epm-q" type="text" placeholder="제목 · 판매자 검색" value="' + esc(mkt.q) + '">' +
       '<span class="epm-leo">내 Leo ' + leoBalance() + '</span>' +
       '</div>' +
       (mkt.notice ? '<div class="epm-note">' + esc(mkt.notice) + '</div>' : '');
@@ -518,42 +675,64 @@
       if (!rows.length) {
         body = '<div class="epm-status">이 조건에 맞는 게시가 없습니다.</div>';
       } else {
-        body = rows.map(function (r) { return mktRowHtml(r); }).join('');
+        body = '<div class="epm-grid">' + rows.map(function (r) { return mktCardHtml(r); }).join('') + '</div>';
       }
       if (mkt.error) body = '<div class="epm-note">새 목록을 불러오지 못해 이전 목록을 보여 드립니다.</div>' + body;
     }
-    mktRoot.innerHTML = head + body;
+    var sheetHtml = '';
+    if (mkt.expanded) {
+      var er = null;
+      (mkt.rows || []).forEach(function (r) { if (r.key === mkt.expanded) er = r; });
+      if (er) sheetHtml = mktSheetHtml(er);
+    }
+    mktRoot.innerHTML = '<div class="epm-wrap">' + rail + '<div class="epm-main">' + mainHead + body + '</div></div>' + sheetHtml;
     Array.prototype.forEach.call(mktRoot.querySelectorAll('[data-epm-cat]'), function (b) {
       b.addEventListener('click', function () { mkt.cat = b.getAttribute('data-epm-cat'); renderMarket(); });
     });
-    var citySel = mktRoot.querySelector('#epm-city');
-    if (citySel) citySel.addEventListener('change', function () { mkt.city = citySel.value; renderMarket(); });
-    var sideSel = mktRoot.querySelector('#epm-side');
-    if (sideSel) sideSel.addEventListener('change', function () { mkt.side = sideSel.value; renderMarket(); });
+    Array.prototype.forEach.call(mktRoot.querySelectorAll('[data-epm-city]'), function (b) {
+      b.addEventListener('click', function () { mkt.city = b.getAttribute('data-epm-city'); renderMarket(); });
+    });
+    Array.prototype.forEach.call(mktRoot.querySelectorAll('[data-epm-side]'), function (b) {
+      b.addEventListener('click', function () { mkt.side = b.getAttribute('data-epm-side'); renderMarket(); });
+    });
     var sortSel = mktRoot.querySelector('#epm-sort');
     if (sortSel) sortSel.addEventListener('change', function () { mkt.sort = sortSel.value; renderMarket(); });
-    var qEl = mktRoot.querySelector('#epm-q');
-    if (qEl) {
-      qEl.addEventListener('input', function () {
-        mkt.q = qEl.value;
-        var pos = qEl.selectionStart;
+    function bindText(id, get, set) {
+      var el = mktRoot.querySelector(id);
+      if (!el) return;
+      el.addEventListener('input', function () {
+        set(el.value);
+        var pos = null;
+        try { pos = el.selectionStart; } catch (e) {}
         renderMarket();
-        var nq = mktRoot.querySelector('#epm-q');
-        if (nq) { nq.focus(); try { nq.setSelectionRange(pos, pos); } catch (e) {} }
+        var n = mktRoot.querySelector(id);
+        if (n) { n.focus(); if (pos !== null) { try { n.setSelectionRange(pos, pos); } catch (e) {} } }
       });
-      qEl.addEventListener('keydown', function (e) { e.stopPropagation(); });
-      qEl.addEventListener('keyup', function (e) { e.stopPropagation(); });
+      el.addEventListener('keydown', function (e) { e.stopPropagation(); });
+      el.addEventListener('keyup', function (e) { e.stopPropagation(); });
     }
+    bindText('#epm-q', function () { return mkt.q; }, function (v) { mkt.q = v; });
+    bindText('#epm-minp', function () { return mkt.minP; }, function (v) { mkt.minP = v; });
+    bindText('#epm-maxp', function () { return mkt.maxP; }, function (v) { mkt.maxP = v; });
     var retry = mktRoot.querySelector('#epm-retry');
     if (retry) retry.addEventListener('click', function () { fetchListings(); });
     Array.prototype.forEach.call(mktRoot.querySelectorAll('[data-epm-row]'), function (el) {
+      function openSheet() {
+        var key = el.getAttribute('data-epm-row');
+        if (mkt.expanded === key) return; /* the sheet is already this card; a card never toggles shut */
+        mkt.expanded = key; mkt.confirmKey = null; centerBeacon('listing_click');
+        renderMarket();
+      }
       el.addEventListener('click', function (e) {
         if (e.target && (e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT')) return;
-        var key = el.getAttribute('data-epm-row');
-        if (mkt.expanded === key) { mkt.expanded = null; }
-        else { mkt.expanded = key; mkt.confirmKey = null; centerBeacon('listing_click'); }
-        renderMarket();
+        openSheet();
       });
+      el.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSheet(); }
+      });
+    });
+    Array.prototype.forEach.call(mktRoot.querySelectorAll('[data-epm-back]'), function (b) {
+      b.addEventListener('click', function () { mkt.expanded = null; mkt.confirmKey = null; renderMarket(); });
     });
     Array.prototype.forEach.call(mktRoot.querySelectorAll('[data-epm-buy]'), function (b) {
       b.addEventListener('click', function () { mkt.confirmKey = b.getAttribute('data-epm-buy'); mkt.notice = ''; renderMarket(); });
@@ -571,27 +750,6 @@
         if (window.__espilStallView) window.__espilStallView(sid);
       });
     });
-  }
-  function mktRowHtml(r) {
-    var p = r.post;
-    var svc = p.kind === 'service';
-    var mine = isMine(r);
-    var badges =
-      '<span class="epm-badge ' + (p.side === 'buy' ? 'buy' : 'sell') + '">' + (p.side === 'buy' ? '매입' : '판매') + '</span>' +
-      (svc ? '<span class="epm-badge svc">서비스 · TESTING</span>' : '') +
-      '<span class="epm-badge cat">' + esc(MKT_CAT_LABEL[p.cat] || '기타') + '</span>' +
-      (mine ? '<span class="epm-badge mine">내 게시</span>' : '');
-    var priceLine = (p.price > 0 ? esc(p.price) + ' Leo' : '가격 협의') + ' · ' + (p.count || 1) + '개 남음';
-    var meta = esc(r.sellerName || 'Guest') + (r.stallName ? ' · ' + esc(r.stallName) : '') + ' · ' + esc(cityName(r.city)) + (p.ts ? ' · ' + tsLabel(p.ts) : '');
-    var html =
-      '<div class="epm-row" data-epm-row="' + esc(r.key) + '">' +
-      '<div class="epm-badges">' + badges + '</div>' +
-      '<div class="epm-title">' + esc(p.title) + '</div>' +
-      '<div class="epm-price">' + priceLine + '</div>' +
-      '<div class="epm-meta">' + meta + '</div>';
-    if (mkt.expanded === r.key) html += mktDetailHtml(r);
-    html += '</div>';
-    return html;
   }
   function mktDetailHtml(r) {
     var p = r.post;
@@ -639,6 +797,9 @@
         if (!mkt.pending || mkt.pending.key !== key) return;
         mkt.pending = null;
         mkt.notice = '판매자의 응답이 없습니다. 목록을 새로고침합니다.';
+        /* the sheet closes with the settle so the notice is
+           what the buyer sees (the buy itself is untouched) */
+        if (mkt.expanded === key) mkt.expanded = null;
         fetchListings();
         renderMarket();
       }, 15000)
@@ -650,7 +811,9 @@
     if (!m || m.t !== 'stall_sold' || !mkt.pending) return;
     if (m.nonce !== mkt.pending.nonce) return;
     clearTimeout(mkt.pending.timer);
+    var settledKey = mkt.pending.key;
     mkt.pending = null;
+    if (mkt.expanded === settledKey) mkt.expanded = null;
     mkt.notice = m.ok ? '구매가 완료됐습니다.' : '거래를 완료할 수 없습니다. 판매가 끝났거나 판매자가 없습니다.';
     fetchListings();
     renderMarket();
@@ -669,6 +832,13 @@
   }
 
   /* ---------------- open / close ---------------- */
+  function portalEvent() {
+    try {
+      window.dispatchEvent(new CustomEvent('espil-portal-state', {
+        detail: { open: !!(winEl && winEl.classList.contains('open')), tab: curTab }
+      }));
+    } catch (e) {}
+  }
   function open(tab) {
     ensureDom();
     centerBeacon('center_view');
@@ -679,6 +849,7 @@
     }
     renderComposer();
     selectTab(tab);
+    portalEvent();
   }
   function close() {
     if (!winEl) return;
@@ -686,15 +857,28 @@
     if (cashHosted) unhostCash();
     winEl.classList.remove('open');
     winEl.setAttribute('aria-hidden', 'true');
+    portalEvent();
+  }
+  function toggle(tab) {
+    if (winEl && winEl.classList.contains('open')) close();
+    else open(tab);
+  }
+  function mountOf() {
+    if (!winEl) return 'dock';
+    if (winEl.classList.contains('espil-booked')) return 'book';
+    try { if (window.innerWidth <= 820) return 'sheet'; } catch (e) {}
+    return 'dock';
   }
 
   window.__espilPortal = {
     open: open,
     close: close,
+    toggle: toggle,
     state: function () {
       return {
         open: !!(winEl && winEl.classList.contains('open')),
         tab: curTab,
+        mount: mountOf(),
         posts: posts.length,
         room: roomKey(),
         cashHosted: cashHosted,
@@ -703,6 +887,9 @@
           rows: mkt.rows ? mkt.rows.length : -1,
           fetchedAt: mkt.fetchedAt,
           cat: mkt.cat,
+          minP: mkt.minP,
+          maxP: mkt.maxP,
+          expanded: mkt.expanded,
           pending: !!mkt.pending,
           error: mkt.error
         }

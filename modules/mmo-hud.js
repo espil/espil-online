@@ -714,6 +714,22 @@
   var css =
     '#espil-hud2-coin,#espil-hud2-score,#espil-hud2-timefps,#espil-hud2-menu,' +
     '#espil-hud2-bars,#espil-hud2-actions,#espil-hud2-chars,#espil-hud2-chat,#espil-hud2-chat-tab{display:none}' +
+    /* COMM-WIDGET toggle (Han 2026-11-25 17:27 item 2,
+       comm-widget/DESIGN.md section 2): the portal's 48 px round
+       button takes the exact spot the retired floating cash
+       button vacated in portal phase A (right 14px, top 118px).
+       It is a plain HUD element - visible on fine AND coarse
+       pointers whenever the body is in-map, above the minimap
+       (z 30) and the dock (z 44), below the settings panel
+       (z 46) - and its active face is driven by the portal's
+       own state event, never by a local guess. */
+    '#espil-hud2-portal{display:none}' +
+    'body.in-map #espil-hud2-portal{display:flex;position:fixed;right:14px;top:118px;width:48px;height:48px;' +
+      'border-radius:50%;z-index:45;align-items:center;justify-content:center;font-size:21px;line-height:1;' +
+      'background:rgba(20,26,22,.82);border:2px solid rgba(255,233,184,.55);color:#ffe9b8;cursor:pointer;' +
+      'box-shadow:0 4px 14px rgba(0,0,0,.4);padding:0;touch-action:manipulation}' +
+    '#espil-hud2-portal.on{border-color:#ffd97a;background:#6d5836;color:#ffe9bd}' +
+    '#espil-hud2-portal:active{filter:brightness(1.3)}' +
     '@media (pointer:coarse){' +
       /* the superseded mobile scheme retires on touch screens */
       '#espil-mmo-combat{display:none!important}' +
@@ -1392,6 +1408,49 @@
     else if (sheetOpen()) closeSheet(); else openSheet();
   });
   menu.appendChild(menuBtn);
+
+  /* COMM-CENTER WIDGET TOGGLE (Han 2026-11-25 17:27 item 2;
+     comm-widget/DESIGN.md section 2). The button only ever
+     calls the portal's own toggle(); when the portal module
+     has not landed yet (it rides the arrival bundle), the
+     click loads it with the same script-injection pattern the
+     portal itself uses for the cash module, then toggles.
+     Place-space child windows never get the button: the
+     portal is a stub there by design. The active face follows
+     the portal's 'espil-portal-state' event, so the button
+     can never disagree with the window it drives. */
+  var portalBtn = null;
+  var portalPlace = false;
+  try { portalPlace = !!sessionStorage.getItem('espil_store_space_v1'); } catch (e) {}
+  if (!portalPlace) {
+    portalBtn = mk('button', 'espil-hud2-portal', '🏪');
+    portalBtn.type = 'button';
+    portalBtn.setAttribute('aria-label', '커뮤니티 센터');
+    portalBtn.setAttribute('aria-expanded', 'false');
+    var paintPortalBtn = function () {
+      try {
+        var on = !!(window.__espilPortal && window.__espilPortal.state && window.__espilPortal.state().open);
+        portalBtn.classList.toggle('on', on);
+        portalBtn.setAttribute('aria-expanded', on ? 'true' : 'false');
+      } catch (e) {}
+    };
+    portalBtn.addEventListener('click', function () {
+      try {
+        if (window.__espilPortal && window.__espilPortal.toggle) { window.__espilPortal.toggle(); paintPortalBtn(); return; }
+        if (window.__espilPortal && window.__espilPortal.open) { window.__espilPortal.open(); paintPortalBtn(); return; }
+      } catch (e) {}
+      try {
+        var s = document.createElement('script');
+        s.src = 'modules/comm-portal.js';
+        s.onload = function () {
+          try { if (window.__espilPortal && window.__espilPortal.toggle) window.__espilPortal.toggle(); } catch (e) {}
+          paintPortalBtn();
+        };
+        document.head.appendChild(s);
+      } catch (e) {}
+    });
+    window.addEventListener('espil-portal-state', paintPortalBtn);
+  }
 
   /* ---- FLIP BOOK MENU (Han 2026-11-16) -------------------------
      Nine pages: Index, Skill, Items, Bag, Map, Stall, Friends /
@@ -2142,7 +2201,7 @@
   var mounted = false;
   function mount() {
     if (!document.body) return;
-    [coin, score, timefps, menu, bars, chars, chatBtn, chatTab, actions, sheet, assignSheet, book].forEach(function (n) {
+    [coin, score, timefps, menu, bars, chars, chatBtn, chatTab, actions, sheet, assignSheet, book, portalBtn].forEach(function (n) {
       if (n && !n.parentNode) document.body.appendChild(n);
     });
     var wrap = el('minimap-wrap');

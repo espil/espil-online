@@ -269,7 +269,24 @@
   function unequip(slot) { var m = equippedMap(); delete m[slot]; saveEq(m); gearChanged(); renderAll(); }
   function equipLook(name) { var s = resolveLookSlot(name); if (!s) return null; var m = lookMap(); m[s] = name; saveLook(m); gearChanged(); renderAll(); return s; }
   function unequipLook(slot) { var m = lookMap(); delete m[slot]; saveLook(m); gearChanged(); renderAll(); }
-  window.__espilGear = { owned: ownedCounts, equipped: equippedMap, slotOf: slotOf, equip: equip, unequip: unequip };
+  /* COMM-WIDGET seam (Han 2026-11-25 17:27 item 2, comm-widget/
+     DESIGN.md section 5): the market card image's tier-1 lookup.
+     A listing title that EXACTLY matches a DB item (the English
+     name first, then kr) resolves to that item's real icon - the
+     same SVG the bag paints - plus its colour pair so the caller
+     can tint the tile. Anything else returns null and the caller
+     falls back to its category tile: a near-name guess is never
+     painted, because a wrong picture is a false listing. The DB
+     stays here; callers never carry a copy of it. */
+  function iconLookup(title) {
+    if (!title) return null;
+    var t = String(title), it = null, i;
+    for (i = 0; i < DB.length; i++) { if (DB[i].name === t) { it = DB[i]; break; } }
+    if (!it) for (i = 0; i < DB.length; i++) { if (DB[i].kr && DB[i].kr === t) { it = DB[i]; break; } }
+    if (!it || !it.app) return null;
+    return { svg: iconSVG(it, 96), c1: it.app.c1 || '', c2: it.app.c2 || '', name: it.name };
+  }
+  window.__espilGear = { owned: ownedCounts, equipped: equippedMap, slotOf: slotOf, equip: equip, unequip: unequip, iconLookup: iconLookup };
 
   /* S4 weapon stat hook for the S1 damage path (consumed guarded):
      the mid-range of the equipped weapon's atk, or matk when its
