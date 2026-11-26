@@ -3532,6 +3532,7 @@
       return true;
     }
     function espilTryAttachClimb(p,mx,mz){
+      if(!ESPIL_ROOF_ACCESS)return false; /* COLLISION DISABLE (Han 2026-11-25, directive 5): no climb attach while roof access is off - see the flag at ESPIL_P1 */
       if(ESPIL_P1)return espilTryAttachClimbPoly(p,mx,mz);
       var off=espilClimbTileOff(p), base=p.pos.y, list=espilClimbCandidates(p), best=null;
       for(var i=0;i<list.length;i++){
@@ -3685,6 +3686,18 @@
        style fails to load, a visible guidance banner is shown instead
        of a silent skip. */
     var ESPIL_P1=true;
+    /* COLLISION DISABLE (Han 2026-11-25, directive 5): wall-climbing
+       and rooftop access are OFF until collision is properly fixed.
+       This one flag gates all three ascent paths: the climb attach
+       funnel (espilTryAttachClimb - gating it also starves the wall
+       jump and the climb-top roof step, which both require the climb
+       state), the ROOF MANTLE block, and the INSIDE-FOOTPRINT
+       RECOVERY (which, while this flag is off, resolves an
+       in-footprint centre to the street edge via espilResumeEdgePoint
+       instead of lifting it onto the roof). Re-enabling after the
+       collision fix is this one line: ESPIL_ROOF_ACCESS=true
+       restores the shipped behaviour. */
+    var ESPIL_ROOF_ACCESS=false;
     /* AVATAR SIZE HELD CONSTANT (Han 2026-11-05): the layer-mode
        avatar growth factor is FROZEN at its approved default-framing
        (zoom 19.3) value, 4.67 x 2^(-(19.3-18.3)/2) = 3.302. It used to
@@ -14372,7 +14385,22 @@
         if(support<=.05&&!p._espilClimb&&!p._espilArrive&&!window.__espilInside&&spb){
           for(var sri=0;sri<spb.length;sri++){
             var rrec=spb[sri];
-            if(rrec.h>p.pos.y+.55&&espilPolyProbe(rrec,p.pos.x,p.pos.z).inside){support=rrec.h;supportCar=null;break;}
+            if(rrec.h>p.pos.y+.55&&espilPolyProbe(rrec,p.pos.x,p.pos.z).inside){
+              if(ESPIL_ROOF_ACCESS){support=rrec.h;supportCar=null;}
+              else{
+                /* COLLISION DISABLE (Han 2026-11-25, directive 5):
+                   with roof access off, the rescue resolves to the
+                   street, not the roof - push the centre to the
+                   footprint edge at ground level, reusing the resume
+                   edge rule's geometry (espilResumeEdgePoint). If no
+                   edge point is acceptable, support stays at street
+                   level and this block retries on the next frame
+                   instead of lifting. */
+                var ep3=espilResumeEdgePoint(p.pos.x,p.pos.z);
+                if(ep3){p.pos.x=ep3.x;p.pos.z=ep3.z;}
+              }
+              break;
+            }
           }
         }
         /* === ROOF MANTLE BEGIN (Han 2026-11-18) ===
@@ -14394,7 +14422,7 @@
            within ESPIL_ROOF_MANTLE_REACH below the pre-fall feet
            height, so every taller building keeps its exact old
            behaviour. */
-        if(support<=.05&&p.jumps>0&&!p.onGround&&!p._espilClimb&&!p._espilArrive&&!window.__espilInside&&spb){
+        if(ESPIL_ROOF_ACCESS&&support<=.05&&p.jumps>0&&!p.onGround&&!p._espilClimb&&!p._espilArrive&&!window.__espilInside&&spb){ /* COLLISION DISABLE (Han 2026-11-25, directive 5): the mantle is gated by ESPIL_ROOF_ACCESS - see the flag at ESPIL_P1 */
           for(var smi=0;smi<spb.length;smi++){
             var mrec=spb[smi];
             if(mrec.h>ESPIL_ROOF_MANTLE_MAX_H||mrec.h<=yBeforeFall+.55||mrec.h-yBeforeFall>ESPIL_ROOF_MANTLE_REACH)continue;
