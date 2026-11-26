@@ -15489,6 +15489,104 @@
       var lng=MAP_CENTER_LNG+(x/(111320*Math.cos(MAP_CENTER_LAT*Math.PI/180)));
       return [lat,lng];
     }
+    /* ==== MINIMAP THEME (Mapbox navigation day/night) - BEGIN ====
+       Han 2026-11-25 15:39 (option 1, decided): the minimap follows
+       the game's clock - Mapbox NAVIGATION DAY tiles by day,
+       NAVIGATION NIGHT tiles by night. Route B (census
+       minimap-theme/CENSUS.md): the Leaflet map, its markers,
+       stages and zoom ladder are untouched; only the TILE SUPPLY
+       changes. The 2026-10-12 move to Leaflet + OSM happened
+       because the in-code token was a placeholder; the token now
+       arrives through the same channel the world map uses
+       (window.__ESPIL_ENV__, read via espilP1Token() once
+       __ESPIL_ENV_READY__ resolves), so the OSM layer stays as
+       the permanent no-token floor: the minimap opens on OSM
+       exactly as today, and if the token is empty, errors or
+       never lands, OSM is what ships - never a blank box.
+       Driver: window.__espilNightState().factor ONLY (the same
+       hemisphere-derived state the night glow and the ground
+       tint read; 0 = day, 1 = night plateau, forced 0 indoors).
+       The swap is binary, so it borrows the glow pattern's
+       hysteresis pair verbatim: night tiles at factor >= 0.45,
+       day tiles back at factor <= 0.30 - between the two the
+       current tiles stay, so dawn/dusk shimmer cannot flap the
+       layer. The check rides updateLeafletMap's existing 200 ms
+       cadence; a swap adds the new tile layer before removing
+       the old one, so the frame is never empty, and markers
+       (player dot, peer dots, the Konbiniya badge) live in the
+       marker pane above the tile pane and are never touched.
+       Tiles: the styles v1 endpoint serves 512 px tiles on the
+       bare /tiles/{z}/{x}/{y} form (measured 2026-11-25), so the
+       layers use the standard tileSize 512 + zoomOffset -1 pair -
+       the ground scale on screen is exactly today's 256 px OSM
+       read, only sharper. Attribution: the map was created with
+       attributionControl:false and the tiles carried none; the
+       theme adds Leaflet's attribution control (prefix off) and
+       drives its string manually on every swap - Leaflet's own
+       per-layer attribution tracking was measured in the rig to
+       keep a removed layer's credit on the control (both credits
+       showed after a swap), so the layers carry no attribution
+       option and espilMinimapSetTiles moves the string itself:
+       the frame credits exactly the ACTIVE source (Mapbox + OSM
+       on Mapbox tiles, OSM alone on the fallback). */
+    var ESPIL_MINIMAP_STYLE_DAY='navigation-day-v1', ESPIL_MINIMAP_STYLE_NIGHT='navigation-night-v1';
+    var ESPIL_MINIMAP_NIGHT_ON=0.45, ESPIL_MINIMAP_NIGHT_OFF=0.30;
+    var ESPIL_MINIMAP_ATTR_OSM='&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors';
+    var ESPIL_MINIMAP_ATTR_MB='&copy; <a href="https://www.mapbox.com/about/maps/" target="_blank" rel="noopener">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
+    var espilMinimapTheme={mode:'osm',layer:null,osm:null,mbDay:null,mbNight:null,mbReady:false,armed:false,f:-1,swaps:0,attr:null,attrCtl:null};
+    function espilMinimapTilesUrl(style,tok){
+      return 'https://api.mapbox.com/styles/v1/mapbox/'+style+'/tiles/{z}/{x}/{y}?access_token='+tok;
+    }
+    function espilMinimapSetTiles(layer,mode){
+      var T=espilMinimapTheme;
+      if(!leafletMap||!layer||T.layer===layer)return;
+      layer.addTo(leafletMap); /* new layer first: no blank frame while it loads */
+      if(T.layer)leafletMap.removeLayer(T.layer);
+      T.layer=layer; T.mode=mode; T.swaps++;
+      if(T.attrCtl){
+        var wantAttr=(mode==='osm')?ESPIL_MINIMAP_ATTR_OSM:ESPIL_MINIMAP_ATTR_MB;
+        if(T.attr&&T.attr!==wantAttr)T.attrCtl.removeAttribution(T.attr);
+        if(T.attr!==wantAttr)T.attrCtl.addAttribution(wantAttr);
+        T.attr=wantAttr;
+      }
+    }
+    function espilMinimapThemeTick(force){
+      var T=espilMinimapTheme;
+      if(!leafletMap||!T.mbReady)return;
+      var st=null;
+      try{ st=window.__espilNightState?window.__espilNightState():null; }catch(e){}
+      if(!st||typeof st.factor!=='number'||st.factor<0)return;
+      var f=st.factor; if(f>1)f=1;
+      T.f=f;
+      var night=(T.mode==='night')?(f>ESPIL_MINIMAP_NIGHT_OFF):(f>=ESPIL_MINIMAP_NIGHT_ON);
+      var want=night?'night':'day';
+      if(!force&&want===T.mode)return;
+      espilMinimapSetTiles(night?T.mbNight:T.mbDay,want);
+    }
+    function espilMinimapThemeArm(){
+      var T=espilMinimapTheme;
+      if(T.armed)return;
+      T.armed=true;
+      var build=function(){
+        if(T.mbReady||!leafletMap)return;
+        var tok='';
+        try{ tok=(typeof espilP1Token==='function')?String(espilP1Token()||''):''; }catch(e){}
+        if(!tok)return; /* no token: OSM stays - the fallback IS the shipped behaviour */
+        T.mbDay=L.tileLayer(espilMinimapTilesUrl(ESPIL_MINIMAP_STYLE_DAY,tok),{tileSize:512,zoomOffset:-1,maxZoom:19});
+        T.mbNight=L.tileLayer(espilMinimapTilesUrl(ESPIL_MINIMAP_STYLE_NIGHT,tok),{tileSize:512,zoomOffset:-1,maxZoom:19});
+        T.mbReady=true;
+        espilMinimapThemeTick(true);
+      };
+      try{ (window.__ESPIL_ENV_READY__||Promise.resolve()).then(build,build); }catch(e){}
+      build(); /* the env may already be populated - init can run after it landed */
+    }
+    window.__espilMinimapThemeState=function(){
+      var T=espilMinimapTheme;
+      var url=(T.layer&&T.layer._url)?String(T.layer._url):null;
+      if(url)url=url.replace(/access_token=[^&]+/,'access_token=*');
+      return {mode:T.mode,mbReady:T.mbReady,f:T.f,swaps:T.swaps,url:url};
+    };
+    /* ==== MINIMAP THEME - END ==== */
     function initLeafletMap(){
       /* 2026-10-12 fix (Han): the Mapbox minimap never rendered — the access
          token in code was the '__PUT_YOUR_MAPBOX_TOKEN_HERE__' placeholder
@@ -15499,7 +15597,17 @@
       var el=document.getElementById('minimap');
       if(!el)return;
       leafletMap=L.map('minimap',{zoomControl:false,attributionControl:false,doubleClickZoom:false,scrollWheelZoom:false});
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(leafletMap);
+      /* MINIMAP THEME (2026-11-25): the OSM layer is created exactly
+         as before and stays the floor - the Mapbox navigation pair
+         replaces it only once the token lands (espilMinimapThemeArm),
+         and any token failure leaves this layer up for good. */
+      espilMinimapTheme.osm=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19});
+      espilMinimapTheme.osm.addTo(leafletMap);
+      espilMinimapTheme.layer=espilMinimapTheme.osm;
+      espilMinimapTheme.attrCtl=L.control.attribution({prefix:false}).addTo(leafletMap);
+      espilMinimapTheme.attrCtl.addAttribution(ESPIL_MINIMAP_ATTR_OSM);
+      espilMinimapTheme.attr=ESPIL_MINIMAP_ATTR_OSM;
+      espilMinimapThemeArm();
       var ll0=gameToLatLng(3,31);
       leafletMap.setView(ll0,CAULDRON_MINIMAP_LEVELS[minimapLevelIdx].zoom);
       playerMarker=L.marker(ll0,{interactive:false,icon:L.divIcon({className:'',
@@ -15536,6 +15644,7 @@
       var now=performance.now();
       if(now-lastMapCenter<200)return;
       lastMapCenter=now;
+      espilMinimapThemeTick(false); /* MINIMAP THEME: day/night tile check on the same 200 ms cadence */
       var ll=gameToLatLng(walkPlayer.pos.x,walkPlayer.pos.z);
       leafletMap.setView(ll,leafletMap.getZoom(),{animate:false});
       if(playerMarker)playerMarker.setLatLng(ll);
