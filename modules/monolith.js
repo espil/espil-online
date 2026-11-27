@@ -3717,17 +3717,21 @@
        of a silent skip. */
     var ESPIL_P1=true;
     /* COLLISION DISABLE (Han 2026-11-25, directive 5): wall-climbing
-       and rooftop access are OFF until collision is properly fixed.
-       This one flag gates all three ascent paths: the climb attach
-       funnel (espilTryAttachClimb - gating it also starves the wall
-       jump and the climb-top roof step, which both require the climb
-       state), the ROOF MANTLE block, and the INSIDE-FOOTPRINT
-       RECOVERY (which, while this flag is off, resolves an
-       in-footprint centre to the street edge via espilResumeEdgePoint
-       instead of lifting it onto the roof). Re-enabling after the
-       collision fix is this one line: ESPIL_ROOF_ACCESS=true
-       restores the shipped behaviour. */
-    var ESPIL_ROOF_ACCESS=false;
+       and rooftop access were OFF until collision was properly fixed.
+       COLLISION FIX (Han 2026-11-26, directive 7): the fix has landed
+       (the record sweep is now the primary wall judge - see
+       collideCircleAxis), so the flag is restored to true, exactly
+       the one line the disable package pre-wrote. The flag now gates
+       exactly the two ascent paths: the climb attach funnel
+       (espilTryAttachClimb - gating it also starves the wall jump
+       and the climb-top roof step, which both require the climb
+       state) and the ROOF MANTLE block. The INSIDE-FOOTPRINT
+       RECOVERY is no longer flag-gated: its edge push-out is
+       permanent (see H7 in updateWalkMap), so a centre inside a
+       footprint never resolves onto a roof again. Setting this flag
+       back to false disables climb + mantle exactly as the disable
+       package shipped; the push-out stays either way. */
+    var ESPIL_ROOF_ACCESS=true;
     /* AVATAR SIZE HELD CONSTANT (Han 2026-11-05): the layer-mode
        avatar growth factor is FROZEN at its approved default-framing
        (zoom 19.3) value, 4.67 x 2^(-(19.3-18.3)/2) = 3.302. It used to
@@ -7621,6 +7625,7 @@
         while(dleft>0){
           var step=Math.min(.3,dleft), nx=p.pos.x+dfx*step, nz=p.pos.z+dfz*step, blocked=false;
           try{ var pr=window.__espilCollisionProbe?window.__espilCollisionProbe(nx,nz):null; if(pr&&pr.blocked)blocked=true; }catch(e){}
+          try{ if(!blocked&&espilPolyPointBlocked(nx,nz,p.pos.y))blocked=true; }catch(e){} /* COLLISION FIX (Han 2026-11-26, directive 7): the dash also consults the building records, not only the class grid */
           if(blocked)break;
           p.pos.x=nx; p.pos.z=nz; dleft-=step;
         }
@@ -10593,9 +10598,10 @@
         var dx=p.pos.x-q.x, dz=p.pos.z-q.z;
         var d2=dx*dx+dz*dz;
         if(d2>=R*R)continue;
-        if(d2<0.0001){ p.pos.x+=R; continue; }
+        if(d2<0.0001){ if(!espilPolyPointBlocked(p.pos.x+R,p.pos.z,p.pos.y))p.pos.x+=R; continue; } /* COLLISION FIX (Han 2026-11-26, directive 7): never push the player into a building record */
         var d=Math.sqrt(d2), push=(R-d)/d;
-        p.pos.x+=dx*push; p.pos.z+=dz*push;
+        var tx=p.pos.x+dx*push, tz=p.pos.z+dz*push;
+        if(!espilPolyPointBlocked(tx,tz,p.pos.y)){ p.pos.x=tx; p.pos.z=tz; }
       }
     }
 
@@ -11367,6 +11373,7 @@
               var nx=walkPlayer.pos.x+dx/dl*(total/steps), nz=walkPlayer.pos.z+dz/dl*(total/steps);
               var pr=window.__espilCollisionProbe?window.__espilCollisionProbe(nx,nz):null;
               if(pr&&pr.blocked)break;
+              if(espilPolyPointBlocked(nx,nz,walkPlayer.pos.y))break; /* COLLISION FIX (Han 2026-11-26, directive 7): knockback also consults the building records */
               walkPlayer.pos.x=nx; walkPlayer.pos.z=nz; moved+=total/steps;
             }
             espilHurt.kb=Math.round((espilHurt.kb+moved)*100)/100;
@@ -14192,6 +14199,25 @@
       }
       return false;
     }
+    /* COLLISION FIX (Han 2026-11-26, directive 7): the record
+       point test the non-walk movement writers (dash, knockback,
+       player-player push, the car module) share - true when a circle
+       of radius r (default PLAYER_R) at (x,z) would touch a record
+       that clears the shared height gate. False until the records
+       are built, matching the probe's pre-load behaviour. */
+    function espilPolyPointBlocked(x,z,py,r){
+      var pb=espilPolyBucketAt(x,z); if(!pb)return false;
+      var rr=(typeof r==='number')?r:PLAYER_R;
+      var refY=espilP1GroundRefY(x,z,py);
+      for(var i=0;i<pb.length;i++){
+        var rec=pb[i];
+        if(rec.h-refY<=.55)continue;
+        if(x<rec.x0-rr||x>rec.x1+rr||z<rec.z0-rr||z>rec.z1+rr)continue;
+        if(espilPolyProbe(rec,x,z).d<rr)return true;
+      }
+      return false;
+    }
+    window.__espilPolyBlockedAt=espilPolyPointBlocked;
     function espilP1QrfAxis(p,axis,r){
       var qs=window.__espilQrfStats||(window.__espilQrfStats={calls:0,hits:0,fallbacks:0,ms:0});
       if(!espilP1.map||!espilP1.ready||espilP1.failed){ qs.fallbacks++; return false; }
@@ -14286,7 +14312,13 @@
          rates (frame steps of several metres) the circle can no
          longer tunnel through a thin building between samples -
          point sampling did exactly that on Han's PC (22:15). */
-      if(ESPIL_P1&&(window.__espilInside||!espilP1QrfAxis(p,axis,r))){
+      if(ESPIL_P1){ /* COLLISION FIX (Han 2026-11-26, directive 7): the
+         exact record sweep is the primary wall judge. The rendered-layer
+         query (espilP1QrfAxis) no longer pre-empts it: it read an
+         untiled layer as "no wall" at entry and after every paint
+         setData, and its two-point sampling let the circle's diagonal
+         edge into corners. The sweep below measures true ring distance
+         at 0.25 m sub-steps, independent of map rendering. */
         var delta=(axis==='x'?p._dx:p._dz)||0;
         var nSub=Math.max(1,Math.min(64,Math.ceil(Math.abs(delta)/0.25)));
         var endA=(axis==='x'?p.pos.x:p.pos.z), startA=endA-delta;
@@ -14466,10 +14498,15 @@
        has landed long before the dive in all but pathological
        loads. Two bounded exits keep it from ever becoming a
        soft-lock: a failed fetch is retried (throttled) while the
-       hold stands, and 30 s after free movement began the hold
-       releases unconditionally - into the pre-fix unjudged state,
-       never into a freeze; that mirrors the entry gates' own
-       "never held hostage" failsafe. Interiors are exempt: the
+       hold stands. COLLISION FIX (Han 2026-11-26, directive 7):
+       the second bounded exit this comment used to record - a 30 s
+       unconditional release into the unjudged state - is REMOVED:
+       an unjudged world must hold, not silently open (the release
+       re-opened the entry window the hold exists to close). If the
+       district fetch permanently fails the hold never releases,
+       but that session has no buildings, no collision and no
+       ground classes at all - a broken session either way - and
+       the retry loop below is unbounded. Interiors are exempt: the
        inside tick's footprint clamp, not the district records,
        judges movement there. The vehicle path needs no gate -
        boarding requires foot movement first, which the hold
@@ -14484,11 +14521,6 @@
       if(window.__espilInside)return false; /* the inside clamp owns interiors, not the district records */
       var now=Date.now();
       if(!espilDistrictHoldSince)espilDistrictHoldSince=now;
-      if(now-espilDistrictHoldSince>ESPIL_DISTRICT_HOLD_CAP_MS){
-        espilDistrictHoldOver=true;
-        console.warn('[District] fix batch 9: movement hold released after 30 s without a district build - movement is unjudged until the data lands');
-        return false;
-      }
       if(!espilDistrictLoading&&now>=espilDistrictHoldRetryAt){ espilDistrictHoldRetryAt=now+2000; loadEspilDistrict(); }
       return true;
     }
@@ -14646,19 +14678,22 @@
           for(var sri=0;sri<spb.length;sri++){
             var rrec=spb[sri];
             if(rrec.h>p.pos.y+.55&&espilPolyProbe(rrec,p.pos.x,p.pos.z).inside){
-              if(ESPIL_ROOF_ACCESS){support=rrec.h;supportCar=null;}
-              else{
-                /* COLLISION DISABLE (Han 2026-11-25, directive 5):
-                   with roof access off, the rescue resolves to the
-                   street, not the roof - push the centre to the
-                   footprint edge at ground level, reusing the resume
-                   edge rule's geometry (espilResumeEdgePoint). If no
-                   edge point is acceptable, support stays at street
-                   level and this block retries on the next frame
-                   instead of lifting. */
-                var ep3=espilResumeEdgePoint(p.pos.x,p.pos.z);
-                if(ep3){p.pos.x=ep3.x;p.pos.z=ep3.z;}
-              }
+              /* COLLISION FIX (Han 2026-11-26, directive 7): the
+                 rescue resolves to the street, not the roof -
+                 PERMANENTLY, no longer flag-gated. A centre inside
+                 a footprint is a defect state, never a legitimate
+                 one; lifting it onto a roof would mask exactly the
+                 residual penetrations this fix must catch and would
+                 re-open a rooftop door for every other writer
+                 (teleport seam, village clamp, car carry) that can
+                 place a centre inside. Push the centre to the
+                 footprint edge at ground level, reusing the resume
+                 edge rule's geometry (espilResumeEdgePoint). If no
+                 edge point is acceptable, support stays at street
+                 level and this block retries on the next frame
+                 instead of lifting. */
+              var ep3=espilResumeEdgePoint(p.pos.x,p.pos.z);
+              if(ep3){p.pos.x=ep3.x;p.pos.z=ep3.z;}
               break;
             }
           }

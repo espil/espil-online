@@ -181,6 +181,11 @@
   function toast(msg) { try { if (window.__espilToast) window.__espilToast(msg); } catch (e) {} }
   function blocked(x, z) {
     try {
+      /* COLLISION FIX (Han 2026-11-26, directive 7): the car also
+         consults the building records at its nose probe point
+         (r=0.9 covers the sedan's corners at the probe point); the
+         class-grid test below stays as a second net. */
+      if (window.__espilPolyBlockedAt && window.__espilPolyBlockedAt(x, z, 0.05, 0.9)) return true;
       var r = window.__espilCollisionProbe && window.__espilCollisionProbe(x, z);
       if (!r) return false;
       if (typeof r === 'object') return !!r.blocked;
