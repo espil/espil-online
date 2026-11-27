@@ -10538,6 +10538,7 @@
       var drop=(typeof espilGlobeDrop==='function')?espilGlobeDrop(p.pos.x,p.pos.z):0;
       espilOwnPlate.position.set(p.pos.x,p.pos.y+2.05*F-drop,p.pos.z);
       var ph=0.6*F; espilOwnPlate.scale.set(ph*3.4,ph,1);
+      if(typeof mapCamera!=='undefined'&&mapCamera)espilOwnPlate.quaternion.copy(mapCamera.quaternion); /* BILLBOARD (Han 2026-11-26 item 10): face the rendering camera - the owner-chip idiom; mapCamera is posed by the same law on both render paths */
       espilOwnPlate.visible=espilAvatarVisible();
     }
     window.__espilNameplateState=function(){
@@ -10612,6 +10613,15 @@
       f:{state:0,scene:null,clips:null,groundY:0,waiters:[]}
     };
     function __espilMapScene(){ try{ return (typeof mapScene!=='undefined'&&mapScene)?mapScene:null; }catch(_){ return null; } }
+    var __espilPlateGeoInst=null;
+    function __espilPlateGeo(){
+      /* One shared unit plane for every plate (the sprite's
+         geometry was shared the same way); callers scale it to
+         the plate law, so nothing per-plate is disposed. */
+      if(!__espilPlateGeoInst)__espilPlateGeoInst=new THREE.PlaneGeometry(1,1);
+      return __espilPlateGeoInst;
+    }
+    var __espilPlateInvQ=new THREE.Quaternion();
     function __espilMakeNameplate(name,accent){
       try{
         var cv=document.createElement('canvas'); cv.width=256; cv.height=64;
@@ -10622,8 +10632,26 @@
         cx.strokeText(nm,128,34); cx.fillStyle='#fff'; cx.fillText(nm,128,34);
         if(accent){ try{ cx.fillStyle=accent; var __bw=Math.max(38,Math.min(190,cx.measureText(nm).width)); cx.fillRect(128-__bw/2,54,__bw,5); }catch(_){} }
         var tex=new THREE.CanvasTexture(cv);
-        var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));
+        /* BILLBOARD PLANE, not a THREE.Sprite (Han 2026-11-26,
+           item 10 - names face the camera frontally): the r128
+           sprite shader billboards against the render camera's
+           matrixWorldInverse, which in the Mapbox custom layer
+           is the identity matrix (measured - the layer camera
+           carries only a projection), so sprite plates never
+           face the real camera there and in practice do not
+           reach the frame at all (the owner chip's 2026-10-26
+           verification, re-measured in nameplate-billboard's
+           census at five camera yaws). A plane on the factory's
+           shared unit geometry, oriented per frame by the two
+           plate ticks (the owner-chip idiom), draws on both
+           render paths. espilAvatarMat keeps the curvature
+           sweep's exemption the SpriteMaterial had by type -
+           the plate is CPU-anchored to the bent ground like
+           the avatar, never shader-bent. */
+        var sp=new THREE.Mesh(__espilPlateGeo(),new THREE.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false}));
+        sp.material.userData.espilAvatarMat=true;
         sp.renderOrder=50;
+        sp.frustumCulled=false;
         return sp;
       }catch(_){ return null; }
     }
@@ -10856,7 +10884,8 @@
           var ss=Math.min(F,4); R.shadow.scale.set(ss,ss,1);
           R.shadow.material.opacity=Math.max(.08,.26-Math.max(0,R.cur.y-rSup)*.05);
           if(R.visual){ R.visual.scale.setScalar(1.5*F); R.visual.position.y=R.baseY*F; }
-          if(R.plate){ R.plate.position.y=2.05*F; var ph=0.6*F; R.plate.scale.set(ph*3.4,ph,1); }
+          if(R.plate){ R.plate.position.y=2.05*F; var ph=0.6*F; R.plate.scale.set(ph*3.4,ph,1);
+            if(typeof mapCamera!=='undefined'&&mapCamera){ R.group.getWorldQuaternion(__espilPlateInvQ).invert(); R.plate.quaternion.copy(__espilPlateInvQ.multiply(mapCamera.quaternion)); } /* BILLBOARD (Han 2026-11-26 item 10): cancel the group's facing yaw so the plate itself faces the rendering camera */ }
           if(R.bubble){
             var bvis=now<R.bubbleUntil;
             R.bubble.visible=bvis;
