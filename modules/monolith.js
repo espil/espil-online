@@ -2895,6 +2895,173 @@
        the district plus a harbour plane north of the waterfront
        street. Gameplay reads the stored collision map; these planes
        are the visual surface only. */
+    /* ==== WATER TEXTURE (Han 2026-11-26 item 6a; visible-water
+       build 2026-11-27) ====
+       The delivered seamless tile (assets/props/ground/
+       water_tile_512.png) on the water a player actually
+       sees. The diagnosis behind the shape (water-visible/
+       BUILD-REPORT.md, all of it measured on the rig):
+       in P1 mode the visible ground is the Mapbox basemap
+       alone - espilP1Hide retires every THREE ground plane,
+       and it retires any PlaneGeometry whose width is >= 400
+       or whose material map image is not a CANVAS (the
+       3600 m harbour slab and v1's IMG-textured planes were
+       faded to opacity 0 and made invisible). The tile is
+       therefore served through a CanvasTexture - canvas-
+       backed maps are the hide pass's own exemption - its
+       canvas pre-filled with the old flat colour 0x2a6a9e
+       until the PNG lands.
+       Vancouver has no single water plane: shoreline chunks
+       generated none (the old all-water corner test) and the
+       baked grid classes the inner harbour 'land' outside a
+       thin dock strip. The chunk water is therefore a
+       per-chunk overlay of 10 m quads whose corners read
+       water on the union sampler (espilWaterCellAt): the
+       baked grid first (its 'water'/swimmable classes paint,
+       'building'/'roof' veto), then the game's own satellite
+       photograph classified per pixel (the basin the grid
+       misses: 98.7% photo-water against 3 grid-water samples
+       in the measured cross-tab; downtown false positives
+       0.000). Isolated single cells are dropped (despeckle).
+       One tile covers ESPIL_WATER_TILE_M metres of world
+       (DRAFT); the scroll advances every cached texture's
+       offset by (+0.004, +0.0017)/s - a slow diagonal drift
+       (DRAFT) - driven from animate(), no second rAF loop.
+       The materials are Lambert, so the scene's day/night
+       lighting treats the water like the character; the
+       basemap night tint (a GL layer under the game layer)
+       cannot reach these surfaces and is not needed. */
+    var ESPIL_WATER_TILE_M=24;
+    var espilWaterTexCache={};
+    function espilWaterTileTex(rx,ry){
+      var key=rx+'x'+ry;
+      var t=espilWaterTexCache[key];
+      if(t)return t;
+      var cv=document.createElement('canvas'); cv.width=512; cv.height=512;
+      var cx2=cv.getContext('2d');
+      cx2.fillStyle='#2a6a9e'; cx2.fillRect(0,0,512,512);
+      t=new THREE.CanvasTexture(cv);
+      t.wrapS=t.wrapT=THREE.RepeatWrapping;
+      t.repeat.set(rx,ry);
+      t.colorSpace=THREE.SRGBColorSpace;
+      var img=new Image();
+      img.onload=function(){ cx2.drawImage(img,0,0,512,512); t.needsUpdate=true; };
+      img.src='assets/props/ground/water_tile_512.png';
+      espilWaterTexCache[key]=t;
+      return t;
+    }
+    var espilWaterMatShared=null;
+    function espilWaterMat(){
+      if(espilWaterMatShared)return espilWaterMatShared;
+      espilWaterMatShared=new THREE.MeshLambertMaterial({map:espilWaterTileTex(1,1),transparent:true,opacity:.92});
+      return espilWaterMatShared;
+    }
+    function espilWaterScrollTick(dt){
+      if(!(dt>0))return;
+      for(var k in espilWaterTexCache){
+        var t=espilWaterTexCache[k];
+        t.offset.x=(t.offset.x+0.004*dt)%1;
+        t.offset.y=(t.offset.y+0.0017*dt)%1;
+      }
+    }
+    /* The satellite photograph as a water sampler. The image
+       is the game's own baked ground (satellite_z15.jpg over
+       x -5008..5356, z -5521..4854 - the buildWalkMapOnce
+       bounds); it is drawn once to a 1664 px canvas when it
+       lands (H5) and classified per sample: harbour water in
+       this imagery is a dark teal whose green channel clears
+       its red by a wide margin (measured: basin samples
+       G-R 37..42 against 14 for forest, 5 for rooftops). */
+    var espilWaterPhoto=null;
+    function espilWaterPhotoArm(img){
+      try{
+        var S=1664;
+        var cv=document.createElement('canvas'); cv.width=S; cv.height=S;
+        var cx2=cv.getContext('2d');
+        cx2.drawImage(img,0,0,S,S);
+        espilWaterPhoto={data:cx2.getImageData(0,0,S,S).data,w:S,h:S};
+      }catch(e){ espilWaterPhoto=null; }
+    }
+    function espilWaterPhotoAt(x,z){
+      var P=espilWaterPhoto; if(!P)return false;
+      var u=Math.floor((x+5008)/10364*P.w), v=Math.floor((z+5521)/10375*P.h);
+      if(u<0||v<0||u>=P.w||v>=P.h)return false;
+      var i=(v*P.w+u)*4, r=P.data[i], g=P.data[i+1], b=P.data[i+2];
+      return (g-r>=25)&&(b-r>=12)&&(r<=80)&&(g<=130);
+    }
+    /* One overlay corner's water answer. The baked grid is
+       the authority where it reaches: 'water'/swimmable
+       paint, 'building'/'roof' veto (land is never painted),
+       anything else falls to the photo sampler. Where the
+       grid does not reach, isWaterAt's own answer (the
+       legacy rectangles) and the photo sampler union. */
+    function espilWaterCellAt(x,z){
+      var probe=window.__espilCollisionProbe||null;
+      var pr=probe?probe(x,z):null;
+      if(pr){
+        if(pr.cls==='building'||pr.cls==='roof')return false;
+        if(pr.cls==='water'||pr.swimmable)return true;
+        return espilWaterPhotoAt(x,z);
+      }
+      return isWaterAt(x,z)||espilWaterPhotoAt(x,z);
+    }
+    /* Chunk water overlay: quads over one 250 m chunk's water
+       cells. A 10 m cell paints only when all four corners
+       read water on the union sampler, so shorelines stay
+       conservative; a painted cell with no painted neighbour
+       is then dropped (despeckle). UVs are world-based
+       (metres / ESPIL_WATER_TILE_M), so the tile runs
+       continuous across cells and chunks. y = .2, the pre-P1
+       chunk water height. */
+    function espilBuildChunkWater(x0,z0){
+      var N=25, cell=CHUNK_SIZE/N;
+      var gw=[], j, i;
+      for(j=0;j<=N;j++){
+        gw.push([]);
+        for(i=0;i<=N;i++)gw[j].push(espilWaterCellAt(x0+i*cell,z0+j*cell));
+      }
+      var paint=[];
+      for(var cj=0;cj<N;cj++){
+        paint.push([]);
+        for(var ci=0;ci<N;ci++)
+          paint[cj].push(!!(gw[cj][ci]&&gw[cj][ci+1]&&gw[cj+1][ci]&&gw[cj+1][ci+1]));
+      }
+      var pos=[],uv=[],nor=[],idx=[];
+      for(var pj=0;pj<N;pj++)for(var pi=0;pi<N;pi++){
+        if(!paint[pj][pi])continue;
+        var nb=(pi>0&&paint[pj][pi-1])||(pi<N-1&&paint[pj][pi+1])||(pj>0&&paint[pj-1][pi])||(pj<N-1&&paint[pj+1][pi]);
+        if(!nb)continue; /* despeckle: isolated single cell */
+        var xa=x0+pi*cell, xb=xa+cell, za=z0+pj*cell, zb=za+cell;
+        var b=pos.length/3;
+        pos.push(xa,.2,za, xb,.2,za, xb,.2,zb, xa,.2,zb);
+        uv.push(xa/ESPIL_WATER_TILE_M,za/ESPIL_WATER_TILE_M, xb/ESPIL_WATER_TILE_M,za/ESPIL_WATER_TILE_M, xb/ESPIL_WATER_TILE_M,zb/ESPIL_WATER_TILE_M, xa/ESPIL_WATER_TILE_M,zb/ESPIL_WATER_TILE_M);
+        nor.push(0,1,0, 0,1,0, 0,1,0, 0,1,0);
+        idx.push(b,b+2,b+1, b,b+3,b+2);
+      }
+      if(!idx.length)return null;
+      var g=new THREE.BufferGeometry();
+      g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+      g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+      g.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3));
+      g.setIndex(idx);
+      var m=new THREE.Mesh(g,espilWaterMat());
+      m.frustumCulled=false;
+      return m;
+    }
+    /* When the satellite photograph lands (H5), chunks that
+       generated before it carry grid-only overlays; rebuild
+       the loaded set once, the refreshOsmChunks pattern. */
+    function refreshWaterChunks(){
+      if(typeof chunkMap==='undefined'||!chunkMap)return;
+      var keys=[];
+      for(var k in chunkMap)keys.push(k);
+      keys.forEach(function(key){
+        var parts=key.split(',');
+        var cx=parseInt(parts[0],10), cz=parseInt(parts[1],10);
+        unloadChunk(cx,cz);
+        generateChunk(cx,cz);
+      });
+    }
     function espilBuildCityGround(cfg){
       if(typeof mapScene==='undefined'||!mapScene)return;
       /* Generalized (Tokyo, 2026-10-18; restored with the New York
@@ -2908,7 +3075,7 @@
       ground.rotation.x=-Math.PI/2; ground.position.set((b.x0+b.x1)/2,-0.02,(b.z0+b.z1)/2);
       ground.receiveShadow=true; ground.frustumCulled=false; mapScene.add(ground);
       if(cfg.harbour){
-        var wmat=new THREE.MeshLambertMaterial({color:0x2a6a9e,transparent:true,opacity:.92});         var water=new THREE.Mesh(new THREE.PlaneGeometry(cfg.harbour.w,cfg.harbour.d,32,8),wmat);
+        var wmat=new THREE.MeshLambertMaterial({map:espilWaterTileTex(Math.max(1,Math.round(cfg.harbour.w/ESPIL_WATER_TILE_M)),Math.max(1,Math.round(cfg.harbour.d/ESPIL_WATER_TILE_M))),transparent:true,opacity:.92});         var water=new THREE.Mesh(new THREE.PlaneGeometry(cfg.harbour.w,cfg.harbour.d,32,8),wmat);
         water.rotation.x=-Math.PI/2; water.position.set(cfg.ox+cfg.harbour.dx,0.02,cfg.oz+cfg.harbour.dz);
         water.receiveShadow=true; water.frustumCulled=false; mapScene.add(water);
       }
@@ -5337,6 +5504,7 @@
             /* Apply globe curve */
                         mapScene.add(smesh);
             window.__satelliteReady=true;
+            espilWaterPhotoArm(tex.image); refreshWaterChunks(); /* water overlay photo sampler (item 6a) */
             window.__satTexSize=tex.image.width+'x'+tex.image.height;
             if(window.__satelliteProgress)window.__satelliteProgress(100);
             console.log('[Satellite] Loaded');
@@ -6348,14 +6516,9 @@
       /* --- Ground: one plane per chunk. Water chunks get water, else land. --- */
       var allWater=isWaterAt(x0,z0)&&isWaterAt(x0+CHUNK_SIZE,z0)&&
                    isWaterAt(x0,z0+CHUNK_SIZE)&&isWaterAt(x0+CHUNK_SIZE,z0+CHUNK_SIZE);
-      if(allWater){
-        var wgeo=new THREE.PlaneGeometry(CHUNK_SIZE,CHUNK_SIZE,1,1);
-        var wmat=new THREE.MeshLambertMaterial({color:0x2a6a9e,transparent:true,opacity:.92});
-                var wmesh=new THREE.Mesh(wgeo,wmat);
-        wmesh.rotation.x=-Math.PI/2;
-        wmesh.position.set(x0+CHUNK_SIZE/2,.2,z0+CHUNK_SIZE/2);
-        group.add(wmesh);
-      }else{
+      var wmesh=espilBuildChunkWater(x0,z0);
+      if(wmesh)group.add(wmesh);
+      if(!allWater){
         /* #8b: Satellite is the ground now — chunk ground planes removed.
            (Water chunks still get water plane below.) */
         /*
@@ -15773,6 +15936,7 @@
       if(cityPhaseActive){
         /* Walkable downtown map owns the frame. */
         updateWalkMap(dt,nowMs/1000);
+        espilWaterScrollTick(dt); /* water texture drift (Han 2026-11-26 item 6a) */
         if(walkPlayer)espilPaintAnchor.set(walkPlayer.pos.x,walkPlayer.pos.z);
         if(typeof ESPIL_P1!=='undefined'&&ESPIL_P1)espilP1PaintUpdate(); /* extrusion paint pass (zoom LOD) gate */
         espilP1Tick(); /* MAPBOX PHASE 1 tick */
