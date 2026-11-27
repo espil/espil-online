@@ -20,9 +20,13 @@
    CURRENT city room's board. Posts live in the CityRoom's memory
    only (ring buffer, last 50, 24 h) and are replayed at join;
    NOTHING is stored server-side. Reading is open to everyone in
-   the room, guests included; writing is signed-in only - the
-   Worker refuses guest frames and stamps the author's confirmed
-   name, so this module only mirrors that gate in the UI. Text
+   the room, guests included; writing is open to everyone joined
+   to the room too (NAME-ONLY ENTRY 2026-11-24 opened the Worker
+   side; GUESTS WRITE TOO, Han 2026-11-26 directive 3, removed
+   this module's sign-in mirror) - the Worker stamps the author's
+   join-confirmed name (a session-less join's name passed the
+   join backstops), so the composer below is rendered for every
+   entrant and the frame carries no name of its own. Text
    cap 300 (the chat cap). A post may carry a sale flag; when the
    author's stall is up in the same room, the post links to the
    stall board (__espilStallView) - the trade itself settles
@@ -388,11 +392,14 @@
   }
   function renderComposer() {
     if (!compEl) return;
-    if (!signedIn()) {
-      compEl.innerHTML = '<div class="epw-note">글을 쓰려면 로그인이 필요합니다. 읽기는 누구나 할 수 있습니다.</div>';
-      inputEl = null; saleEl = null;
-      return;
-    }
+    /* GUESTS WRITE TOO (Han 2026-11-26 directive 3): the
+       composer renders for every entrant, signed-in or not. The
+       old sign-in mirror is gone - the Worker has accepted
+       session-less feed_post frames since NAME-ONLY ENTRY
+       (2026-11-24) and stamps the join-confirmed name itself,
+       so a guest's post carries the guest's own room name
+       exactly like an account post. signedIn() survives only
+       as a state() report (below); it gates nothing here. */
     compEl.innerHTML =
       '<textarea id="ep-feed-input" maxlength="300" placeholder="이 도시에 글 남기기 (300자)"></textarea>' +
       '<div class="epw-comp-row">' +
