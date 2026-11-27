@@ -1535,10 +1535,14 @@
   /* ---------------- city selection layer ----------------
      Monolith's reel lists only the cities its selectable set
      opens, and its pins sit disabled for the rest. While the
-     flow is at the city step this layer re-enables every pin
-     and routes each pick - a bundle city through the entry-
-     confirmation law below, every other city to the
-     preparation panel. The LIST itself shows the enterable
+     flow is at the city step this layer routes the pin picks
+     that can arrive - a bundle city through the entry-
+     confirmation law below. A bundle-less pin keeps the
+     inactive form monolith built it with, stays disabled
+     and is inert: its click opens nothing (GLOBE PIN FORM,
+     Han 2026-11-27; the preparation panel is reached from
+     the city's own address, not from its pin). The LIST
+     itself shows the enterable
      cities only (Han 2026-11-26, correction 2: bundle-less
      cities are hidden from the list; their inactive form
      lives on the globe's pins, monolith's surface). */
@@ -1617,8 +1621,16 @@
       if ((!cities.length || !list) && tries < 200) return;
       clearInterval(timer);
       if (!list) return;
-      /* pins: every city selectable */
+      /* pins: the bundle cities are enabled (monolith never
+         locks them; this remains as the belt for that set).
+         Bundle-less pins KEEP the inactive form monolith
+         built them with and stay disabled - inert (GLOBE PIN
+         FORM, Han 2026-11-27): a bundle-less pin click must
+         not respond and must not open the preparation panel;
+         the panel stays reachable from the city's own
+         address - see the path preselect below. */
       cities.forEach(function (c) {
+        if (!BUNDLE_CITIES[c.name]) return;
         c.pin.disabled = false;
         c.pin.classList.remove('is-inactive');
       });
@@ -1819,10 +1831,14 @@
         }
       }
     }, 300);
-    /* pin picks for bundle-less cities: capture-phase, so
-       monolith's own pin handler (which would refuse them) never
-       runs; a bundle city's pin falls through to the native flow,
-       the same delegation as the list (Wave 0, 2026-11-19). */
+    /* pin picks at the city step: capture-phase, so monolith's
+       own pin handler never runs here. A bundle city's pin is
+       routed by the entry-confirmation law below, the same
+       delegation as the list (Wave 0, 2026-11-19). A
+       bundle-less city's pin is INERT (GLOBE PIN FORM, Han
+       2026-11-27): its button is disabled, so a real click
+       never dispatches; a click event that still arrives is
+       consumed and answered with nothing. */
     document.addEventListener('click', function (e) {
       if (step !== 'city') return;
       var t = e.target;
@@ -1861,8 +1877,14 @@
         selectBundleCity(name);
         return;
       }
-      if (zoomPhase) cancelZoom(); /* a bundle-less pin pick during a zoom-in spends the zoom, then opens its panel */
-      openPrep(name);
+      /* GLOBE PIN FORM (Han 2026-11-27): a bundle-less pin
+         pick is answered with NOTHING - no preparation panel,
+         no selection change, no zoom spent. (Before this
+         ruling the pick spent any zoom-in and opened the
+         panel.) The preparation panel remains reachable from
+         the city's own address via the path preselect in
+         activateCityLayer, never from its pin. */
+      return;
     }, true);
   }
 
@@ -2502,9 +2524,22 @@
      on those braces). stripPinLocks mutates only when a lock is
      actually present, so the observer cannot loop on its own
      corrections. */
+  /* GLOBE PIN FORM (Han 2026-11-26 correction 2 + the pin
+     answer of 2026-11-27) SUPERSEDES the 2026-11-10 look-open
+     order above for bundle-less cities: their pins keep the
+     inactive form monolith built them with (is-inactive -
+     pair.css greys them to 45% opacity - and disabled) and
+     their clicks are inert: no preparation panel, no response
+     at all. The strip therefore scopes to the bundle cities
+     only (monolith never locks those; the strip remains as
+     the belt for that set alone). A pin whose name is not in
+     BUNDLE_CITIES is treated as bundle-less and never
+     stripped. */
   function stripPinLocks() {
     var pins = document.querySelectorAll('#city-pins .city-pin');
     for (var i = 0; i < pins.length; i++) {
+      var nm = (pins[i].getAttribute('aria-label') || '').split(',')[0].trim();
+      if (!BUNDLE_CITIES[nm]) continue;
       if (pins[i].disabled) pins[i].disabled = false;
       if (pins[i].classList.contains('is-inactive')) pins[i].classList.remove('is-inactive');
     }
