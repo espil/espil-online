@@ -61,9 +61,6 @@
      the survival-game monster layer is a world feature too; it
      self-gates identically, so the pairing keeps their population
      systems armed together.
-   - tiles3d: the same seams as npcs - the Google 3D Tiles layer is
-     a world feature; the module itself is the LIGHT decision entry
-     (the heavy renderer loads only on a tilesEnabled:true decision).
    - cashshop: the same seams as npcs - the cash shop (Han decision
      round 3, 2026-11-09) is reachable from anywhere in the map,
      so it arms with the arrival bundle like the other world
@@ -148,8 +145,7 @@
      in this loader stays down - presence/social (the parent's
      heartbeat already represents the player), vehicles, arena,
      monsters/npcs, store + store-page-link (no re-entry from
-     inside), tiles3d (the child's map load must not spend the
-     tiles quota). No seam below this branch runs in such a
+     inside). No seam below this branch runs in such a
      window.
      ARENA PLACE split (Han 2026-11-18): the same mark with slug
      'arena' is NOT a store child - it is the arena's own place
@@ -161,7 +157,7 @@
      arm for this slug, and the store set stays down exactly as
      above: no social (formation and chat stay in the street
      window), no story (the parent is the sole story author), no
-     store pair, no vehicles, no npcs, no tiles3d. presence.js is
+     store pair, no vehicles, no npcs. presence.js is
      an eager tag, not a lazy module - its arena-room exception
      lives in its own connect() lock. */
   var placeMark = null;
@@ -188,7 +184,7 @@
   window.addEventListener('espil-dive-start', function () { load('tutorial.js'); });
   window.addEventListener('espil-guide', function (e) {
     var d = e && e.detail; if (!d) return;
-    if (d.type === 'arrival') { socialBundle(); load('monsters.js'); load('tiles3d.js'); load('cashshop.js'); load('comm-portal.js'); load('arena.js'); load('story.js'); load('vehicles.js'); load('boat.js'); load('fishing.js'); load('billboard-video.js'); }
+    if (d.type === 'arrival') { socialBundle(); load('monsters.js'); load('cashshop.js'); load('comm-portal.js'); load('arena.js'); load('story.js'); load('vehicles.js'); load('boat.js'); load('fishing.js'); load('billboard-video.js'); }
     if (d.type === 'interior') { storePair(); load('panels.js'); }
   });
   window.addEventListener('espil-party-frame', socialBundle);
@@ -256,7 +252,7 @@
      interception must be resident before the Enter click. 600 ms,
      and each arm is a no-op once loaded. */
   setInterval(function () {
-    if (document.body && document.body.classList.contains('in-map')) { socialBundle(); load('monsters.js'); load('tiles3d.js'); load('cashshop.js'); load('comm-portal.js'); load('arena.js'); load('story.js'); load('vehicles.js'); load('boat.js'); load('fishing.js'); load('billboard-video.js'); }
+    if (document.body && document.body.classList.contains('in-map')) { socialBundle(); load('monsters.js'); load('cashshop.js'); load('comm-portal.js'); load('arena.js'); load('story.js'); load('vehicles.js'); load('boat.js'); load('fishing.js'); load('billboard-video.js'); }
     if (window.__espilInside) storePair();
     var bp = document.getElementById('bldg-panel');
     if (bp && bp.getAttribute('aria-hidden') === 'false') load('store-page-link.js');

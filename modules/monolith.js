@@ -4163,8 +4163,8 @@
        at night - its scene lighting collapses with the
        astronomical daylight dl AND the #espil-daynight screen
        multiplies x0.5 on top - while the ground (the Mapbox base
-       here, the Google tiles in tiles3d-core) receives only the
-       screen, so at the night plateau the ground keeps
+       here) receives only the screen, so at the night plateau
+       the ground keeps
        0.49-0.51 of its day value against the character's
        0.22-0.25 and the world reads half-lit. This block gives
        the BASE side the missing share: one background layer
@@ -6106,22 +6106,6 @@
             if(x>=srec.x0-PLAYER_R&&x<=srec.x1+PLAYER_R&&z>=srec.z0-PLAYER_R&&z<=srec.z1+PLAYER_R&&espilPolyProbe(srec,x,z).d<=PLAYER_R)support=srec.h;
           }
         }
-      }
-      /* TILES SURFACE FOLLOW (combined tiles package section 2,
-         2026-11-19): while the Google tiles are LIVE the ground
-         base reads the tile surface at this column (the core's
-         sampler, __espilTileSurfaceAt) instead of sitting on the
-         baked .05 - the visible terrain stands 5-11.5 m above the
-         baked plane downtown, so a body floored on the records
-         alone sinks that far below what Han sees (his report,
-         2026-11-19 22:23). The tile value can only RAISE the
-         ground base here: record tops (roofs) above it still win,
-         and with tiles off or not live the hook returns null and
-         this function is byte-for-byte the old law. */
-      if(window.__espilTileSurfaceAt){
-        var tileSup=null;
-        try{ tileSup=window.__espilTileSurfaceAt(x,z,refY); }catch(e){ tileSup=null; }
-        if(tileSup!==null&&tileSup>support)support=tileSup;
       }
       return support;
     }
@@ -13123,8 +13107,8 @@
       return out;
     }
     var ESPIL_CB_TARGET_H=1.7; /* the game's player height, as the KayKit dummy */
-    var ESPIL_CB_BASIS_JS='modules/tiles3d/vendor/three/addons/libs/basis/basis_transcoder.js';
-    var ESPIL_CB_BASIS_WASM='modules/tiles3d/vendor/three/addons/libs/basis/basis_transcoder.wasm';
+    var ESPIL_CB_BASIS_JS='modules/vendor/basis/basis_transcoder.js';
+    var ESPIL_CB_BASIS_WASM='modules/vendor/basis/basis_transcoder.wasm';
     var ESPIL_CB_LOCAL=null,ESPIL_CB_REMOTES_BUILT=0;
     window.__espilGuestBodyState=function(){
       var L=ESPIL_CB_LOCAL;
@@ -14130,30 +14114,18 @@
        share the record law's height gate - a record counts
        only when its height clears the player's height by
        more than 0.55 m. The records are baked against the
-       flat ground datum (player y is 0.05 with tiles off),
-       but while the tiles are live the support law stands
-       the player on the tile surface (+5.0-11.5 m around
-       spawn), so the raw comparison silently disqualified
-       every record shorter than the terrain lift: measured
-       3/3 pass-throughs of an h=4 building with every judge
-       blind, against the same building blocking with tiles
-       off (tiles-loading/DIAGNOSIS.md verdict 1). The gate
-       therefore reads the player's height in the records'
-       own frame: py minus the tile-surface height at the
-       player's column, as the shipped __espilTileSurfaceAt
-       reports it. When the hook is absent (tiles off / core
-       not loaded) or has no live sample for the column, the
-       reference is py itself and the gate is the old law
-       byte-for-byte. Only the comparison's reference
-       changes - the 0.55 threshold and every other law
-       (roof overlap, support, safe zone) are untouched. */
+       flat ground datum, so the reference is the player's
+       own height py and the gate is the old law byte-for-byte.
+       (A tiles-era variant of this gate once subtracted a
+       live tile-surface sample from py; the Google tiles
+       path was discarded on 2026-11-26, the sampler hook is
+       gone, and the reference is py itself, as it already
+       was on every entry since the street gate closed.)
+       Only the comparison's reference is defined here - the
+       0.55 threshold and every other law (roof overlap,
+       support, safe zone) are untouched. */
     function espilP1GroundRefY(x,z,py){
-      if(!window.__espilTileSurfaceAt)return py;
-      var pose=null;
-      try{ pose=window.__espilPlayerPose?window.__espilPlayerPose():null; }catch(e){ pose=null; }
-      var s=null;
-      try{ s=window.__espilTileSurfaceAt(pose?pose.x:x,pose?pose.z:z,py); }catch(e){ s=null; }
-      return (typeof s==='number'&&isFinite(s))?py-s:py;
+      return py;
     }
     function espilP1QrfHit(x,z,py){
       var ll=espilP1LngLat(x,z);
@@ -14728,27 +14700,6 @@
           }
         }
         /* === ROOF MANTLE END === */
-      }
-      /* TILES SURFACE FOLLOW (combined tiles package section 2,
-         2026-11-19): the ground base of this landing law. While
-         the Google tiles are LIVE, the core's surface sampler
-         (__espilTileSurfaceAt) reports the terrain height of
-         this body's column - the bottom surface of the tile
-         geometry there - and it becomes the floor whenever it
-         stands above the support the records found, so the
-         character walks ON the terrain Han sees instead of
-         5-11.5 m under it (tiles-collision/DIAGNOSIS.md,
-         defect 3). Record supports (roofs, the inside-footprint
-         lift, the mantle) are computed first and are never
-         LOWERED by this - the tile value can only raise the
-         floor (a car support is left alone - the ride follows
-         its own law).
-         Tiles off or not live: the hook is absent or returns
-         null and this section changes nothing. */
-      if(!supportCar&&window.__espilTileSurfaceAt){
-        var tileGround=null;
-        try{ tileGround=window.__espilTileSurfaceAt(p.pos.x,p.pos.z,yBeforeFall); }catch(e){ tileGround=null; }
-        if(tileGround!==null&&tileGround>support)support=tileGround;
       }
       if(p.pos.y<=support){
         /* Batch G: a fly/ride release fall is charged HERE, at impact,
