@@ -7177,139 +7177,93 @@
       else window.addEventListener('load',onReady);
     })();
     /* ================================================================
-       Skill system — Keeper (the only class for now).
-       No weapons exist yet, so the whole kit is unarmed: punch slash,
-       kick, and a tool quotation. Each move carries its own damage, range,
-       cooldown, arc effect and synthesized sound. MOVES is the single
-       table new moves plug into later (weapons included, once forged).
-       Skill points come from levels (EXP arrives with enemies); 3 starter
-       points are granted so the tree works today.
-       ================================================================ */
-    var MOVE_ORDER=['punch','kick','throw','defense','dash','spin','wave','art'];
+       Combat — the pattern system (Han 2026-11-26 combat spec).
+       There is no skill tree: attack skills come WITH weapons.
+       ASDF are the attack patterns (A hand, S leg, D body - Dash
+       Strike, F finisher - the equipped weapon's art) and R is
+       Defense; weapons are held in a 4-slot loadout switched
+       with the number keys. MOVES holds the body-technique defs;
+       ESPIL_FAMILY_PATTERNS resolves the pattern per equipped
+       family; every hit rides the one damage path
+       (espilApplyMoveHit -> __espilMonsterHit).
+              ================================================================ */
+    var MOVE_ORDER=['a','s','d','f','defense'];
     /* FIX-7 item 6 (Han 2026-11-12): every skill's effect RANGE
-       widened +50% (punch 2.2->3.3, kick 2.8->4.2, throw 8->12,
-       dash 3.4->5.1, spin 2.6->3.9, wave 9->13.5, art base 3->4.5;
-       the Weapon Art family forms in ESPIL_ART_MOVES widened the
-       same way). Damage / cooldown / arc / MP untouched - ranges
-       are Han's feel call; defense has no spatial effect and is
-       unchanged. */
+       widened +50% (punch 2.2->3.3, kick 2.8->4.2, dash 3.4->5.1,
+       art base 3->4.5; the Weapon Art family forms in
+       ESPIL_ART_MOVES widened the same way). Damage / cooldown /
+       arc / MP untouched - ranges are Han's feel call; defense
+       has no spatial effect and is unchanged. */
     var MOVES={
-      punch:{name:'Punch',key:'Q',icon:'👊',color:0xbfe9ff,css:'#bfe9ff',
+      punch:{name:'Punch',key:'A',icon:'👊',color:0xbfe9ff,css:'#bfe9ff',
         dmg:8,range:3.3,cd:.45,arc:1.9,y:1.05,
         desc:'A quick punch.'},
-      kick:{name:'Kick',key:'W',icon:'🦵',color:0x7dfce6,css:'#7dfce6',
+      kick:{name:'Kick',key:'S',icon:'🦵',color:0x7dfce6,css:'#7dfce6',
         dmg:13,range:4.2,cd:.65,arc:2.2,y:.6,
         desc:'A heavy kick. Slower, longer reach.'},
-      throw:{name:'Quote Tool',key:'E',icon:'「」',art:'quote',color:0xffd76e,css:'#ffd76e',
-        dmg:10,range:12,cd:.9,arc:1.6,y:1.3,proj:true,
-        desc:'Quote a tool from your knowledge. It flies forth and bursts on arrival.'},
       defense:{name:'Defense',key:'R',icon:'🛡️',color:0x9fe8b3,css:'#9fe8b3',
         dmg:0,range:0,cd:2.5,arc:0,y:1.0,guard:true,
         desc:'Raise your guard. Blocks while active.'},
-      /* Batch 6 Item C: unlockable skills (character tree nodes
-         m_dash / m_spin / m_wave gate them; 'art' is gated per
-         weapon family in the weapon tree). MP cost stays 0 - Han
-         decision D7 (MP costs) is undecided; do not invent costs. */
-      dash:{name:'Dash Strike',key:'A',icon:'💨',art:'dash',color:0x9fd8ff,css:'#9fd8ff',
+      /* Dash Strike is the D pattern (body) - a basic technique
+         every player has (combat spec 2026-11-26). MP cost stays
+         0 - Han decision D7 (MP costs) is undecided; do not
+         invent costs. Quote Tool / Spinning Strike / Ranged Wave
+         are closed as independent skills (spec Q5 draft). */
+      dash:{name:'Dash Strike',key:'D',icon:'💨',art:'dash',color:0x9fd8ff,css:'#9fd8ff',
         dmg:11,range:5.1,cd:.8,arc:1.7,y:1.0,dashMove:true,
-        desc:'Dash forward and strike whatever you reach.'},
-      spin:{name:'Spinning Strike',key:'S',icon:'🌀',art:'spin',color:0x7dfce6,css:'#7dfce6',
-        dmg:15,range:3.9,cd:1.4,arc:6.3,y:.9,
-        desc:'A full-circle strike that hits everything around you.'},
-      wave:{name:'Ranged Wave',key:'D',icon:'🌊',art:'wave',color:0x6fb7ff,css:'#6fb7ff',
-        dmg:12,range:13.5,cd:1.1,arc:1.2,y:1.2,proj:true,
-        desc:'A wave of force down the facing line.'},
-      art:{name:'Weapon Art',key:'F',icon:'⚔️',art:'art',color:0xffd76e,css:'#ffd76e',
-        dmg:0,range:4.5,cd:2.2,arc:2.4,y:1.05,
-        desc:'Your equipped weapon\'s signature art. Its form follows the weapon family; unlocked per family in the weapon tree.'}
+        desc:'Dash forward and strike whatever you reach.'}
     };
-    /* Skill bar slots, QWER row then ASDF row. Locked slots show a lock;
-       empty ones are inert placeholders for future skills. */
+    /* Pattern row (combat spec, Han 2026-11-26): the ASDF keys
+       are the attack patterns - A hand, S leg, D body (Dash
+       Strike), F finisher (the equipped weapon's art). R keeps
+       Defense (its slot is undecided in the spec's reflection
+       note, so v1 leaves it where it lives). Q/W/E are unbound
+       now: Punch is the A pattern's unarmed form, Kick is the
+       S pattern, and Quote Tool / Spinning Strike / Ranged Wave
+       are closed as independent skills. */
     var SKILL_SLOTS=[
-      {key:'q',move:'punch'},
-      {key:'w',move:'kick'},
-      {key:'e',move:'throw'},
-      {key:'r',move:'defense'},
-      {key:'a',move:'dash'},
-      {key:'s',move:'spin'},
-      {key:'d',move:'wave'},
-      {key:'f',move:'art'}
+      {key:'a',move:'a'},
+      {key:'s',move:'s'},
+      {key:'d',move:'d'},
+      {key:'f',move:'f'},
+      {key:'r',move:'defense'}
     ];
     function skillSlotForKey(key){
       for(var i=0;i<SKILL_SLOTS.length;i++)if(SKILL_SLOTS[i].key===key)return SKILL_SLOTS[i];
       return null;
     }
-    var SKILL_NODES=[
-      {id:'m_walk',name:'Walking',max:20,art:'walk',desc:'+1.5% walk speed per rank. A good walker is a fast walker.'},
-      {id:'m_run',name:'Running',max:20,art:'run',needNode:'m_walk',needRank:3,desc:'+2% run speed per rank. Requires Walking Lv 3.'},
-      {id:'m_jump',name:'Jump',max:20,art:'jump',desc:'+1% jump velocity per rank.'},
-      {id:'m_djump',name:'Double Jump',max:10,art:'djump',needNode:'m_jump',needRank:3,desc:'+2% double-jump velocity per rank. Requires Jump Lv 3.'},
-      {id:'m_punch',name:'Punch',max:20,art:'punch',desc:'+5% Punch damage per rank.'},
-      {id:'m_kick',name:'Kick',max:20,art:'kick',desc:'+5% Kick damage per rank.'},
-      {id:'m_throw',name:'Quote Tool',max:20,art:'quote',desc:'+5% damage per rank.'},
-      {id:'m_defense',name:'Defense',max:20,art:'defense',desc:'+0.06s guard duration per rank.'},
-      {id:'m_dash',name:'Dash Strike',max:20,art:'dash',needNode:'m_kick',needRank:3,desc:'Unlocks Dash Strike (A key). +5% damage per rank. Requires Kick Lv 3.'},
-      {id:'m_spin',name:'Spinning Strike',max:20,art:'spin',needNode:'m_punch',needRank:5,desc:'Unlocks Spinning Strike (S key). +5% damage per rank. Requires Punch Lv 5.'},
-      {id:'m_wave',name:'Ranged Wave',max:20,art:'wave',needNode:'m_throw',needRank:5,desc:'Unlocks Ranged Wave (D key). +5% damage per rank. Requires Quote Tool Lv 5.'},
-      {id:'swift',name:'Swift Forge',max:5,need:2,art:'swift',desc:'+5% attack speed per rank.'},
-      {id:'reach',name:'Long Reach',max:3,need:2,art:'reach',desc:'+7% range per rank.'},
-      {id:'toss',name:'Cauldron Toss',locked:true,art:'throw',desc:'Hurl a whole burning cauldron. Arrives with the combat update.'},
-      {id:'guard',name:'Ember Guard',locked:true,art:'defense',desc:'A ring of forge-fire around you. Arrives with the combat update.'}
-    ];
-    /* The tree itself: node positions (percent) + branch parents. One page. */
-    var TREE_LAYOUT=[
-      {id:'keeper',x:50,y:90,root:true},
-      {id:'m_walk',x:30,y:76,parent:'keeper'},
-      {id:'m_run',x:20,y:58,parent:'m_walk'},
-      {id:'swift',x:24,y:38,parent:'m_run'},
-      {id:'m_jump',x:43,y:64,parent:'keeper'},
-      {id:'m_djump',x:43,y:46,parent:'m_jump'},
-      {id:'reach',x:57,y:32,parent:'m_djump'},
-      {id:'m_defense',x:57,y:74,parent:'keeper'},
-      {id:'m_punch',x:68,y:68,parent:'keeper'},
-      {id:'m_kick',x:78,y:58,parent:'m_punch'},
-      {id:'m_throw',x:88,y:68,parent:'keeper'},
-      {id:'m_dash',x:64,y:48,parent:'m_kick'},
-      {id:'m_spin',x:80,y:42,parent:'m_kick'},
-      {id:'m_wave',x:90,y:50,parent:'m_throw'},
-      {id:'toss',x:72,y:26,parent:null},
-      {id:'guard',x:85,y:32,parent:null}
-    ];
-    var selectedSkillId='m_punch';
-    function skillNodeById(id){
-      for(var i=0;i<SKILL_NODES.length;i++)if(SKILL_NODES[i].id===id)return SKILL_NODES[i];
-      return null;
+    /* ESPIL_FAMILY_PATTERNS: the pattern def for a slot, per
+       equipped weapon family. A (hand), S (leg) and D (body) are
+       body techniques - one def for every family today, exactly
+       the live Punch / Kick / Dash Strike defs; the weapon
+       differentiates them in play through espilWeaponFactor and
+       the element tag, the same way it always has. F is the
+       family's Weapon Art and is resolved live by espilArtMoveDef
+       (ESPIL_ART_MOVES + the unarmed fallback), so it is not
+       duplicated here. The table is family-keyed so a family's
+       A/S/D can diverge later without touching doMove. */
+    var ESPIL_FAMILY_PATTERNS={
+      unarmed:{a:MOVES.punch,s:MOVES.kick,d:MOVES.dash},
+      sword:{a:MOVES.punch,s:MOVES.kick,d:MOVES.dash},
+      staff:{a:MOVES.punch,s:MOVES.kick,d:MOVES.dash},
+      bow:{a:MOVES.punch,s:MOVES.kick,d:MOVES.dash},
+      dagger:{a:MOVES.punch,s:MOVES.kick,d:MOVES.dash}
+    };
+    function espilPatternDef(slot){
+      if(slot==='defense')return MOVES.defense;
+      if(slot==='f')return espilArtMoveDef();
+      var fam=espilFamilyEquipped()||'unarmed';
+      var t=ESPIL_FAMILY_PATTERNS[fam]||ESPIL_FAMILY_PATTERNS.unarmed;
+      return t?t[slot]:null;
     }
-    function prereqMet(n){
-      if(!n||n.locked||n.root)return true;
-      if(n.need&&totalSpent()<n.need)return false;
-      if(n.needNode&&(skillState.alloc[n.needNode]||0)<(n.needRank||0))return false;
-      return true;
-    }
-    /* Movement skills feed back into the walk controller.
-       Batch 6 Item C: the shoes tree stacks on top (s_swift all
-       gaits, s_stride run only, s_leap jump power). */
     function moveSpeeds(){
-      var a=skillState.alloc;
-      var sw=espilTreeAlloc('s_swift'), st2=espilTreeAlloc('s_stride'), lp=espilTreeAlloc('s_leap');
-      /* TUNING (Han 2026-11-23: movement too fast, animation too
-         fast, screen too far): the street bases fall from walk
-         13.5 / run 21.6 to walk 5.0 / run 8.0 - the 1.6 run/walk
-         ratio is preserved exactly, and the stride sync divides
-         the locomotion timeScale by the same 2.7x, so the legs
-         slow WITH the body. ESPIL_ANIM_SPEED_F itself is NOT
-         deepened: it is the foot-ground deviation Han set on
-         2026-11-16, and cutting it further would add slide, not
-         calm. Swim keeps 4 - it already sat inside the tuned band
-         and its clip is not stride-synced. The skill multipliers
-         below ride the bases unchanged. */
-      var r={
-        walk:5*(1+.015*(a['m_walk']||0))*(1+.015*sw),
-        run:8*(1+.02*(a['m_run']||0))*(1+.015*sw+.03*st2),
-        swim:4,
-        jumpV:9*(1+.01*(a['m_jump']||0))*(1+.015*lp),
-        djumpV:9*(1+.02*(a['m_djump']||0))*(1+.015*lp)
-      };
+      /* TUNING (Han 2026-11-23, FINAL): walk 5.0 / run 8.0 /
+         swim 4 and the jump bases, exactly as confirmed. The
+         skill-tree and shoes-tree multipliers that used to ride
+         these bases are retired with the trees (combat spec
+         2026-11-26, section 4.2): every player now moves at
+         the confirmed bases. */
+      var r={ walk:5, run:8, swim:4, jumpV:9, djumpV:9 };
       /* PLACE SPACE (Han 2026-11-16, design 5): inside a building's
          own space the street speeds are far too fast for a lobby -
          the walk tick reads these two constants instead (the same
@@ -7339,46 +7293,13 @@
         }else if(art==='kick'){
           R(6,3,4,6,'#8a5a33');R(6,3,4,1,'#6e4525');
           R(5,9,7,3,'#a06a3c');R(5,12,7,1,'#4e3018');R(6,4,1,4,'#c98f5f');
-        }else if(art==='throw'){
-          R(6,11,4,3,'#d63a2a');R(7,8,3,4,'#ff7b2f');R(7,5,2,4,'#ffd23f');
-          R(8,3,1,3,'#fff3b0');R(5,12,6,1,'#7a1f16');
         }else if(art==='defense'){
           R(4,3,8,2,'#9fe8b3');R(4,5,8,5,'#3fae6a');R(7,5,2,5,'#2e8b52');
           R(5,10,6,2,'#3fae6a');R(6,12,4,1,'#2e8b52');R(7,13,2,1,'#256b40');
           R(4,5,1,5,'#c9f5d8');
-        }else if(art==='swift'){
-          R(9,2,3,4,'#ffd23f');R(6,5,6,3,'#ffd23f');R(4,7,3,5,'#ffd23f');
-          R(9,3,1,3,'#fff3b0');R(6,6,3,1,'#fff3b0');
-        }else if(art==='reach'){
-          R(2,7,8,2,'#7dfce6');R(2,7,8,1,'#d8fff9');
-          R(10,5,2,6,'#7dfce6');R(12,6,2,4,'#7dfce6');R(14,7,1,2,'#e8fffd');
-        }else if(art==='quote'){
-          R(4,4,2,8,'#ffd76e');R(4,4,4,2,'#ffd76e');
-          R(10,4,2,8,'#ffd76e');R(8,10,4,2,'#ffd76e');
-          R(7,7,2,2,'#fff3b0');
-        }else if(art==='walk'){
-          R(7,6,3,5,'#8a5a33');R(6,10,5,2,'#a06a3c');R(6,12,5,1,'#4e3018');
-          R(2,7,3,1,'#7dfce6');R(1,10,4,1,'#7dfce6');
-        }else if(art==='run'){
-          R(8,6,3,5,'#8a5a33');R(7,10,5,2,'#a06a3c');R(7,12,5,1,'#4e3018');
-          R(1,5,4,1,'#ffd23f');R(2,8,4,1,'#ffd23f');R(1,11,4,1,'#ffd23f');
-        }else if(art==='jump'){
-          R(7,2,2,8,'#bfe9ff');R(5,4,2,3,'#bfe9ff');R(9,4,2,3,'#bfe9ff');
-          R(7,2,1,8,'#e8f4ff');R(6,11,4,2,'#8a5a33');
-        }else if(art==='djump'){
-          R(3,7,2,5,'#7dfce6');R(2,5,2,3,'#7dfce6');R(4,5,2,3,'#7dfce6');
-          R(10,7,2,5,'#7dfce6');R(9,5,2,3,'#7dfce6');R(11,5,2,3,'#7dfce6');
-          R(3,7,1,5,'#d8fff9');R(10,7,1,5,'#d8fff9');
         }else if(art==='dash'){
           R(2,6,5,2,'#9fd8ff');R(1,9,6,2,'#9fd8ff');R(3,12,4,2,'#9fd8ff');
           R(9,5,4,6,'#e8f4ff');R(12,7,2,2,'#bfe9ff');
-        }else if(art==='spin'){
-          R(7,2,2,3,'#7dfce6');R(11,4,3,2,'#7dfce6');R(12,8,2,3,'#7dfce6');
-          R(9,12,3,2,'#7dfce6');R(4,11,2,3,'#7dfce6');R(2,7,3,2,'#7dfce6');
-          R(7,7,2,2,'#d8fff9');
-        }else if(art==='wave'){
-          R(3,4,2,8,'#6fb7ff');R(6,6,2,5,'#6fb7ff');R(9,7,2,3,'#6fb7ff');
-          R(12,8,2,2,'#bfe9ff');
         }else if(art==='art'){
           R(4,11,7,2,'#8a5a33');R(9,3,3,9,'#ffd76e');R(10,2,1,3,'#fff3b0');
           R(3,12,3,1,'#ffd76e');
@@ -7390,41 +7311,29 @@
           R(4,2,2,12,'#8a6844');R(4,2,8,1,'#e8e0cc');R(4,13,8,1,'#e8e0cc');R(11,7,2,1,'#ffd76e');
         }else if(art==='dagger'){
           R(10,3,3,7,'#e8eef2');R(9,10,4,2,'#7a4a8c');R(10,12,2,2,'#3a2a5e');
-        }else if(art==='shield'){
-          R(4,3,8,2,'#9fe8b3');R(4,5,8,5,'#3fae6a');R(7,5,2,5,'#2e8b52');
-          R(5,10,6,2,'#3fae6a');R(6,12,4,1,'#2e8b52');
-        }else if(art==='boot'){
-          R(5,3,4,7,'#8a6844');R(5,10,8,3,'#a06a3c');R(5,13,8,1,'#4e3018');
-        }else if(art==='vital'){
-          R(7,4,2,8,'#e86a8a');R(4,7,8,2,'#e86a8a');R(5,5,1,1,'#ffd7e2');
-        }else if(art==='regen'){
-          R(7,3,2,9,'#58c96b');R(5,5,2,2,'#58c96b');R(10,5,2,2,'#58c96b');
-          R(4,9,3,2,'#58c96b');R(9,9,3,2,'#58c96b');R(7,12,1,1,'#d8ffd2');
-        }else if(art==='ward'){
-          R(5,3,6,10,'#6fb7ff');R(6,5,4,2,'#bfe9ff');R(7,9,2,3,'#bfe9ff');
         }
         url=c.toDataURL();
       }catch(e){}
       SKILL_ICONS[art]=url;return url;
     }
-    /* Knowledge cost to go from rank -> rank+1. */
-    function rankCost(rank){ return 1+Math.floor(rank/4); }
-    /* Progression is Knowledge, not levels: watching videos earns Knowledge,
-       which is spent to raise each skill toward Lv 20. */
+    /* skillState is the live combat state (hp / mp / cd / exp
+       ride this one object). Its Knowledge balance and the tree
+       allocations (alloc) are RETIRED by the combat spec
+       (2026-11-26, sections 4.3-4.4): the stored record is
+       loaded and re-saved verbatim - never deleted, never
+       migrated - and no code reads alloc or spends Knowledge
+       any more. The balance's disposition is the COO's item,
+       not this build's. */
     var skillState={knowledge:10,alloc:{},hp:100,maxhp:100,mp:50,maxmp:50,exp:0,maxexp:100,cd:{punch:0,kick:0,throw:0,defense:0}};
     try{
       var _ss=JSON.parse(window.localStorage.getItem('espil_skills_v1')||'null');
       if(_ss){
-        /* Drop allocations for nodes that no longer exist; clamp ranks to 20. */
-        var _na={};
-        if(_ss.alloc)for(var _k in _ss.alloc){
-          for(var _ni=0;_ni<SKILL_NODES.length;_ni++){
-            if(SKILL_NODES[_ni].id===_k){_na[_k]=Math.min(20,_ss.alloc[_k]);break;}
-          }
-        }
-        skillState.alloc=_na;
-        /* Old skill points convert to Knowledge. */
-        skillState.knowledge=10+((_ss.points||0)*5)+(_ss.knowledge||0);
+        /* Retired fields ride verbatim (combat spec 4.3): the
+           loader no longer filters alloc against a node table
+           (there is none) and no longer converts old points or
+           re-grants the starter Knowledge. */
+        if(_ss.alloc&&typeof _ss.alloc==='object')skillState.alloc=_ss.alloc;
+        if(typeof _ss.knowledge==='number')skillState.knowledge=_ss.knowledge;
         if(typeof _ss.hp==='number')skillState.hp=_ss.hp;
         if(typeof _ss.maxhp==='number')skillState.maxhp=_ss.maxhp;
         if(typeof _ss.mp==='number')skillState.mp=_ss.mp;
@@ -7436,29 +7345,32 @@
       if(typeof skillState.cd[MOVE_ORDER[_mi]]!=='number')skillState.cd[MOVE_ORDER[_mi]]=0;
     }
     function saveSkills(){try{window.localStorage.setItem('espil_skills_v1',JSON.stringify(skillState));}catch(e){}}
-    function totalSpent(){var s=0;for(var k in skillState.alloc)s+=skillState.alloc[k];return s;}
-    /* Knowledge earned by watching videos (the video player calls gainKnowledge
-       when a video completes; the tree's demo button simulates it for now). */
+    /* Knowledge contact (combat spec 4.4): the balance's one
+       remaining seam, handed to the COO's disposition. The tree
+       panel's demo button - its only production caller - is
+       retired with the tree; the function and its __espilSkills
+       export stay in place. */
     function gainKnowledge(n,source){
       n=Math.max(0,Math.floor(n||0));
       if(!n)return;
       skillState.knowledge+=n;
-      saveSkills();paintStatus();paintKnowledge();
+      saveSkills();paintStatus();
       if(window.__espilToast)window.__espilToast('📚 +'+n+' Knowledge'+(source?' — '+source:''));
     }
-    function moveStatsAt(id,rank){
-      var m=(id==='art')?espilArtMoveDef():MOVES[id];
-      var cd=m.cd/(1+.05*(skillState.alloc.swift||0));
-      if(id==='dash')cd*=Math.max(.4,1-.06*espilTreeAlloc('s_dashcd')); /* shoes tree */
-      return {
-        m:m,
-        dmg:Math.round(m.dmg*(1+.05*rank)*espilTreeDmgMul()),
-        range:m.range*(1+.07*(skillState.alloc.reach||0))+espilTreeRangeBonus(m),
-        cd:cd,
-        guardDur:m.guard?(1.2+0.06*rank):0
-      };
+    /* Pattern stats (combat spec 2026-11-26): the def IS the
+       stat line now. The tree terms that used to adjust it -
+       character rank (+5%/rank), swift cooldown, reach, the
+       weapon-tree damage multiplier and Mastery range - are
+       retired with the trees (section 4.2 states the drops);
+       the equipped weapon still scales damage through
+       espilWeaponFactor inside espilApplyMoveHit, and Defense
+       keeps its authored 1.2 s guard duration (the m_defense
+       rank term is gone with the ranks). */
+    function moveStats(id){
+      var md=espilPatternDef(id);
+      if(!md)return null;
+      return { m:md, dmg:md.dmg, range:md.range, cd:md.cd, guardDur:md.guard?1.2:0 };
     }
-    function moveStats(id){return moveStatsAt(id,skillState.alloc['m_'+id]||0);}
     /* Synthesized swing / impact sounds — no audio assets needed. */
     function skillSfx(kind){
       try{
@@ -7561,9 +7473,6 @@
       if(anyCd)paintCooldowns();
       espilHealTick(dt); /* HEAL FX (2026-11-13): drives the heal bar/count animation + world FX */
       if(skillState.mp<skillState.maxmp){skillState.mp=Math.min(skillState.maxmp,skillState.mp+5*dt);paintStatus();}
-      /* Batch 6: armour tree regeneration (a_regen) */
-      var _rg=espilTreeAlloc('a_regen');
-      if(_rg>0&&skillState.hp>0&&skillState.hp<skillState.maxhp){skillState.hp=Math.min(skillState.maxhp,skillState.hp+.4*_rg*dt);paintStatus();}
       if(walkPlayer&&walkPlayer.guarding>0)walkPlayer.guarding-=dt;
       for(i=fxPool.length-1;i>=0;i--){
         var f=fxPool[i];f.t+=dt;var k=f.t/f.life;
@@ -7585,23 +7494,24 @@
     function doMove(id){
       if(typeof espilKbFpvActive==='function'&&espilKbFpvActive())return; /* KONBINIYA FPV: attack inputs are inert inside (Han 2026-11-08) - every attack entry point funnels through here */
       if(window.__espilEntryMode==='shop')return; /* SHOP MODE (landing flow, Han 2026-11-09): combat inputs are disabled for the whole session - the last input path of MONOLITH-SEAM item 1 (monsters.js already gates spawns/targets/hits; the DOM buttons are inert there) */
-      if(!cityPhaseActive||!walkPlayer||skillTreeOpen)return;
+      if(!cityPhaseActive||!walkPlayer)return;
       if(espilDead)return; /* SURVIVAL S1: the death choice owns the body */
-      var m=MOVES[id];
-      if(!m)return;
-      /* Batch 6 Item C: tree-gated skills stay shut until learned */
-      if(id==='dash'&&!(skillState.alloc.m_dash>0)){ if(window.__espilToast)window.__espilToast('Dash Strike is learned in the skill tree (K).'); return; }
-      if(id==='spin'&&!(skillState.alloc.m_spin>0)){ if(window.__espilToast)window.__espilToast('Spinning Strike is learned in the skill tree (K).'); return; }
-      if(id==='wave'&&!(skillState.alloc.m_wave>0)){ if(window.__espilToast)window.__espilToast('Ranged Wave is learned in the skill tree (K).'); return; }
-      if(id==='art'){
-        var _fam=espilFamilyEquipped();
-        if(!_fam||!(espilTreeAlloc(_fam+'_art')>0)){ if(window.__espilToast)window.__espilToast('Weapon Art unlocks in the weapon tree (K) for the equipped weapon family.'); return; }
-      }
+      /* Combat spec (Han 2026-11-26): ASDF are the attack
+         patterns and R is Defense. Patterns are never locked -
+         they come with the equipped weapon, and the A/S/D body
+         techniques work unarmed too - so the tree unlock gates
+         that used to stand here are gone with the trees.
+         Cooldowns are keyed by pattern slot (Q9 draft: shared
+         per slot, never per weapon), so a loadout switch can
+         neither reset nor inherit a pattern cooldown. */
+      if(id!=='a'&&id!=='s'&&id!=='d'&&id!=='f'&&id!=='defense')return;
       if(skillState.cd[id]>0)return;
-      var st=moveStats(id),p=walkPlayer;
+      var st=moveStats(id); if(!st)return;
+      var m=st.m,p=walkPlayer;
       skillState.cd[id]=st.cd;
-      /* Batch 6: Dash Strike first closes the gap (collision-grid
-         steps), then the strike lands from the new spot. */
+      /* Dash Strike (the D pattern) first closes the gap
+         (collision-grid steps), then the strike lands from the
+         new spot. */
       if(m.dashMove){
         var dfx=-Math.sin(p.faceY), dfz=-Math.cos(p.faceY), dleft=st.range*.8;
         while(dleft>0){
@@ -7614,7 +7524,7 @@
       }
       /* Play attack animation (male_attack.glb) — replaces procedural lunge */
       if(p.av&&p.av.playOneShot)p.av.playOneShot('attack');
-      p.lungeT=(id==='throw'?.16:(id==='defense'?.12:.22)); /* fallback procedural motion */
+      p.lungeT=(id==='defense'?.12:.22); /* fallback procedural motion */
       if(m.guard){
         espilDefenseAt=espilGameT; /* SURVIVAL S1: perfect-window clock */
         spawnGuard(m,st.guardDur);
@@ -7627,12 +7537,14 @@
       }else{
         spawnArc(st.m.color,st.range,st.m.arc,st.m.y,.24,.55,1.15);
         spawnFlash(st.m.color,st.range*.6);
-        if(id==='kick'){skillSfx('whoosh-lo');skillSfx('thud');}
+        if(id==='s'){skillSfx('whoosh-lo');skillSfx('thud');}
         else{skillSfx('whoosh');}
       }
-      /* Batch 6 FEEL: the new skills also stamp their range mesh -
-         a ground disc fading through a 50% gradient to the edge. */
-      if(id==='dash'||id==='spin'||id==='wave'||id==='art')spawnRangeMesh(st);
+      /* FEEL: the D and F patterns stamp their range mesh - a
+         ground disc fading through a 50% gradient to the edge
+         (the Batch 6 stamp, kept for the two patterns that
+         descend from the skills that carried it). */
+      if(id==='d'||id==='f')spawnRangeMesh(st);
       if(!m.guard)espilApplyMoveHit(id,st); /* SURVIVAL S1: hits land */
       paintCooldowns();
     }
@@ -7640,7 +7552,6 @@
     function paintStatus(){
       var lv=document.getElementById('ms-lv');
       if(lv)lv.textContent='KEEPER';
-      paintKnowledge();
       /* Han 2026-10-14: HP/MP render into the glass potion flasks (--p fill).
          HEAL FX (Han 2026-11-13): while a heal animation runs, the
          flasks render the animation's display value (smooth fill +
@@ -7670,18 +7581,22 @@
       if(exp)exp.style.width=expPct+'%';
       if(expt)expt.textContent=Math.round(expPct)+'%';
     }
-    function paintKnowledge(){
-      var kn=document.getElementById('ms-kn');
-      if(kn)kn.textContent='📚 '+skillState.knowledge;
-      var stk=document.getElementById('st-kn');
-      if(stk)stk.textContent='📚 Knowledge: '+skillState.knowledge;
-    }
+    /* The two Knowledge displays (status window + tree panel)
+       are retired with the tree (combat spec 4.1 / 4.4): the
+       balance itself stays in espil_skills_v1, unread here. */
     function paintMoveSlots(){
       SKILL_SLOTS.forEach(function(s){
         if(!s.move)return;
         var st=moveStats(s.move);
         var b=document.getElementById('slot-'+s.key);
-        if(b)b.title=st.m.name+' ('+s.key.toUpperCase()+'): '+st.dmg+' dmg · '+st.range.toFixed(1)+'m · '+st.cd.toFixed(2)+'s — '+st.m.desc;
+        if(!b||!st)return;
+        b.title=st.m.name+' ('+s.key.toUpperCase()+'): '+st.dmg+' dmg · '+st.range.toFixed(1)+'m · '+st.cd.toFixed(2)+'s — '+st.m.desc;
+        b.setAttribute('aria-label',st.m.name+', key '+s.key.toUpperCase());
+        var sic=pxIcon(st.m.art||s.move);
+        var ic=b.querySelector('.sicon');
+        if(ic)ic.innerHTML=sic?'<img alt="" src="'+sic+'">':(st.m.icon||'');
+        var mn=b.querySelector('.mn');
+        if(mn)mn.textContent=st.m.name.toUpperCase();
       });
     }
     function paintCooldowns(){
@@ -7689,179 +7604,18 @@
         var el=document.getElementById('move-cd-'+id);
         if(!el)return;
         var st=moveStats(id);
+        if(!st)return;
         var pct=st.cd>0?Math.max(0,Math.min(1,skillState.cd[id]/st.cd))*100:0;
         el.style.setProperty('--cdp',pct+'%');
       });
     }
-    function raiseSkill(id){
-      var n=skillNodeById(id);
-      if(!n||n.locked||n.root)return;
-      if(n.need&&totalSpent()<n.need){
-        if(window.__espilToast)window.__espilToast('Requires '+n.need+' ranks learned first.');
-        return;
-      }
-      if(n.needNode){
-        var pr=skillState.alloc[n.needNode]||0,pn=skillNodeById(n.needNode);
-        if(pr<(n.needRank||0)){
-          if(window.__espilToast)window.__espilToast((pn?pn.name:'Previous skill')+' Lv '+(n.needRank||0)+' required first.');
-          return;
-        }
-      }
-      var rank=skillState.alloc[id]||0;
-      if(rank>=n.max)return;
-      var c=rankCost(rank);
-      if(skillState.knowledge<c){
-        if(window.__espilToast)window.__espilToast('Not enough Knowledge — watch videos to earn more.');
-        return;
-      }
-      skillState.knowledge-=c;skillState.alloc[id]=rank+1;
-      saveSkills();
-      if(window.EspilAudio&&window.EspilAudio.tick)window.EspilAudio.tick();
-      renderSkillTree();paintStatus();paintMoveSlots();
-    }
-    function statLine(n,rank){
-      var id=n.id;
-      if(id==='m_walk')return (7.5*(1+.015*rank)).toFixed(1)+' m/s walk speed';
-      if(id==='m_run')return (12*(1+.02*rank)).toFixed(1)+' m/s run speed';
-      if(id==='m_jump')return (9*(1+.01*rank)).toFixed(1)+' jump velocity';
-      if(id==='m_djump')return (9*(1+.02*rank)).toFixed(1)+' double-jump velocity';
-      if(id.indexOf('m_')===0){
-        var mid=id.slice(2),s=moveStatsAt(mid,rank);
-        if(MOVES[mid].guard)return s.guardDur.toFixed(2)+'s guard · '+s.cd.toFixed(2)+'s cd';
-        return s.dmg+' dmg · '+s.range.toFixed(1)+'m · '+s.cd.toFixed(2)+'s';
-      }
-      if(id==='swift')return '+'+(5*rank)+'% attack speed';
-      if(id==='reach')return '+'+(7*rank)+'% range';
-      return '';
-    }
-    function renderSkillDesc(){
-      var d=document.getElementById('st-desc');
-      if(!d)return;
-      if(selectedSkillId==='keeper'){
-        d.innerHTML='<h3>The Keeper\'s Tree</h3>'+
-          '<p>Every branch is a human skill — walking, running, jumping, fighting. '+
-          'Watch videos to earn Knowledge, then grow each branch toward mastery.</p>'+
-          '<p class="cur">Ranks learned: '+totalSpent()+'</p>';
-        return;
-      }
-      var n=skillNodeById(selectedSkillId);
-      if(!n){d.innerHTML='';return;}
-      var rank=skillState.alloc[n.id]||0;
-      if(n.locked){
-        d.innerHTML='<h3>'+n.name+'</h3><p>'+n.desc+'</p><p class="cost">🔒 Locked</p>';
-        return;
-      }
-      var maxed=rank>=n.max;
-      d.innerHTML='<h3>'+n.name+'</h3><p>'+n.desc+'</p>'+
-        '<p class="cur">Current Lv '+rank+': '+statLine(n,rank)+'</p>'+
-        (maxed?'<p class="cost">MAX LEVEL</p>'
-              :'<p class="nxt">Next Lv '+(rank+1)+': '+statLine(n,rank+1)+'</p>'+
-               '<p class="cost">Cost: 📚 '+rankCost(rank)+'</p>');
-    }
-    function branchPath(NS,x1,y1,x2,y2,w,col){
-      var mx=(x1+x2)/2,my=(y1+y2)/2;
-      var dx=x2-x1,dy=y2-y1,len=Math.sqrt(dx*dx+dy*dy)||1;
-      var cx=mx-dy/len*len*.12,cy=my+dx/len*len*.12;
-      var p=document.createElementNS(NS,'path');
-      p.setAttribute('d','M'+x1+','+y1+' Q'+cx.toFixed(1)+','+cy.toFixed(1)+' '+x2+','+y2);
-      p.setAttribute('stroke',col);p.setAttribute('stroke-width',w);
-      p.setAttribute('fill','none');p.setAttribute('stroke-linecap','round');
-      return p;
-    }
-    function renderSkillTree(){
-      paintKnowledge();
-      espilEnsureTreeTabs();
-      if(espilTreeLayer!=='character'){ renderLayerTree(); return; }
-      var tv=document.getElementById('st-treeview');
-      if(tv){
-        tv.innerHTML='';
-        var NS='http://www.w3.org/2000/svg';
-        var svg=document.createElementNS(NS,'svg');
-        svg.setAttribute('viewBox','0 0 100 100');
-        svg.setAttribute('preserveAspectRatio','none');
-        svg.setAttribute('class','branches');
-        /* trunk + roots */
-        svg.appendChild(branchPath(NS,50,101,50,86,3.4,'#5a3d26'));
-        svg.appendChild(branchPath(NS,50,95,43,101,1.6,'#5a3d26'));
-        svg.appendChild(branchPath(NS,50,95,57,101,1.6,'#5a3d26'));
-        var byId={};
-        TREE_LAYOUT.forEach(function(L){byId[L.id]=L;});
-        TREE_LAYOUT.forEach(function(L,li){
-          if(L.parent&&byId[L.parent]){
-            var P=byId[L.parent];
-            svg.appendChild(branchPath(NS,P.x,P.y,L.x,L.y,1.3,'#6b4a2f'));
-            /* leaves along the branch (deterministic scatter) */
-            for(var k=1;k<=2;k++){
-              var t=k/3,lx=P.x+(L.x-P.x)*t,ly=P.y+(L.y-P.y)*t;
-              var lf=document.createElementNS(NS,'ellipse');
-              lf.setAttribute('cx',(lx+((li*7+k*13)%5-2)*.9).toFixed(1));
-              lf.setAttribute('cy',(ly+((li*11+k*7)%5-2)*.9).toFixed(1));
-              lf.setAttribute('rx','1.8');lf.setAttribute('ry','1.1');
-              lf.setAttribute('fill','#3f7d44');lf.setAttribute('opacity','.85');
-              lf.setAttribute('transform','rotate('+((li*37+k*53)%60-30).toFixed(0)+' '+lx.toFixed(1)+' '+ly.toFixed(1)+')');
-              svg.appendChild(lf);
-            }
-          }else if(!L.parent&&!L.root){
-            /* locked bud: dashed stem */
-            var st=document.createElementNS(NS,'line');
-            st.setAttribute('x1',L.x);st.setAttribute('y1',L.y+11);
-            st.setAttribute('x2',L.x);st.setAttribute('y2',L.y+2.5);
-            st.setAttribute('stroke','#5a5a5a');st.setAttribute('stroke-width','1');
-            st.setAttribute('stroke-dasharray','1.5 1.2');
-            svg.appendChild(st);
-          }
-        });
-        tv.appendChild(svg);
-        TREE_LAYOUT.forEach(function(L){
-          var isRoot=!!L.root;
-          var n=isRoot?{id:'keeper',name:'KEEPER',root:true}:skillNodeById(L.id);
-          if(!n)return;
-          var rank=isRoot?0:(skillState.alloc[n.id]||0);
-          var maxed=!isRoot&&!n.locked&&rank>=n.max;
-          var ok=isRoot||prereqMet(n);
-          var d=document.createElement('div');
-          d.className='tnode'+(isRoot?' tnode-root':'')+(n.locked?' is-locked':'')+
-            (maxed?' is-maxed':'')+((!isRoot&&!ok)?' is-dim':'')+
-            (selectedSkillId===n.id?' is-selected':'');
-          d.style.left=L.x+'%';d.style.top=L.y+'%';
-          d.setAttribute('role','button');
-          var icon=isRoot?null:pxIcon(n.art||n.id);
-          var inner='<span class="tnode-icon">'+(icon?'<img alt="" src="'+icon+'">':'\uD83C\uDF33')+'</span>'+
-            '<span class="tnode-name">'+n.name+'</span>';
-          if(!isRoot){
-            inner+='<span class="tnode-lv'+(maxed?' is-max':'')+'">'+
-              (n.locked?'\uD83D\uDD12':(maxed?'MASTER':'Lv '+rank+'/'+n.max))+'</span>';
-            if(!n.locked&&!maxed&&ok)
-              inner+='<button type="button" class="tnode-plus" aria-label="Raise '+n.name+'">+</button>';
-          }
-          d.innerHTML=inner;
-          d.addEventListener('click',function(e){
-            var t=e&&e.target;
-            var isPlus=t&&(t.className==='tnode-plus'||(t.classList&&typeof t.classList.contains==='function'&&t.classList.contains('tnode-plus')));
-            if(isRoot){selectedSkillId='keeper';renderSkillTree();return;}
-            if(isPlus){raiseSkill(n.id);return;}
-            selectedSkillId=n.id;
-            if(n.locked&&window.__espilToast)window.__espilToast(n.name+' arrives with the combat update.');
-            else if(!ok&&window.__espilToast){
-              var req=n.needNode?(skillNodeById(n.needNode).name+' Lv '+n.needRank):(n.need+' ranks learned');
-              window.__espilToast('Requires '+req+' first.');
-            }
-            renderSkillTree();
-          });
-          tv.appendChild(d);
-        });
-      }
-      renderSkillDesc();
-    }
-    var skillTreeOpen=false;
-    function toggleSkillTree(force){
-      var panel=document.getElementById('skill-tree');
-      if(!panel)return;
-      var open=typeof force==='boolean'?force:!skillTreeOpen;
-      skillTreeOpen=open;
-      panel.setAttribute('aria-hidden',String(!open));
-      if(open){renderSkillTree();if(window.EspilAudio&&window.EspilAudio.tick)window.EspilAudio.tick();}
-    }
+    /* The Keeper skill tree and the three gear trees are
+       retired (combat spec 2026-11-26, section 4.1): the
+       panel, its renderers and the Knowledge spend are gone.
+       The stored records (espil_skills_v1 alloc/knowledge,
+       espil_trees_v1) are neither deleted nor migrated -
+       section 4.3 - and the proficiency counters in
+       espil_trees_v1 keep counting (section 6, Q10 draft). */
     /* QA #14 (UI room, 2026-10-06): I/M/H/P hotkeys. K already bound above. */
     var inventoryOpen=false,characterOpen=false;
     function toggleInventory(force){
@@ -11005,47 +10759,42 @@
       if(row&&!row.children.length){
         SKILL_SLOTS.forEach(function(s){
           var b=document.createElement('button');
-          b.type='button';b.className='move-slot'+(s.move?'':' is-locked');b.id='slot-'+s.key;
-          if(s.move){
-            var m=MOVES[s.move];
-            var sic=pxIcon(m.art||s.move);
-            b.setAttribute('aria-label',m.name+', key '+s.key.toUpperCase());
-            b.innerHTML='<span class="key">'+s.key.toUpperCase()+'</span>'+
-              '<span class="sicon">'+(sic?'<img alt="" src="'+sic+'">':m.icon)+'</span>'+
-              '<span class="mn">'+m.name.toUpperCase()+'</span>'+
-              '<span class="cd" id="move-cd-'+s.move+'"></span>';
-            (function(mid){b.addEventListener('pointerdown',function(e){e.preventDefault();doMove(mid);});})(s.move);
-          }else{
-            var lbl=s.locked?s.locked.split(' ')[1].toUpperCase():'\u2014';
-            b.setAttribute('aria-label',(s.locked||'Empty')+' skill slot, key '+s.key.toUpperCase());
-            b.title=s.locked?s.locked+' \u2014 arrives with the combat update.':'Empty skill slot';
-            b.innerHTML='<span class="key">'+s.key.toUpperCase()+'</span>'+
-              '<span class="sicon">'+(s.locked?'\uD83D\uDD12':'')+'</span>'+
-              '<span class="mn">'+lbl+'</span>';
-            if(s.locked)(function(nm){b.addEventListener('pointerdown',function(e){e.preventDefault();if(window.__espilToast)window.__espilToast(nm+' arrives with the combat update.');});})(s.locked);
-          }
+          b.type='button';b.className='move-slot';b.id='slot-'+s.key;
+          var st=moveStats(s.move);
+          var md=st?st.m:MOVES.defense;
+          var sic=pxIcon(md.art||s.move);
+          b.setAttribute('aria-label',md.name+', key '+s.key.toUpperCase());
+          b.innerHTML='<span class="key">'+s.key.toUpperCase()+'</span>'+
+            '<span class="sicon">'+(sic?'<img alt="" src="'+sic+'">':md.icon)+'</span>'+
+            '<span class="mn">'+md.name.toUpperCase()+'</span>'+
+            '<span class="cd" id="move-cd-'+s.move+'"></span>';
+          (function(mid){b.addEventListener('pointerdown',function(e){e.preventDefault();doMove(mid);});})(s.move);
           row.appendChild(b);
         });
       }
-      /* QA #13 (UI room, 2026-10-06): 1234 item slots. */
+      /* Loadout row (combat spec 2026-11-26, P2): the 1-4 slots
+         hold designated weapons; a press (or the number keys)
+         switches the equipped weapon through panels' own equip
+         write. This build only creates the cells - their
+         contents are painted by paintLoadoutRow(). The cells
+         keep the QA #13 placeholder ids (item-1..4). */
       var irow=document.getElementById('item-row');
       if(irow&&!irow.children.length){
-        ['1','2','3','4'].forEach(function(k){
+        ['1','2','3','4'].forEach(function(k,ix){
           var b=document.createElement('button');
-          b.type='button';b.className='move-slot is-locked';b.id='item-'+k;
-          b.setAttribute('aria-label','Empty item slot, key '+k);
-          b.title='Empty item slot';
+          b.type='button';b.className='move-slot loadout-slot';b.id='item-'+k;
           b.innerHTML='<span class="key">'+k+'</span>'+
             '<span class="sicon"></span>'+
-            '<span class="mn">\u2014</span>';
+            '<span class="mn">—</span>';
+          (function(n){b.addEventListener('pointerdown',function(e){e.preventDefault();espilSwitchLoadout(n);});})(ix);
           irow.appendChild(b);
         });
+        paintLoadoutRow();
       }
       /* QA (UI room, 2026-10-08): keyboard-style menu buttons on right (desktop only). */
       var kbm=document.getElementById('kb-menu');
       if(kbm&&!kbm.children.length){
         var menus=[
-          {key:'K',label:'SKILL',fn:function(){toggleSkillTree();}},
           {key:'M',label:'MAP',fn:function(){if(window.__espilToast)window.__espilToast('Map stages arrive with the UI update.');}},
           {key:'I',label:'INV',fn:function(){toggleInventory();}},
           {key:'P',label:'CHAR',off:true,fn:function(){toggleCharacterPanel();}},
@@ -11070,9 +10819,9 @@
       paintStatus();paintMoveSlots();paintCooldowns();
     }
     function hideSkillHud(){
-      skillTreeOpen=false;inventoryOpen=false;characterOpen=false;
+      inventoryOpen=false;characterOpen=false;
       setChatTyping(false);
-      ['map-status','skill-bar','skill-tree','inventory-panel','character-panel','chat-window','quickbar'].forEach(function(id){
+      ['map-status','skill-bar','inventory-panel','character-panel','chat-window','quickbar'].forEach(function(id){
         var el=document.getElementById(id);
         if(el)el.setAttribute('aria-hidden','true');
       });
@@ -11125,7 +10874,7 @@
     function espilPlayerDefValue(){
       var base=0;
       try{ if(typeof window.__espilPlayerDef==='function')base=window.__espilPlayerDef()||0; }catch(e){}
-      return base+espilTreeDefBonus(); /* Batch 6: armour tree stacks */
+      return base; /* combat spec 4.2: the armour tree's a_guard bonus is retired with the trees - gear DEF only */
     }
     function espilLeoBalance(){
       var v=parseInt(localStorage.getItem('espil_leo_balance'),10);
@@ -11174,10 +10923,13 @@
       }
       for(i=0;i<hits.length;i++){
         var crit=Math.random()<ESPIL_CRIT_CHANCE;
-        /* SKILL WIRING (menu overhaul step 1): st.dmg is the rank-adjusted
-           value the skill window displays - it already carries the character
-           tree rank (+5%/rank) and espilTreeDmgMul(). The old line used the
-           base st.m.dmg, so rank investment raised only the shown number. */
+        /* PATTERN WIRING (combat spec 2026-11-26): st.dmg is the
+           pattern def's own damage - the number the skill bar
+           displays. The tree terms that used to be folded in
+           (character rank, the weapon-tree multiplier) are
+           retired (section 4.2); the equipped weapon still
+           scales the hit through espilWeaponFactor (factor,
+           above) and tags its element. */
         var raw=st.dmg*factor*(crit?ESPIL_CRIT_MULT:1);
         var res=null;
         try{ res=window.__espilMonsterHit(hits[i].id,raw,p.pos.x,p.pos.z,{crit:crit,element:element}); }catch(e){}
@@ -12251,8 +12003,10 @@
         espilEvadeTimer=setTimeout(function(){ if(espilEvadeEl)espilEvadeEl.style.opacity='0'; },650);
       }catch(e){}
     }
+    /* __espilSkills.tree is retired with the tree (combat spec
+       4.1); state / gainKnowledge / move stay. */
     window.__espilSkills={state:skillState,gainKnowledge:gainKnowledge,
-      move:doMove,tree:toggleSkillTree};
+      move:doMove};
     /* ================================================================
        BATCH 6 (Han 2026-11-07) - Item C gear skill trees + Item D
        2D guest avatars.
@@ -12354,18 +12108,16 @@
       return null;
     }
 
-    /* ---------------- Item C: the three gear trees ----------------
-       The character tree above spends Knowledge. The gear trees
-       spend USE: GROWTH RULE (chosen for this batch, stated) -
-       the weapon tree's currency is kills landed with that weapon
-       family equipped, and its Mastery ranks are ADDITIONALLY
-       gated by Item B crafting tiers (rank r needs an owned
-       weapon of the family crafted to tier r); the armour tree's
-       currency is applied hits weathered; the shoes tree's is
-       metres travelled. One node belongs to exactly one tree;
-       effects stack across trees; unequipping deactivates a gear
-       tree (bonuses read the CURRENTLY equipped family / nothing)
-       but spent points are never lost. */
+    /* ---------------- Item C: the gear trees (RETIRED) ----------------
+       Combat spec (Han 2026-11-26, section 4.1): the three gear
+       trees (weapon / armour / shoes) are removed - their node
+       tables, the raise path, and every combat read of them.
+       What stays, by the spec's own drafts: the espil_trees_v1
+       record itself (neither deleted nor migrated - 4.3) and
+       its proficiency counters, which keep counting kills /
+       hits weathered / metres travelled even though nothing
+       reads them now (section 6, Q10 draft), so a future
+       re-connection is not starved of data. */
     var ESPIL_TREES_KEY='espil_trees_v1';
     var espilTreesCache=null, espilTreesDirty=false;
     function espilTrees(){
@@ -12385,7 +12137,6 @@
     function espilTreesSave(){ espilTreesDirty=false; try{ window.localStorage.setItem(ESPIL_TREES_KEY,JSON.stringify(espilTrees())); }catch(e){} }
     function espilTreesMark(){ espilTreesDirty=true; }
     setInterval(function(){ if(espilTreesDirty)espilTreesSave(); },2500);
-    function espilTreeAlloc(id){ try{ return espilTrees().alloc[id]||0; }catch(e){ return 0; } }
     function espilFamilyEquipped(){
       try{
         var eq=JSON.parse(window.localStorage.getItem('espil_equipped')||'null');
@@ -12397,20 +12148,6 @@
       }catch(e){}
       return null;
     }
-    function espilTreeDmgMul(){
-      try{
-        var fam=espilFamilyEquipped(); if(!fam)return 1;
-        return 1+.04*espilTreeAlloc(fam+'_edge')+.03*espilTreeAlloc(fam+'_master');
-      }catch(e){ return 1; }
-    }
-    function espilTreeRangeBonus(m){
-      try{
-        if(!m||m.guard||m.proj)return 0;
-        var fam=espilFamilyEquipped(); if(!fam)return 0;
-        return .1*espilTreeAlloc(fam+'_master');
-      }catch(e){ return 0; }
-    }
-    function espilTreeDefBonus(){ return 2*espilTreeAlloc('a_guard'); }
     function espilTreeOnKill(){
       var fam=espilFamilyEquipped(); if(!fam)return;
       var t=espilTrees(); t.prof.weapon[fam]=(t.prof.weapon[fam]||0)+1; espilTreesMark();
@@ -12429,86 +12166,160 @@
       if(fam&&ESPIL_ART_MOVES[fam])return ESPIL_ART_MOVES[fam];
       return {name:'Weapon Art',icon:'⚔️',art:'art',color:0xffd76e,css:'#ffd76e',dmg:6,range:3.6,cd:2.2,arc:2.2,y:1.05,desc:'Equip a weapon to give the art its form.'};
     }
-    var ESPIL_FAM_NAME={sword:'Sword',staff:'Staff',bow:'Bow',dagger:'Dagger'};
-    var ESPIL_WEAPON_NODES=function(fam){
-      var fn=ESPIL_FAM_NAME[fam]||fam;
-      return [
-        {id:fam+'_edge',layer:'weapon',name:fn+' Edge',art:fam,max:10,desc:'+4% damage with '+fam+' weapons per rank.'},
-        {id:fam+'_art',layer:'weapon',name:(ESPIL_ART_MOVES[fam]?ESPIL_ART_MOVES[fam].name:'Weapon Art'),art:'art',max:1,desc:'Unlock the '+fam+' weapon art (F key).'},
-        {id:fam+'_master',layer:'weapon',name:fn+' Mastery',art:fam,max:5,desc:'+3% damage and +0.1 m range per rank. Rank r requires an owned '+fam+' weapon crafted to tier r.'}
-      ];
-    };
-    var ESPIL_ARMOUR_NODES=[
-      {id:'a_vital',layer:'armour',name:'Vitality',art:'vital',max:10,desc:'+8 max HP per rank.'},
-      {id:'a_guard',layer:'armour',name:'Guard Plate',art:'shield',max:10,desc:'+2 Defense while guarding per rank.'},
-      {id:'a_regen',layer:'armour',name:'Second Wind',art:'regen',max:5,desc:'Regenerate +0.4 HP per second per rank.'},
-      {id:'a_ward',layer:'armour',name:'Mind Ward',art:'ward',max:5,desc:'+4 max MP per rank.'}
-    ];
-    var ESPIL_SHOES_NODES=[
-      {id:'s_swift',layer:'shoes',name:'Swift Steps',art:'boot',max:10,desc:'+1.5% move speed per rank.'},
-      {id:'s_stride',layer:'shoes',name:'Long Stride',art:'run',max:5,desc:'+3% run speed per rank.'},
-      {id:'s_leap',layer:'shoes',name:'Spring Heel',art:'jump',max:10,desc:'+1.5% jump power per rank.'},
-      {id:'s_dashcd',layer:'shoes',name:'Dash Cycle',art:'dash',max:5,desc:'Dash Strike cooldown -6% per rank.'}
-    ];
-    function espilTreeNodeDef(id){
-      var i,f,ns;
-      for(i=0;i<ESPIL_ARMOUR_NODES.length;i++)if(ESPIL_ARMOUR_NODES[i].id===id)return ESPIL_ARMOUR_NODES[i];
-      for(i=0;i<ESPIL_SHOES_NODES.length;i++)if(ESPIL_SHOES_NODES[i].id===id)return ESPIL_SHOES_NODES[i];
-      var fams=['sword','staff','bow','dagger'];
-      for(f=0;f<fams.length;f++){ ns=ESPIL_WEAPON_NODES(fams[f]); for(i=0;i<ns.length;i++)if(ns[i].id===id)return ns[i]; }
-      return null;
-    }
-    function espilTreeCost(rank){ return 1+Math.floor(rank/3); }
-    function espilTreeAvail(layer,fam){
-      var t=espilTrees();
-      if(layer==='weapon')return (t.prof.weapon[fam]||0)-(t.spent.weapon[fam]||0);
-      if(layer==='armour')return (t.prof.armour||0)-(t.spent.armour||0);
-      if(layer==='shoes')return Math.floor(t.prof.shoes||0)-(t.spent.shoes||0);
-      return 0;
-    }
-    function espilMasteryMet(fam,nextRank){
+    /* ================================================================
+       WEAPON LOADOUT (combat spec 2026-11-26, section 2 + P2)
+       espil_loadout_v1 = {slots:[name|null x4], active:0..3}.
+       The loadout DESIGNATES held weapons; the equipped weapon
+       itself always lives in panels' espil_equipped, and every
+       equip write goes through panels' own path
+       (window.__espilGear.equip - the same write the bag's
+       Equip button makes). Invariant: the active slot names
+       the equipped weapon (or the last one, while unarmed).
+       - Number keys 1-4 / loadout-row presses switch: the
+         target slot's weapon is equipped through panels.
+       - An equip made anywhere else (the bag) is adopted:
+         the 'espil-gear-changed' event re-syncs the active
+         slot, so the patterns (which follow the equipped
+         weapon) and the loadout never disagree.
+       - Designation is assigned in the bag (panels calls
+         __espilLoadout.assign); assigning to the active slot
+         also equips.
+       Q9 drafts (unanswered, reversible): switch cooldown
+       0.5 s, shared across slots; pattern cooldowns are keyed
+       by pattern slot, not by weapon (in doMove), so a switch
+       neither resets nor inherits a pattern cooldown.
+       ================================================================ */
+    var ESPIL_LOADOUT_KEY='espil_loadout_v1';
+    var espilLoadoutCache=null, espilSwitchCdUntil=0;
+    function espilLoadout(){
+      if(espilLoadoutCache)return espilLoadoutCache;
+      var L={slots:[null,null,null,null],active:0};
+      var had=false;
       try{
-        if(!window.__espilGear||!window.__espilGearWindow||!window.__espilCraftTier)return false;
-        var owned=window.__espilGear.owned();
-        for(var i=0;i<owned.length;i++){
-          var it=window.__espilGearWindow.itemOf(owned[i].name);
-          if(it&&it.slot==='weapon'&&it.app&&it.app.shape===fam&&window.__espilCraftTier(owned[i].name)>=nextRank)return true;
+        var raw=JSON.parse(window.localStorage.getItem(ESPIL_LOADOUT_KEY)||'null');
+        if(raw){
+          had=true;
+          if(raw.slots&&raw.slots.length)for(var i=0;i<4;i++)L.slots[i]=raw.slots[i]||null;
+          if(typeof raw.active==='number')L.active=Math.max(0,Math.min(3,raw.active|0));
         }
       }catch(e){}
-      return false;
+      if(!had){
+        /* First run: the currently equipped weapon (panels'
+           state) seeds the active slot, so the weapon already
+           in hand is the player's slot 1 from the start. */
+        try{
+          var eq=JSON.parse(window.localStorage.getItem('espil_equipped')||'null');
+          if(eq&&eq.weapon)L.slots[L.active]=eq.weapon;
+        }catch(e){}
+      }
+      espilLoadoutCache=L;
+      return L;
     }
-    function raiseTreeNode(id){
-      var n=espilTreeNodeDef(id); if(!n)return {ok:false,why:'unknown'};
-      var t=espilTrees(), rank=t.alloc[id]||0;
-      if(rank>=n.max)return {ok:false,why:'maxed'};
-      var fam=(n.layer==='weapon')?id.split('_')[0]:null;
-      var avail=espilTreeAvail(n.layer,fam), cost=espilTreeCost(rank);
-      if(avail<cost)return {ok:false,why:'currency',avail:avail,cost:cost};
-      if(fam&&id===fam+'_master'&&!espilMasteryMet(fam,rank+1))return {ok:false,why:'craft-tier',need:rank+1};
-      t.alloc[id]=rank+1;
-      if(n.layer==='weapon')t.spent.weapon[fam]=(t.spent.weapon[fam]||0)+cost;
-      else if(n.layer==='armour')t.spent.armour=(t.spent.armour||0)+cost;
-      else t.spent.shoes=(t.spent.shoes||0)+cost;
-      espilTreesSave();
-      if(id==='a_vital'){ skillState.maxhp=100+8*(t.alloc.a_vital||0); saveSkills(); paintStatus(); }
-      if(id==='a_ward'){ skillState.maxmp=50+4*(t.alloc.a_ward||0); saveSkills(); paintStatus(); }
-      if(skillTreeOpen)renderSkillTree();
-      return {ok:true,rank:rank+1};
+    function espilLoadoutSave(){
+      try{ window.localStorage.setItem(ESPIL_LOADOUT_KEY,JSON.stringify(espilLoadout())); }catch(e){}
     }
-    (function espilTreesInit(){
-      var t=espilTrees();
-      skillState.maxhp=100+8*(t.alloc.a_vital||0);
-      skillState.maxmp=50+4*(t.alloc.a_ward||0);
+    function espilEquippedWeaponName(){
+      try{
+        var eq=JSON.parse(window.localStorage.getItem('espil_equipped')||'null');
+        return (eq&&eq.weapon)||null;
+      }catch(e){ return null; }
+    }
+    function paintLoadoutRow(){
+      var L=espilLoadout();
+      for(var n=0;n<4;n++){
+        var b=document.getElementById('item-'+(n+1));
+        if(!b)continue;
+        var w=L.slots[n];
+        b.classList.toggle('is-active',n===L.active);
+        b.classList.toggle('is-locked',!w);
+        var fam=null;
+        if(w&&window.__espilGearWindow&&window.__espilGearWindow.itemOf){
+          var it=window.__espilGearWindow.itemOf(w);
+          if(it&&it.app)fam=it.app.shape;
+        }
+        var sic=fam?pxIcon(fam):'';
+        var ic=b.querySelector('.sicon');
+        if(ic)ic.innerHTML=sic?'<img alt="" src="'+sic+'">':'';
+        var mn=b.querySelector('.mn');
+        if(mn)mn.textContent=fam?fam.toUpperCase():'—';
+        b.setAttribute('aria-label',w?('Loadout slot '+(n+1)+': '+w+(n===L.active?' (equipped)':'')):('Loadout slot '+(n+1)+': empty'));
+        b.title=w?('Loadout '+(n+1)+' — '+w):'Empty loadout slot — designate a weapon in the bag';
+      }
+    }
+    function espilSwitchLoadout(n){
+      if(!cityPhaseActive||!walkPlayer)return;
+      if(window.__espilEntryMode==='shop')return;
+      if(espilDead)return;
+      if(n<0||n>3)return;
+      var L=espilLoadout();
+      var w=L.slots[n];
+      if(n===L.active){
+        /* Already the active slot: re-draw its weapon if the
+           bag unequipped it meanwhile. */
+        if(w&&espilEquippedWeaponName()!==w&&window.__espilGear&&window.__espilGear.equip){
+          window.__espilGear.equip(w);
+          paintLoadoutRow(); paintMoveSlots();
+        }
+        return;
+      }
+      if(!w){
+        if(window.__espilToast)window.__espilToast('Loadout slot '+(n+1)+' is empty — designate a weapon in the bag.');
+        return;
+      }
+      if(espilGameT<espilSwitchCdUntil)return; /* Q9 draft: 0.5 s shared switch cooldown */
+      espilSwitchCdUntil=espilGameT+.5;
+      L.active=n; espilLoadoutSave();
+      if(window.__espilGear&&window.__espilGear.equip)window.__espilGear.equip(w);
+      paintLoadoutRow(); paintMoveSlots();
+      if(window.__espilToast)window.__espilToast('⚔️ '+w);
+    }
+    function espilLoadoutAssign(name,n){
+      var it=(window.__espilGearWindow&&window.__espilGearWindow.itemOf)?window.__espilGearWindow.itemOf(name):null;
+      if(!it||it.slot!=='weapon')return {ok:false,why:'not-a-weapon'};
+      if(n<0||n>3)return {ok:false,why:'slot'};
+      var L=espilLoadout();
+      for(var i=0;i<4;i++)if(L.slots[i]===name&&i!==n)L.slots[i]=null;
+      L.slots[n]=name; espilLoadoutSave();
+      if(n===L.active&&window.__espilGear&&window.__espilGear.equip)window.__espilGear.equip(name);
+      paintLoadoutRow(); paintMoveSlots();
+      return {ok:true,slot:n};
+    }
+    /* Adoption: an equip made outside the loadout (the bag's
+       Equip button, a story grant) re-syncs the designation -
+       the newly equipped weapon becomes the active slot's
+       content, or activates the slot already holding it. */
+    window.addEventListener('espil-gear-changed',function(){
+      var w=espilEquippedWeaponName();
+      if(!w)return;
+      var L=espilLoadout();
+      if(L.slots[L.active]!==w){
+        var j=L.slots.indexOf(w);
+        if(j>=0)L.active=j; else L.slots[L.active]=w;
+        espilLoadoutSave();
+      }
+      paintLoadoutRow(); paintMoveSlots();
+    });
+    window.__espilLoadout={
+      state:function(){ var L=espilLoadout(); return {slots:L.slots.slice(),active:L.active,equipped:espilEquippedWeaponName(),switchCdLeft:Math.max(0,Math.round((espilSwitchCdUntil-espilGameT)*100)/100)}; },
+      switchTo:espilSwitchLoadout,
+      assign:espilLoadoutAssign
+    };
+    window.__espilPatterns={
+      table:ESPIL_FAMILY_PATTERNS,
+      def:function(slot){ var d=espilPatternDef(slot); return d?{name:d.name,dmg:d.dmg,range:d.range,cd:d.cd,proj:!!d.proj,guard:!!d.guard,dashMove:!!d.dashMove,art:d.art||null}:null; },
+      family:function(){ return espilFamilyEquipped(); }
+    };
+    /* Combat spec 4.2: the a_vital / a_ward tree bonuses are
+       retired - max HP / MP are the bases (100 / 50) again. The
+       recompute-on-boot shape is the one the tree init used to
+       run, so a stored larger max from the tree era does not
+       ride forward; hp / mp clamp to the bases. */
+    (function espilBaseStatsInit(){
+      skillState.maxhp=100;
+      skillState.maxmp=50;
       if(skillState.hp>skillState.maxhp)skillState.hp=skillState.maxhp;
       if(skillState.mp>skillState.maxmp)skillState.mp=skillState.maxmp;
     })();
-    window.__espilTrees={raise:raiseTreeNode,state:function(){
-      var t=espilTrees(), fam=espilFamilyEquipped();
-      return { layer:espilTreeLayer, prof:t.prof, spent:t.spent, alloc:t.alloc,
-        avail:{ weapon:fam?espilTreeAvail('weapon',fam):0, armour:espilTreeAvail('armour'), shoes:espilTreeAvail('shoes') },
-        family:fam, dmgMul:espilTreeDmgMul(), defBonus:espilTreeDefBonus(),
-        maxhp:skillState.maxhp, maxmp:skillState.maxmp };
-    }};
     /* ---- skill range mesh (FEEL spec): a ground disc whose
        gradient texture runs from 50% opacity at the centre to
        clear at the rim, stamped by the Batch 6 skills via fxPool. */
@@ -12537,166 +12348,6 @@
       mapScene.add(grp);
       fxPool.push({grp:grp,mat:mat,geo:geo,t:0,life:.4,s0:st.range*.35,s1:st.range,o0:.5});
     }
-    /* ---- four-layer tree UI. The character layer is the Keeper
-       tree; the gear layers render here with the Asset spec's ring
-       shapes (weapon hexagon, armour shield-square, shoes
-       triangle; character keeps the circle of the base CSS).
-       SKILL ICON STATUS: the Asset room delivered the icon SPEC
-       (SKILL-ICON-SPEC-v1, files icon_<tree>_<skill>.png) but no
-       icon files exist yet - nodes therefore carry the layer ring
-       shape + the runtime pixel glyph + a text label as UI chrome,
-       and the delivered icon set remains PENDING Asset delivery. */
-    var espilTreeLayer='character';
-    function espilEnsureTreeTabs(){
-      var panel=document.getElementById('skill-tree'), tv=document.getElementById('st-treeview');
-      if(!panel||!tv||!tv.parentNode)return;
-      if(!document.getElementById('espil-trees-style')){
-        var st=document.createElement('style'); st.id='espil-trees-style';
-        st.textContent=
-          '#espil-tree-tabs{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}'+
-          '#espil-tree-tabs button{flex:1 1 auto;min-width:100px;padding:7px 8px;border-radius:9px;border:1px solid rgba(169,126,70,.6);background:rgba(28,22,14,.72);color:#e8dcc0;font:800 11.5px Manrope,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px}'+
-          '#espil-tree-tabs button.on{background:rgba(122,84,32,.85);color:#ffe9ad;border-color:#d8a94e}'+
-          '#espil-tree-tabs .rg{width:14px;height:14px;flex:0 0 auto;background:#d8a94e;display:inline-block}'+
-          '.rg-circle{border-radius:50%}'+
-          '.rg-hex{clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%)}'+
-          '.rg-shield{clip-path:polygon(0 0,100% 0,100% 68%,50% 100%,0 68%)}'+
-          '.rg-tri{clip-path:polygon(50% 100%,0 0,100% 0)}'+
-          '.tnode-icon.ring-hex{border-radius:6px;clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%)}'+
-          '.tnode-icon.ring-shield{border-radius:4px;clip-path:polygon(0 0,100% 0,100% 68%,50% 100%,0 68%)}'+
-          '.tnode-icon.ring-tri{border-radius:0;clip-path:polygon(50% 100%,0 0,100% 0)}'+
-          '.espil-tree-note{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);width:78%;text-align:center;color:#e8dcc0;font:600 13px/1.5 Manrope,sans-serif;text-shadow:0 1px 3px #000}';
-        document.head.appendChild(st);
-      }
-      var bar=document.getElementById('espil-tree-tabs');
-      if(!bar){
-        bar=document.createElement('div');
-        bar.id='espil-tree-tabs';
-        var defs=[['character','Character','rg-circle'],['weapon','Weapon','rg-hex'],['armour','Armour','rg-shield'],['shoes','Shoes','rg-tri']];
-        defs.forEach(function(df){
-          var b=document.createElement('button');
-          b.type='button'; b.setAttribute('data-treelayer',df[0]);
-          b.innerHTML='<span class="rg '+df[2]+'"></span>'+df[1];
-          b.addEventListener('click',function(){
-            espilTreeLayer=df[0];
-            if(espilTreeLayer==='character')selectedSkillId='keeper';
-            renderSkillTree();
-          });
-          bar.appendChild(b);
-        });
-        tv.parentNode.insertBefore(bar,tv);
-      }
-      var btns=bar.querySelectorAll('[data-treelayer]');
-      for(var i=0;i<btns.length;i++)btns[i].classList.toggle('on',btns[i].getAttribute('data-treelayer')===espilTreeLayer);
-    }
-    function espilLayerNodes(){
-      if(espilTreeLayer==='weapon'){
-        var fam=espilFamilyEquipped();
-        return fam?ESPIL_WEAPON_NODES(fam):[];
-      }
-      if(espilTreeLayer==='armour')return ESPIL_ARMOUR_NODES;
-      if(espilTreeLayer==='shoes')return ESPIL_SHOES_NODES;
-      return [];
-    }
-    function espilLayerCurrencyLine(){
-      var t=espilTrees();
-      if(espilTreeLayer==='weapon'){
-        var fam=espilFamilyEquipped();
-        if(!fam)return 'No weapon equipped.';
-        return 'Kills with '+(ESPIL_FAM_NAME[fam]||fam)+' weapons: '+(t.prof.weapon[fam]||0)+' · unspent '+espilTreeAvail('weapon',fam);
-      }
-      if(espilTreeLayer==='armour')return 'Hits weathered: '+(t.prof.armour||0)+' · unspent '+espilTreeAvail('armour');
-      if(espilTreeLayer==='shoes')return 'Metres travelled: '+Math.floor(t.prof.shoes||0)+' · unspent '+espilTreeAvail('shoes');
-      return '';
-    }
-    function renderLayerTree(){
-      var tv=document.getElementById('st-treeview');
-      if(tv){
-        tv.innerHTML='';
-        var fam=espilTreeLayer==='weapon'?espilFamilyEquipped():null;
-        var nodes=espilLayerNodes();
-        var ringCls=espilTreeLayer==='weapon'?'ring-hex':(espilTreeLayer==='armour'?'ring-shield':'ring-tri');
-        if(espilTreeLayer==='weapon'&&!fam){
-          var note=document.createElement('div');
-          note.className='espil-tree-note';
-          note.textContent='Equip a weapon to open its tree. Each weapon family (sword, staff, bow, dagger) grows its own tree - swapping weapons swaps the active tree, and no points are ever lost.';
-          tv.appendChild(note);
-        }
-        var root=document.createElement('div');
-        root.className='tnode tnode-root';
-        root.style.left='50%'; root.style.top='88%';
-        var rootName=espilTreeLayer==='weapon'?(fam?((ESPIL_FAM_NAME[fam]||fam).toUpperCase()+' TREE'):'WEAPON TREE'):(espilTreeLayer==='armour'?'ARMOUR TREE':'SHOES TREE');
-        var rootGlyph=espilTreeLayer==='weapon'?'⚔️':(espilTreeLayer==='armour'?'🛡️':'👢');
-        root.innerHTML='<span class="tnode-icon '+ringCls+'" style="font-size:1.3rem">'+rootGlyph+'</span><span class="tnode-name">'+rootName+'</span>';
-        tv.appendChild(root);
-        var xs=nodes.length===3?[25,50,75]:(nodes.length===4?[16,38,62,84]:[50]);
-        nodes.forEach(function(n,ix){
-          var rank=espilTreeAlloc(n.id), maxed=rank>=n.max;
-          var cost=espilTreeCost(rank);
-          var avail=espilTreeAvail(n.layer,fam);
-          var okk=!maxed&&avail>=cost;
-          if(fam&&n.id===fam+'_master'&&!espilMasteryMet(fam,rank+1))okk=false;
-          var d=document.createElement('div');
-          d.className='tnode'+(maxed?' is-maxed':'')+(!okk&&!maxed?' is-dim':'')+(selectedSkillId===n.id?' is-selected':'');
-          d.style.left=xs[ix]+'%'; d.style.top='46%';
-          d.setAttribute('role','button');
-          var icon=pxIcon(n.art||n.id);
-          var inner='<span class="tnode-icon '+ringCls+'">'+(icon?'<img alt="" src="'+icon+'">':'')+'</span>'+
-            '<span class="tnode-name">'+n.name+'</span>'+
-            '<span class="tnode-lv'+(maxed?' is-max':'')+'">'+(maxed?'MASTER':'Lv '+rank+'/'+n.max)+'</span>';
-          if(!maxed&&okk)inner+='<button type="button" class="tnode-plus" aria-label="Raise '+n.name+'">+</button>';
-          d.innerHTML=inner;
-          d.addEventListener('click',function(e){
-            var tg=e&&e.target;
-            var isPlus=tg&&(tg.className==='tnode-plus'||(tg.classList&&typeof tg.classList.contains==='function'&&tg.classList.contains('tnode-plus')));
-            if(isPlus){
-              var r=raiseTreeNode(n.id);
-              if(!r.ok&&window.__espilToast){
-                window.__espilToast(r.why==='craft-tier'?('Craft a '+(ESPIL_FAM_NAME[fam]||fam)+' weapon to tier '+r.need+' first.')
-                  :r.why==='currency'?('Not enough '+(espilTreeLayer==='weapon'?'kills with this family':espilTreeLayer==='armour'?'hits weathered':'metres travelled')+'.')
-                  :'Cannot raise this node yet.');
-              }
-              renderSkillTree();
-              return;
-            }
-            selectedSkillId=n.id;
-            renderSkillTree();
-          });
-          tv.appendChild(d);
-        });
-      }
-      renderLayerDesc();
-    }
-    function renderLayerDesc(){
-      var d=document.getElementById('st-desc');
-      if(!d)return;
-      var n=selectedSkillId?espilTreeNodeDef(selectedSkillId):null;
-      if(!n||n.layer!==espilTreeLayer){
-        var titles={weapon:'The Weapon Tree',armour:'The Armour Tree',shoes:'The Shoes Tree'};
-        var bodies={
-          weapon:'One tree per weapon family. Only the equipped weapon\'s tree is active; swapping weapons swaps the tree. Kills with the family earn its points, and crafted tiers deepen Mastery.',
-          armour:'Defence and survival, grown by weathering hits. Its bonuses stack with every other tree and stay yours even with nothing equipped.',
-          shoes:'Movement, grown by travelling. Speed, stride, leap and dash cycling - earned on foot, kept forever.'};
-        d.innerHTML='<h3>'+(titles[espilTreeLayer]||'Tree')+'</h3><p>'+(bodies[espilTreeLayer]||'')+'</p><p class="cur">'+espilLayerCurrencyLine()+'</p>';
-        return;
-      }
-      var rank=espilTreeAlloc(n.id), maxed=rank>=n.max;
-      var fam=n.layer==='weapon'?n.id.split('_')[0]:null;
-      var costLine=maxed?'<p class="cost">MAX LEVEL</p>'
-        :'<p class="cost">Cost: '+espilTreeCost(rank)+' · '+espilLayerCurrencyLine()+'</p>';
-      var extra='';
-      if(fam&&n.id===fam+'_master')extra='<p class="cur">Crafted-tier gate: '+(espilMasteryMet(fam,rank+1)?'met for the next rank':'needs a '+(ESPIL_FAM_NAME[fam]||fam)+' weapon at tier '+(rank+1))+'</p>';
-      d.innerHTML='<h3>'+n.name+'</h3><p>'+n.desc+'</p><p class="cur">Current Lv '+rank+' / '+n.max+'</p>'+extra+costLine;
-    }
-    /* Locked ASDF slots read as locked until their skill is learned. */
-    setInterval(function(){
-      try{
-        var fam=espilFamilyEquipped();
-        var locks={a:!(skillState.alloc.m_dash>0),s:!(skillState.alloc.m_spin>0),d:!(skillState.alloc.m_wave>0),
-                   f:!(fam&&espilTreeAlloc(fam+'_art')>0)};
-        for(var k in locks){ var b=document.getElementById('slot-'+k); if(b)b.classList.toggle('is-locked',!!locks[k]); }
-      }catch(e){}
-    },800);
-
     /* ---------------- Item D: the 2D sprite avatar ----------------
        Guests render as billboard sprites from the delivered motion
        sets, copied into assets/char2d/ with uniform fNN.webp names
@@ -13847,22 +13498,12 @@
     initChat();
     (function wireSkillHud(){
       var atk=document.getElementById('map-attack');
-      if(atk)atk.addEventListener('pointerdown',function(e){e.preventDefault();doMove('punch');});
+      if(atk)atk.addEventListener('pointerdown',function(e){e.preventDefault();doMove('a');});
       /* INTERACT button (Han 2026-10-20 mobile layout): the touch
          twin of Space - wall jump first while climbing, then the
          building/store interact, exactly the keydown order. */
       var itb=document.getElementById('map-interact');
       if(itb)itb.addEventListener('pointerdown',function(e){e.preventDefault();if(!espilSpaceWallJump())tryInteract();});
-      var tt=document.getElementById('tree-toggle');
-      if(tt)tt.addEventListener('click',function(e){e.stopPropagation();toggleSkillTree();});
-      var sc=document.getElementById('st-close');
-      if(sc)sc.addEventListener('click',function(){toggleSkillTree(false);});
-      var st=document.getElementById('skill-tree');
-      if(st)st.addEventListener('click',function(e){if(e.target===st)toggleSkillTree(false);});
-      /* Demo: simulate finishing a video (+5 Knowledge). The real video
-         player will call window.__espilSkills.gainKnowledge(n) instead. */
-      var stb=document.getElementById('st-study');
-      if(stb)stb.addEventListener('click',function(){gainKnowledge(5,'demo video');renderSkillTree();});
       /* QA #14 (UI room): inventory + character panel close handlers. */
       var ic=document.getElementById('inv-close');
       if(ic)ic.addEventListener('click',function(){toggleInventory(false);});
@@ -14078,7 +13719,6 @@
         if(friendsOpen){ toggleFriendsPanel(false); e.__espilEscBacked=true; return; }
         if(characterOpen){ toggleCharacterPanel(false); e.__espilEscBacked=true; return; }
         if(inventoryOpen){ toggleInventory(false); e.__espilEscBacked=true; return; }
-        if(skillTreeOpen){ toggleSkillTree(false); e.__espilEscBacked=true; return; }
         return;
       }
       if(k===' '||k==='ArrowUp'||k==='ArrowDown'||k==='ArrowLeft'||k==='ArrowRight')e.preventDefault();
@@ -14094,8 +13734,9 @@
       if(k.toLowerCase()==='b'&&!e.repeat){
         if(typeof summonVehicle==='function')summonVehicle();
       }
-      /* Skill slots: QWER row, then ASDF row (1-4 are item slots — UI room).
-         K opens the skill tree. */
+      /* Pattern row: ASDF patterns + R Defense (combat spec
+         2026-11-26). 1-4 switch the weapon loadout. K is
+         unbound - the skill tree is retired. */
       var ae=document.activeElement,atag=(ae&&ae.tagName)||'';
       if(!/INPUT|TEXTAREA|SELECT/.test(atag)){
         var lk=k.toLowerCase(),sl=skillSlotForKey(lk);
@@ -14105,8 +13746,11 @@
             if(sl.move)doMove(sl.move);
             else if(sl.locked&&window.__espilToast)window.__espilToast(sl.locked+' arrives with the combat update.');
           }
-        }else if(lk==='k'){
-          if(!e.repeat)toggleSkillTree();
+        }else if(lk>='1'&&lk<='4'){
+          /* Loadout switch (combat spec P2). Not an attack, so
+             the FPV skill-row suppression above does not apply;
+             the input-focus guard around this whole block does. */
+          if(!e.repeat)espilSwitchLoadout(parseInt(lk,10)-1);
         }else if(lk==='i'){
           /* QA #14 (UI room): I toggles inventory. */
           if(!e.repeat)toggleInventory();
@@ -15119,7 +14763,7 @@
         var m=centeredMarker||markers[navIndex];
         if(m)selectCity(m);
       }
-      else if(e.key==='Escape'){ if(e.__espilEscBacked)return; if(skillTreeOpen){toggleSkillTree(false);} else if(selected){clearSelection(true);} }
+      else if(e.key==='Escape'){ if(e.__espilEscBacked)return; if(selected){clearSelection(true);} }
     });
     /* Virtual joystick (touch devices): analog movement stick for the walkable map.
        Only live while the map is open; exposes a normalized -1..1 vector. */

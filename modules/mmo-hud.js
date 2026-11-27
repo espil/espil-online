@@ -501,8 +501,8 @@
       if (e.currentTarget.classList.contains('b5-off')) return;
       try {
         if (window.__espilSkills && window.__espilSkills.move) window.__espilSkills.move(id);
-        else sendKey(id === 'punch' ? 'q' : id === 'kick' ? 'w' : id === 'throw' ? 'e' : 'r',
-                     id === 'punch' ? 'KeyQ' : id === 'kick' ? 'KeyW' : id === 'throw' ? 'KeyE' : 'KeyR');
+        else sendKey(id === 'defense' ? 'r' : id,
+                     id === 'defense' ? 'KeyR' : 'Key' + id.toUpperCase());
       } catch (err) {}
     };
   }
@@ -512,16 +512,17 @@
     b5Combat = document.createElement('div');
     b5Combat.id = 'espil-mmo-combat';
     b5Combat.setAttribute('aria-label', 'Combat shortcuts');
+    /* Combat spec (Han 2026-11-26): the cluster carries the
+       ASDF patterns + Defense. The retired moves (punch / kick /
+       throw / dash / spin / wave / art as separate buttons) are
+       gone - A IS the punch pattern, S the kick, D Dash Strike,
+       F the weapon art; Quote Tool / Spinning Strike / Ranged
+       Wave are closed as independent skills. */
     var defs = [
-      { move: 'punch', icon: '👊', label: 'PUNCH' },
-      { move: 'kick', icon: '🦵', label: 'KICK' },
-      { move: 'throw', icon: '「」', label: 'THROW' },
-      /* Batch 6 Item C: the tree-gated skills join the cluster;
-         doMove itself refuses (with a toast) until each is learned. */
-      { move: 'dash', icon: '💨', label: 'DASH' },
-      { move: 'spin', icon: '🌀', label: 'SPIN' },
-      { move: 'wave', icon: '🌊', label: 'WAVE' },
-      { move: 'art', icon: '⚔️', label: 'ART' },
+      { move: 'a', icon: '👊', label: 'A' },
+      { move: 's', icon: '🦵', label: 'S' },
+      { move: 'd', icon: '💨', label: 'D' },
+      { move: 'f', icon: '⚔️', label: 'F' },
       { move: 'defense', icon: '🛡️', label: 'DEFENSE' },
       { fly: true, icon: '✈️', label: 'TELEPORT' }
     ];
@@ -557,9 +558,9 @@
           if (window.__espilOpenSelfProfile) window.__espilOpenSelfProfile();
           else sendKey('p', 'KeyP');
         } },
-      { id: 'skill', icon: '⚔️', label: 'Skill tree', fn: function () {
-          if (window.__espilSkills && window.__espilSkills.tree) window.__espilSkills.tree();
-          else sendKey('k', 'KeyK');
+      { id: 'loadout', icon: '⚔️', label: 'Loadout', fn: function () {
+          if (window.__espilGearWindow && window.__espilGearWindow.openProfile) window.__espilGearWindow.openProfile();
+          else sendKey('p', 'KeyP');
         } },
       { id: 'stall', icon: '🧺', label: 'Stall', fn: function () { sendKey('y', 'KeyY'); } }
     ];
@@ -603,7 +604,7 @@
       combatCluster: !!document.getElementById('espil-mmo-combat'),
       menu4: !!document.getElementById('espil-mmo-menu4'),
       attacksOff: (function () {
-        var b = document.querySelector('#espil-mmo-combat button[data-move="punch"]');
+        var b = document.querySelector('#espil-mmo-combat button[data-move="a"]');
         return !!b && b.classList.contains('b5-off');
       })()
     };
@@ -632,7 +633,7 @@
    events that grant Leo per kill) - session count, no invented
    numbers. The largest action button (ATK, sword glyph) fires the
    game's existing touch attack surface (#map-attack, which is
-   doMove('punch')) - the same move the PUNCH button reaches through
+   doMove('a')) - the same pattern the A button reaches through
    __espilSkills.move, exactly as the two surfaces behaved before.
    BUTTON SIZE STANDARD (Han 2026-11-08, overriding the references'
    large-button grammar): the old cluster's main buttons measured
@@ -1109,13 +1110,6 @@
       '.espil-booked .epw-card{width:100%!important;max-width:none!important;height:100%;max-height:none!important}' +
       '.espil-booked .st-close,.espil-booked .ecw-close,.espil-booked .epw-close{display:none!important}' +
       '.espil-booked .st-grid{overflow-y:auto!important}' +
-      '#skill-tree.espil-booked .st-treeview{height:44dvh;flex:none}' +
-      /* flex:none matters: game-ui makes .st-card a column
-         flex box, and the treeview's automatic minimum is 0
-         (its nodes are absolutely positioned), so on short
-         screens it shrinks to a 2px strip and its nodes
-         become unhittable. Unshrunk, the card's own
-         overflow-y:auto scrolls the rest of the page. */
       '#skill-tree.espil-booked .st-desc{min-height:0}' +
     '}' +
     /* landscape: the ledger form - height-led sizing, rail in dvh */
@@ -1125,13 +1119,6 @@
       '.bk-close{width:clamp(44px,12dvh,54px);height:clamp(44px,12dvh,54px)}' +
       '.bk-page{left:2.5dvh;right:2.5dvh}' +
       '.bk-leaf{left:2.5dvh;right:2.5dvh}' +
-      /* the tree's node rows are positioned in % of the
-         treeview, so at the portrait-led 44dvh on a 390px-tall
-         screen the layout compresses ~2.6x and sibling nodes
-         overlap each other's centres (measured). Landscape
-         restores the tree's natural 440px design height
-         (112dvh at 390px); the booked card scrolls to it. */
-      '#skill-tree.espil-booked .st-treeview{height:112dvh}' +
     '}';
   var styleEl = document.createElement('style');
   styleEl.id = 'espil-hud2-style';
@@ -1366,9 +1353,9 @@
   var sheet = mk('div', 'espil-hud2-sheet');
   sheet.setAttribute('aria-hidden', 'true');
   var SHEET = [
-    { id: 'skill', icon: '⚔️', label: 'Skill tree', key: 'K', fn: function () {
-        if (window.__espilSkills && window.__espilSkills.tree) window.__espilSkills.tree();
-        else sendKey('k', 'KeyK'); } },
+    { id: 'loadout', icon: '⚔️', label: 'Loadout', key: '1-4', fn: function () {
+        if (window.__espilGearWindow && window.__espilGearWindow.openProfile) window.__espilGearWindow.openProfile();
+        else sendKey('p', 'KeyP'); } },
     { id: 'items', icon: '🧰', label: 'Items', key: 'P', fn: function () {
         if (window.__espilOpenSelfProfile) window.__espilOpenSelfProfile();
         else sendKey('p', 'KeyP'); } },
@@ -1490,10 +1477,10 @@
      pointers only - under fine pointers none of this is built. */
   var BK_PAGES = [
     { id: 'index', title: 'Menu' },
-    { id: 'skill', title: 'Skill tree', panelId: 'skill-tree', closeId: 'st-close',
+    { id: 'loadout', title: 'Loadout', panelId: 'inventory-panel', closeId: 'inv-close',
       open: function () {
-        if (window.__espilSkills && window.__espilSkills.tree) window.__espilSkills.tree();
-        else sendKey('k', 'KeyK');
+        if (window.__espilGearWindow && window.__espilGearWindow.openBag) window.__espilGearWindow.openBag();
+        else sendKey('i', 'KeyI');
       } },
     { id: 'items', title: 'Items', panelId: 'character-panel', closeId: 'char-close',
       open: function () {
@@ -1927,7 +1914,7 @@
     status.className = 'bk-status';
     idxWrap.appendChild(status);
     var rowMeta = {
-      skill: SHEET[0], items: SHEET[1], bag: SHEET[2], map: SHEET[3], stall: SHEET[4],
+      loadout: SHEET[0], items: SHEET[1], bag: SHEET[2], map: SHEET[3], stall: SHEET[4],
       friends: { icon: '👥', key: 'O' }, settings: { icon: '⚙️', key: '' }, portal: { icon: '💬', key: '' }
     };
     BK_PAGES.forEach(function (p, i) {
@@ -1978,8 +1965,7 @@
   var POS_C = { atk: [2, 2], jump: [60, 3], use: [110, 3], fly: [160, 5] };
   var actions = mk('div', 'espil-hud2-actions');
   actions.setAttribute('aria-label', 'Actions');
-  var KEYMAP = { punch: ['q', 'KeyQ'], kick: ['w', 'KeyW'], throw: ['e', 'KeyE'], defense: ['r', 'KeyR'],
-                 dash: ['a', 'KeyA'], spin: ['s', 'KeyS'], wave: ['d', 'KeyD'], art: ['f', 'KeyF'] };
+  var KEYMAP = { a: ['a', 'KeyA'], s: ['s', 'KeyS'], d: ['d', 'KeyD'], f: ['f', 'KeyF'], defense: ['r', 'KeyR'] };
   function fireMove(id) {
     return function (e) {
       e.preventDefault();
@@ -1996,7 +1982,7 @@
       if (e.currentTarget.classList.contains('h2-off')) return;
       var t = el(targetId);
       if (t) { try { t.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true })); return; } catch (err) {} }
-      if (targetId === 'map-attack') { try { if (window.__espilSkills) window.__espilSkills.move('punch'); } catch (err) {} }
+      if (targetId === 'map-attack') { try { if (window.__espilSkills) window.__espilSkills.move('a'); } catch (err) {} }
     };
   }
   var actBtns = {};
@@ -2018,10 +2004,10 @@
   actBtns.fly.setAttribute('aria-label', 'TELEPORT');
 
   /* ---- quick slots (Han 2026-11-11) ------------------------------
-     Four slots, each holding one of the game's eight moves. Tap
-     fires through the exact desktop path (__espilSkills.move ===
-     doMove, which itself refuses unlearned tree skills with its
-     own toast); a long press (>=480ms, near-stationary) opens the
+     Four slots, each holding one of the game's five patterns
+     (combat spec 2026-11-26: ASDF + Defense). Tap fires through
+     the exact desktop path (__espilSkills.move === doMove); a
+     long press (>=480ms, near-stationary) opens the
      assign sheet instead, and tapping an EMPTY slot opens it too.
      Assignment persists with the skill state: the companion record
      espil_quickslots_v1, mirrored into __espilSkills.state.qs so
@@ -2030,23 +2016,25 @@
      there picks named fields only, so the HUD reads the raw
      record back as its fallback). Cooldowns paint from the game's
      own cooldown map (__espilCombatState().cd, seconds left); the
-     sweep fraction divides by the MOVES base cooldown - swift-rank
-     reductions make that an approximation for display only. */
+     sweep fraction divides by the pattern def's own cooldown. */
   var QS_KEY = 'espil_quickslots_v1';
   var QS_MOVES = {
-    punch:   { name: 'Punch',           icon: '👊', cd: 0.45, key: 'Q' },
-    kick:    { name: 'Kick',            icon: '🦵', cd: 0.65, key: 'W' },
-    throw:   { name: 'Quote Tool',      icon: '「」', cd: 0.9,  key: 'E' },
-    defense: { name: 'Defense',         icon: '🛡️', cd: 2.5,  key: 'R' },
-    dash:    { name: 'Dash Strike',     icon: '💨', cd: 0.8,  key: 'A', tree: true },
-    spin:    { name: 'Spinning Strike', icon: '🌀', cd: 1.4,  key: 'S', tree: true },
-    wave:    { name: 'Ranged Wave',     icon: '🌊', cd: 1.1,  key: 'D', tree: true },
-    art:     { name: 'Weapon Art',      icon: '⚔️', cd: 2.2,  key: 'F', tree: true }
+    a:       { name: 'Punch (A pattern)', icon: '👊', cd: 0.45, key: 'A' },
+    s:       { name: 'Kick (S pattern)',  icon: '🦵', cd: 0.65, key: 'S' },
+    d:       { name: 'Dash Strike',     icon: '💨', cd: 0.8,  key: 'D' },
+    f:       { name: 'Weapon Art',        icon: '⚔️', cd: 2.2,  key: 'F' },
+    defense: { name: 'Defense',           icon: '🛡️', cd: 2.5,  key: 'R' }
   };
-  var QS_ORDER = ['punch', 'kick', 'throw', 'defense', 'dash', 'spin', 'wave', 'art'];
+  var QS_ORDER = ['a', 's', 'd', 'f', 'defense'];
+  /* Retired move ids -> their pattern successors (combat spec
+     2026-11-26). throw / spin / wave are closed as independent
+     skills (spec Q5 draft) and have no successor: they sanitize
+     to an empty slot, so a stored bar from the tree era still
+     resolves instead of going blank. */
+  var QS_LEGACY = { punch: 'a', kick: 's', dash: 'd', art: 'f', defense: 'defense' };
   function qsSanitize(a) {
     if (!Array.isArray(a) || a.length !== 4) return null;
-    return a.map(function (v) { return QS_MOVES[v] ? v : null; });
+    return a.map(function (v) { return QS_MOVES[v] ? v : (QS_LEGACY[v] || null); });
   }
   function qsLoad() {
     try {
@@ -2058,7 +2046,7 @@
       var b = s && qsSanitize(s.qs);
       if (b) return b;
     } catch (e) {}
-    return ['punch', 'kick', 'throw', 'defense'];
+    return ['a', 's', 'd', 'defense'];
   }
   var qsSlots = qsLoad();
   function qsSave() {

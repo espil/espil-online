@@ -36,11 +36,10 @@
    • Rewards through the EXISTING stores only, never a fork:
      Leo into the one espil_leo_balance key; items through the
      shared espil-guide monster-drop grant (panels.js writes
-     espil_owned_items); skills recorded as learned IN THE
-     TREES (Dash Strike = the character tree's m_dash alloc in
-     espil_skills_v1, Weapon Art = the equipped family's
-     <fam>_art alloc in espil_trees_v1, both written through
-     the live state objects the monolith itself saves); the Q7
+     espil_owned_items); skills are NOT recorded anywhere
+     since the combat spec (2026-11-26) retired the trees -
+     Dash Strike is the D pattern and the Weapon Art is the
+     F pattern, both following the equipped weapon; the Q7
      title joins the panels title list (espil_titles).
    • Combat steps ride the arena's instance machinery
      (__espilInstanceSpawn): instance bodies are exempt from
@@ -288,40 +287,36 @@
       }));
     } catch (e) {}
   }
-  function grantDashStrike() {
+  /* COMBAT SPEC (Han 2026-11-26, section 7 P4 / Q8 draft): Dash
+     Strike is the D pattern - basic kit every player has - so the
+     Q3 grant is retired and nothing is written to espil_skills_v1
+     (the stored record is neither deleted nor migrated, 4.3).
+     dashLearned() answers true: the pattern is always available.
+     The Q3 reward TEXT in completeQuest below is story canon and
+     is NOT changed here - it rides Q8 with the story room. */
+  function grantDashStrike() { return true; }
+  function dashLearned() { return true; }
+  /* COMBAT SPEC (Han 2026-11-26, section 7 P4 / Q8 draft): the
+     Weapon Art is the F pattern - it follows the equipped weapon
+     (monolith's espilArtMoveDef) and is granted by nothing, so
+     the Q7 tree grant is retired and nothing is written to
+     espil_trees_v1. artLearned() reports the family whose art is
+     in hand right now - the equipped weapon's family, or null
+     unarmed (the old default-to-sword write is gone with the
+     grant). The family is read through monolith's own pattern
+     resolver when it is up, with the panels item table as the
+     direct fallback - the same espil_equipped record either way. */
+  function espilEquippedFamily() {
     try {
-      var ss = window.__espilSkills && window.__espilSkills.state;
-      if (!ss || !ss.alloc) return false;
-      if (ss.alloc.m_dash > 0) return true;
-      ss.alloc.m_dash = 1;   /* recorded as learned in the character tree */
-      try { localStorage.setItem('espil_skills_v1', JSON.stringify(ss)); } catch (e) {}
-      return true;
-    } catch (e) { return false; }
-  }
-  function dashLearned() {
-    try { var ss = window.__espilSkills && window.__espilSkills.state; return !!(ss && ss.alloc && ss.alloc.m_dash > 0); } catch (e) { return false; }
-  }
-  function grantWeaponArt() {
-    try {
-      var ts = window.__espilTrees && window.__espilTrees.state();
-      if (!ts || !ts.alloc) return null;
-      var fam = ts.family || 'sword';
-      if (!(ts.alloc[fam + '_art'] > 0)) {
-        ts.alloc[fam + '_art'] = 1;   /* the weapon tree's art node, learned */
-        try { localStorage.setItem('espil_trees_v1', JSON.stringify({ prof: ts.prof, spent: ts.spent, alloc: ts.alloc })); } catch (e) {}
-      }
-      return fam;
+      if (window.__espilPatterns && window.__espilPatterns.family) return window.__espilPatterns.family();
+      var eq = JSON.parse(localStorage.getItem('espil_equipped') || 'null');
+      if (!eq || !eq.weapon) return null;
+      var it = window.__espilGearWindow && window.__espilGearWindow.itemOf ? window.__espilGearWindow.itemOf(eq.weapon) : null;
+      return (it && it.app && it.app.shape) || null;
     } catch (e) { return null; }
   }
-  function artLearned() {
-    try {
-      var ts = window.__espilTrees && window.__espilTrees.state();
-      if (!ts || !ts.alloc) return null;
-      var fams = ['sword', 'staff', 'bow', 'dagger'];
-      for (var i = 0; i < fams.length; i++) if (ts.alloc[fams[i] + '_art'] > 0) return fams[i];
-      return null;
-    } catch (e) { return null; }
-  }
+  function grantWeaponArt() { return espilEquippedFamily(); }
+  function artLearned() { return espilEquippedFamily(); }
   function grantTitle(title) {
     try {
       var list = JSON.parse(localStorage.getItem(TITLES_KEY) || 'null');

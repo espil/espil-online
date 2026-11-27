@@ -580,23 +580,11 @@ window.__ESPIL_ENV_READY__=(window.fetch?fetch('/.env').then(function(r){return 
       <input class="chat-input" id="chat-input" type="text" maxlength="200"
              placeholder="Press Enter to chat…" data-i18n-ph="chatPh" autocomplete="off" aria-label="Chat message" />
     </div>
-    <div class="skill-tree" id="skill-tree" aria-hidden="true" role="dialog" aria-label="Skill tree: Keeper">
-      <div class="st-card">
-        <div class="st-head">
-          <div>
-            <h2 data-i18n="keeperTitle">KEEPER</h2>
-            <p class="st-sub" data-i18n="keeperSub">Espil&rsquo;s own craft &mdash; the cauldron is both forge and weapon.</p>
-          </div>
-          <button class="st-close" id="st-close" type="button" aria-label="Close skill tree">&#10005;</button>
-        </div>
-        <div class="st-knrow"><span id="st-kn">📚 Knowledge: 10</span><button class="st-study" id="st-study" type="button" data-i18n="studyBtn">▶ Watch a video (demo) +5</button></div>
-        <p class="st-knsub" data-i18n="keeperNote">Knowledge comes from watching videos — not from leveling up. Spend it to grow each branch toward mastery.</p>
-        <div class="st-treeview" id="st-treeview" role="tree" aria-label="Keeper skill tree"></div>
-        <div class="st-desc" id="st-desc"></div>
-        <p class="st-foot" data-i18n="keeperFoot">Walking, running, jumping — every human movement is a skill. New branches grow with the combat update.</p>
-      </div>
-    </div>
-    <!-- QA #14 (UI room, 2026-10-06): Inventory panel (I key). -->
+    <!-- The skill-tree panel is retired (combat spec, Han
+         2026-11-26, section 4.1): attack patterns come with
+         weapons (ASDF) and the loadout lives in the bag. The
+         .skill-tree CLASS stays - the character / inventory /
+         friends panels still wear it. -->
     <div class="skill-tree" id="inventory-panel" aria-hidden="true" role="dialog" aria-label="Inventory">
       <div class="st-card">
         <div class="st-head">

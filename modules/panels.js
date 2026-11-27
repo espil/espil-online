@@ -1209,11 +1209,27 @@
           '<div style="font-size:10px;opacity:.7;margin-top:3px">재료는 몬스터 사냥 드랍으로 모읍니다. 변환하면 강화 단계는 초기화됩니다.</div></div>';
       }
     }
+    /* COMBAT SPEC (Han 2026-11-26, P2): a selected weapon can be
+       designated to one of the four loadout slots here; the
+       write goes through monolith's __espilLoadout.assign, and
+       the equipped weapon itself keeps living in
+       espil_equipped via the Equip button above. */
+    var loState = null;
+    try { if (window.__espilLoadout) loState = window.__espilLoadout.state(); } catch (e) {}
+    var loSlotOf = -1;
+    if (loState && bagSel && resolveSlot(bagSel) === 'weapon') loSlotOf = loState.slots.indexOf(bagSel);
+    var loHtml = '';
+    if (bagSel && resolveSlot(bagSel) === 'weapon') {
+      loHtml = '<div style="margin-top:6px"><div style="font-size:11px;margin-bottom:4px">로드아웃 자리 지정 <span style="opacity:.7">(숫자키 1-4로 전환)</span></div><div class="bag-dbtns">' +
+        [0, 1, 2, 3].map(function (n) {
+          return '<button type="button" class="bag-dbtn' + (loSlotOf === n ? '' : ' sub') + '" data-loadout-slot="' + n + '">' + (n + 1) + (loSlotOf === n ? ' ✓' : '') + '</button>';
+        }).join('') + '</div></div>';
+    }
     var info = myInfo();
     wrap.innerHTML =
       '<div class="bag-tabs">' + BAG_TABS.map(function (t) { return '<button class="bag-tab' + (bagTab === t[0] ? ' on' : '') + '" data-bagtab="' + t[0] + '" type="button">' + t[1] + '</button>'; }).join('') + '</div>' +
       '<div class="bag-grid">' + cells.join('') + '</div>' +
-      '<div class="bag-detail">' + detail + btns + '</div>' + craftHtml +
+      '<div class="bag-detail">' + detail + btns + '</div>' + loHtml + craftHtml +
       '<p class="bag-foot"><span>가방 ' + counts.reduce(function (a, c) { return a + c.n; }, 0) + ' / 96</span><span>Leo Coin: ' + info.leo + '</span></p>';
     g.innerHTML = ''; g.appendChild(wrap);
     wrap.querySelectorAll('[data-bagtab]').forEach(function (b) {
@@ -1236,6 +1252,16 @@
           else if (res && res.ok) window.__espilToast('변환 완료: ' + res.to);
           else window.__espilToast('재료가 부족합니다');
         }
+        renderBag();
+      });
+    });
+    wrap.querySelectorAll('[data-loadout-slot]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var n = parseInt(b.getAttribute('data-loadout-slot'), 10);
+        if (!window.__espilLoadout) { if (window.__espilToast) window.__espilToast('로드아웃을 사용할 수 없습니다'); return; }
+        var r = window.__espilLoadout.assign(bagSel, n);
+        if (r && r.ok) { if (window.__espilToast) window.__espilToast('로드아웃 ' + (n + 1) + '번 자리에 지정했습니다: ' + bagSel); }
+        else if (window.__espilToast) window.__espilToast('지정할 수 없습니다');
         renderBag();
       });
     });
