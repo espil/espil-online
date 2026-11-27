@@ -414,7 +414,7 @@
     if(openBtn)openBtn.addEventListener('click',function(e){e.stopPropagation();openModal();});
     if(closeBtn)closeBtn.addEventListener('click',closeModal);
     if(modal)modal.addEventListener('click',function(e){ if(e.target===modal)closeModal(); });
-    document.addEventListener('keydown',function(e){ if(e.key==='Escape')closeModal(); });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&modal&&modal.getAttribute('aria-hidden')==='false')closeModal(); }); /* ESC = BACK: spend the press only while the modal is actually presented */
     /* Sign-in presentation (Han 2026-11-10): the sign-in form itself
        now lives inside the landing text div (#city-status) as
        #signin-div - the div switches to its login state (.auth-open)

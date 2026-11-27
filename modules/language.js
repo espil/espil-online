@@ -286,7 +286,7 @@ ccBodyLunaris:{en:'Lunaris · the designated character for this account',ko:'Lun
       document.addEventListener('pointerdown',function(e){
         if(menu.classList.contains('open')&&!e.target.closest('#lang-wrap'))closeMenu();
       });
-      document.addEventListener('keydown',function(e){ if(e.key==='Escape')closeMenu(); });
+      document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&!e.__espilEscBacked){ var _wasOpen=menu.classList.contains('open'); closeMenu(); if(_wasOpen)e.__espilEscBacked=true; } });
     }
     var sel=document.getElementById('opt-lang');
     if(sel)sel.addEventListener('change',function(){ window.__espilSetLang(sel.value); });

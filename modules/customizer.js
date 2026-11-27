@@ -191,7 +191,7 @@
       s.onload = function () { if (window.__espilPortal && window.__espilPortal.open) window.__espilPortal.open('cash'); };
       document.head.appendChild(s);
     });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeLockPanel(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !e.__espilEscBacked) { var _wasOpen = !!(lockPanel && lockPanel.classList.contains('open')); closeLockPanel(); if (_wasOpen) e.__espilEscBacked = true; } });
     lockPanel = wrap;
     return wrap;
   }

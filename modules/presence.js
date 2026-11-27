@@ -717,9 +717,11 @@
     var nk = window.__espilNormKey ? window.__espilNormKey(e) : e.key; /* IME fix: the jamo for F (code KeyF) must open the menu too */
     if ((nk === 'f' || nk === 'F') && nearPeer && !typing && document.body.classList.contains('in-map')) {
       openInteractMenu(nearPeer);
-    } else if (e.key === 'Escape') {
+    } else if (e.key === 'Escape' && !e.__espilEscBacked) {
+      var _anyPeer = !!menuPeer;
       if (menuPeer) closeInteractMenu();
-      var card = $('espil-peer-card'); if (card && card.style.display === 'block') card.style.display = 'none';
+      var card = $('espil-peer-card'); if (card && card.style.display === 'block') { card.style.display = 'none'; _anyPeer = true; }
+      if (_anyPeer) e.__espilEscBacked = true; /* ESC = BACK: one press, one layer */
     }
   });
   window.__espilDmState = function(){

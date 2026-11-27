@@ -1249,7 +1249,7 @@
       if(openBtn)openBtn.addEventListener('click',open);
       if(closeBtn)closeBtn.addEventListener('click',close);
       if(modal)modal.addEventListener('click',function(e){ if(e.target===modal)close(); });
-      document.addEventListener('keydown',function(e){ if(e.key==='Escape')close(); });
+      document.addEventListener('keydown',function(e){ if(e.key==='Escape'){ var _wasOpen=window.__espilNoticeOpen; close(); if(_wasOpen)e.__espilEscBacked=true; } });
     })();
     (function wireCharCustom(){
       var male=document.getElementById('char-male');
@@ -7152,6 +7152,7 @@
           var isList=!listView.classList.contains('hidden');
           if(e.key==='Escape'){
             m.classList.add('hidden');
+            e.__espilEscBacked=true; /* ESC = BACK: this press is spent (monolith in-map branch reads the mark) */
             /* Han: restore SPACE prompt if still near a building (the
                top name pill is retired - names float on buildings now) */
             var ip=document.getElementById('interact-prompt');
@@ -14003,32 +14004,52 @@
          instead of doing nothing - see the branch. The 2026-10-14
          rule stands in form: ESC never exits to landing by itself;
          leaving is the panel's own Return row, a deliberate
-         second step. */
+         second step.
+         Amended 2026-11-27 (Han 2026-11-26, item 3 - ESC = BACK):
+         the Package E open-on-empty behaviour is superseded.
+         One press backs exactly one layer; a press with nothing
+         open does nothing. See the branch. */
       if(k==='Escape'&&!e.repeat){
         e.preventDefault();
-        /* The snapshot reads every state this branch closes, plus
-           two surfaces closed by their own listeners on the same
-           press (the notice panel and the auth
-           modal), so one press never both closes one of those and
-           opens the options. */
-        var _escAny=!!(skillTreeOpen||inventoryOpen||characterOpen||friendsOpen||stallOpen||espilBldgPanelRec||settingsOpen||window.__espilNoticeOpen);
-        if(!_escAny){ var _bo=document.getElementById('bldg-opts'); if(_bo&&_bo.classList.contains('open'))_escAny=true; }
-        if(!_escAny){ var _sh=document.getElementById('shop-ui'); if(_sh&&_sh.classList.contains('open'))_escAny=true; }
-        if(!_escAny){ var _sm0=document.getElementById('store-modal'); if(_sm0&&!_sm0.classList.contains('hidden'))_escAny=true; }
-        if(!_escAny){ var _am=document.getElementById('signin-modal'); if(_am&&_am.getAttribute('aria-hidden')==='false')_escAny=true; }
-        if(skillTreeOpen)toggleSkillTree(false);
-        if(inventoryOpen)toggleInventory(false);
-        if(characterOpen)toggleCharacterPanel(false);
-        if(friendsOpen)toggleFriendsPanel(false);
-        if(stallOpen)toggleStallPanel(false);
-        if(espilBldgPanelRec)closeBuildingPanel();
-        closeBuildingOpts();
-        espilCloseShop();
-        espilCloseGuide();
-        if(settingsOpen)toggleSettingsPanel(false);
-        var _sm=document.getElementById('store-modal');
-        if(_sm&&!_sm.classList.contains('hidden'))_sm.classList.add('hidden');
-        if(!_escAny)toggleSettingsPanel(true);
+        /* ESC = BACK (Han 2026-11-26, item 3): close exactly
+           ONE layer, innermost first among this branch's own
+           surfaces, and do nothing when nothing is open - the
+           2026-11-25 Package E branch this replaces closed
+           every open panel at once and opened the options
+           surface when it closed nothing; both halves are
+           superseded. Coordination: a press an earlier handler
+           already spent (the notice panel or the store modal,
+           both registered above in this file) carries
+           __espilEscBacked and stands this branch down.
+           Surfaces owned by other modules that can stand above
+           the game's own panels - the community widget
+           (__espilPortal) and the panels.js profile element -
+           defer the press to their own handlers, which mark
+           the event when they act; the notice panel and a
+           presented sign-in modal defer the same way (the
+           snapshot's standing reads, kept). espilCloseGuide
+           leaves the chain: it is an empty no-op since the
+           DiveGuide removal. */
+        if(e.__espilEscBacked)return;
+        if(window.__espilPortal&&window.__espilPortal.state&&window.__espilPortal.state().open)return;
+        var _cpB=document.getElementById('character-panel');
+        if(_cpB&&_cpB.getAttribute('aria-hidden')==='false'&&!characterOpen)return;
+        if(window.__espilNoticeOpen)return;
+        var _amB=document.getElementById('signin-modal');
+        if(_amB&&_amB.getAttribute('aria-hidden')==='false')return;
+        if(settingsOpen){ toggleSettingsPanel(false); e.__espilEscBacked=true; return; }
+        var _smB=document.getElementById('store-modal');
+        if(_smB&&!_smB.classList.contains('hidden')){ _smB.classList.add('hidden'); e.__espilEscBacked=true; return; }
+        var _shB=document.getElementById('shop-ui');
+        if(_shB&&_shB.classList.contains('open')){ espilCloseShop(); e.__espilEscBacked=true; return; }
+        if(espilBldgPanelRec){ closeBuildingPanel(); e.__espilEscBacked=true; return; }
+        var _boB=document.getElementById('bldg-opts');
+        if(_boB&&_boB.classList.contains('open')){ closeBuildingOpts(); e.__espilEscBacked=true; return; }
+        if(stallOpen){ toggleStallPanel(false); e.__espilEscBacked=true; return; }
+        if(friendsOpen){ toggleFriendsPanel(false); e.__espilEscBacked=true; return; }
+        if(characterOpen){ toggleCharacterPanel(false); e.__espilEscBacked=true; return; }
+        if(inventoryOpen){ toggleInventory(false); e.__espilEscBacked=true; return; }
+        if(skillTreeOpen){ toggleSkillTree(false); e.__espilEscBacked=true; return; }
         return;
       }
       if(k===' '||k==='ArrowUp'||k==='ArrowDown'||k==='ArrowLeft'||k==='ArrowRight')e.preventDefault();
@@ -15056,7 +15077,7 @@
       if(document.body.classList.contains('in-map')||cityPhaseActive)return;
       /* City entry gate (2026-10-06 QA #4): any key enters, ESC goes back to the info panel. */
       if(entryActive){
-        if(e.key==='Escape'){e.preventDefault();cancelCityEntry();}
+        if(e.key==='Escape'){ if(!e.__espilEscBacked){e.preventDefault();cancelCityEntry();} }
         else{e.preventDefault();finishCityEntry();}
         return;
       }
@@ -15069,7 +15090,7 @@
         var m=centeredMarker||markers[navIndex];
         if(m)selectCity(m);
       }
-      else if(e.key==='Escape'){ if(skillTreeOpen){toggleSkillTree(false);} else if(selected){clearSelection(true);} }
+      else if(e.key==='Escape'){ if(e.__espilEscBacked)return; if(skillTreeOpen){toggleSkillTree(false);} else if(selected){clearSelection(true);} }
     });
     /* Virtual joystick (touch devices): analog movement stick for the walkable map.
        Only live while the map is open; exposes a normalized -1..1 vector. */

@@ -2435,7 +2435,55 @@
     if (window.__espilIntroActive) return;
     e.preventDefault();
     e.stopPropagation();
+    e.__espilEscBacked = true; /* ESC = BACK: mark the press spent - the handler below shares this node and must not spend it twice */
     cancelZoom();
+  }, true);
+
+  /* ESC = BACK (Han 2026-11-26, item 3): one press backs
+     exactly one flow step, and the flow's own Back rows are
+     the map - the auth form's Back returns to the doors, the
+     panels' Back rows return to the menu, the menu's Back
+     row returns to the login step, the prep panel's Back
+     returns to city selection, the city step's Back returns
+     to the menu. Same capture + stop idiom as the zoom
+     handler above, so a claimed press never reaches the
+     landing handlers under this flow. The zoom phase itself
+     stays with the handler above. Defers, unclaimed, when a
+     surface above the flow owns the press: the notice panel,
+     a pending login gate, or - outside the login step - the
+     presented sign-in modal (landing-auth unwinds those, one
+     layer each). At the first surface (the doors) the press
+     is consumed and does nothing, so repeated presses come
+     to rest there instead of closing the doors away. */
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || e.repeat) return;
+    if (window.__espilIntroActive) return;
+    if (e.__espilEscBacked) return; /* the zoom handler above already spent this press */
+    if (step !== 'login' && step !== 'menu' && step !== 'city') return;
+    if (window.__espilNoticeOpen) return;
+    if (typeof window.__espilLoginGatePending === 'function' && window.__espilLoginGatePending()) return;
+    if (step === 'login') {
+      var as = authDiv ? authDiv.getAttribute('data-authstep') : '';
+      e.preventDefault();
+      e.stopPropagation();
+      if (as === 'login' || as === 'signup') presentAuthStep('choice');
+      return;
+    }
+    var modal = $('signin-modal');
+    if (modal && modal.getAttribute('aria-hidden') === 'false') return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (step === 'menu') {
+      var about = $('espil-about-panel'), zea = $('espil-zealandia-panel');
+      if ((about && about.getAttribute('aria-hidden') === 'false') ||
+          (zea && zea.getAttribute('aria-hidden') === 'false')) { presentFlowView($('espil-mainmenu')); return; }
+      backToLogin();
+      return;
+    }
+    /* step === 'city', zoom phase already claimed above */
+    var prep = $('espil-cityprep-panel');
+    if (prep && prep.getAttribute('aria-hidden') === 'false') { closePrep(); return; }
+    backToMenu();
   }, true);
 
 

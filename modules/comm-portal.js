@@ -389,7 +389,12 @@
       }
     }, true);
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && winEl && winEl.classList.contains('open')) close();
+      /* ESC = BACK (Han 2026-11-26, item 3): the widget is one
+         layer - close it, mark the press spent, and never let
+         the same press also open the settings panel (the
+         pre-package outcome measured at the v2 gate). */
+      if (e.key !== 'Escape' || e.__espilEscBacked) return;
+      if (winEl && winEl.classList.contains('open')) { e.__espilEscBacked = true; close(); }
     });
     renderComposer();
   }

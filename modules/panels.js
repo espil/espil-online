@@ -1414,7 +1414,7 @@
     if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
     var k = ((window.__espilNormKey ? window.__espilNormKey(e) : e.key) || '').toLowerCase(); /* IME fix: jamo -> letter via the monolith helper, raw key if it is absent (carried from production panels.js) */
     if (k === 'p' && !e.repeat) toggleProfile();
-    if (k === 'escape') { var p = charPanel(); if (p && p.getAttribute('aria-hidden') === 'false') toggleProfile(false); }
+    if (k === 'escape' && !e.__espilEscBacked) { var p = charPanel(); if (p && p.getAttribute('aria-hidden') === 'false') { e.__espilEscBacked = true; toggleProfile(false); } } /* ESC = BACK: one press, one layer */
   });
   window.__espilPanelsState = function () {
     return { owned: ownedCounts(), equipped: equippedMap(),

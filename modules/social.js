@@ -326,7 +326,7 @@
     if (ctxEl && ctxEl.style.display === 'block' && !ctxEl.contains(e.target)) closeCtx();
   });
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') { closeCtx(); if (cardEl) cardEl.style.display = 'none'; hideInvite(); }
+    if (e.key === 'Escape' && !e.__espilEscBacked) { var _anyCtx = (ctxEl && ctxEl.style.display === 'block') || (cardEl && cardEl.style.display === 'block') || (inviteEl && inviteEl.style.display !== 'none' && inviteEl.style.display !== ''); closeCtx(); if (cardEl) cardEl.style.display = 'none'; hideInvite(); if (_anyCtx) e.__espilEscBacked = true; } /* ESC = BACK: one press, one layer */
   });
 
   /* ---------------- party frames ------------------------------- */
@@ -578,7 +578,7 @@
     if (!inMap()) return;
     var k = ((window.__espilNormKey ? window.__espilNormKey(e) : e.key) || '').toLowerCase(); /* IME fix: jamo -> letter via the monolith helper, raw key if it is absent */
     if (k === 'o' && !e.repeat) { e.preventDefault(); e.stopPropagation(); togglePanel(); }
-    else if (k === 'escape') { var p = panelEl(); if (p && p.getAttribute('aria-hidden') === 'false') togglePanel(false); }
+    else if (k === 'escape') { var p = panelEl(); if (p && p.getAttribute('aria-hidden') === 'false') { e.preventDefault(); e.stopPropagation(); e.__espilEscBacked = true; togglePanel(false); } } /* ESC = BACK: claim the press so no second layer closes under it */
   }, true);
   (function watchPanel() {
     var p = panelEl(); if (!p) { setTimeout(watchPanel, 800); return; }
