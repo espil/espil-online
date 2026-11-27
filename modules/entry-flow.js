@@ -1001,14 +1001,14 @@
     '#city-list .city-name.is-active{animation:none}' +
     '#city-list .city-name.is-active::before,#city-list .city-name.is-active::after{content:none}' +
     '#city-list .espil-city-btn.is-centered{font-size:clamp(1.5rem,4.4vw,2rem)}' +
-    /* CITY SCOPE REVISION (Han 2026-11-26): an inactive city's
-       row carries a small state tag after its name (the text is
-       the language table's cityInactive row, carried on a
-       data-i18n span so a language switch re-renders it). The
-       dimming itself is pair.css's own .city-name.is-inactive
-       treatment - the same grey monolith's inactive entries
-       wear - so no rule for it lives here. */
-    '#city-list .espil-inactive-tag{margin-left:.55em;font-size:.62em;font-weight:700;letter-spacing:.14em;white-space:nowrap}';
+    /* MOBILE ENTRY FIXES (Han 2026-11-26, correction 3): the
+       menu's primary keeps COLOUR emphasis only - bright text,
+       no enlargement - the exact shape Han set for the guest
+       door (2026-11-25 directive 1b shape B, pair.css's
+       #auth-go-guest rule). No row of any flow view carries
+       the .is-centered enlargement anymore (see buildUI), so
+       Play no longer stands highlighted among the menu rows. */
+    '#espil-menu-play{color:#fff8e1}';
   document.head.appendChild(css);
 
   /* ---------------- DOM: menu + panels ---------------- */
@@ -1019,8 +1019,14 @@
     n.setAttribute('aria-hidden', 'true');
     return n;
   }
-  function flowItem(id, label, primary) {
-    return '<button type="button" class="city-name espil-flow-item' + (primary ? ' is-centered' : '') +
+  /* MOBILE ENTRY FIXES (Han 2026-11-26, correction 3): no flow
+     item is born highlighted - the menu's Play used to be built
+     with the .is-centered enlargement baked in (the old
+     `primary` argument), so it alone stood big and bright among
+     the menu rows. The rows are a matched set now; Play's
+     primary read is colour only (the injected CSS above). */
+  function flowItem(id, label) {
+    return '<button type="button" class="city-name espil-flow-item' +
       '" id="' + id + '">' + label + '</button>';
   }
   function buildUI() {
@@ -1039,11 +1045,11 @@
       '<div class="espil-flow-title">Espil Online</div>' +
       '<p class="espil-flow-sub">A digital replica of this world, in real time.</p>' +
       '<div class="espil-flow-reel">' +
-      flowItem('espil-menu-play', 'Play', true) +
-      flowItem('espil-menu-shop', 'Shop', false) +
-      flowItem('espil-menu-zealandia', 'Zealandia', false) +
-      flowItem('espil-menu-about', 'About', false) +
-      flowItem('espil-menu-back', 'Back', false) +
+      flowItem('espil-menu-play', 'Play') +
+      flowItem('espil-menu-shop', 'Shop') +
+      flowItem('espil-menu-zealandia', 'Zealandia') +
+      flowItem('espil-menu-about', 'About') +
+      flowItem('espil-menu-back', 'Back') +
       '</div>';
     ui.appendChild(menu);
 
@@ -1055,7 +1061,7 @@
       '<p class="espil-flow-copy">Zealandia is where the real game continues - in the Espil app for mobile and PC. ' +
       'There is no entry into Zealandia on the web: here the journey ends at the Auckland Time Stone, and the app takes over from there.</p>' +
       '<div class="espil-flow-reel">' +
-      flowItem('espil-zealandia-back', 'Back', false) +
+      flowItem('espil-zealandia-back', 'Back') +
       '</div>';
     ui.appendChild(zea);
 
@@ -1071,7 +1077,7 @@
       'the destination is a map of the whole world, with the city chosen by where you are.</p>' +
       '<p class="espil-flow-copy" id="espil-about-sources">' + efT('aboutSources') + '</p>' +
       '<div class="espil-flow-reel">' +
-      flowItem('espil-about-back', 'Back', false) +
+      flowItem('espil-about-back', 'Back') +
       '</div>';
     ui.appendChild(about);
 
@@ -1082,7 +1088,7 @@
       '<div class="espil-flow-title" id="espil-cityprep-name">City</div>' +
       '<p class="espil-flow-copy">This city\'s data pack is in preparation. When it is ready, the city opens here exactly as it stands in the real world.</p>' +
       '<div class="espil-flow-reel">' +
-      flowItem('espil-cityprep-back', 'Back to city selection', false) +
+      flowItem('espil-cityprep-back', 'Back to city selection') +
       '</div>';
     ui.appendChild(prep);
 
@@ -1097,47 +1103,16 @@
     $('espil-zealandia-back').addEventListener('click', function () { presentFlowView($('espil-mainmenu')); });
     $('espil-about-back').addEventListener('click', function () { presentFlowView($('espil-mainmenu')); });
     $('espil-cityprep-back').addEventListener('click', function () { closePrep(); });
-    /* Fix batch 8 items 2+4: every view's reel tracks its centre
-       on scroll, like the city reel - the row nearest the reel's
-       vertical centre carries .is-centered. */
-    var reels = ui.querySelectorAll('.espil-flow-reel');
-    for (var ri = 0; ri < reels.length; ri++) {
-      (function (reel) {
-        var frame = 0;
-        reel.addEventListener('scroll', function () {
-          if (!frame) frame = requestAnimationFrame(function () {
-            frame = 0;
-            centerFlowReel(reel.parentNode);
-          });
-        }, { passive: true });
-      })(reels[ri]);
-    }
-  }
-  /* The flow-reel centre tracker (items 2+4): nearest row to the
-     reel's vertical centre is the centred one. On presentation
-     presentFlowView resets the reel to the top, where the FIRST
-     row is the nearest - so the first row starts active (item 2),
-     and once the user scrolls this tracker governs, exactly the
-     batch-7 reconciliation for the city reel. Views without a
-     reel keep their first item centred. */
-  function centerFlowReel(view) {
-    if (!view) return;
-    var items = view.querySelectorAll('.espil-flow-item');
-    if (!items.length) return;
-    var closest = items[0];
-    var reel = view.querySelector('.espil-flow-reel');
-    if (reel) {
-      var rr = reel.getBoundingClientRect();
-      var centre = rr.top + rr.height / 2, dist = Infinity;
-      for (var i = 0; i < items.length; i++) {
-        var r = items[i].getBoundingClientRect();
-        var d = Math.abs(r.top + r.height / 2 - centre);
-        if (d < dist) { dist = d; closest = items[i]; }
-      }
-    }
-    for (var j = 0; j < items.length; j++) {
-      items[j].classList.toggle('is-centered', items[j] === closest);
-    }
+    /* MOBILE ENTRY FIXES (Han 2026-11-26, correction 3): the
+       flow views' reels no longer track a centre - the batch-8
+       centre tracker put the .is-centered enlargement on the
+       row nearest the reel's centre, which at rest was always
+       Play, so Play stood highlighted among the menu rows.
+       These views are ACTION lists, not selections: their rows
+       are a matched set (Play keeps colour emphasis only, the
+       shape-B precedent of the two doors). The CITY list is
+       not a flow view and keeps its centre law untouched - 
+       there the centred row IS the selection read. */
   }
   function show(n) { if (n) n.setAttribute('aria-hidden', 'false'); }
   function hide(n) { if (n) n.setAttribute('aria-hidden', 'true'); }
@@ -1153,12 +1128,12 @@
     FLOW_VIEW_IDS.forEach(function (id) { var n = $(id); if (n && n !== view) hide(n); });
     if (view) {
       show(view);
-      /* Fix batch 8 item 2: a presented list starts at its first
-         row - reel back to the top and let the centre tracker put
-         the active treatment on row one. */
+      /* A presented list starts at its first row - reel back to
+         the top. (The centre tracker that used to dress row one
+         in the .is-centered enlargement is gone - correction 3
+         above; the rows are a matched set.) */
       var vreel = view.querySelector('.espil-flow-reel');
       if (vreel) vreel.scrollTop = 0;
-      centerFlowReel(view);
       /* I18N GUESTBTN PACKAGE: the About data-sources block is
          rendered from the T table - refresh it on presentation so
          it follows the language in force when the panel opens. */
@@ -1294,7 +1269,12 @@
       };
     },
     cancel: function () { cancelZoom(); },
-    tick: function () { flowAudio('tick'); }
+    tick: function () { flowAudio('tick'); },
+    /* MOBILE ENTRY FIXES (correction 1): the keyboard pass
+       stamps its scrolls as the player's own, so the centre
+       tracker's defence never mistakes an arrow step for a
+       foreign programmatic scroll. */
+    userScroll: function () { flowNoteUserScroll(); }
   };
   window.__espilEntryConfirmState = window.__espilEntryConfirm.state;
   function dive(name) {
@@ -1396,12 +1376,14 @@
 
   /* ---------------- city selection layer ----------------
      Monolith's reel lists only the cities its selectable set
-     opens, and its pins sit disabled for the rest. Han's order
-     makes ALL cities selectable: while the flow is at the city
-     step this layer lists every city, re-enables every pin, and
-     routes each pick - Vancouver to monolith's own button (its
-     info panel and DIVE run untouched), every other city to the
-     preparation panel. */
+     opens, and its pins sit disabled for the rest. While the
+     flow is at the city step this layer re-enables every pin
+     and routes each pick - a bundle city through the entry-
+     confirmation law below, every other city to the
+     preparation panel. The LIST itself shows the enterable
+     cities only (Han 2026-11-26, correction 2: bundle-less
+     cities are hidden from the list; their inactive form
+     lives on the globe's pins, monolith's surface). */
   var cityLayerActive = false;
   /* Fix batch 8 item 5 (Han 2026-11-14): the centred city faces
      the globe's centre again. The original reel coupled the two:
@@ -1417,6 +1399,32 @@
      re-presentation does not re-drive an unchanged facing. */
   var flowCenterCity = null;
   var flowFacedCity = null;
+  /* MOBILE ENTRY FIXES (Han 2026-11-26, correction 1) - scroll
+     intent bookkeeping for the centre tracker's defence below.
+     MEASURED CAUSE (production bytes, mobile viewport, probe
+     attribution): monolith scrolls the SHARED #city-list back
+     to the top whenever its centerReel runs - on every window
+     resize (monolith.js's resize handler; mobile browsers fire
+     resize as their chrome shows/hides during a scroll) and
+     inside the confirm delegation (its reel-button click and
+     selectCity both centerReel). Its reel buttons are hidden
+     by this layer (display:none, offsetTop 0), so every such
+     scroll lands at scrollTop 0 - the top, Vancouver's end -
+     and this layer's centre tracker then dutifully moved the
+     centred treatment, the focus and (outside a zoom) the
+     selection itself onto Vancouver. Han, who had selected
+     Paris, watched the list climb back to Vancouver. The
+     defence: the tracker tells the player's own scrolls (a
+     wheel, a touch, a press on the list, the keyboard pass -
+     each stamps flowScrollIntentUntil) from foreign
+     programmatic scrolls; a foreign scroll that would move
+     the centre off the standing selection is answered by
+     restoring the selected row to the centre, so the chosen
+     window carries through as-is. While a touch is down the
+     gesture owns the list and the defence stands aside. */
+  var flowScrollIntentUntil = 0;
+  var flowTouchDown = false;
+  function flowNoteUserScroll() { flowScrollIntentUntil = Date.now() + 1600; }
   function faceFlowCity(name) {
     if (!name || name === flowFacedCity) return;
     flowFacedCity = name;
@@ -1456,10 +1464,18 @@
         c.pin.disabled = false;
         c.pin.classList.remove('is-inactive');
       });
-      /* the reel: hide monolith's own entries, list all cities
-         (CITY SCOPE REVISION, Han 2026-11-26: every city keeps
-         its row - a city that cannot be entered is INACTIVE in
-         the list, not absent from it) */
+      /* the reel: hide monolith's own entries, list the cities
+         that can be entered
+         (MOBILE ENTRY FIXES, Han 2026-11-26, correction 2 -
+         superseding the same day's city-scope revision: a city
+         that cannot be entered is HIDDEN from the list again,
+         not shown inactive, and no 'Inactive' text is written
+         anywhere. The harvest above still feeds the pins and
+         the per-city-URL preselect below, so a bundle-less
+         city's own address opens its preparation panel exactly
+         as before; the inactive form Han ordered lives on the
+         GLOBE's pins, which are monolith's surface, not this
+         list.) */
       var orig = [];
       for (var i = 0; i < list.children.length; i++) {
         orig.push(list.children[i]);
@@ -1467,6 +1483,7 @@
       }
       flowOrigCityBtns = orig; /* LANDING PACKAGE: dive() delegates through these (the enter button's path before item 2b) */
       cities.forEach(function (c) {
+        if (!BUNDLE_CITIES[c.name]) return; /* correction 2: no row for a city that cannot be entered */
         var b = document.createElement('button');
         b.type = 'button';
         b.className = 'city-name espil-city-btn';
@@ -1475,38 +1492,7 @@
         nm.textContent = c.name;
         b.appendChild(nm);
         b.setAttribute('aria-label', c.pin.getAttribute('aria-label') || c.name);
-        if (!BUNDLE_CITIES[c.name]) {
-          /* CITY SCOPE REVISION (Han 2026-11-26): a city with
-             no data bundle is INACTIVE in the list - present
-             like every other city, but dimmed in pair.css's
-             .city-name.is-inactive treatment, disabled, and
-             tagged with the language table's cityInactive text
-             (a data-i18n span, so a language switch re-renders
-             the tag; city names themselves are not translated,
-             as before). The row's click handler below refuses
-             it outright, the centre tracker never centres or
-             marks it, and the keyboard pass steps over it: from
-             the LIST it can never be selected, confirmed or
-             routed to the preparation panel. Its own address
-             still opens that panel (the path preselect below
-             reads the harvest, not the rows), and its pin keeps
-             its standing behaviour - neither is the list. */
-          b.classList.add('is-inactive');
-          b.disabled = true;
-          b.setAttribute('aria-label', (c.pin.getAttribute('aria-label') || c.name) + ', ' + efT('cityInactive'));
-          var tag = document.createElement('span');
-          tag.className = 'espil-inactive-tag';
-          tag.setAttribute('data-i18n', 'cityInactive');
-          tag.textContent = efT('cityInactive');
-          b.appendChild(tag);
-        }
         b.addEventListener('click', function () {
-          /* CITY SCOPE REVISION: an inactive row's click is
-             inert - it selects nothing, cancels nothing, opens
-             nothing (a real click never reaches here: the
-             button is disabled; this guard covers a dispatched
-             one). */
-          if (!BUNDLE_CITIES[c.name]) return;
           /* ENTRY CONFIRMATION (Han 2026-11-26, directive 1): a
              click SELECTS - it never enters by itself. A click on
              the already-marked row is the confirm (the "click
@@ -1558,16 +1544,50 @@
         var centre = lr.top + lr.height / 2;
         var closest = null, dist = Infinity;
         for (var n = 0; n < btns.length; n++) {
-          /* CITY SCOPE REVISION (Han 2026-11-26): the centre
-             search passes over inactive rows - the centred
-             treatment (the big name, the mark, DOM focus) only
-             ever rests on a city that can be entered, however
-             the list was scrolled. The nearest enterable row to
-             the centre carries it. */
+          /* The centre search only ever rests on a city that
+             can be entered. Since correction 2 (Han 2026-11-26)
+             the list carries bundle cities only, so this skip
+             is a backstop, not the mechanism. */
           if (!BUNDLE_CITIES[btns[n].getAttribute('data-city')]) continue;
           var r = btns[n].getBoundingClientRect();
           var d = Math.abs(r.top + r.height / 2 - centre);
           if (d < dist) { dist = d; closest = btns[n]; }
+        }
+        /* MOBILE ENTRY FIXES (Han 2026-11-26, correction 1) -
+           the defence: while a selection stands (or a confirmed
+           zoom runs), a scroll that is NOT the player's own must
+           not move the centre off it. Foreign programmatic
+           scrolls (monolith's centerReel on resize and inside
+           the confirm delegation - measured cause, see the
+           flowScrollIntentUntil note above) land this list at
+           the top; left alone, the pass below would dress
+           Vancouver in the centred treatment and, outside a
+           zoom, hand it the selection. Instead the standing
+           row is restored to the centre and keeps the treatment,
+           the focus and the facing; the restore's own scroll
+           event re-runs this tracker, which then finds the
+           standing row already centred and settles through the
+           normal path. The player's own scrolls (intent-stamped,
+           or a touch still down) never reach this branch - for
+           them the centre, and with it the selection, follows
+           the scroll exactly as before. */
+        var standingName = zoomPhase ? zoomPhase.name : selectedBundleCity;
+        if (standingName && !flowTouchDown && Date.now() > flowScrollIntentUntil) {
+          var standingRow = null;
+          for (var si = 0; si < btns.length; si++) {
+            if (btns[si].getAttribute('data-city') === standingName) { standingRow = btns[si]; break; }
+          }
+          if (standingRow && standingRow !== closest) {
+            for (var sm = 0; sm < btns.length; sm++) {
+              btns[sm].classList.toggle('is-centered', btns[sm] === standingRow);
+            }
+            if (document.activeElement !== standingRow) {
+              try { standingRow.focus({ preventScroll: true }); } catch (e) {}
+            }
+            faceFlowCity(standingName);
+            try { standingRow.scrollIntoView({ block: 'center' }); } catch (e) {}
+            return;
+          }
         }
         for (var m = 0; m < btns.length; m++) {
           btns[m].classList.toggle('is-centered', btns[m] === closest);
@@ -1615,8 +1635,17 @@
          (the scroll itself then proceeds exactly as normal).
          Programmatic scrolls (monolith's delegation centring)
          fire neither event, so the zoom it starts is safe. */
-      list.addEventListener('wheel', function () { if (zoomPhase) cancelZoom(); }, { passive: true });
-      list.addEventListener('touchmove', function () { if (zoomPhase) cancelZoom(); }, { passive: true });
+      list.addEventListener('wheel', function () { flowNoteUserScroll(); if (zoomPhase) cancelZoom(); }, { passive: true });
+      list.addEventListener('touchmove', function () { flowNoteUserScroll(); if (zoomPhase) cancelZoom(); }, { passive: true });
+      /* MOBILE ENTRY FIXES (correction 1): the rest of the
+         player's own scroll gestures stamp the same intent - a
+         touch from its start (the defence stands aside while
+         the finger is down) through its end, and any press on
+         the list (a row tap, a scrollbar drag). */
+      list.addEventListener('touchstart', function () { flowTouchDown = true; flowNoteUserScroll(); }, { passive: true });
+      list.addEventListener('touchend', function () { flowTouchDown = false; flowNoteUserScroll(); }, { passive: true });
+      list.addEventListener('touchcancel', function () { flowTouchDown = false; flowNoteUserScroll(); }, { passive: true });
+      list.addEventListener('pointerdown', function () { flowNoteUserScroll(); }, { passive: true });
       requestAnimationFrame(updateFlowReelCenter);
       setTimeout(updateFlowReelCenter, 350);
       /* LANDING PACKAGE (Han 2026-11-25, item 3): a bundle-less
@@ -2785,6 +2814,7 @@
              selection-move feedback (stepCity's old idiom). */
           var ec = window.__espilEntryConfirm;
           if (ec && ec.cancel) ec.cancel();
+          if (ec && ec.userScroll) ec.userScroll(); /* MOBILE ENTRY FIXES (correction 1): the arrow step below is the player's own scroll */
           /* CITY SCOPE REVISION (Han 2026-11-26): the step
              lands on the next ENTERABLE row, skipping inactive
              rows outright - the mark only ever rests on a city
