@@ -14,19 +14,24 @@
   var video = document.getElementById('espil-intro-video-el');
   var skip = document.getElementById('espil-intro-video-skip');
   var dismissed = false, lastT = -1, stallTicks = 0;
-  function dismiss() {
+  var dismissReason = null, dismissT = -1; /* handoff facts for the
+     landing typewriter (Han 2026-11-26): why the video left, and the
+     playhead at that moment - captured once, at dismissal. */
+  function dismiss(reason) {
     if (dismissed) return; dismissed = true;
+    dismissReason = reason || 'skip';
+    try { dismissT = video ? video.currentTime : -1; } catch (e) { dismissT = -1; }
     try { if (video) video.pause(); } catch (e) {}
     document.removeEventListener('keydown', onKey, true);
     root.classList.add('iv-hide');
     setTimeout(function () { if (root.parentNode) root.parentNode.removeChild(root); }, 500);
   }
-  function onKey(e) { if (e && (e.key === 'Escape' || e.key === 'Esc')) dismiss(); }
-  if (skip) skip.addEventListener('click', dismiss);
+  function onKey(e) { if (e && (e.key === 'Escape' || e.key === 'Esc')) dismiss('skip'); }
+  if (skip) skip.addEventListener('click', function () { dismiss('skip'); });
   document.addEventListener('keydown', onKey, true);
   if (video) {
-    video.addEventListener('ended', dismiss);
-    video.addEventListener('error', dismiss, true);
+    video.addEventListener('ended', function () { dismiss('ended'); });
+    video.addEventListener('error', function () { dismiss('error'); }, true);
     var p = null;
     try { p = video.play(); } catch (e) {}
     if (p && p.catch) p.catch(function () { /* muted autoplay refused: stay as a poster with the skip live; the watchdog below still bounds it */ });
@@ -36,11 +41,11 @@
       if (dismissed) { clearInterval(iv); return; }
       var t = -1; try { t = video.currentTime; } catch (e) {}
       if (t === lastT) { stallTicks++; } else { stallTicks = 0; lastT = t; }
-      if (stallTicks >= 4) { clearInterval(iv); dismiss(); }
+      if (stallTicks >= 4) { clearInterval(iv); dismiss('stall'); }
     }, 1000);
-  } else { dismiss(); }
+  } else { dismiss('novideo'); }
   window.__espilIntroVideo = {
     dismiss: dismiss,
-    state: function () { return { dismissed: dismissed, t: video ? video.currentTime : -1 }; }
+    state: function () { return { dismissed: dismissed, t: video ? video.currentTime : -1, dismissReason: dismissReason, dismissT: dismissT }; }
   };
 })();

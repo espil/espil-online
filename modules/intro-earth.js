@@ -16,7 +16,7 @@
     var BREATHE_MS=850; /* the beat between the two words */
     var TYPE_MIN=50,TYPE_JITTER=50; /* 50-100ms per char: brisk, natural keystroke rhythm */
     var CARET_LINGER=800; /* caret keeps blinking briefly after typing, then the continue prompt */
-    var done=false,continued=false,earthReady=false,typedDone=false,idx=0;
+    var done=false,continued=false,earthReady=false,typedDone=false,idx=0,holdDirect=false;
     var reduced=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     window.__espilIntroActive=true;
     /* Starfield */
@@ -82,7 +82,12 @@
       if(typedDone&&earthReady&&!done){
         done=true;
         if(logo)logo.classList.add('done');
-        setTimeout(contFn,900);
+        /* A-plan HOLD (see landDirect): the advance lands directly
+           on the doors - no 900 ms beat, no slide-up, no camera
+           descent - because the video's own final frame already
+           IS the doors composition. */
+        if(holdDirect)landDirect();
+        else setTimeout(contFn,900);
       }
     }
     function typeStep(){
@@ -125,6 +130,38 @@
       beginEarth();
       intro.classList.add('leaving');
       setTimeout(function(){if(intro.parentNode)intro.parentNode.removeChild(intro);},2600);
+    }
+    /* A-plan direct landing (Han 2026-11-26, A-plan chosen by the
+       asset room): when the intro video's dismissal facts say its
+       baked-in typewriter already ran to completion (HOLD), the
+       video's last beat has already transitioned its kiosk screen
+       from the sign composition to the landing's DOORS composition
+       and ends on that exact frame. The page therefore lands
+       DIRECTLY on the doors: contFn's end state (the intro overlay
+       gone, __espilIntroActive false, the audio pop and the
+       return-to-orbit BGM) reached in one synchronous step, with
+       the two pieces of theatre left out - the 'leaving' slide-up
+       (the sign must never present, not even sliding away) and
+       beginEarthReveal's camera descent. The camera needs no move
+       at all: the globe script's boot framing IS the settled
+       framing (its resize() snaps the orbit and target distances
+       to the default and the targets rest at the facing pitch and
+       yaw), and beginEarthReveal would only park it at 1.6x and
+       ease it back - the replayed zoom the A-plan removes.
+       Entry-flow's own boot poll presents the doors once #intro
+       is gone and the intro flag is false, and the globe's city
+       pins unhide on the same flag - the same machinery the
+       natural advance reaches, minus the theatre. While the Earth
+       is still loading, maybeShowContinue's law governs exactly
+       as on the typing path: the landing waits for
+       espil-earth-ready (or its 45 s bound) with the intro
+       overlay up and the sign unlit. */
+    function landDirect(){
+      if(continued||!done||!intro)return;continued=true;
+      window.__espilIntroActive=false;
+      if(window.EspilAudio&&window.EspilAudio.pop)window.EspilAudio.pop();
+      if(window.EspilAudio&&window.EspilAudio.onReturnToOrbit)window.EspilAudio.onReturnToOrbit();
+      if(intro.parentNode)intro.parentNode.removeChild(intro);
     }
     /* City switch reload (2026-10-16): after the reload startCityEntry
        requests, re-select the pending city and click through its
@@ -243,16 +280,65 @@
          Nothing else moves: the text, the
          typing speed and the Earth reveal are untouched, and no entry
          step waits on this - only the typer's start moves. */
+      /* Typewriter handoff (Han 2026-11-26, reading (i), beat map
+         FINAL from the asset room the same day for v6; A-plan
+         chosen by the asset room the same day): the NEW intro
+         video carries the typewriter inside itself, on the Earth
+         inside the kiosk screen - typing starts at 4.75 s and
+         completes at 6.00 s; the kiosk screen then shows the
+         landing's first frame and from 8.00 s the screen content
+         fills the whole frame, transitioning from the sign
+         composition to the DOORS composition (globe, city pins,
+         the ENTER panel) and ending on the page's settled doors
+         frame exactly. The page typer must never re-type what
+         the video already typed - and under the A-plan the page
+         must not present the sign at all on that path: the video
+         ended on the doors, so a completed sign appearing now
+         (then sliding away while the camera descends) would step
+         the scene BACKWARD before the doors. When the dismissal
+         facts say the video's typing ran to completion (HOLD),
+         the page therefore lands directly on the doors
+         (completeHandoff + landDirect, via holdDirect in
+         maybeShowContinue); every other path keeps the shipped
+         typing exactly (TYPE). The threshold is the video's
+         typing-completion time; if the media's beat map ever
+         moves, this one constant is where it is re-tied. */
+      var ESPIL_VIDEO_TYPE_DONE_S=6.00;
+      function completeHandoff(){
+        /* HOLD's terminal step: typedDone is set WITHOUT lighting
+           a single character - the sign never presents on this
+           path, not even while the landing waits for the Earth
+           (maybeShowContinue's law still gates the advance on
+           espil-earth-ready, exactly as for a finished typing
+           run, and the overlay stays up unlit in the meantime).
+           When the advance fires, landDirect removes the overlay
+           in the same task, so no frame of the sign can paint;
+           the end state - #intro removed, the intro flag false,
+           the doors presented by entry-flow's own poll - is the
+           natural advance's own, reached without its theatre. */
+        typedDone=true;
+        maybeShowContinue();
+      }
+      function handoffMode(){
+        var st=null;
+        try{ st=(window.__espilIntroVideo&&window.__espilIntroVideo.state())||null; }catch(e){}
+        if(!st||!st.dismissed)return 'type';
+        if(st.dismissReason==='ended')return 'hold';
+        if(st.dismissReason==='error'||st.dismissReason==='stall'||st.dismissReason==='novideo')return 'type';
+        if(typeof st.dismissT==='number'&&st.dismissT>=ESPIL_VIDEO_TYPE_DONE_S)return 'hold';
+        return 'type';
+      }
       var typingStarted=false;
-      function beginTyping(){
+      function beginTyping(mode){
         if(typingStarted)return;typingStarted=true;
+        var apply=function(){ if(mode==='hold'){ holdDirect=true; completeHandoff(); } else startTyping(); };
         /* Don't let the typing play out in a hidden tab: wait until the page is visible. */
         if(document.hidden){
           var __visStart=function(){
-            if(!document.hidden){document.removeEventListener('visibilitychange',__visStart);startTyping();}
+            if(!document.hidden){document.removeEventListener('visibilitychange',__visStart);apply();}
           };
           document.addEventListener('visibilitychange',__visStart);
-        }else startTyping();
+        }else apply();
       }
       function introVideoGone(){
         if(!document.getElementById('espil-intro-video'))return true;
@@ -261,7 +347,7 @@
           return !!(st&&st.dismissed);
         }catch(e){return false;}
       }
-      if(introVideoGone())beginTyping();
+      if(introVideoGone())beginTyping(handoffMode());
       else{
         var videoWaitStart=Date.now();
         var lastVidT=-1,lastAdvance=Date.now();
@@ -272,7 +358,7 @@
           if(st&&typeof st.t==='number'&&st.t!==lastVidT){lastVidT=st.t;lastAdvance=now;}
           if(introVideoGone()||(!st&&now-videoWaitStart>=15000)||(st&&now-lastAdvance>=15000)){
             clearInterval(videoPoll);
-            beginTyping();
+            beginTyping(handoffMode());
           }
         },200);
       }
