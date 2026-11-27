@@ -1868,7 +1868,12 @@
        (espilP1Hide), so this shader never reaches them - the
        extrusion side is treated separately by espilDitherLayerTick
        below (a stipple-pattern layer for the occluding features
-       only, driven by the camera clamp's own segment law). */
+       only, driven by the camera clamp's own segment law).
+       RETIRED (Han 2026-11-26, item 7): both treatments in this
+       lineage are superseded by the two-pass X-ray silhouette in
+       the custom layer (espilXraySilhouette); the arming tick is
+       disarmed and the layer twin is removed. This block stays as
+       the lineage record. */
     var ESPIL_OCCLUDE_RADIUS_FACTOR=1.35; /* circle radius = projected character half-height x this (>1: the circle is larger than the character) */
     var ESPIL_OCCLUDE_CHAR_H=1.8; /* character height in metres used for the projection */
     var ESPIL_OCCLUDE_EPS=0.00002; /* window-depth epsilon: a fragment must be at least ~this much closer than the character centre to be cut */
@@ -1903,149 +1908,36 @@
     }
     var _espilOccV=new THREE.Vector3(), _espilOccFeet=new THREE.Vector3(), _espilOccHead=new THREE.Vector3();
     function espilOccludeTick(){
-      var on=false, cx=0, cy=0, rad=0, cz=1;
-      try{
-        if(espilOccludeMaster && !window.__espilInside && !(typeof espilZoomFpv!=='undefined'&&espilZoomFpv&&(espilZoomFpv.applied||espilZoomFpv.blend>0)) && typeof walkPlayer!=='undefined' && walkPlayer && walkPlayer.pos &&
-           typeof mapCamera!=='undefined' && mapCamera && typeof renderer!=='undefined' && renderer){ /* ZOOM-FPV (Han 2026-11-17): while the zoom source applies there is nothing to occlude at the eye, and the marched segment is a boom the view no longer uses - both dither paths stand down until blend is back to 0 */
-          var grp=(walkPlayer.av&&walkPlayer.av.group)?walkPlayer.av.group:null;
-          if(grp)grp.getWorldPosition(_espilOccFeet); else _espilOccFeet.copy(walkPlayer.pos);
-          _espilOccHead.set(_espilOccFeet.x,_espilOccFeet.y+ESPIL_OCCLUDE_CHAR_H,_espilOccFeet.z);
-          var dbW=renderer.domElement.width, dbH=renderer.domElement.height;
-          _espilOccV.copy(_espilOccFeet).project(mapCamera);
-          var fNdc={x:_espilOccV.x,y:_espilOccV.y};
-          _espilOccV.copy(_espilOccHead).project(mapCamera);
-          var hNdc={x:_espilOccV.x,y:_espilOccV.y};
-          _espilOccV.copy(_espilOccFeet); _espilOccV.y+=ESPIL_OCCLUDE_CHAR_H/2; _espilOccV.project(mapCamera);
-          if(_espilOccV.z>-1&&_espilOccV.z<1&&Math.abs(_espilOccV.x)<1.3&&Math.abs(_espilOccV.y)<1.3){
-            cx=(_espilOccV.x*0.5+0.5)*dbW; cy=(_espilOccV.y*0.5+0.5)*dbH; cz=_espilOccV.z*0.5+0.5;
-            var charHeightPx=Math.abs(hNdc.y-fNdc.y)*0.5*dbH; /* full projected character height in px */
-            rad=Math.min(charHeightPx*0.5*ESPIL_OCCLUDE_RADIUS_FACTOR, dbH*0.75); /* radius = half-height x factor, so the circle's diameter is ESPIL_OCCLUDE_RADIUS_FACTOR x the character's full height */
-            if(rad>1)on=true;
-          }
-        }
-      }catch(e){ on=false; }
-      espilOccludeU.enabled.value=on?1:0;
-      if(on){ espilOccludeU.centre.value.set(cx,cy); espilOccludeU.radius.value=rad; espilOccludeU.charZ.value=cz; }
-      espilOccludeState.enabled=on;
-      espilOccludeState.centrePx=on?[Math.round(cx),Math.round(cy)]:null;
-      espilOccludeState.radiusPx=on?Math.round(rad*10)/10:0;
-      espilOccludeState.charDepth=on?Math.round(cz*1000000)/1000000:null;
+      /* RETIRED (Han 2026-11-26, item 7): the wall-dither treatments
+         this tick armed - the THREE-side screen-door above and the
+         layer-mode twin below - are superseded by the two-pass
+         X-ray silhouette in the custom layer (espilXraySilhouette).
+         The tick stays as a disarmed stub: the shared uniforms are
+         pinned at enabled = 0, so the espilOccludePatchMat shader
+         branch can never discard a fragment, and the probe seam
+         keeps reporting the retired state honestly. The patch
+         function and its material call sites stay in place
+         (2026-11-03 lineage); espilP1FadeMat / espilP1Hide are a
+         different system and are untouched. */
+      if(espilOccludeU.enabled.value!==0)espilOccludeU.enabled.value=0;
+      espilOccludeState.enabled=false;
+      espilOccludeState.centrePx=null;
+      espilOccludeState.radiusPx=0;
+      espilOccludeState.charDepth=null;
       espilOccludeState.patchedMaterials=espilOccludePatchedCount;
-      espilDitherLayerTick(); /* layer-mode extrusion stipple (Han 2026-11-14), throttled inside */
     }
     window.__espilOccludeState=function(){
-      return {enabled:espilOccludeState.enabled,master:espilOccludeMaster,centrePx:espilOccludeState.centrePx,radiusPx:espilOccludeState.radiusPx,charDepth:espilOccludeState.charDepth,patchedMaterials:espilOccludePatchedCount,factor:ESPIL_OCCLUDE_RADIUS_FACTOR,mode:'dither-bayer4',keep:espilOccludeU.keep.value};
+      return {enabled:espilOccludeState.enabled,master:espilOccludeMaster,centrePx:espilOccludeState.centrePx,radiusPx:espilOccludeState.radiusPx,charDepth:espilOccludeState.charDepth,patchedMaterials:espilOccludePatchedCount,factor:ESPIL_OCCLUDE_RADIUS_FACTOR,mode:'retired-xray',keep:espilOccludeU.keep.value};
     };
     window.__espilOccludeState.setEnabled=function(b){ espilOccludeMaster=!!b; return espilOccludeMaster; };
-    /* ---- DITHER, layer mode (Han 2026-11-14) ----
-       In the Mapbox pipeline the occluders are fill-extrusions on
-       the 'espil-buildings' source; the THREE shader above never
-       reaches them. The treatment here: the features the APPLIED
-       camera segment (chest/head -> the clamped camera point, the
-       camera clamp's own law, marched the same way espilCamMarch
-       marches) passes through below their roofs are moved out of
-       the solid base layer into 'espil-buildings-dither', a twin
-       extrusion layer (same source, same height/colour) whose
-       fill-extrusion-pattern is a Bayer 4x4 checker image - a true
-       stipple: the kept texels draw the wall, the clear texels let
-       the character behind it draw. Everything else stays solid.
-       The set is recomputed at a 200 ms cadence and the layer
-       filters are rewritten only when the set changes. Records map
-       to feature indices by ring signature against
-       espilP1BldCache (both derive from espilDistrict.buildings
-       with the same skip rules and order); an ambiguous or
-       unmatched record is never treated (fail-safe). Suppressed
-       under exactly the camera clamp's suppressions (indoors,
-       store pause, scripted arrival/landing). */
-    var espilDitherExt={ids:[],key:null,lastMs:0,featMap:null,featMapSrc:null,active:false};
-    var _espilDithHits=[];
-    function espilDitherBayer2(x,y){ var v=x/2+y*y*0.75; return v-Math.floor(v); }
-    function espilDitherBayer4(x,y){ return espilDitherBayer2(Math.floor(x/2),Math.floor(y/2))*0.25+espilDitherBayer2(x,y); }
-    function espilDitherFeatMap(){
-      var cache=(typeof espilP1BldCache!=='undefined')?espilP1BldCache:null;
-      if(!cache||!cache.rings)return null;
-      if(espilDitherExt.featMap&&espilDitherExt.featMapSrc===cache)return espilDitherExt.featMap;
-      var map={};
-      for(var i=0;i<cache.rings.length;i++){
-        var r=cache.rings[i]; if(!r||r.length<6)continue;
-        var key=Math.round(r[0]*100)+','+Math.round(r[1]*100)+'|'+(r.length/2)+'|'+Math.round(r[r.length-2]*100)+','+Math.round(r[r.length-1]*100);
-        if(map[key]!==undefined){ map[key]=-1; continue; } /* ambiguous signature - never treat */
-        map[key]=i;
-      }
-      espilDitherExt.featMap=map; espilDitherExt.featMapSrc=cache;
-      return map;
-    }
-    function espilDitherFeatI(rec,map){
-      var ring=rec.ring; if(!ring||ring.length<3)return -1;
-      var f=ring[0], l=ring[ring.length-1];
-      var key=Math.round(f[0]*100)+','+Math.round(f[1]*100)+'|'+ring.length+'|'+Math.round(l[0]*100)+','+Math.round(l[1]*100);
-      var v=map[key]; return (typeof v==='number')?v:-1;
-    }
-    function espilDitherCollect(ax,ay,az,bx,by,bz,recs,out){
-      var dist=Math.hypot(bx-ax,by-ay,bz-az);
-      var steps=Math.max(2,Math.ceil(dist/0.4));
-      for(var i=1;i<=steps;i++){
-        var f=i/steps;
-        var x=ax+(bx-ax)*f, y=ay+(by-ay)*f, z=az+(bz-az)*f;
-        for(var j=0;j<recs.length;j++){
-          var rec=recs[j];
-          if(x<rec.x0||x>rec.x1||z<rec.z0||z>rec.z1)continue;
-          if(y>rec.h+0.35)continue;
-          if(espilPolyProbe(rec,x,z).inside&&out.indexOf(rec)<0&&out.length<6)out.push(rec);
-        }
-      }
-    }
-    function espilDitherLayerTick(){
-      var S=espilDitherExt;
-      var now=performance.now();
-      if(now-S.lastMs<200)return;
-      S.lastMs=now;
-      var live=false, ids=[];
-      try{
-        if(espilOccludeMaster&&typeof ESPIL_P1!=='undefined'&&ESPIL_P1&&espilP1.layerLive&&!espilP1.failed&&espilP1.buildingsAdded&&espilP1.map&&
-           !window.__espilInside&&!window.__espilStorePaused&&!(typeof espilZoomFpv!=='undefined'&&espilZoomFpv&&(espilZoomFpv.applied||espilZoomFpv.blend>0))&&typeof walkPlayer!=='undefined'&&walkPlayer&&walkPlayer.pos&&!walkPlayer._espilArrive&&!walkPlayer._espilLanding&&
-           typeof espilPolyHash!=='undefined'&&espilPolyHash&&typeof espilCamPos!=='undefined'&&espilCamPos){
-          var fmap=espilDitherFeatMap();
-          if(fmap){
-            var p=walkPlayer.pos;
-            var recs=espilCollectRecsNear((p.x+espilCamPos.x)/2,(p.z+espilCamPos.z)/2,espilCamDEff/2+6);
-            _espilDithHits.length=0;
-            espilDitherCollect(p.x,p.y+1.3,p.z,espilCamPos.x,espilCamPos.y,espilCamPos.z,recs,_espilDithHits);
-            espilDitherCollect(p.x,p.y+1.75,p.z,espilCamPos.x,espilCamPos.y,espilCamPos.z,recs,_espilDithHits);
-            /* Shoulder segments (±0.40 m at chest height): the
-               character's silhouette is wider than the centre ray,
-               so a building edge threading just past the centre ray
-               still covers half the body on screen. The corridor
-               matches the cutout's own screen-space radius
-               (half-height x 1.35) in world terms. */
-            var _vx=espilCamPos.x-p.x,_vz=espilCamPos.z-p.z,_vl=Math.sqrt(_vx*_vx+_vz*_vz);
-            if(_vl>0.001){ var _px=-_vz/_vl*0.40,_pz=_vx/_vl*0.40;
-              espilDitherCollect(p.x+_px,p.y+1.3,p.z+_pz,espilCamPos.x+_px,espilCamPos.y,espilCamPos.z+_pz,recs,_espilDithHits);
-              espilDitherCollect(p.x-_px,p.y+1.3,p.z-_pz,espilCamPos.x-_px,espilCamPos.y,espilCamPos.z-_pz,recs,_espilDithHits);
-            }
-            for(var i=0;i<_espilDithHits.length;i++){ var fi=espilDitherFeatI(_espilDithHits[i],fmap); if(fi>=0&&ids.indexOf(fi)<0)ids.push(fi); }
-            ids.sort(function(a,b){return a-b;});
-            live=ids.length>0;
-          }
-        }
-      }catch(e){ live=false; ids=[]; }
-      var key=ids.join(',');
-      if(key!==S.key){
-        S.key=key; S.ids=ids;
-        try{
-          var m2=espilP1.map;
-          if(m2&&m2.getLayer('espil-buildings-3d'))m2.setFilter('espil-buildings-3d',ids.length?['!in','i'].concat(ids):['!in','i']);
-          if(m2&&m2.getLayer('espil-buildings-dither'))m2.setFilter('espil-buildings-dither',ids.length?['in','i'].concat(ids):['in','i']);
-        }catch(e){}
-      }
-      S.active=live;
-    }
-    window.__espilDitherState=function(){
-      return {master:espilOccludeMaster,
-        three:{mode:'bayer4',keep:espilOccludeU.keep.value,enabled:espilOccludeState.enabled,centrePx:espilOccludeState.centrePx,radiusPx:espilOccludeState.radiusPx,patchedMaterials:espilOccludePatchedCount},
-        extrusion:{live:!!(typeof ESPIL_P1!=='undefined'&&ESPIL_P1&&espilP1.layerLive&&!espilP1.failed),active:espilDitherExt.active,occluders:espilDitherExt.ids.slice(),keep:ESPIL_DITHER_EXT_KEEP}};
-    };
-    window.__espilDitherState.setKeep=function(f){ if(typeof f==='number'&&f>0&&f<=1)espilOccludeU.keep.value=f; return espilOccludeU.keep.value; };
+    /* ---- DITHER, layer mode - REMOVED (Han 2026-11-26) ----
+       The twin extrusion layer this block drove
+       ('espil-buildings-dither') is removed with the game's own
+       building rendering (item 6c: the original Mapbox model
+       renders the buildings now), and the occlusion treatment it
+       carried is superseded by the two-pass X-ray silhouette
+       (item 7). espilDitherLayerTick, its collectors and the
+       __espilDitherState seam retire with it. */
     var curvedMatCache={};
     function curvedMat(color){
       var key='c'+color, m=curvedMatCache[key];
@@ -3992,56 +3884,31 @@
         try{ espilP1.map.getSource('espil-buildings').setData({type:'FeatureCollection',features:espilP1BldCache.feats}); }catch(e){}
       }
     }
-    /* STYLE 3D OFF (Han 2026-10-17): a Standard-based style serves its
-       own 3D buildings through an IMPORT - those layers never appear
-       in getStyle().layers, so the layer scan in espilP1AddBuildings
-       cannot see or hide them, and the style's city would render under
-       ours (the double-render suspect of the 22:13 diagnosis). The
-       import carries its own config switch: show3dObjects=false turns
-       the style's 3D objects off at the source. Retried from the tick
-       until it lands (an import may settle after 'load'). */
-    function espilP1HideStyle3D(){
-      if(!espilP1.map||espilP1.style3dOff)return;
-      var done=true;
-      try{
-        var st=espilP1.map.getStyle();
-        var imps=(st&&st.imports)||[];
-        for(var ii=0;ii<imps.length;ii++){
-          var iid=(imps[ii]&&imps[ii].id)||'basemap';
-          try{ espilP1.map.setConfigProperty(iid,'show3dObjects',false); }
-          catch(e){ done=false; }
-        }
-      }catch(e){ done=false; }
-      if(done)espilP1.style3dOff=true;
-    }
+    /* STYLE 3D - LEFT AS THE STYLE DEFINES IT (Han 2026-11-26,
+       item 6c): until Han orders otherwise the buildings are the
+       ORIGINAL Mapbox model. The 2026-10-17 STYLE 3D OFF switch
+       (espilP1HideStyle3D, which wrote show3dObjects=false into
+       the basemap import and was retried from the tick) is
+       removed: the config is never written again, so the import
+       renders its own 3D buildings per the style's config. */
     function espilP1AddBuildings(){
       if(!espilP1.map||espilP1.buildingsAdded)return;
       var blds=(typeof espilDistrict!=='undefined'&&espilDistrict&&espilDistrict.buildings)||[];
       if(!blds.length)return; /* district data not in yet - the tick retries */
-      /* COLOR-KEY (Han 2026-10-17): exactly ONE building rendering -
-         the base style's own building layers (which carry their own
-         zoom band and made the color vanish at high and low zoom)
-         are hidden; our extrusion below is the only buildings, keyed
-         green at every zoom (the layer has no minzoom/maxzoom). */
-      try{
-        var lys=espilP1.map.getStyle().layers||[];
-        for(var li2=0;li2<lys.length;li2++){
-          var LL=lys[li2];
-          if(LL.id==='espil-buildings-3d'||LL.id==='espil-buildings-collision')continue;
-          if(LL['source-layer']==='building'||/building/i.test(LL.id)){
-            try{espilP1.map.setLayoutProperty(LL.id,'visibility','none');}catch(e){}
-          }
-        }
-      }catch(e){}
+      /* NATIVE BUILDINGS (Han 2026-11-26, item 6c): the
+         2026-10-17 COLOR-KEY settlement is reversed - the base
+         style's own building layers are NO LONGER hidden, and no
+         game extrusion replaces them (see below). The style
+         renders its buildings exactly as it defines them. */
       try{
         if(!espilP1.map.getSource('espil-buildings')){
           espilP1.map.addSource('espil-buildings',{type:'geojson',data:espilP1BuildingsGeoJSON()});
-          /* Building colour (Han 2026-10-18): the fixed key green
-             (#00c853) pin is RELEASED - buildings render in a neutral
-             tone, #c9c4bb (light greige). The green was only the
-             contract's display marker; collision is record-polygon
-             based and colour-independent, unchanged. */
-          espilP1.map.addLayer({id:'espil-buildings-3d',type:'fill-extrusion',source:'espil-buildings',paint:{'fill-extrusion-color':'#c9c4bb','fill-extrusion-height':['get','hv'],'fill-extrusion-base':0,'fill-extrusion-opacity':1}}); /* paint height is hv (the record height, or 0 for a zoom-LOD-flattened feature); the record h stays in properties for collision */
+          /* Our fill-extrusion building layer
+             ('espil-buildings-3d', #c9c4bb over the record
+             heights) is REMOVED (Han 2026-11-26, item 6c): the
+             buildings on screen are the style's own now. The
+             'espil-buildings' source stays - the invisible
+             collision helper layer below shares it. */
           /* COLLISION LAYER (Han 2026-10-17, CarInMap method): a flat,
              invisible fill over the same footprints - the wall judge
              queries THIS layer with queryRenderedFeatures. The
@@ -4049,114 +3916,27 @@
              silhouette overhangs the footprint and would wall off open
              ground beside tall buildings. */
           espilP1.map.addLayer({id:'espil-buildings-collision',type:'fill',source:'espil-buildings',paint:{'fill-color':'#000000','fill-opacity':0}});
-          /* DITHER layer (Han 2026-11-14): a twin of the base
-             extrusion (same source, height and colour) carrying a
-             Bayer 4x4 checker pattern image, so the features
-             espilDitherLayerTick moves here (filter on property i)
-             render as a stipple the character reads through while
-             every other building stays solid in the base layer.
-             Created with a match-nothing filter; the tick owns the
-             filters from there. The pattern image is white - the
-             paint colour shades it exactly like the base layer. */
-          try{
-            if(!espilP1.map.hasImage('espil-dither-checker')){
-              var dcv=document.createElement('canvas'); dcv.width=dcv.height=4;
-              var dg=dcv.getContext('2d'); var dimg=dg.createImageData(4,4);
-              for(var dy=0;dy<4;dy++)for(var dx=0;dx<4;dx++){
-                var dOff=(dy*4+dx)*4, dOn=espilDitherBayer4(dx,dy)<ESPIL_DITHER_EXT_KEEP;
-                dimg.data[dOff]=255; dimg.data[dOff+1]=255; dimg.data[dOff+2]=255; dimg.data[dOff+3]=dOn?255:0;
-              }
-              dg.putImageData(dimg,0,0);
-              espilP1.map.addImage('espil-dither-checker',dg.getImageData(0,0,4,4));
-            }
-            espilP1.map.addLayer({id:'espil-buildings-dither',type:'fill-extrusion',source:'espil-buildings',filter:['in','i'],paint:{'fill-extrusion-color':'#c9c4bb','fill-extrusion-height':['get','hv'],'fill-extrusion-base':0,'fill-extrusion-opacity':1,'fill-extrusion-pattern':'espil-dither-checker'}});
-          }catch(e){}
+          /* The DITHER twin layer ('espil-buildings-dither' +
+             the 'espil-dither-checker' pattern image) is REMOVED
+             (Han 2026-11-26: the twin-drawn buildings go; item 7's
+             X-ray replaces the treatment it carried). */
         }else{
           espilP1.map.getSource('espil-buildings').setData(espilP1BuildingsGeoJSON());
         }
         espilP1.buildingsAdded=true;
       }catch(e){}
-      espilP1HideStyle3D();
     }
-    /* ==== NIGHT GLOW (Mapbox layer paint) - BEGIN ====
-       Building-glow revival (COO-delegated decision 2026-11-18;
-       design: daynight/GLOW-DESIGN.md). The original glow
-       (time-of-day.js) lerps THREE wall-material emissive toward
-       amber 0xffb45e by the night factor - but the field's buildings
-       are THIS Mapbox fill-extrusion layer, not THREE walls, so the
-       collector finds 0 materials outdoors and the glow is dead in
-       the field (diagnosis 2026-11-17). This block applies the same
-       visual law to the surface the buildings are actually drawn
-       on: the 'espil-buildings-3d' paint (and its dither twin's
-       colour, so an occluding building stipples in the same tone).
-       Driver: window.__espilNightState().factor ONLY - the existing
-       day/night state (hemisphere-derived, forced to 0 indoors,
-       driven by __espilNightForce). No second clock, no new state.
-       Day: at f=0 the colour is the literal creation value
-       '#c9c4bb' and the pattern is removed, so the day appearance
-       is exactly the pre-glow one. Cost: one 1 s interval; paint
-       writes only on a >=0.02 factor move, a map/layer identity
-       change (style reload self-heal), or a pattern flip - zero
-       paint writes and zero per-frame work at day steady state.
-       The hv height law (espilP1PaintApply), the dither filters
-       (espilDitherLayerTick) and espilP1Hide are untouched. */
-    var ESPIL_NIGHTGLOW_DAY='#c9c4bb', ESPIL_NIGHTGLOW_MIX=0.6;
-    var ESPIL_NIGHTGLOW_PAT_ON=0.45, ESPIL_NIGHTGLOW_PAT_OFF=0.30;
-    var espilNightGlow={f:-1,color:null,pattern:false,applies:0,map:null,layer:null,dLayer:null,imgDone:false};
-    function espilNightGlowColor(f){
-      var t=f*ESPIL_NIGHTGLOW_MIX;
-      if(t<=0)return ESPIL_NIGHTGLOW_DAY;
-      var r=Math.round(0xc9+(0xff-0xc9)*t), g=Math.round(0xc4+(0xb4-0xc4)*t), b=Math.round(0xbb+(0x5e-0xbb)*t);
-      return 'rgb('+r+','+g+','+b+')';
-    }
-    function espilNightGlowEnsureImage(map){
-      var G=espilNightGlow;
-      if(G.imgDone)return;
-      G.imgDone=true; /* one attempt ever; a failed image leaves the colour law alone */
-      try{
-        if(map.hasImage('espil-night-windows'))return;
-        var cv=document.createElement('canvas'); cv.width=cv.height=96;
-        var cx2=cv.getContext('2d');
-        cx2.fillStyle='rgb(84,84,88)'; cx2.fillRect(0,0,96,96); /* facade: paint colour darkened to ~33% */
-        /* Deterministic lit pattern: of each 4x4 window cells, 9 lit
-           (white = full paint colour), 3 dim, 4 dark (facade). */
-        var lit=[1,1,0,1, 0,1,1,2, 1,0,1,1, 2,1,0,1];
-        for(var gy=0;gy<4;gy++)for(var gx=0;gx<4;gx++){
-          var v=lit[gy*4+gx]; if(!v)continue;
-          cx2.fillStyle=v===1?'rgb(255,255,255)':'rgb(120,120,118)';
-          cx2.fillRect(gx*24+5,gy*24+6,14,10);
-        }
-        map.addImage('espil-night-windows',cx2.getImageData(0,0,96,96));
-      }catch(e){}
-    }
-    function espilNightGlowTick(){
-      var st=null;
-      try{ st=window.__espilNightState?window.__espilNightState():null; }catch(e){}
-      if(!st||typeof st.factor!=='number')return;
-      var f=st.factor; if(f<0)f=0; if(f>1)f=1;
-      var map=null;
-      try{ map=(typeof espilP1!=='undefined'&&espilP1)?espilP1.map:null; }catch(e){}
-      if(!map)return;
-      var layer=null, dLayer=null;
-      try{ layer=map.getLayer('espil-buildings-3d'); dLayer=map.getLayer('espil-buildings-dither'); }catch(e){}
-      if(!layer)return;
-      var G=espilNightGlow;
-      var wantPat=G.pattern?(f>ESPIL_NIGHTGLOW_PAT_OFF):(f>=ESPIL_NIGHTGLOW_PAT_ON);
-      var color=espilNightGlowColor(f);
-      if(map===G.map&&layer===G.layer&&dLayer===G.dLayer&&Math.abs(f-G.f)<0.02&&wantPat===G.pattern&&color===G.color)return;
-      try{
-        map.setPaintProperty('espil-buildings-3d','fill-extrusion-color',color);
-        if(dLayer)map.setPaintProperty('espil-buildings-dither','fill-extrusion-color',color);
-        if(wantPat!==G.pattern){
-          if(wantPat){ espilNightGlowEnsureImage(map); map.setPaintProperty('espil-buildings-3d','fill-extrusion-pattern','espil-night-windows'); }
-          else map.setPaintProperty('espil-buildings-3d','fill-extrusion-pattern',null);
-        }
-        G.f=f; G.color=color; G.pattern=wantPat; G.map=map; G.layer=layer; G.dLayer=dLayer; G.applies++;
-      }catch(e){}
-    }
-    window.__espilNightGlowState=function(){ var G=espilNightGlow; return {f:G.f,color:G.color,pattern:G.pattern,applies:G.applies}; };
-    setInterval(espilNightGlowTick,1000);
-    /* ==== NIGHT GLOW (Mapbox layer paint) - END ==== */
+    /* ==== NIGHT GLOW (Mapbox layer paint) - REMOVED
+       (Han 2026-11-26, item 6c) ====
+       The glow block painted a lit-window pattern
+       ('espil-night-windows') and an amber colour lerp onto the
+       game's own extrusion layer at night. That layer is gone
+       and the buildings are the style's own now, so nothing may
+       paint a window texture or a glow colour onto them: the
+       tick, the image builder, the __espilNightGlowState seam
+       and its 1 s interval are removed whole. The NIGHT GROUND
+       tint below is a separate block (the 2026-11-20
+       night-uniformity fix) and stays byte-identical. */
     /* ==== NIGHT GROUND (Mapbox base tint) - BEGIN ====
        Night-mismatch fix (Han report 2026-11-20; diagnosis:
        night-mismatch/DIAGNOSIS.md). The character darkens TWICE
@@ -4247,6 +4027,62 @@
        (x east, y up, z south) onto Mercator (x east, y south, z up).
        If anything in this path fails, layerLive stays false and the
        game renders on its own canvas exactly as before. */
+    /* ==== X-RAY SILHOUETTE (Han 2026-11-26, item 7) ====
+       Two-pass rendering of the LOCAL player inside this custom
+       layer (renderingMode '3d', so the avatar already shares
+       the Mapbox depth buffer): PASS 1 draws the avatar's meshes
+       with an override material - depthFunc THREE.GreaterDepth,
+       depthWrite false, a solid unlit colour - so the silhouette
+       lands ONLY where building geometry already wrote nearer
+       depth in front of the character; PASS 2 is the ordinary
+       scene render below, which draws the normal model over the
+       silhouette wherever the character is in the open. Draft
+       look (Han retunes on his screen verdict): soft cyan-white
+       0x9fe4ff at 0.88 opacity. Scope: walkPlayer.av.group only -
+       remote players, monsters and NPCs keep their rendering.
+       The material is marked espilAvatarMat so the
+       globe-curvature patch exempts it like the avatar's own
+       materials (the avatar is CPU-anchored to the bent ground;
+       a bent silhouette would double-drop). skinning:true is
+       REQUIRED: the bundled three is r128, where skinning is a
+       material flag, and the avatar is a single SkinnedMesh - a
+       plain basic material would draw its bind pose instead of
+       the posed figure (measured 2026-11-27: no silhouette at
+       all without the flag, at any depth setting). */
+    var espilXrayMat=null;
+    function espilXrayMaterial(){
+      if(espilXrayMat)return espilXrayMat;
+      var m=new THREE.MeshBasicMaterial({color:0x9fe4ff,transparent:true,opacity:0.88,depthTest:true,depthWrite:false,skinning:true});
+      m.depthFunc=THREE.GreaterDepth;
+      m.userData.espilAvatarMat=true;
+      espilXrayMat=m;
+      return m;
+    }
+    var _espilXrayMeshes=[], _espilXraySaved=[], _espilXrayHidden=[];
+    function espilXraySilhouette(r, cam){
+      var grp=null;
+      try{ grp=(typeof walkPlayer!=='undefined'&&walkPlayer&&walkPlayer.av&&walkPlayer.av.group)?walkPlayer.av.group:null; }catch(e){}
+      if(!grp||!grp.visible||typeof mapScene==='undefined'||!mapScene)return;
+      if(!(document.body&&document.body.classList&&document.body.classList.contains('in-map')))return;
+      var chain=[], n=grp;
+      while(n&&n!==mapScene){ chain.push(n); n=n.parent; }
+      if(n!==mapScene)return; /* the avatar is not in this scene */
+      var meshes=_espilXrayMeshes, saved=_espilXraySaved, hidden=_espilXrayHidden;
+      meshes.length=0; saved.length=0; hidden.length=0;
+      grp.traverse(function(o){ if(o.isMesh)meshes.push(o); });
+      if(!meshes.length)return;
+      var mat=espilXrayMaterial();
+      try{
+        for(var i=0;i<meshes.length;i++){ saved.push([meshes[i],meshes[i].material]); meshes[i].material=mat; }
+        for(var c=0;c<chain.length;c++){
+          var sib=chain[c].parent.children;
+          for(var j=0;j<sib.length;j++){ if(sib[j]!==chain[c]){ hidden.push([sib[j],sib[j].visible]); sib[j].visible=false; } }
+        }
+        r.render(mapScene, cam);
+      }catch(e){}
+      for(var k=0;k<saved.length;k++)saved[k][0].material=saved[k][1];
+      for(var q=0;q<hidden.length;q++)hidden[q][0].visible=hidden[q][1];
+    }
     function espilP1GameLayer(){
       return {
         id:'espil-game-layer', type:'custom', renderingMode:'3d',
@@ -4283,7 +4119,8 @@
             .multiply(new THREE.Matrix4().makeTranslation(-(cfgL.ox||0), 0, -(cfgL.oz||0)));
           var m=new THREE.Matrix4().fromArray(matrix);
           espilP1.layerCam.projectionMatrix=m.multiply(l);
-          try{ r.render(mapScene, espilP1.layerCam); }catch(e){}
+          espilXraySilhouette(r, espilP1.layerCam); /* X-RAY pass 1 (Han 2026-11-26, item 7): the silhouette, against the basemap's depth */
+          try{ r.render(mapScene, espilP1.layerCam); }catch(e){} /* pass 2: the normal scene */
           try{ r.state.reset(); }catch(e){}
           /* Loader contract under the conversion: the continuous
              repaint loop means the map may never go 'idle', so the
@@ -4355,7 +4192,7 @@
              is copied into Han's own account later, this path never runs. */
           espilP1.onFallback=true;
           espilP1.buildingsAdded=false; /* setStyle wipes sources - the load handler re-adds the buildings */
-          espilP1.style3dOff=false; espilP1.style3dTries=0; /* the fallback style gets its own 3D-off attempt */
+          espilP1.style3dOff=false; espilP1.style3dTries=0; /* style3d flags retired (Han 2026-11-26 item 6c) - inert fields, kept so the reset shape is unchanged */
           espilP1.layerAdded=false; /* setStyle also wipes custom layers - re-added on the same load */
           espilP1Banner('Could not read the designated style, so the base map is shown with street-name labels removed.');
           try{ espilP1.map.setStyle('mapbox://styles/mapbox/streets-v12'); }
@@ -4395,7 +4232,6 @@
       if(window.__espilDistrictMeshesBuilt&&typeof mapBuilt!=='undefined'&&mapBuilt)espilP1Hide();
       if(typeof renderer!=='undefined'&&renderer)renderer.setClearColor(0x000000,0);
       if(espilP1.ready&&!espilP1.buildingsAdded)espilP1AddBuildings(); /* preload case: district data may land after the map load */
-      if(espilP1.ready&&!espilP1.style3dOff&&espilP1.style3dTries<1200){ espilP1.style3dTries++; espilP1HideStyle3D(); }
       if(espilP1.ready&&!espilP1.layerAdded)espilP1AddLayer();
       if(espilP1.map&&espilP1.ready&&typeof walkPlayer!=='undefined'&&walkPlayer){
         /* CAMERA ANCHOR (Han PC QA 2026-10-18, round 2): the camera
@@ -4468,12 +4304,10 @@
           walkCamDist=espilP1DistFromZoom(espilP1.zoom);
         }
         var zoom=espilP1.zoom;
-        /* Batch 5 item 8: the occlusion cap also applies to the
-           Mapbox camera - a capped effective distance raises the
-           applied zoom for this frame only; the user's zoom state
-           (espilP1.zoom / zoomT) is never rewritten. */
-        if(typeof espilCamDEff==='number'&&espilCamDEff<espilP1DistFromZoom(zoom)-0.05)
-          zoom=espilP1ZoomFromDist(Math.max(2.2,espilCamDEff));
+        /* OCCLUSION ZOOM REMOVED (Han 2026-11-26, item 11): the
+           Batch 5 item 8 cap that raised this frame's zoom when a
+           building capped the boom is deleted - the applied zoom
+           is the player's zoom state, never an occlusion cap. */
         /* ZOOM-FPV (Han 2026-11-17): the pitch is the one P1
            framing term the zoom source touches - 52 + 33 x blend,
            reaching the interior's 85 only as the blend completes.
@@ -14416,33 +14250,27 @@
       }
       if(window.__espilInside||window.__espilStorePaused||p._espilArrive||p._espilLanding){ espilCamDEff=walkCamDist; return; }
       espilCamChecks++;
-      var allowed=espilCamSegAllowed(p);
-      espilCamAllowed=allowed;
-      if(allowed<espilCamEff)espilCamEff=Math.max(allowed,espilCamEff-dt*30); /* clamp in fast */
-      else espilCamEff=Math.min(walkCamDist,espilCamEff+dt*6);                /* release slowly */
-      if(espilCamEff>walkCamDist)espilCamEff=walkCamDist;
-      espilCamDEff=Math.min(walkCamDist,espilCamEff);
-      /* self-check: the applied segment (chest -> camera at the
-         effective distance, same ray) must be clear of the volumes */
-      var layerLive=(typeof ESPIL_P1!=='undefined'&&ESPIL_P1&&ESPIL_P1.layerLive&&!ESPIL_P1.failed);
-      var pitch2=layerLive?0.9076:walkCamPitch;
-      var cp2=Math.cos(pitch2), sp2=Math.sin(pitch2), d2=espilCamDEff;
-      var recs2=(typeof espilPolyHash!=='undefined'&&espilPolyHash)?espilCollectRecsNear(p.pos.x+Math.sin(walkCamYaw)*cp2*d2/2,p.pos.z+Math.cos(walkCamYaw)*cp2*d2/2,d2/2+6):[];
-      espilCamSegClear=espilCamMarch(p.pos.x,p.pos.y+1.3,p.pos.z,
-        p.pos.x+Math.sin(walkCamYaw)*cp2*d2, p.pos.y+sp2*d2+1.2, p.pos.z+Math.cos(walkCamYaw)*cp2*d2, d2, recs2)===null;
-      /* the applied camera point itself (overlay want formula)
-         must sit outside every volume, below-roof test included */
-      var cpx=p.pos.x+Math.sin(walkCamYaw)*Math.cos(walkCamPitch)*d2,
-          cpy=p.pos.y+Math.sin(walkCamPitch)*d2+1.2,
-          cpz=p.pos.z+Math.cos(walkCamYaw)*Math.cos(walkCamPitch)*d2;
+      /* OCCLUSION ZOOM REMOVED (Han 2026-11-26, item 11): the
+         boom is no longer capped by the buildings in its path -
+         the effective distance is the follow distance itself, so
+         the camera never dollies in when a building covers the
+         character (the X-ray silhouette carries occlusion now).
+         espilCamSegAllowed / espilCamMarch stay in place uncalled,
+         like espilP1QrfAxis before them. The home branch above
+         (the interior room cap) is a separate law, untouched;
+         espilCamPos keeps its unclamped-ray formula so the probe
+         seam's shape is unchanged, with clamped permanently
+         false. */
+      espilCamAllowed=walkCamDist;
+      espilCamBlockedAt=null;
+      espilCamEff=walkCamDist;
+      espilCamDEff=walkCamDist;
+      var cpx=p.pos.x+Math.sin(walkCamYaw)*Math.cos(walkCamPitch)*espilCamDEff,
+          cpy=p.pos.y+Math.sin(walkCamPitch)*espilCamDEff+1.2,
+          cpz=p.pos.z+Math.cos(walkCamYaw)*Math.cos(walkCamPitch)*espilCamDEff;
       espilCamPos={x:Math.round(cpx*100)/100,y:Math.round(cpy*100)/100,z:Math.round(cpz*100)/100};
       espilCamInside=false;
-      for(var q=0;q<recs2.length;q++){
-        var rq=recs2[q];
-        if(cpx<rq.x0||cpx>rq.x1||cpz<rq.z0||cpz>rq.z1)continue;
-        if(cpy>rq.h+0.35)continue;
-        if(espilPolyProbe(rq,cpx,cpz).inside){espilCamInside=true;break;}
-      }
+      espilCamSegClear=true;
     }
     var espilCamPos=null, espilCamInside=false;
     window.__espilCamClampState=function(){
@@ -15934,7 +15762,7 @@
     var lastFrameT=performance.now();
     function animate(){
       requestAnimationFrame(animate);
-      espilOccludeTick(); /* wall-occlusion dither uniforms + extrusion stipple tick (Han 2026-11-14; system from 2026-11-03) */
+      espilOccludeTick(); /* retired wall-dither tick (Han 2026-11-26 item 7): a disarmed stub kept for the probe seam */
       var nowMs=performance.now();
       var dt=Math.min(.05,(nowMs-lastFrameT)/1000);lastFrameT=nowMs;
       /* HIT STOP (Han 2026-11-17): the shared deadline - while it
