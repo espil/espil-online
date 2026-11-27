@@ -1008,7 +1008,20 @@
        #auth-go-guest rule). No row of any flow view carries
        the .is-centered enlargement anymore (see buildUI), so
        Play no longer stands highlighted among the menu rows. */
-    '#espil-menu-play{color:#fff8e1}';
+    '#espil-menu-play{color:#fff8e1}' +
+    /* ESPIL-FLOW REEL (Han 2026-11-26, item 1): the flow
+       views' reels turn like a roulette, built like the city
+       list - the row at the reel's centre carries .is-centered,
+       tracked on scroll by the flow's own tracker (see
+       spinFlowReel below). Inside a flow reel the class is
+       COLOUR ONLY: pair.css's bright warm-white stands, while
+       its enlargement, weight, spacing and glow are scoped
+       back to the row's matched-set values - correction 3's
+       shape-B law, so no menu row ever stands big among the
+       others, at rest or mid-spin. The city step's own scoped
+       enlargement (#city-list above) is a different rule and
+       is untouched. */
+    '.espil-flow-reel .city-name.is-centered{font-size:.76rem;font-weight:600;letter-spacing:.12em;text-shadow:none}';
   document.head.appendChild(css);
 
   /* ---------------- DOM: menu + panels ---------------- */
@@ -1103,16 +1116,38 @@
     $('espil-zealandia-back').addEventListener('click', function () { presentFlowView($('espil-mainmenu')); });
     $('espil-about-back').addEventListener('click', function () { presentFlowView($('espil-mainmenu')); });
     $('espil-cityprep-back').addEventListener('click', function () { closePrep(); });
-    /* MOBILE ENTRY FIXES (Han 2026-11-26, correction 3): the
-       flow views' reels no longer track a centre - the batch-8
-       centre tracker put the .is-centered enlargement on the
-       row nearest the reel's centre, which at rest was always
-       Play, so Play stood highlighted among the menu rows.
-       These views are ACTION lists, not selections: their rows
-       are a matched set (Play keeps colour emphasis only, the
-       shape-B precedent of the two doors). The CITY list is
-       not a flow view and keeps its centre law untouched - 
-       there the centred row IS the selection read. */
+    /* ESPIL-FLOW REEL (Han 2026-11-26, item 1) - supersedes the
+       MOBILE ENTRY FIXES correction-3 note that stood here.
+       Correction 3 removed the batch-8 centre tracker because
+       it dressed the centred row in pair.css's .is-centered
+       ENLARGEMENT and at rest that was always Play, so Play
+       stood highlighted among the menu rows. Item 1 orders
+       the reel itself built like the city list, turning like
+       a roulette - so the centre tracking returns, but the
+       centred treatment inside a flow reel is COLOUR ONLY
+       (the scoped rule in the injected CSS above): the rows
+       stay a matched set in size and weight (Play keeps its
+       colour emphasis, the shape-B precedent of the two
+       doors), and the bright centre mark travels as the reel
+       turns. These views remain ACTION lists, not selections:
+       the tracker moves no focus and selects nothing - the
+       keyboard pass keeps focus, clicks keep acting. The
+       CITY list is not a flow view and keeps its centre law
+       untouched - there the centred row IS the selection. */
+    var fvReels = ui.querySelectorAll('.espil-flow-reel');
+    for (var fvr = 0; fvr < fvReels.length; fvr++) {
+      (function (reel) {
+        reel.addEventListener('scroll', function () {
+          if (!reel._fvFrame) reel._fvFrame = requestAnimationFrame(function () { updateFlowViewReelCenter(reel); });
+        }, { passive: true });
+        /* The player's own grab ends a running spin at once -
+           the same intent idiom as the city list's: the spin
+           is presentation motion, never a fight. */
+        reel.addEventListener('wheel', function () { cancelFlowReelSpin(reel); }, { passive: true });
+        reel.addEventListener('touchstart', function () { cancelFlowReelSpin(reel); }, { passive: true });
+        reel.addEventListener('pointerdown', function () { cancelFlowReelSpin(reel); }, { passive: true });
+      })(fvReels[fvr]);
+    }
   }
   function show(n) { if (n) n.setAttribute('aria-hidden', 'false'); }
   function hide(n) { if (n) n.setAttribute('aria-hidden', 'true'); }
@@ -1128,12 +1163,17 @@
     FLOW_VIEW_IDS.forEach(function (id) { var n = $(id); if (n && n !== view) hide(n); });
     if (view) {
       show(view);
-      /* A presented list starts at its first row - reel back to
-         the top. (The centre tracker that used to dress row one
-         in the .is-centered enlargement is gone - correction 3
-         above; the rows are a matched set.) */
+      /* A presented list SPINS back to its first row like a
+         roulette (Han 2026-11-26, item 1; spinFlowReel below):
+         the reel sweeps from its last row through the centre
+         with decelerating motion and settles on the first row,
+         the view's rest row, which then carries the centred
+         (colour-only) treatment. Single-row reels, and any
+         presentation under prefers-reduced-motion, land on
+         the first row at once - the same rest state this
+         presentation always produced. */
       var vreel = view.querySelector('.espil-flow-reel');
-      if (vreel) vreel.scrollTop = 0;
+      if (vreel) spinFlowReel(vreel);
       /* I18N GUESTBTN PACKAGE: the About data-sources block is
          rendered from the T table - refresh it on presentation so
          it follows the language in force when the panel opens. */
@@ -1149,6 +1189,98 @@
     hide($('espil-cityprep-panel'));
     var cs = $('city-status');
     if (cs) cs.classList.remove('flow-open');
+  }
+
+  /* ---------------- ESPIL-FLOW REEL (Han 2026-11-26, item 1):
+     "릴이 돌아가야해 룰렛처럼, city-list 처럼 제작해" - the flow
+     views' reel must actually turn like a roulette, built like
+     the city-list. The construction is the city step's own,
+     carried to the flow views: a native scroller with snap, a
+     rAF centre tracker that dresses the row nearest the centre
+     (here colour only - the scoped rule in the injected CSS),
+     and, on presentation, a SPIN: the reel starts at its last
+     row and sweeps upward through the centre with an
+     easeOutQuint drive - fastest at the start, decelerating -
+     so the rows cross the centre at ever-longer intervals and
+     the motion settles exactly on the first row, the view's
+     rest row, which keeps the centred treatment. The snap is
+     suspended during the sweep (a mandatory snap would grab
+     the moving reel mid-flight) and restored at the landing,
+     where the target IS a snap position. The player's own
+     grab (wheel / touch / press, registered in buildUI) cancels
+     a spin at once; a spin also dies the frame its view is
+     hidden. Under prefers-reduced-motion - read at spin time
+     through window.matchMedia, the same media query monolith
+     reads for its decorative motion; this module carried no
+     hook of its own - the reel lands on its rest row at once,
+     the exact rest state presentation produced before. */
+  function flowReelCenterTop(reel, row) {
+    var max = reel.scrollHeight - reel.clientHeight;
+    if (max < 0) max = 0;
+    var top = row.offsetTop + row.offsetHeight / 2 - reel.clientHeight / 2;
+    if (top < 0) top = 0;
+    if (top > max) top = max;
+    return top;
+  }
+  function updateFlowViewReelCenter(reel) {
+    reel._fvFrame = 0;
+    var view = reel.parentNode;
+    if (!view || view.getAttribute('aria-hidden') !== 'false') return;
+    var rows = reel.querySelectorAll('.espil-flow-item');
+    if (!rows.length) return;
+    var rr = reel.getBoundingClientRect();
+    var centre = rr.top + rr.height / 2;
+    var closest = null, dist = Infinity;
+    for (var n = 0; n < rows.length; n++) {
+      var r = rows[n].getBoundingClientRect();
+      var d = Math.abs(r.top + r.height / 2 - centre);
+      if (d < dist) { dist = d; closest = rows[n]; }
+    }
+    for (var m = 0; m < rows.length; m++) {
+      rows[m].classList.toggle('is-centered', rows[m] === closest);
+    }
+  }
+  function cancelFlowReelSpin(reel) {
+    var spin = reel._fvSpin;
+    if (!spin) return;
+    reel._fvSpin = null;
+    if (spin.raf) cancelAnimationFrame(spin.raf);
+    reel.style.scrollSnapType = spin.snap;
+    updateFlowViewReelCenter(reel);
+  }
+  function spinFlowReel(reel) {
+    cancelFlowReelSpin(reel);
+    var rows = reel.querySelectorAll('.espil-flow-item');
+    if (!rows.length) return;
+    var to = flowReelCenterTop(reel, rows[0]);
+    var reduced = false;
+    try { reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) {}
+    if (rows.length < 2 || reduced) { reel.scrollTop = to; updateFlowViewReelCenter(reel); return; }
+    var from = flowReelCenterTop(reel, rows[rows.length - 1]);
+    if (from === to) { reel.scrollTop = to; updateFlowViewReelCenter(reel); return; }
+    var spin = { raf: 0, snap: reel.style.scrollSnapType || '', t0: 0, dur: 900 + 150 * (rows.length - 1), from: from, to: to };
+    reel._fvSpin = spin;
+    reel.style.scrollSnapType = 'none';
+    reel.scrollTop = from;
+    updateFlowViewReelCenter(reel);
+    var stepSpin = function (now) {
+      if (reel._fvSpin !== spin) return;
+      var view = reel.parentNode;
+      if (!view || view.getAttribute('aria-hidden') !== 'false') { cancelFlowReelSpin(reel); return; }
+      if (!spin.t0) spin.t0 = now;
+      var p = (now - spin.t0) / spin.dur;
+      if (p >= 1) {
+        reel._fvSpin = null;
+        reel.style.scrollSnapType = spin.snap;
+        reel.scrollTop = spin.to;
+        updateFlowViewReelCenter(reel);
+        return;
+      }
+      var e = 1 - Math.pow(1 - p, 5);
+      reel.scrollTop = spin.from + (spin.to - spin.from) * e;
+      spin.raf = requestAnimationFrame(stepSpin);
+    };
+    spin.raf = requestAnimationFrame(stepSpin);
   }
 
   /* Back entries (Han 2026-11-10: a way back at every step of
