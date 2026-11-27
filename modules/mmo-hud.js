@@ -724,11 +724,27 @@
        (z 46) - and its active face is driven by the portal's
        own state event, never by a local guess. */
     '#espil-hud2-portal{display:none}' +
-    'body.in-map #espil-hud2-portal{display:flex;position:fixed;right:14px;top:118px;width:48px;height:48px;' +
+    /* COMM-CENTER V2 (Han 2026-11-26 item 9): the toggle
+       leaves the minimap's disc. The stage-1 minimap spans
+       top 64..212 / right 14..~162 on fine pointers, and the
+       old spot (right 14, top 118) sat inside that span - the
+       button painted over the map's lower-left disc, exactly
+       the corner the attribution line crowds. The button now
+       rests LEFT of the minimap, vertically centred on it
+       (centre y 138): right 176px (a >=14px gap to the disc's
+       left edge), top 114px. Its face is the Earth logo - the
+       site's designated logo mark, /apple-touch-icon.png, the
+       rendered Earth disc the landing carries - not a glyph.
+       The coarse arrangements re-place it in their own blocks
+       below (landscape: left of the 118px minimap; portrait:
+       the right column under the score line, the minimap
+       being top-left there). */
+    'body.in-map #espil-hud2-portal{display:flex;position:fixed;right:176px;top:114px;width:48px;height:48px;' +
       'border-radius:50%;z-index:45;align-items:center;justify-content:center;font-size:21px;line-height:1;' +
       'background:rgba(20,26,22,.82);border:2px solid rgba(255,233,184,.55);color:#ffe9b8;cursor:pointer;' +
       'box-shadow:0 4px 14px rgba(0,0,0,.4);padding:0;touch-action:manipulation}' +
-    '#espil-hud2-portal.on{border-color:#ffd97a;background:#6d5836;color:#ffe9bd}' +
+    '#espil-hud2-portal img{width:100%;height:100%;display:block;border-radius:50%;object-fit:cover;pointer-events:none}' +
+    '#espil-hud2-portal.on{border-color:#ffd97a;background:#6d5836;color:#ffe9bd;box-shadow:0 0 0 3px rgba(255,217,122,.45),0 4px 14px rgba(0,0,0,.4)}' +
     '#espil-hud2-portal:active{filter:brightness(1.3)}' +
     '@media (pointer:coarse){' +
       /* the superseded mobile scheme retires on touch screens */
@@ -826,6 +842,9 @@
       'body.in-map #espil-hud2-score{top:10px;width:320px;height:30px;padding:0 22px}' +
       'body.in-map #minimap-wrap[data-stage="1"]{top:10px!important;right:10px!important;left:auto!important;' +
         'width:118px!important;height:118px!important;border-radius:12px!important;transform:none}' +
+      /* comm-center toggle: left of this minimap (its left
+         edge rests at right:128), centred on it (centre y 69) */
+      'body.in-map #espil-hud2-portal{right:142px!important;top:45px!important}' +
       'body.in-map #espil-hud2-timefps{top:132px;right:10px;width:118px}' +
       'body.in-map #espil-hud2-menu{left:50%;transform:translateX(-50%);top:46px;flex-direction:row}' +
       'body.in-map #espil-hud2-bars{left:50%;transform:translateX(-50%);bottom:calc(14px + var(--espil-attrib-h,0px));width:min(210px,32vw)}' +
@@ -849,6 +868,11 @@
       'body.in-map #minimap-wrap[data-stage="1"]{top:10px!important;left:10px!important;right:auto!important;' +
         'width:92px!important;height:92px!important;border-radius:50%!important;transform:none}' +
       'body.in-map #espil-hud2-timefps{top:106px;left:10px;right:auto;width:92px;font-size:9px;padding:1px 5px}' +
+      /* comm-center toggle: the portrait minimap is top-left,
+         so the button keeps the right column but drops under
+         the score line (ends y 88) and ends above the topbar
+         pills (top 164): 110..158 */
+      'body.in-map #espil-hud2-portal{right:14px!important;top:110px!important}' +
       'body.in-map #espil-hud2-coin{left:110px;top:10px;flex-direction:row}' +
       '#espil-hud2-coin .h2-medal{width:20px;height:20px;font-size:9px}' +
       '#espil-hud2-coin .h2-num{font-size:10px}' +
@@ -1423,17 +1447,19 @@
   var portalPlace = false;
   try { portalPlace = !!sessionStorage.getItem('espil_store_space_v1'); } catch (e) {}
   if (!portalPlace) {
-    portalBtn = mk('button', 'espil-hud2-portal', '🏪');
+    portalBtn = mk('button', 'espil-hud2-portal', '<img src="apple-touch-icon.png" alt="" draggable="false">');
     portalBtn.type = 'button';
-    portalBtn.setAttribute('aria-label', '커뮤니티 센터');
     portalBtn.setAttribute('aria-expanded', 'false');
     var paintPortalBtn = function () {
       try {
         var on = !!(window.__espilPortal && window.__espilPortal.state && window.__espilPortal.state().open);
         portalBtn.classList.toggle('on', on);
         portalBtn.setAttribute('aria-expanded', on ? 'true' : 'false');
+        /* the label follows the selected pack (cc* table) */
+        if (window.__espilT) portalBtn.setAttribute('aria-label', window.__espilT('ccTitle'));
       } catch (e) {}
     };
+    paintPortalBtn();
     portalBtn.addEventListener('click', function () {
       try {
         if (window.__espilPortal && window.__espilPortal.toggle) { window.__espilPortal.toggle(); paintPortalBtn(); return; }

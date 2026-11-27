@@ -84,7 +84,27 @@
    'espil-portal-state' window event so the HUD toggle's
    active face never forks from the real state.
 
-   Module sources are TAGLESS (house rule) - no script tags here. */
+   Module sources are TAGLESS (house rule) - no script tags here.
+
+   V2 (2026-11-26, Han items 8 + 9): every string this module
+   renders routes through the language tables (__espilT, cc*
+   keys in language.js) - the center renders in the selected
+   pack, English included, and Korean appears only under the
+   Korean pack. The window is restyled to OUR MINIHOMPY form
+   (the han.espil.online/minihome tokens): white frame, blue
+   border, colour tabs, and a MAIN tab whose stage stands the
+   player's real avatar (a compact transplant of panels.js's
+   verified character-stage pattern - same selection record,
+   same body routes, same grounding) over a miniroom frame.
+   The main also carries the visit box: the people in this
+   city from presence, each row riding the one real visit
+   that exists today (their stall view, in-room, stall up -
+   the feed's rule). Center-to-center visiting has no seam
+   yet; see comm-center-v2/CENSUS.md section 4. The market
+   data path, the buy frame, the counters and the feed's
+   posting rules are untouched by this build (the composer
+   renders for every entrant since the guest-posts ship -
+   this build only routes its strings). */
 (function () {
   'use strict';
   if (window.__espilPortal) return; /* once per page */
@@ -119,6 +139,24 @@
     });
   }
   function chatState() { try { return window.__espilChatState ? window.__espilChatState() : null; } catch (e) { return null; } }
+  /* Language routing (v2): every rendered string reads the
+     CURRENT pack at render time through language.js's table.
+     The fallback (table absent - a load order that cannot
+     occur on the production page, where language.js is a
+     static script) is the key itself, never a frozen string. */
+  function T(k) { try { return window.__espilT ? window.__espilT(k) : k; } catch (e) { return k; } }
+  function TF(k, ph, val) { return T(k).split(ph).join(String(val == null ? '' : val)); }
+  /* The name this player wears - the nameplate law's exact
+     resolution (#char-name, then espil_username, then Guest),
+     read from the same sources presence.myName() reads. */
+  function myDisplayName() {
+    try {
+      var inp = document.getElementById('char-name');
+      var v = inp ? String(inp.value || '').trim() : '';
+      if (!v) { try { v = String(localStorage.getItem('espil_username') || '').trim(); } catch (e) { v = ''; } }
+      return (v || 'Guest').slice(0, 16);
+    } catch (e) { return 'Guest'; }
+  }
   function signedIn() { try { return !!localStorage.getItem('espil_session_v1'); } catch (e) { return false; } }
   function roomKey() { var st = chatState(); return st && st.room ? String(st.room) : ''; }
   function cityLabel() {
@@ -138,95 +176,141 @@
     var st = document.createElement('style');
     st.id = 'espil-portal-style';
     st.textContent =
+      /* MINIHOMPY FORM (v2, Han directive 2 + item 8b): the
+         han.espil.online/minihome tokens - white frame, blue
+         border #5f87a8, line #b7c9d8, ink #33383d, soft
+         #6b7683, orange #f26d21 / orange-dk #d35400, blue
+         #3b6ea5, the colour tab set, dotted box heads, the
+         miniroom tint #fdf6ec for the market ground. The dock
+         geometry (mount, size) is the widget build's own. */
       '#espil-portal-window{position:fixed;top:174px;right:10px;width:min(920px,96vw);height:min(84vh,860px,calc(100vh - 184px));z-index:44;display:none}' +
       '#espil-portal-window.open{display:block}' +
-      '.epw-card{background:linear-gradient(180deg,#3a2a1c,#241a10);border:2px solid #8a6a44;border-radius:14px;' +
-      'width:100%;height:100%;box-sizing:border-box;display:flex;flex-direction:column;padding:18px 20px;color:#f2e3c2;font-family:sans-serif;' +
-      'box-shadow:0 12px 40px rgba(0,0,0,.6)}' +
-      '.epw-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}' +
-      '.epw-title{font-size:21px;font-weight:800;color:#ffe9bd}' +
-      '.epw-close{border:1px solid #8a6a44;background:#57402a;color:#ffe9bd;border-radius:8px;padding:6px 12px;cursor:pointer;font-weight:700;min-width:48px;min-height:48px}' +
-      '.epw-tabs{display:flex;gap:8px;border-bottom:1px solid #57402a;padding-bottom:10px;margin-bottom:10px}' +
-      '.epw-tab{border:1px solid #6d5836;background:#2e2114;color:#d8c49a;border-radius:999px;padding:7px 16px;cursor:pointer;font-weight:700;font-size:13.5px}' +
-      '.epw-tab.on{border-color:#c9a227;background:#6d5836;color:#ffe9bd}' +
-      '.epw-pane{display:none;flex:1;min-height:0;overflow-y:auto}' +
+      '.epw-card{background:#fff;border:2px solid #5f87a8;border-radius:12px;' +
+      'width:100%;height:100%;box-sizing:border-box;display:flex;flex-direction:column;padding:18px 22px 14px;color:#33383d;' +
+      'font-family:"Malgun Gothic","Apple SD Gothic Neo",Dotum,"Manrope",sans-serif;' +
+      'box-shadow:0 14px 40px rgba(23,48,74,.4)}' +
+      '.epw-head{display:flex;align-items:center;justify-content:space-between;border-bottom:3px double #b7c9d8;padding-bottom:8px;margin-bottom:10px}' +
+      '.epw-title{font-size:19px;font-weight:bold;color:#33383d}' +
+      '.epw-title .epw-house{color:#f26d21;margin-right:6px}' +
+      '.epw-close{border:1px solid #d35400;background:#f26d21;color:#fff;border-radius:4px;padding:8px 14px;cursor:pointer;font-weight:bold;min-width:48px;min-height:48px;font-size:12px}' +
+      '.epw-close:hover{background:#d35400}' +
+      '.epw-tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}' +
+      '.epw-tab{border:none;color:#fff;border-radius:6px;padding:9px 18px;cursor:pointer;font-weight:bold;font-size:13px;min-height:48px;box-shadow:2px 2px 5px rgba(23,48,74,.25)}' +
+      '.epw-tab[data-ep-tab="main"]{background:#f26d21}' +
+      '.epw-tab[data-ep-tab="feed"]{background:#5b8c5a}' +
+      '.epw-tab[data-ep-tab="market"]{background:#3b6ea5}' +
+      '.epw-tab[data-ep-tab="cash"]{background:#7a5ba6}' +
+      '.epw-tab.on{filter:brightness(1.13);box-shadow:3px 3px 8px rgba(23,48,74,.4);outline:2px solid rgba(51,56,61,.35)}' +
+      '.epw-pane{display:none;flex:1;min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#8fb0cc #e8eff5}' +
       '.epw-pane.on{display:block}' +
       '#ep-pane-feed>*{max-width:640px;margin-left:auto;margin-right:auto}' +
       '#ep-pane-market{position:relative;overflow:hidden}' +
       '#ep-market-root{height:100%}' +
-      '.epw-city{font-size:15px;font-weight:800;color:#ffd76a;margin-bottom:8px}' +
-      '.epf-post{border:1px solid #57402a;border-radius:10px;padding:9px 12px;background:rgba(0,0,0,.22);margin-bottom:8px}' +
-      '.epf-meta{font-size:11.5px;color:#b8a888;margin-bottom:3px}' +
-      '.epf-meta b{color:#ffe9bd;font-size:12.5px}' +
-      '.epf-text{font-size:13.5px;line-height:1.5;color:#f2e3c2;word-break:break-word;white-space:pre-wrap}' +
-      '.epf-stall{margin-top:6px;border:1px solid #c9a227;background:#6d5836;color:#ffe9bd;border-radius:8px;padding:4px 11px;cursor:pointer;font-weight:700;font-size:12px}' +
-      '.epf-empty{font-size:13.5px;color:#b8a888;line-height:1.6;padding:14px 2px}' +
-      '.epw-comp{border-top:1px solid #57402a;padding-top:10px;margin-top:2px}' +
-      '.epw-comp textarea{width:100%;box-sizing:border-box;min-height:52px;resize:vertical;border:1px solid #6d5836;border-radius:10px;' +
-      'background:rgba(0,0,0,.3);color:#fff4cf;font:600 13.5px sans-serif;padding:9px 11px}' +
+      '.epw-city{font-size:14px;font-weight:bold;color:#d35400;border-bottom:2px solid #f26d21;padding-bottom:4px;margin-bottom:10px}' +
+      '.epf-post{border:1px solid #b7c9d8;border-radius:6px;background:#fff;margin-bottom:12px;overflow:hidden}' +
+      '.epf-meta{font-size:11.5px;color:#6b7683;background:#fdf6ee;border-bottom:1px dotted #b7c9d8;padding:7px 12px}' +
+      '.epf-meta b{color:#3b6ea5;font-size:12.5px}' +
+      '.epf-text{font-size:13.5px;line-height:1.55;color:#33383d;word-break:break-word;white-space:pre-wrap;padding:9px 12px 2px}' +
+      '.epf-stall{margin:8px 12px 10px;border:1px solid #d35400;background:#f26d21;color:#fff;border-radius:4px;padding:6px 14px;cursor:pointer;font-weight:bold;font-size:12px;min-height:48px}' +
+      '.epf-empty{font-size:13.5px;color:#6b7683;line-height:1.6;padding:14px 2px}' +
+      '.epw-comp{border-top:3px double #b7c9d8;padding-top:10px;margin-top:2px}' +
+      '.epw-comp textarea{width:100%;box-sizing:border-box;min-height:52px;resize:vertical;border:1px solid #b7c9d8;border-radius:4px;' +
+      'background:#fff;color:#33383d;font:600 13.5px "Malgun Gothic",sans-serif;padding:9px 11px}' +
       '.epw-comp-row{display:flex;align-items:center;gap:10px;margin-top:8px}' +
-      '.epw-post-btn{border:1px solid #c9a227;background:#6d5836;color:#ffe9bd;border-radius:8px;padding:7px 18px;cursor:pointer;font-weight:800}' +
-      '.epw-sale{font-size:12.5px;color:#d8c49a;display:flex;align-items:center;gap:5px;cursor:pointer}' +
-      '.epw-note{font-size:12.5px;color:#b8a888;line-height:1.55}' +
-      '.epw-market{font-size:14px;color:#d8c49a;line-height:1.65;padding:16px 4px}' +
-      '.epm-wrap{display:flex;gap:14px;height:100%}' +
-      '.epm-rail{width:220px;flex:none;overflow-y:auto;padding-right:2px}' +
-      '.epm-rail-h{font-size:11.5px;font-weight:800;color:#b8a888;letter-spacing:.06em;margin:14px 0 6px}' +
+      '.epw-post-btn{border:1px solid #d35400;background:#f26d21;color:#fff;border-radius:4px;padding:8px 18px;cursor:pointer;font-weight:bold;min-height:48px}' +
+      '.epw-sale{font-size:12.5px;color:#33383d;display:flex;align-items:center;gap:5px;cursor:pointer}' +
+      '.epw-note{font-size:12.5px;color:#6b7683;line-height:1.55}' +
+      '.epw-market{font-size:14px;color:#33383d;line-height:1.65;padding:16px 4px}' +
+      /* main tab: the minihome columns - rail + main, the
+         avatar window over a miniroom frame */
+      '.eph-cols{display:flex;gap:0}' +
+      '.eph-rail{width:208px;flex:none;padding-right:14px;border-right:1px dotted #b7c9d8}' +
+      '.eph-main{flex:1;padding-left:16px;min-width:0}' +
+      '.eph-box{border:1px solid #b7c9d8;border-radius:6px;padding:9px 10px;margin-bottom:12px;background:#fff}' +
+      '.eph-box h4{font-size:11px;color:#d35400;border-bottom:1px dotted #b7c9d8;padding-bottom:4px;margin-bottom:7px;letter-spacing:.4px}' +
+      '.eph-name{font-size:16px;font-weight:bold;color:#33383d;margin-bottom:4px;word-break:break-word}' +
+      '.eph-line{font-size:12px;color:#6b7683;padding:2.5px 0;border-bottom:1px dotted #e3ebf2}' +
+      '.eph-line:last-child{border-bottom:none}' +
+      '.eph-links{display:flex;flex-direction:column;gap:6px}' +
+      '.eph-link{border:none;color:#fff;border-radius:6px;padding:9px 12px;cursor:pointer;font-weight:bold;font-size:13px;min-height:48px;text-align:left}' +
+      '.eph-link[data-ep-goto="feed"]{background:#5b8c5a}' +
+      '.eph-link[data-ep-goto="market"]{background:#3b6ea5}' +
+      '.eph-link[data-ep-goto="cash"]{background:#7a5ba6}' +
+      '.eph-avatarwin{border:1px solid #b7c9d8;border-radius:6px;padding:6px;background:#fdfdf8;margin-bottom:14px}' +
+      '.eph-stage{position:relative;height:190px;border:1px solid #d8e2ec;overflow:hidden;background:linear-gradient(180deg,#dfeaf3 0%,#dfeaf3 60%,#efdfba 60.2%,#e2c892 100%)}' +
+      '.eph-stage canvas{display:block;width:100%;height:100%}' +
+      '.eph-nametag{position:absolute;left:12px;bottom:10px;background:rgba(255,255,255,.88);border:1px solid #b7c9d8;border-radius:3px;padding:1px 7px;font-weight:bold;color:#33383d;font-size:12px;z-index:3}' +
+      '.eph-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:12px;font-size:12px;color:#6b7683;z-index:2}' +
+      '.eph-openbar{display:flex;justify-content:space-between;align-items:center;padding-top:6px;font-size:11px;gap:8px}' +
+      '.eph-openbar .lbl{color:#d35400;font-weight:bold}' +
+      '.eph-openbar .city{color:#6b7683;white-space:nowrap}' +
+      '.eph-visit-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 2px;border-bottom:1px dotted #b7c9d8}' +
+      '.eph-visit-row:last-child{border-bottom:none}' +
+      '.eph-visit-name{font-weight:bold;color:#3b6ea5;font-size:12.5px;word-break:break-word}' +
+      '.eph-visit-btn{border:1px solid #d35400;background:#f26d21;color:#fff;border-radius:4px;padding:6px 14px;cursor:pointer;font-weight:bold;font-size:12px;min-height:48px;flex:none}' +
+      '.eph-visit-none{color:#6b7683;font-size:11.5px}' +
+      /* market: the miniroom ground carries the tab */
+      '.epm-wrap{display:flex;gap:14px;height:100%;background:#fdf6ec;border:1px solid #e8d3ae;border-radius:6px;padding:10px;box-sizing:border-box}' +
+      '.epm-rail{width:220px;flex:none;overflow-y:auto;padding:10px 12px;background:#fff;border:1px solid #b7c9d8;border-radius:6px}' +
+      '.epm-rail-h{font-size:11px;font-weight:bold;color:#d35400;letter-spacing:.4px;border-bottom:1px dotted #b7c9d8;padding-bottom:4px;margin:14px 0 7px}' +
       '.epm-rail-h:first-child{margin-top:0}' +
       '.epm-cats{display:flex;flex-direction:column;gap:5px}' +
-      '.epm-catbtn{border:1px solid #6d5836;background:#2e2114;color:#d8c49a;border-radius:8px;padding:6px 12px;cursor:pointer;font-weight:700;font-size:13px;min-height:48px;text-align:left}' +
-      '.epm-catbtn.on{border-color:#c9a227;background:#6d5836;color:#ffe9bd}' +
+      '.epm-catbtn{border:1px solid #b7c9d8;background:#fff;color:#33383d;border-radius:4px;padding:6px 12px;cursor:pointer;font-weight:bold;font-size:13px;min-height:48px;text-align:left}' +
+      '.epm-catbtn.on{border-color:#3b6ea5;background:#3b6ea5;color:#fff}' +
       '.epm-cities{display:flex;flex-direction:column;gap:5px;max-height:264px;overflow-y:auto}' +
       '.epm-sides{display:flex;gap:5px}' +
       '.epm-sides .epm-catbtn{flex:1;text-align:center;padding:6px 4px}' +
       '.epm-prices{display:flex;gap:6px;align-items:center}' +
-      '.epm-prices span{color:#b8a888;font-size:13px}' +
-      '.epm-pin{flex:1;min-width:0;border:1px solid #6d5836;border-radius:8px;background:rgba(0,0,0,.3);color:#fff4cf;font:600 13px sans-serif;padding:6px 8px;min-height:48px;box-sizing:border-box}' +
+      '.epm-prices span{color:#6b7683;font-size:13px}' +
+      '.epm-pin{flex:1;min-width:0;border:1px solid #b7c9d8;border-radius:4px;background:#fff;color:#33383d;font:600 13px "Malgun Gothic",sans-serif;padding:6px 8px;min-height:48px;box-sizing:border-box}' +
       '.epm-main{flex:1;min-width:0;min-height:0;overflow-y:auto;padding-right:2px}' +
       '.epm-mainhead{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}' +
-      '.epm-sel{border:1px solid #6d5836;background:#2e2114;color:#ffe9bd;border-radius:8px;padding:6px 8px;font-size:13px;font-weight:700;min-height:48px}' +
-      '.epm-q{width:100%;border:1px solid #6d5836;border-radius:8px;background:rgba(0,0,0,.3);color:#fff4cf;font:600 13px sans-serif;padding:6px 10px;min-height:48px;box-sizing:border-box}' +
-      '.epm-leo{font-size:12.5px;color:#ffd76a;font-weight:700;margin-left:auto}' +
-      '.epm-status{font-size:13px;color:#b8a888;line-height:1.6;padding:10px 2px}' +
-      '.epm-note{font-size:12.5px;color:#ffd76a;line-height:1.55;margin-bottom:8px}' +
+      '.epm-sel{border:1px solid #b7c9d8;background:#fff;color:#33383d;border-radius:4px;padding:6px 8px;font-size:13px;font-weight:bold;min-height:48px}' +
+      '.epm-q{width:100%;border:1px solid #b7c9d8;border-radius:4px;background:#fff;color:#33383d;font:600 13px "Malgun Gothic",sans-serif;padding:6px 10px;min-height:48px;box-sizing:border-box}' +
+      '.epm-leo{font-size:12.5px;color:#d35400;font-weight:bold;margin-left:auto}' +
+      '.epm-status{font-size:13px;color:#6b7683;line-height:1.6;padding:10px 2px}' +
+      '.epm-note{font-size:12.5px;color:#d35400;line-height:1.55;margin-bottom:8px}' +
       '.epm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px}' +
-      '.epm-card{border:1px solid #57402a;border-radius:12px;background:rgba(0,0,0,.22);overflow:hidden;cursor:pointer;display:flex;flex-direction:column}' +
-      '.epm-card:active{filter:brightness(1.25)}' +
-      '.epm-img{position:relative;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.3)}' +
+      '.epm-card{border:1px solid #b7c9d8;border-radius:6px;background:#fff;overflow:hidden;cursor:pointer;display:flex;flex-direction:column}' +
+      '.epm-card:active{filter:brightness(1.06)}' +
+      '.epm-img{position:relative;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:#fdfdf8}' +
       '.epm-img svg{width:64%;height:64%}' +
       '.epm-glyph{font-size:64px;line-height:1}' +
       '.epm-img .epm-badges{position:absolute;top:6px;left:6px;margin-bottom:0}' +
       '.epm-adslot{height:0;overflow:hidden}' +
-      '.epm-card .epm-price{font-size:19px;font-weight:800;color:#ffe9a8;margin:8px 10px 0}' +
-      '.epm-card .epm-title{font-size:13.5px;font-weight:700;color:#f2e3c2;margin:3px 10px 0;line-height:1.35;min-height:2.7em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}' +
-      '.epm-card .epm-meta{font-size:11.5px;color:#b8a888;margin:3px 10px 0}' +
-      '.epm-card .epm-seller{font-size:11.5px;color:#d8c49a;margin:2px 10px 10px}' +
-      '.epm-sheet{position:absolute;inset:0;z-index:5;background:linear-gradient(180deg,#3a2a1c,#241a10);overflow-y:auto;padding:14px 16px}' +
-      '.epm-back{border:1px solid #c9a227;background:#6d5836;color:#ffe9bd;border-radius:8px;padding:7px 16px;cursor:pointer;font-weight:800;font-size:13.5px;min-width:48px;min-height:48px;margin-bottom:12px}' +
-      '.epm-sheet .epm-img{width:min(300px,80vw);border-radius:12px;margin-bottom:12px}' +
+      '.epm-card .epm-price{font-size:19px;font-weight:800;color:#d35400;margin:8px 10px 0}' +
+      '.epm-card .epm-title{font-size:13.5px;font-weight:bold;color:#33383d;margin:3px 10px 0;line-height:1.35;min-height:2.7em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}' +
+      '.epm-card .epm-meta{font-size:11.5px;color:#6b7683;margin:3px 10px 0}' +
+      '.epm-card .epm-seller{font-size:11.5px;color:#3b6ea5;margin:2px 10px 10px}' +
+      '.epm-sheet{position:absolute;inset:0;z-index:5;background:#fff;overflow-y:auto;padding:14px 16px}' +
+      '.epm-back{border:1px solid #d35400;background:#f26d21;color:#fff;border-radius:4px;padding:8px 16px;cursor:pointer;font-weight:bold;font-size:13.5px;min-width:48px;min-height:48px;margin-bottom:12px}' +
+      '.epm-sheet .epm-img{width:min(300px,80vw);border-radius:6px;border:1px solid #b7c9d8;margin-bottom:12px}' +
       '.epm-sheet .epm-glyph{font-size:110px}' +
-      '.epm-sheet .epm-price{font-size:24px;font-weight:800;color:#ffe9a8}' +
-      '.epm-sheet .epm-title{font-size:17px;font-weight:800;color:#f2e3c2;margin-top:4px}' +
-      '.epm-sheet .epm-meta{font-size:12.5px;color:#b8a888;margin-top:5px;line-height:1.65}' +
+      '.epm-sheet .epm-price{font-size:24px;font-weight:800;color:#d35400}' +
+      '.epm-sheet .epm-title{font-size:17px;font-weight:bold;color:#33383d;margin-top:4px}' +
+      '.epm-sheet .epm-meta{font-size:12.5px;color:#6b7683;margin-top:5px;line-height:1.65}' +
       '@media (max-width:820px){' +
-      '.epm-wrap{flex-direction:column}' +
-      '.epm-rail{width:auto;flex:none;overflow:visible;padding-right:0}' +
+      '.epm-wrap{flex-direction:column;overflow-y:auto}' +
+      '.epm-rail{width:auto;flex:none;overflow:visible;padding-right:12px}' +
       '.epm-cats{flex-direction:row;flex-wrap:wrap}' +
       '.epm-cities{flex-direction:row;flex-wrap:wrap;max-height:none;overflow:visible}' +
       '.epm-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}' +
+      '.eph-cols{flex-direction:column}' +
+      '.eph-rail{width:auto;border-right:none;padding-right:0}' +
+      '.eph-main{padding-left:0}' +
       '}' +
       '.epm-badges{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:4px}' +
-      '.epm-badge{padding:1px 7px;border-radius:99px;font-size:10px;font-weight:800;color:#fff;background:rgba(90,110,140,.6)}' +
-      '.epm-badge.sell{background:rgba(255,150,60,.55)}' +
-      '.epm-badge.buy{background:rgba(90,140,255,.55)}' +
-      '.epm-badge.svc{background:rgba(150,110,255,.55)}' +
-      '.epm-badge.cat{background:rgba(201,162,39,.45);color:#ffe9bd}' +
-      '.epm-badge.mine{background:rgba(70,160,90,.55)}' +
-      '.epm-detail{margin-top:10px;border-top:1px solid #57402a;padding-top:10px}' +
-      '.epm-pnote{font-size:12.5px;color:#d8c49a;line-height:1.55;white-space:pre-wrap;word-break:break-word}' +
+      '.epm-badge{padding:1px 7px;border-radius:99px;font-size:10px;font-weight:800;color:#fff;background:#8a97a5}' +
+      '.epm-badge.sell{background:#f26d21}' +
+      '.epm-badge.buy{background:#3b6ea5}' +
+      '.epm-badge.svc{background:#7a5ba6}' +
+      '.epm-badge.cat{background:#fdf1e7;color:#d35400;border:1px solid #e8d3ae}' +
+      '.epm-badge.mine{background:#5b8c5a}' +
+      '.epm-detail{margin-top:10px;border-top:1px dotted #b7c9d8;padding-top:10px}' +
+      '.epm-pnote{font-size:12.5px;color:#454c53;line-height:1.55;white-space:pre-wrap;word-break:break-word}' +
       '.epm-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}' +
-      '.epm-btn{border:1px solid #c9a227;background:#6d5836;color:#ffe9bd;border-radius:8px;padding:7px 16px;cursor:pointer;font-weight:800;font-size:13.5px;min-height:48px}' +
-      '.epm-btn.sub{border-color:#6d5836;background:#2e2114;color:#d8c49a}' +
+      '.epm-btn{border:1px solid #d35400;background:#f26d21;color:#fff;border-radius:4px;padding:8px 16px;cursor:pointer;font-weight:bold;font-size:13.5px;min-height:48px}' +
+      '.epm-btn.sub{border-color:#3b6ea5;background:#fff;color:#3b6ea5}' +
       '.epm-btn[disabled]{opacity:.45;cursor:default}' +
       '#espil-cash-window.ep-hosted{position:static!important;inset:auto!important;width:100%!important;height:100%!important;background:none!important;z-index:auto!important}' +
       '#espil-cash-window.ep-hosted.open{display:block!important}' +
@@ -238,13 +322,35 @@
     winEl.id = 'espil-portal-window';
     winEl.setAttribute('aria-hidden', 'true');
     winEl.innerHTML =
-      '<div class="epw-card" role="dialog" aria-label="커뮤니티 센터">' +
-      '<div class="epw-head"><div class="epw-title">커뮤니티 센터</div>' +
-      '<button class="epw-close" id="espil-portal-close" type="button">닫기</button></div>' +
+      '<div class="epw-card" role="dialog" id="ep-card">' +
+      '<div class="epw-head"><div class="epw-title"><span class="epw-house">\u2302</span><span id="ep-title"></span></div>' +
+      '<button class="epw-close" id="espil-portal-close" type="button"></button></div>' +
       '<div class="epw-tabs">' +
-      '<button class="epw-tab" data-ep-tab="feed" type="button">피드</button>' +
-      '<button class="epw-tab" data-ep-tab="market" type="button">마켓</button>' +
-      '<button class="epw-tab" data-ep-tab="cash" type="button">캐시 상점</button>' +
+      '<button class="epw-tab" data-ep-tab="main" type="button"></button>' +
+      '<button class="epw-tab" data-ep-tab="feed" type="button"></button>' +
+      '<button class="epw-tab" data-ep-tab="market" type="button"></button>' +
+      '<button class="epw-tab" data-ep-tab="cash" type="button"></button>' +
+      '</div>' +
+      '<div class="epw-pane" id="ep-pane-main">' +
+      '<div class="eph-cols">' +
+      '<div class="eph-rail">' +
+      '<div class="eph-box"><div class="eph-name" id="ep-main-name"></div><div id="ep-main-info"></div></div>' +
+      '<div class="eph-box"><h4 id="ep-main-quickh"></h4><div class="eph-links">' +
+      '<button class="eph-link" data-ep-goto="feed" type="button"></button>' +
+      '<button class="eph-link" data-ep-goto="market" type="button"></button>' +
+      '<button class="eph-link" data-ep-goto="cash" type="button"></button>' +
+      '</div></div>' +
+      '</div>' +
+      '<div class="eph-main">' +
+      '<div class="eph-avatarwin"><div class="eph-stage" id="ep-main-stage">' +
+      '<div class="eph-msg" id="ep-main-msg" style="display:none"></div>' +
+      '<div class="eph-nametag" id="ep-main-nametag"></div>' +
+      '</div>' +
+      '<div class="eph-openbar"><span class="lbl" id="ep-main-bodylabel"></span><span class="city" id="ep-main-cityline"></span></div>' +
+      '</div>' +
+      '<div class="eph-box"><h4 id="ep-main-visith"></h4><div id="ep-main-visit"></div></div>' +
+      '</div>' +
+      '</div>' +
       '</div>' +
       '<div class="epw-pane" id="ep-pane-feed">' +
       '<div class="epw-city" id="ep-feed-city"></div>' +
@@ -268,6 +374,10 @@
     Array.prototype.forEach.call(winEl.querySelectorAll('[data-ep-tab]'), function (b) {
       b.addEventListener('click', function () { selectTab(b.getAttribute('data-ep-tab')); });
     });
+    Array.prototype.forEach.call(winEl.querySelectorAll('[data-ep-goto]'), function (b) {
+      b.addEventListener('click', function () { selectTab(b.getAttribute('data-ep-goto')); });
+    });
+    renderChrome();
     /* While the cash window is hosted in the cash pane, its own
        backdrop-click close must not fire: the pane is an ancestor,
        so this capture listener sees a click aimed at the hosted
@@ -284,19 +394,47 @@
     renderComposer();
   }
 
+  /* The static chrome (title, close, tab + quick-link labels,
+     box heads) is re-read from the language table whenever it
+     is (re)painted - on build, on open, and on a language
+     switch - so no pack is ever frozen into the DOM. */
+  function renderChrome() {
+    if (!winEl) return;
+    var card = winEl.querySelector('#ep-card');
+    if (card) card.setAttribute('aria-label', T('ccTitle'));
+    var tt = winEl.querySelector('#ep-title');
+    if (tt) tt.textContent = T('ccTitle');
+    var cl = winEl.querySelector('#espil-portal-close');
+    if (cl) cl.textContent = T('ccClose');
+    var tabKeys = { main: 'ccTabMain', feed: 'ccTabFeed', market: 'ccTabMarket', cash: 'ccTabCash' };
+    Array.prototype.forEach.call(winEl.querySelectorAll('[data-ep-tab]'), function (b) {
+      var k = tabKeys[b.getAttribute('data-ep-tab')];
+      if (k) b.textContent = T(k);
+    });
+    Array.prototype.forEach.call(winEl.querySelectorAll('[data-ep-goto]'), function (b) {
+      var k = tabKeys[b.getAttribute('data-ep-goto')];
+      if (k) b.textContent = T(k);
+    });
+    var qh = winEl.querySelector('#ep-main-quickh');
+    if (qh) qh.textContent = T('ccQuickGo');
+    var vh = winEl.querySelector('#ep-main-visith');
+    if (vh) vh.textContent = T('ccVisitTitle');
+  }
+
   /* ---------------- tabs ---------------- */
   function selectTab(tab) {
-    if (tab !== 'feed' && tab !== 'market' && tab !== 'cash') tab = 'feed';
+    if (tab !== 'main' && tab !== 'feed' && tab !== 'market' && tab !== 'cash') tab = 'feed';
     if (tab !== 'cash' && cashHosted) unhostCash();
     curTab = tab;
     try { localStorage.setItem(LS_TAB, tab); } catch (e) {}
     Array.prototype.forEach.call(winEl.querySelectorAll('[data-ep-tab]'), function (b) {
       b.classList.toggle('on', b.getAttribute('data-ep-tab') === tab);
     });
-    ['feed', 'market', 'cash'].forEach(function (t) {
+    ['main', 'feed', 'market', 'cash'].forEach(function (t) {
       var p = winEl.querySelector('#ep-pane-' + t);
       if (p) p.classList.toggle('on', t === tab);
     });
+    if (tab === 'main') renderMain(); else ccsSetOpen(false);
     if (tab === 'feed') renderFeed();
     if (tab === 'market') enterMarket(); else stopMarketTimer();
     if (tab === 'cash') hostCash();
@@ -323,7 +461,7 @@
     /* The cash shop rides the arrival bundle; if it has not
        landed yet on this page, pull it in directly (the lock
        panel's established fallback pattern). */
-    pane.innerHTML = '<div class="epw-note" style="padding:14px 2px">캐시 상점을 불러오는 중입니다...</div>';
+    pane.innerHTML = '<div class="epw-note" style="padding:14px 2px">' + esc(T('ccCashLoading')) + '</div>';
     var s = document.createElement('script');
     s.src = 'modules/cashshop.js';
     s.onload = function () { if (curTab === 'cash' && winEl.classList.contains('open')) hostCash(); };
@@ -359,14 +497,14 @@
     if (!listEl) return;
     var st = chatState();
     var label = cityLabel();
-    cityEl.textContent = label ? (label + ' 피드') : '피드';
+    cityEl.textContent = label ? TF('ccFeedOf', '{city}', label) : T('ccTabFeed');
     prunePosts();
     if (!st || !st.joined) {
-      listEl.innerHTML = '<div class="epf-empty">도시에 접속하면 피드가 열립니다.</div>';
+      listEl.innerHTML = '<div class="epf-empty">' + esc(T('ccFeedJoinFirst')) + '</div>';
       return;
     }
     if (!posts.length) {
-      listEl.innerHTML = '<div class="epf-empty">아직 글이 없습니다. 첫 글을 남겨 보십시오.</div>';
+      listEl.innerHTML = '<div class="epf-empty">' + esc(T('ccFeedEmpty')) + '</div>';
       return;
     }
     listEl.innerHTML = '';
@@ -375,10 +513,10 @@
       d.className = 'epf-post';
       var stallBtn = '';
       if (p.sale && p.sid && stallFor(p.sid) && window.__espilStallView) {
-        stallBtn = '<button class="epf-stall" type="button" data-ep-stall="' + esc(p.sid) + '">좌판 보기</button>';
+        stallBtn = '<button class="epf-stall" type="button" data-ep-stall="' + esc(p.sid) + '">' + esc(T('ccViewStall')) + '</button>';
       }
       d.innerHTML =
-        '<div class="epf-meta"><b>' + esc(p.authorName || 'Guest') + '</b> · ' + hhmm(p.ts) + (p.sale ? ' · 판매 글' : '') + '</div>' +
+        '<div class="epf-meta"><b>' + esc(p.authorName || 'Guest') + '</b> · ' + hhmm(p.ts) + (p.sale ? ' · ' + esc(T('ccSalePost')) : '') + '</div>' +
         '<div class="epf-text">' + esc(p.text || '') + '</div>' + stallBtn;
       listEl.appendChild(d);
     });
@@ -401,10 +539,10 @@
        exactly like an account post. signedIn() survives only
        as a state() report (below); it gates nothing here. */
     compEl.innerHTML =
-      '<textarea id="ep-feed-input" maxlength="300" placeholder="이 도시에 글 남기기 (300자)"></textarea>' +
+      '<textarea id="ep-feed-input" maxlength="300" placeholder="' + esc(T('ccFeedPh')) + '"></textarea>' +
       '<div class="epw-comp-row">' +
-      '<button class="epw-post-btn" id="ep-feed-send" type="button">게시</button>' +
-      '<label class="epw-sale"><input type="checkbox" id="ep-feed-sale"> 판매 글</label>' +
+      '<button class="epw-post-btn" id="ep-feed-send" type="button">' + esc(T('ccPost')) + '</button>' +
+      '<label class="epw-sale"><input type="checkbox" id="ep-feed-sale"> ' + esc(T('ccSalePost')) + '</label>' +
       '<span class="epw-note" id="ep-feed-note"></span>' +
       '</div>';
     inputEl = compEl.querySelector('#ep-feed-input');
@@ -421,7 +559,7 @@
     var ok = false;
     try { ok = !!(window.__espilSocialSend && window.__espilSocialSend({ t: 'feed_post', text: text, sale: !!(saleEl && saleEl.checked) })); } catch (e) {}
     if (!ok) {
-      if (noteEl) noteEl.textContent = '아직 도시에 연결되지 않았습니다.';
+      if (noteEl) noteEl.textContent = T('ccNotJoined');
       return;
     }
     /* no local echo: the room broadcasts the post back to
@@ -468,13 +606,27 @@
      a trade settles. The buy itself is one presence frame -
      settlement (Leo movement, item grant, counts) stays in
      stall2.js, this tab only asks and watches for the answer. */
-  var MKT_CATS = [
-    ['all', '전체'], ['service', '서비스'], ['food', '음식'], ['furniture', '가구'],
-    ['clothing', '의류'], ['equipment', '장비'], ['books', '책'], ['consumables', '소모품'],
-    ['materials', '재료'], ['misc', '기타']
-  ];
-  var MKT_CAT_LABEL = {};
-  MKT_CATS.forEach(function (c) { MKT_CAT_LABEL[c[0]] = c[1]; });
+  var MKT_CAT_KEYS = ['all', 'service', 'food', 'furniture', 'clothing',
+    'equipment', 'books', 'consumables', 'materials', 'misc'];
+  var MKT_CAT_T = {
+    all: 'ccAll', service: 'ccCatService', food: 'ccCatFood',
+    furniture: 'ccCatFurniture', clothing: 'ccCatClothing',
+    equipment: 'ccCatEquipment', books: 'ccCatBooks',
+    consumables: 'ccCatConsumables', materials: 'ccCatMaterials',
+    misc: 'ccCatMisc'
+  };
+  function catLabel(k) { return T(MKT_CAT_T[k] || 'ccCatMisc'); }
+  /* The market notice is stored as a language KEY (+ an
+     optional {n} fill), never as a baked string, so a pack
+     switch after the fact still renders it in the live pack. */
+  function noticeText() {
+    var n = mkt.notice;
+    if (!n) return '';
+    if (typeof n === 'string') return n;
+    var s = T(n.k);
+    if (n.n != null) s = s.split('{n}').join(String(n.n));
+    return s;
+  }
   var mkt = {
     rows: null, fetchedAt: 0, loading: false, error: false,
     cat: 'all', side: 'all', city: 'all', q: '', sort: 'new',
@@ -586,10 +738,10 @@
     var p = r.post;
     var badges =
       '<div class="epm-badges">' +
-      '<span class="epm-badge ' + (p.side === 'buy' ? 'buy' : 'sell') + '">' + (p.side === 'buy' ? '매입' : '판매') + '</span>' +
-      (p.kind === 'service' ? '<span class="epm-badge svc">서비스 · TESTING</span>' : '') +
-      '<span class="epm-badge cat">' + esc(MKT_CAT_LABEL[p.cat] || '기타') + '</span>' +
-      (isMine(r) ? '<span class="epm-badge mine">내 게시</span>' : '') +
+      '<span class="epm-badge ' + (p.side === 'buy' ? 'buy' : 'sell') + '">' + esc(p.side === 'buy' ? T('ccBadgeBuy') : T('ccBadgeSell')) + '</span>' +
+      (p.kind === 'service' ? '<span class="epm-badge svc">' + esc(T('ccBadgeSvc')) + '</span>' : '') +
+      '<span class="epm-badge cat">' + esc(catLabel(p.cat)) + '</span>' +
+      (isMine(r) ? '<span class="epm-badge mine">' + esc(T('ccBadgeMine')) + '</span>' : '') +
       '</div>';
     var look = null;
     try { look = (p.kind === 'item' && window.__espilGear && window.__espilGear.iconLookup) ? window.__espilGear.iconLookup(p.title) : null; } catch (e) { look = null; }
@@ -608,9 +760,9 @@
   }
   function mktCardHtml(r) {
     var p = r.post;
-    var priceLine = (p.price > 0 ? esc(p.price) + ' Leo' : '가격 협의');
+    var priceLine = (p.price > 0 ? esc(p.price) + ' Leo' : esc(T('ccNegotiable')));
     var meta = esc(cityName(r.city)) + (r.stallName ? ' · ' + esc(r.stallName) : '');
-    var seller = esc(r.sellerName || 'Guest') + ' · ' + (p.count || 1) + '개 남음' + (p.ts ? ' · ' + tsLabel(p.ts) : '');
+    var seller = esc(r.sellerName || 'Guest') + ' · ' + esc(TF('ccLeft', '{n}', p.count || 1)) + (p.ts ? ' · ' + tsLabel(p.ts) : '');
     return '<div class="epm-card" data-epm-row="' + esc(r.key) + '" role="button" tabindex="0">' +
       mktImageHtml(r, false) +
       '<div class="epm-price">' + priceLine + '</div>' +
@@ -621,11 +773,11 @@
   }
   function mktSheetHtml(r) {
     var p = r.post;
-    var priceLine = (p.price > 0 ? esc(p.price) + ' Leo' : '가격 협의') + ' · ' + (p.count || 1) + '개 남음';
+    var priceLine = (p.price > 0 ? esc(p.price) + ' Leo' : esc(T('ccNegotiable'))) + ' · ' + esc(TF('ccLeft', '{n}', p.count || 1));
     var meta = esc(cityName(r.city)) + (r.stallName ? ' · ' + esc(r.stallName) : '') +
       '<br>' + esc(r.sellerName || 'Guest') + (p.ts ? ' · ' + tsLabel(p.ts) : '');
     return '<div class="epm-sheet">' +
-      '<button class="epm-back" type="button" data-epm-back="1">‹ 목록으로</button>' +
+      '<button class="epm-back" type="button" data-epm-back="1">' + esc(T('ccBackToList')) + '</button>' +
       mktImageHtml(r, true) +
       '<div class="epm-price">' + priceLine + '</div>' +
       '<div class="epm-title">' + esc(p.title) + '</div>' +
@@ -635,56 +787,56 @@
   }
   function renderMarket() {
     if (!mktRoot) return;
-    var catBtns = MKT_CATS.map(function (c) {
-      return '<button class="epm-catbtn' + (mkt.cat === c[0] ? ' on' : '') + '" type="button" data-epm-cat="' + c[0] + '">' + c[1] + '</button>';
+    var catBtns = MKT_CAT_KEYS.map(function (c) {
+      return '<button class="epm-catbtn' + (mkt.cat === c ? ' on' : '') + '" type="button" data-epm-cat="' + c + '">' + esc(catLabel(c)) + '</button>';
     }).join('');
     var cityBtns = ['all'].concat(mktCities()).map(function (c) {
-      return '<button class="epm-catbtn' + (mkt.city === c ? ' on' : '') + '" type="button" data-epm-city="' + esc(c) + '">' + (c === 'all' ? '모든 도시' : esc(cityName(c))) + '</button>';
+      return '<button class="epm-catbtn' + (mkt.city === c ? ' on' : '') + '" type="button" data-epm-city="' + esc(c) + '">' + (c === 'all' ? esc(T('ccAllCities')) : esc(cityName(c))) + '</button>';
     }).join('');
     var rail =
       '<div class="epm-rail">' +
-      '<input class="epm-q" id="epm-q" type="text" placeholder="제목 · 판매자 검색" value="' + esc(mkt.q) + '">' +
-      '<div class="epm-rail-h">카테고리</div>' +
+      '<input class="epm-q" id="epm-q" type="text" placeholder="' + esc(T('ccSearchPh')) + '" value="' + esc(mkt.q) + '">' +
+      '<div class="epm-rail-h">' + esc(T('ccRailCategory')) + '</div>' +
       '<div class="epm-cats">' + catBtns + '</div>' +
-      '<div class="epm-rail-h">도시</div>' +
+      '<div class="epm-rail-h">' + esc(T('ccRailCity')) + '</div>' +
       '<div class="epm-cities">' + cityBtns + '</div>' +
-      '<div class="epm-rail-h">가격 (Leo)</div>' +
+      '<div class="epm-rail-h">' + esc(T('ccRailPrice')) + '</div>' +
       '<div class="epm-prices">' +
-      '<input class="epm-pin" id="epm-minp" type="number" min="0" inputmode="numeric" placeholder="최소" value="' + esc(mkt.minP) + '"><span>~</span>' +
-      '<input class="epm-pin" id="epm-maxp" type="number" min="0" inputmode="numeric" placeholder="최대" value="' + esc(mkt.maxP) + '">' +
+      '<input class="epm-pin" id="epm-minp" type="number" min="0" inputmode="numeric" placeholder="' + esc(T('ccPriceMin')) + '" value="' + esc(mkt.minP) + '"><span>~</span>' +
+      '<input class="epm-pin" id="epm-maxp" type="number" min="0" inputmode="numeric" placeholder="' + esc(T('ccPriceMax')) + '" value="' + esc(mkt.maxP) + '">' +
       '</div>' +
-      '<div class="epm-rail-h">거래</div>' +
+      '<div class="epm-rail-h">' + esc(T('ccRailSide')) + '</div>' +
       '<div class="epm-sides">' +
-      '<button class="epm-catbtn' + (mkt.side === 'all' ? ' on' : '') + '" type="button" data-epm-side="all">전체</button>' +
-      '<button class="epm-catbtn' + (mkt.side === 'sell' ? ' on' : '') + '" type="button" data-epm-side="sell">판매</button>' +
-      '<button class="epm-catbtn' + (mkt.side === 'buy' ? ' on' : '') + '" type="button" data-epm-side="buy">매입</button>' +
+      '<button class="epm-catbtn' + (mkt.side === 'all' ? ' on' : '') + '" type="button" data-epm-side="all">' + esc(T('ccAll')) + '</button>' +
+      '<button class="epm-catbtn' + (mkt.side === 'sell' ? ' on' : '') + '" type="button" data-epm-side="sell">' + esc(T('ccBadgeSell')) + '</button>' +
+      '<button class="epm-catbtn' + (mkt.side === 'buy' ? ' on' : '') + '" type="button" data-epm-side="buy">' + esc(T('ccBadgeBuy')) + '</button>' +
       '</div>' +
       '</div>';
     var mainHead =
       '<div class="epm-mainhead">' +
       '<select class="epm-sel" id="epm-sort">' +
-      '<option value="new"' + (mkt.sort === 'new' ? ' selected' : '') + '>최신순</option>' +
-      '<option value="low"' + (mkt.sort === 'low' ? ' selected' : '') + '>가격 낮은순</option>' +
-      '<option value="high"' + (mkt.sort === 'high' ? ' selected' : '') + '>가격 높은순</option>' +
+      '<option value="new"' + (mkt.sort === 'new' ? ' selected' : '') + '>' + esc(T('ccSortNew')) + '</option>' +
+      '<option value="low"' + (mkt.sort === 'low' ? ' selected' : '') + '>' + esc(T('ccSortLow')) + '</option>' +
+      '<option value="high"' + (mkt.sort === 'high' ? ' selected' : '') + '>' + esc(T('ccSortHigh')) + '</option>' +
       '</select>' +
-      '<span class="epm-leo">내 Leo ' + leoBalance() + '</span>' +
+      '<span class="epm-leo">' + esc(TF('ccMyLeo', '{n}', leoBalance())) + '</span>' +
       '</div>' +
-      (mkt.notice ? '<div class="epm-note">' + esc(mkt.notice) + '</div>' : '');
+      (mkt.notice ? '<div class="epm-note">' + esc(noticeText()) + '</div>' : '');
     var body = '';
     if (mkt.rows === null && mkt.loading) {
-      body = '<div class="epm-status">목록을 불러오는 중입니다...</div>';
+      body = '<div class="epm-status">' + esc(T('ccMktLoading')) + '</div>';
     } else if (mkt.rows === null && mkt.error) {
-      body = '<div class="epm-status">목록을 불러오지 못했습니다.<br><button class="epm-btn sub" type="button" id="epm-retry">다시 시도</button></div>';
+      body = '<div class="epm-status">' + esc(T('ccMktLoadFail')) + '<br><button class="epm-btn sub" type="button" id="epm-retry">' + esc(T('ccRetry')) + '</button></div>';
     } else if (!mkt.rows || !mkt.rows.length) {
-      body = '<div class="epm-status">지금 올라온 좌판이 없습니다. 좌판을 연 판매자가 접속하면 이곳에 나타납니다.</div>';
+      body = '<div class="epm-status">' + esc(T('ccMktEmpty')) + '</div>';
     } else {
       var rows = mktFiltered();
       if (!rows.length) {
-        body = '<div class="epm-status">이 조건에 맞는 게시가 없습니다.</div>';
+        body = '<div class="epm-status">' + esc(T('ccMktNoMatch')) + '</div>';
       } else {
         body = '<div class="epm-grid">' + rows.map(function (r) { return mktCardHtml(r); }).join('') + '</div>';
       }
-      if (mkt.error) body = '<div class="epm-note">새 목록을 불러오지 못해 이전 목록을 보여 드립니다.</div>' + body;
+      if (mkt.error) body = '<div class="epm-note">' + esc(T('ccMktStale')) + '</div>' + body;
     }
     var sheetHtml = '';
     if (mkt.expanded) {
@@ -742,7 +894,7 @@
       b.addEventListener('click', function () { mkt.expanded = null; mkt.confirmKey = null; renderMarket(); });
     });
     Array.prototype.forEach.call(mktRoot.querySelectorAll('[data-epm-buy]'), function (b) {
-      b.addEventListener('click', function () { mkt.confirmKey = b.getAttribute('data-epm-buy'); mkt.notice = ''; renderMarket(); });
+      b.addEventListener('click', function () { mkt.confirmKey = b.getAttribute('data-epm-buy'); mkt.notice = null; renderMarket(); });
     });
     Array.prototype.forEach.call(mktRoot.querySelectorAll('[data-epm-cancel]'), function (b) {
       b.addEventListener('click', function () { mkt.confirmKey = null; renderMarket(); });
@@ -766,23 +918,23 @@
     var canBuy = p.side === 'sell' && p.price > 0 && !isMine(r);
     var acts = '';
     if (pending) {
-      acts = '<span class="epw-note">구매를 요청했습니다. 판매자의 응답을 기다리는 중입니다...</span>';
+      acts = '<span class="epw-note">' + esc(T('ccBuyPending')) + '</span>';
     } else if (mkt.confirmKey === r.key) {
       acts =
-        '<span class="epw-note">' + esc(p.title) + '을(를) ' + esc(p.price) + ' Leo에 구매하시겠습니까? 수수료는 없습니다.</span>' +
-        '<button class="epm-btn" type="button" data-epm-confirm="' + esc(r.key) + '">구매 확정</button>' +
-        '<button class="epm-btn sub" type="button" data-epm-cancel="1">취소</button>';
+        '<span class="epw-note">' + esc(TF('ccBuyConfirmQ', '{title}', p.title).split('{price}').join(String(p.price))) + '</span>' +
+        '<button class="epm-btn" type="button" data-epm-confirm="' + esc(r.key) + '">' + esc(T('ccBuyConfirm')) + '</button>' +
+        '<button class="epm-btn sub" type="button" data-epm-cancel="1">' + esc(T('ccCancel')) + '</button>';
     } else {
-      if (canBuy) acts += '<button class="epm-btn" type="button" data-epm-buy="' + esc(r.key) + '"' + (joined ? '' : ' disabled') + '>구매하기</button>';
-      if (inMyRoom(r) && window.__espilStallView) acts += '<button class="epm-btn sub" type="button" data-epm-visit="' + esc(r.sid) + '">좌판 보기</button>';
-      if (p.side === 'buy') acts += '<span class="epw-note">매입 게시입니다. 판매는 좌판에서 직접 거래해 주십시오.</span>';
-      else if (p.price <= 0) acts += '<span class="epw-note">가격 협의 게시입니다. 좌판에서 직접 거래해 주십시오.</span>';
-      else if (isMine(r)) acts += '<span class="epw-note">내 게시입니다.</span>';
-      if (canBuy && !joined) acts += '<span class="epw-note">도시에 접속하면 구매할 수 있습니다.</span>';
+      if (canBuy) acts += '<button class="epm-btn" type="button" data-epm-buy="' + esc(r.key) + '"' + (joined ? '' : ' disabled') + '>' + esc(T('ccBuyNow')) + '</button>';
+      if (inMyRoom(r) && window.__espilStallView) acts += '<button class="epm-btn sub" type="button" data-epm-visit="' + esc(r.sid) + '">' + esc(T('ccViewStall')) + '</button>';
+      if (p.side === 'buy') acts += '<span class="epw-note">' + esc(T('ccBuyPostNote')) + '</span>';
+      else if (p.price <= 0) acts += '<span class="epw-note">' + esc(T('ccNegotPostNote')) + '</span>';
+      else if (isMine(r)) acts += '<span class="epw-note">' + esc(T('ccMineNote')) + '</span>';
+      if (canBuy && !joined) acts += '<span class="epw-note">' + esc(T('ccJoinToBuy')) + '</span>';
     }
     return '<div class="epm-detail">' +
       (p.note ? '<div class="epm-pnote">' + esc(p.note) + '</div>' : '') +
-      (p.kind === 'service' ? '<div class="epm-pnote" style="opacity:.7">서비스는 구매 후 판매자와 채팅으로 전달 방식을 정합니다. (TESTING)</div>' : '') +
+      (p.kind === 'service' ? '<div class="epm-pnote" style="opacity:.7">' + esc(T('ccSvcNote')) + '</div>' : '') +
       '<div class="epm-actions">' + acts + '</div></div>';
   }
   function doBuy(key) {
@@ -791,19 +943,19 @@
     if (!row || mkt.pending) return;
     var p = row.post;
     var price = parseInt(p.price, 10) || 0;
-    if (leoBalance() < price) { mkt.notice = 'Leo가 부족합니다. (보유 ' + leoBalance() + ' Leo)'; mkt.confirmKey = null; renderMarket(); return; }
+    if (leoBalance() < price) { mkt.notice = { k: 'ccLeoShort', n: leoBalance() }; mkt.confirmKey = null; renderMarket(); return; }
     var nonce = 'c' + Date.now().toString(36) + Math.floor(Math.random() * 1679616).toString(36);
     var sent = false;
     try { sent = !!(window.__espilSocialSend && window.__espilSocialSend({ t: 'stall_buy', to: row.sid, postId: p.id, via: 'center', city: row.city, nonce: nonce })); } catch (e) {}
     mkt.confirmKey = null;
-    if (!sent) { mkt.notice = '아직 도시에 연결되지 않아 구매할 수 없습니다.'; renderMarket(); return; }
-    mkt.notice = '';
+    if (!sent) { mkt.notice = { k: 'ccNotJoinedBuy' }; renderMarket(); return; }
+    mkt.notice = null;
     mkt.pending = {
       key: key, nonce: nonce,
       timer: setTimeout(function () {
         if (!mkt.pending || mkt.pending.key !== key) return;
         mkt.pending = null;
-        mkt.notice = '판매자의 응답이 없습니다. 목록을 새로고침합니다.';
+        mkt.notice = { k: 'ccSellerNoAnswer' };
         /* the sheet closes with the settle so the notice is
            what the buyer sees (the buy itself is untouched) */
         if (mkt.expanded === key) mkt.expanded = null;
@@ -821,7 +973,7 @@
     var settledKey = mkt.pending.key;
     mkt.pending = null;
     if (mkt.expanded === settledKey) mkt.expanded = null;
-    mkt.notice = m.ok ? '구매가 완료됐습니다.' : '거래를 완료할 수 없습니다. 판매가 끝났거나 판매자가 없습니다.';
+    mkt.notice = { k: m.ok ? 'ccBuyDone' : 'ccBuyFailed' };
     fetchListings();
     renderMarket();
   });
@@ -838,6 +990,350 @@
     if (mkt.timer) { clearInterval(mkt.timer); mkt.timer = null; }
   }
 
+  /* ---------------- main (minihome) ----------------
+     The center's main: the player's own minihome face. The
+     rail carries the name + state lines and the quick links;
+     the main column carries the avatar window (the real body
+     on a miniroom frame) and the visit box. The visit box
+     lists the other people in this city from presence; a
+     row's action rides __espilStallView under the feed's
+     exact rule (in-room, stall up). Nothing else exists to
+     visit yet - see CENSUS section 4. */
+  function renderMain() {
+    if (!winEl) return;
+    renderChrome();
+    var name = myDisplayName();
+    var nm = winEl.querySelector('#ep-main-name');
+    if (nm) nm.textContent = name;
+    var tag = winEl.querySelector('#ep-main-nametag');
+    if (tag) tag.textContent = name;
+    var label = cityLabel();
+    var cityTxt = label ? TF('ccNowIn', '{city}', label) : T('ccNowhere');
+    var cl = winEl.querySelector('#ep-main-cityline');
+    if (cl) cl.textContent = cityTxt;
+    var info = winEl.querySelector('#ep-main-info');
+    if (info) {
+      info.innerHTML =
+        '<div class="eph-line">' + esc(cityTxt) + '</div>' +
+        '<div class="eph-line">' + esc(TF('ccMyLeo', '{n}', leoBalance())) + '</div>' +
+        '<div class="eph-line">' + esc(signedIn() ? T('ccSignedIn') : T('ccGuestState')) + '</div>';
+    }
+    var box = winEl.querySelector('#ep-main-visit');
+    if (box) {
+      var st = chatState();
+      var me = mySid();
+      var others = ((st && st.users) || []).filter(function (u) { return u && String(u.id) !== me; });
+      if (!st || !st.joined || !others.length) {
+        box.innerHTML = '<div class="eph-visit-none">' + esc(T('ccVisitEmpty')) + '</div>';
+      } else {
+        box.innerHTML = '';
+        others.forEach(function (u) {
+          var row = document.createElement('div');
+          row.className = 'eph-visit-row';
+          var canVisit = !!(u.stall && window.__espilStallView);
+          row.innerHTML = '<span class="eph-visit-name">' + esc(u.name || 'Guest') + '</span>' +
+            (canVisit
+              ? '<button class="eph-visit-btn" type="button" data-ep-visit="' + esc(u.id) + '">' + esc(T('ccViewStall')) + '</button>'
+              : '<span class="eph-visit-none">' + esc(T('ccVisitNone')) + '</span>');
+          box.appendChild(row);
+        });
+        Array.prototype.forEach.call(box.querySelectorAll('[data-ep-visit]'), function (b) {
+          b.addEventListener('click', function () {
+            var sid = b.getAttribute('data-ep-visit');
+            close();
+            if (window.__espilStallView) window.__espilStallView(sid);
+          });
+        });
+      }
+    }
+    ccsSetOpen(true);
+  }
+
+  /* ---------------- main avatar stage ----------------
+     A compact transplant of panels.js's verified character
+     stage (the __espilCustPreview pattern): the same
+     selection record (espil_character + espil_session_v1,
+     the session record's designated Lunaris mark included),
+     the same three body routes - style1-4 / kaykit through
+     monolith's __espilBuildGateAvatar, master through the
+     same GLB pair the gate preview loads, Lunaris through
+     assets/zealandia/lunaris.glb - and the same grounding
+     (bind-pose bbox, then a posed re-ground). Idle only; the
+     renderer runs only while the center stands open on the
+     main tab. A body that cannot stand shows the routed
+     note - never a substitute character. */
+  var CCS = {
+    mounted: false, open: false, raf: 0, lastTs: 0,
+    renderer: null, scene: null, camera: null, pivot: null,
+    cur: null, selKey: '', cache: {}, pollTimer: 0
+  };
+  function ccsLs(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
+  function ccsLsJson(k) { try { var v = window.localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+  function ccsSelection() {
+    var rec = ccsLsJson('espil_character') || {};
+    var ses = ccsLsJson('espil_session_v1');
+    var gender = rec.gender === 'female' ? 'female' : 'male';
+    if (ses && ses.designatedBody === 'lunaris') return { gender: gender, body: 'lunaris', designated: 'lunaris' };
+    var bc = rec.bodyChoice;
+    if (/^(master|style[1-4]|kaykit)$/.test(bc || '')) return { gender: gender, body: bc, designated: null };
+    if (!ses) {
+      var mode = 'chibi';
+      try {
+        if (window.__espilGuestBodyState) mode = window.__espilGuestBodyState().mode || mode;
+        else if (window.__ESPIL_GUEST_BODY__) mode = window.__ESPIL_GUEST_BODY__;
+      } catch (e) {}
+      if (mode === 'kaykit') return { gender: gender, body: 'kaykit', designated: null };
+      if (mode === 'sprite') return { gender: gender, body: 'sprite', designated: null };
+      return { gender: gender, body: 'style1', designated: null };
+    }
+    return { gender: gender, body: 'master', designated: null };
+  }
+  function ccsSelKey(sel) { return sel.designated ? 'lunaris' : sel.gender + '|' + sel.body; }
+  function ccsBodyLabel(sel) {
+    if (sel.designated) return T('ccBodyLunaris');
+    var g = T(sel.gender === 'female' ? 'female' : 'male');
+    var b = sel.body === 'master' ? 'Master' : sel.body === 'kaykit' ? 'KayKit' : sel.body === 'sprite' ? 'Sprite' : 'Style ' + sel.body.slice(-1);
+    return g + ' · ' + b;
+  }
+  function ccsStripRootMotion(clip) {
+    clip.tracks = clip.tracks.filter(function (t) {
+      var n = (t.name || '').toLowerCase();
+      var isPos = n.indexOf('.position') >= 0;
+      var isRoot = /^(mixamorig[_:]?hips|hips|armature|root)/.test(n);
+      return !(isPos && isRoot);
+    });
+    return clip;
+  }
+  function ccsNoCull(group) { group.traverse(function (o) { if (o.isMesh || o.isSkinnedMesh) o.frustumCulled = false; }); }
+  function ccsGroundPosed(model) {
+    try {
+      var bbox = new THREE.Box3().setFromObject(model);
+      if (isFinite(bbox.min.y)) model.position.y -= bbox.min.y;
+    } catch (e) {}
+  }
+  function ccsBuildMasterEntry(gender) {
+    var ent = { kind: 'master', ready: false, failed: false, group: new THREE.Group(), mixer: null, actions: {}, curAnim: null };
+    var loader = new THREE.GLTFLoader();
+    try { if (window.MeshoptDecoder) loader.setMeshoptDecoder(window.MeshoptDecoder); } catch (e) {}
+    loader.load(gender === 'female' ? 'assets/character/female_idle.glb' : 'assets/character/male.glb', function (gltf) {
+      try {
+        var model = gltf.scene;
+        model.rotation.y = Math.PI;
+        model.scale.setScalar(1.5);
+        var bbox = new THREE.Box3().setFromObject(model);
+        model.position.y -= bbox.min.y;
+        model.traverse(function (o) { if (o.isMesh) o.castShadow = true; });
+        ent.group.add(model);
+        var mixer = new THREE.AnimationMixer(model);
+        ent.mixer = mixer;
+        var clips = gltf.animations || [];
+        function findClip(rx) { for (var i = 0; i < clips.length; i++) { if (rx.test(clips[i].name)) return clips[i]; } return null; }
+        var idleClip = findClip(/baselayer|idle/i) || clips[0];
+        if (gender === 'female' && idleClip) idleClip = ccsStripRootMotion(idleClip);
+        if (idleClip) { ent.actions.idle = mixer.clipAction(idleClip); ent.actions.idle.play(); ent.curAnim = 'idle'; }
+        try { mixer.update(0); } catch (e) {}
+        ccsGroundPosed(model);
+        ent.ready = true;
+        if (gender === 'male') {
+          loader.load('assets/character/male_idle.glb', function (g2) {
+            var cs = g2.animations || [];
+            if (!cs.length || !ent.mixer) return;
+            var act = ent.mixer.clipAction(ccsStripRootMotion(cs[0]));
+            var old = ent.actions.idle;
+            ent.actions.idle = act;
+            if (ent.curAnim === 'idle') {
+              act.reset().fadeIn(.15).play();
+              if (old && old !== act) { old.fadeOut(.15); setTimeout(function () { try { old.stop(); } catch (e) {} }, 220); }
+            }
+          });
+        }
+      } catch (e) { ent.failed = true; }
+    }, undefined, function () { ent.failed = true; });
+    return ent;
+  }
+  function ccsBuildLunarisEntry() {
+    var ent = { kind: 'lunaris', ready: false, failed: false, group: new THREE.Group(), mixer: null, actions: {}, curAnim: null };
+    var loader = new THREE.GLTFLoader();
+    try { if (window.MeshoptDecoder) loader.setMeshoptDecoder(window.MeshoptDecoder); } catch (e) {}
+    loader.load('assets/zealandia/lunaris.glb', function (gltf) {
+      try {
+        var model = gltf.scene;
+        model.rotation.y = Math.PI;
+        var bbox = new THREE.Box3().setFromObject(model);
+        model.position.y -= bbox.min.y;
+        model.traverse(function (o) { if (o.isMesh) o.castShadow = true; });
+        ent.group.add(model);
+        var mixer = new THREE.AnimationMixer(model);
+        ent.mixer = mixer;
+        (gltf.animations || []).forEach(function (clip) { ent.actions[clip.name] = mixer.clipAction(clip); });
+        if (ent.actions.Idle) { ent.actions.Idle.play(); ent.curAnim = 'Idle'; }
+        try { mixer.update(0); } catch (e) {}
+        ccsGroundPosed(model);
+        ent.ready = true;
+      } catch (e) { ent.failed = true; }
+    }, undefined, function () { ent.failed = true; });
+    return ent;
+  }
+  function ccsBuildGameEntry(sel) {
+    var av = null;
+    try { av = window.__espilBuildGateAvatar ? window.__espilBuildGateAvatar(sel.gender, sel.body) : null; } catch (e) {}
+    if (!av) return { kind: 'game', ready: false, failed: true, group: new THREE.Group(), mixer: null, actions: {}, curAnim: null, av: null };
+    return { kind: 'game', ready: false, failed: false, group: av.group, av: av,
+             get mixer() { return av.mixer; }, get actions() { return av.actions || {}; },
+             get curAnim() { return av.curAnim; } };
+  }
+  function ccsEntryFor(sel) {
+    var key = ccsSelKey(sel);
+    if (CCS.cache[key]) return CCS.cache[key];
+    var ent;
+    if (sel.designated) ent = ccsBuildLunarisEntry();
+    else if (sel.body === 'master') ent = ccsBuildMasterEntry(sel.gender);
+    else ent = ccsBuildGameEntry(sel);
+    ent.key = key;
+    CCS.cache[key] = ent;
+    return ent;
+  }
+  function ccsEntryReady(ent) {
+    if (!ent || ent.failed) return false;
+    if (ent.kind === 'game') return !!(ent.av && ent.av.ready && ent.av.mixer);
+    return !!ent.ready;
+  }
+  function ccsEntryPlayIdle(ent) {
+    if (!ent) return;
+    try {
+      if (ent.kind === 'game') { if (ent.av && ent.av.playAnim) ent.av.playAnim('idle'); return; }
+      if (ent.kind === 'lunaris') {
+        var w = ent.actions.Wave, id = ent.actions.Idle;
+        if (w && ent.curAnim === 'Wave') w.fadeOut(.15);
+        if (id) { id.reset().fadeIn(.15).play(); ent.curAnim = 'Idle'; }
+        return;
+      }
+      var a = ent.actions.idle;
+      if (a && ent.curAnim !== 'idle') { a.reset().fadeIn(.15).play(); ent.curAnim = 'idle'; }
+    } catch (e) {}
+  }
+  function ccsMount() {
+    if (typeof THREE === 'undefined' || typeof THREE.GLTFLoader === 'undefined') return false;
+    var stage = winEl.querySelector('#ep-main-stage');
+    if (!stage) return false;
+    var cv = document.createElement('canvas');
+    stage.insertBefore(cv, stage.firstChild);
+    var renderer = new THREE.WebGLRenderer({ canvas: cv, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    CCS.renderer = renderer;
+    var scene = new THREE.Scene();
+    CCS.scene = scene;
+    var camera = new THREE.PerspectiveCamera(36, 1, 0.1, 60);
+    camera.position.set(0, 1.04, 3.35);
+    camera.lookAt(0, 0.88, 0);
+    CCS.camera = camera;
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x8a6a3b, 1.05));
+    var key = new THREE.DirectionalLight(0xfff2dd, 1.6); key.position.set(1.6, 3.0, 2.4); scene.add(key);
+    var fill = new THREE.DirectionalLight(0xdfe8ff, 0.5); fill.position.set(-2.0, 1.2, 1.4); scene.add(fill);
+    var disc = new THREE.Mesh(new THREE.CircleGeometry(0.62, 28),
+      new THREE.MeshBasicMaterial({ color: 0x8a6a3b, transparent: true, opacity: 0.35, depthWrite: false }));
+    disc.rotation.x = -Math.PI / 2; disc.position.y = 0.002;
+    scene.add(disc);
+    var pivot = new THREE.Group();
+    pivot.rotation.y = Math.PI;
+    scene.add(pivot);
+    CCS.pivot = pivot;
+    CCS.mounted = true;
+    return true;
+  }
+  function ccsSizeRenderer() {
+    if (!CCS.renderer || !CCS.camera) return;
+    var cv = CCS.renderer.domElement;
+    var w = cv.clientWidth || 260, h = cv.clientHeight || 190;
+    CCS.renderer.setSize(w, h, false);
+    CCS.camera.aspect = w / h;
+    CCS.camera.updateProjectionMatrix();
+  }
+  function ccsShowSelection() {
+    if (!CCS.mounted) return;
+    var sel = ccsSelection();
+    CCS.sel = sel;
+    var key = ccsSelKey(sel);
+    var labelEl = winEl.querySelector('#ep-main-bodylabel');
+    if (labelEl) labelEl.textContent = sel.body === 'sprite' ? '' : ccsBodyLabel(sel);
+    var msgEl = winEl.querySelector('#ep-main-msg');
+    if (sel.body === 'sprite') {
+      if (CCS.cur && CCS.cur.group && CCS.cur.group.parent === CCS.pivot) CCS.pivot.remove(CCS.cur.group);
+      CCS.cur = null; CCS.selKey = key;
+      if (msgEl) { msgEl.style.display = ''; msgEl.textContent = T('ccAvatarSprite'); }
+      return;
+    }
+    var ent = ccsEntryFor(sel);
+    if (ent.failed) {
+      if (msgEl) { msgEl.style.display = ''; msgEl.textContent = T('ccAvatarFail'); }
+    } else if (msgEl) msgEl.style.display = 'none';
+    if (key !== CCS.selKey || CCS.cur !== ent) {
+      if (CCS.cur && CCS.cur.group && CCS.cur.group.parent === CCS.pivot) CCS.pivot.remove(CCS.cur.group);
+      if (CCS.pivot) { CCS.pivot.rotation.y = Math.PI; CCS.pivot.position.y = 0; }
+      ccsNoCull(ent.group);
+      CCS.pivot.add(ent.group);
+      CCS.cur = ent;
+      ccsEntryPlayIdle(ent);
+      CCS.selKey = key;
+    }
+  }
+  function ccsTick(ts) {
+    if (!CCS.open) { CCS.raf = 0; return; }
+    CCS.raf = requestAnimationFrame(ccsTick);
+    var dt = Math.min(0.05, CCS.lastTs ? (ts - CCS.lastTs) / 1000 : 0.016);
+    CCS.lastTs = ts;
+    var ent = CCS.cur;
+    if (ent && ent.mixer && ccsEntryReady(ent)) { try { ent.mixer.update(dt); } catch (e) {} }
+    if (CCS.renderer && CCS.scene && CCS.camera) CCS.renderer.render(CCS.scene, CCS.camera);
+  }
+  function ccsSetOpen(on) {
+    if (on === CCS.open) { if (on && CCS.mounted) ccsShowSelection(); return; }
+    CCS.open = on;
+    if (on) {
+      if (!CCS.mounted && !ccsMount()) {
+        var msgEl = winEl.querySelector('#ep-main-msg');
+        if (msgEl) { msgEl.style.display = ''; msgEl.textContent = T('ccAvatarFail'); }
+        return;
+      }
+      CCS.lastTs = 0;
+      ccsSizeRenderer();
+      ccsShowSelection();
+      if (!CCS.raf) CCS.raf = requestAnimationFrame(ccsTick);
+      if (CCS.pollTimer) clearInterval(CCS.pollTimer);
+      CCS.pollTimer = setInterval(function () {
+        if (!CCS.open) return;
+        if (ccsSelKey(ccsSelection()) !== CCS.selKey) ccsShowSelection();
+      }, 900);
+    } else {
+      if (CCS.raf) cancelAnimationFrame(CCS.raf);
+      CCS.raf = 0;
+      if (CCS.pollTimer) { clearInterval(CCS.pollTimer); CCS.pollTimer = 0; }
+    }
+  }
+
+  /* A language switch while the center stands open repaints
+     the open surfaces in the new pack. The two real controls
+     are the landing language menu (.lang-opt) and the
+     settings select (#opt-lang); both are delegated here so
+     the hook survives their DOM living outside this module.
+     A composer draft in the feed textarea does not survive
+     the repaint - the same trade open() itself makes. */
+  function rerenderOpen() {
+    if (!winEl || !winEl.classList.contains('open')) return;
+    renderChrome();
+    renderComposer();
+    if (curTab === 'main') renderMain();
+    else if (curTab === 'feed') renderFeed();
+    else if (curTab === 'market') renderMarket();
+  }
+  document.addEventListener('click', function (e) {
+    var t = e && e.target;
+    if (t && t.closest && t.closest('.lang-opt')) setTimeout(rerenderOpen, 0);
+  });
+  document.addEventListener('change', function (e) {
+    if (e && e.target && e.target.id === 'opt-lang') setTimeout(rerenderOpen, 0);
+  });
+
   /* ---------------- open / close ---------------- */
   function portalEvent() {
     try {
@@ -852,14 +1348,19 @@
     winEl.classList.add('open');
     winEl.setAttribute('aria-hidden', 'false');
     if (!tab) {
-      try { tab = localStorage.getItem(LS_TAB) || 'feed'; } catch (e) { tab = 'feed'; }
+      /* v2: a first open lands on the minihome main (the
+         avatar); a stored tab still restores, and explicit-tab
+         callers are untouched. */
+      try { tab = localStorage.getItem(LS_TAB) || 'main'; } catch (e) { tab = 'main'; }
     }
+    renderChrome();
     renderComposer();
     selectTab(tab);
     portalEvent();
   }
   function close() {
     if (!winEl) return;
+    ccsSetOpen(false);
     stopMarketTimer();
     if (cashHosted) unhostCash();
     winEl.classList.remove('open');
