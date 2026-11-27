@@ -548,6 +548,34 @@
       top:0; right:0; width:100vw; height:100vh; border-radius:0; border:none; z-index:70;
     }
     #minimap { width:100%; height:100%; }
+    /* Minimap attribution - minimum form (Han 2026-11-26 item 5):
+       the credit is a licence obligation and stays - full text,
+       both links, legible at all times - but the stock Leaflet
+       strip (white 80% box, 12px, margin 0) spanned the full
+       width of the stage-1 disc (100% wide, 25.5% high on the
+       132px desktop frame; 30.5% high on mobile landscape) and
+       in mobile portrait its box ran 4.7px past the frame's
+       left edge (94.7px on a 90px frame). Minimum form: 9px
+       cream on the frame's own dark green at half alpha,
+       right-aligned, wrapped inside the frame; the Leaflet
+       corner and the control are both capped at the frame
+       width so the box can never exceed it. Mapbox permits
+       adjusting the attribution's font color and size to
+       match the theme while it stays legible
+       (docs.mapbox.com/help/dive-deeper/attribution). */
+    #minimap .leaflet-bottom.leaflet-right { max-width:100%; }
+    #minimap .leaflet-control-attribution {
+      background:rgba(7,19,14,.55);
+      color:rgba(246,240,224,.94);
+      font-size:9px; line-height:1.35;
+      padding:1px 5px;
+      max-width:100%; box-sizing:border-box;
+      white-space:normal; text-align:right;
+      border-radius:7px 0 0 0;
+    }
+    #minimap .leaflet-control-attribution a { color:inherit; text-decoration:none; }
+    #minimap .leaflet-control-attribution a:hover,
+    #minimap .leaflet-control-attribution a:focus { text-decoration:underline; }
     #minimap-wrap[data-stage="1"] .map-zoom-controls { display:none; }
     .map-zoom-controls {
       position:absolute; z-index:10; right:8px; top:8px; display:flex; gap:6px;
