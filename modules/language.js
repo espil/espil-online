@@ -18,6 +18,7 @@ signinTitle:{en:'ENTER ESPIL ONLINE',ko:'ESPIL ONLINE 입장',fr:'ENTRER DANS ES
 signinSub:{en:"Choose how you'd like to arrive.",ko:'어떻게 입장하시겠습니까?',fr:'Choisissez comment vous souhaitez arriver.',zh:'请选择您的进入方式。'},
 guestEnter:{en:'ENTER AS GUEST',ko:'게스트로 입장',fr:'ENTRER EN INVITÉ',zh:'以访客身份进入'},
 comingSoon:{en:'COMING SOON',ko:'준비 중',fr:'BIENTÔT DISPONIBLE',zh:'即将推出'},
+cityInactive:{en:'Inactive',ko:'비활성',fr:'Inactif',zh:'未激活'},
 noticeTitle:{en:'Notices',ko:'공지사항',fr:'Avis',zh:'公告'},
 noticeSub:{en:'Espil Online news and updates',ko:'Espil Online 소식과 업데이트',fr:"Actualités et mises à jour d'Espil Online",zh:'Espil Online 新闻与更新'},
 tabAnnounce:{en:'Announcements',ko:'공지',fr:'Annonces',zh:'公告'},

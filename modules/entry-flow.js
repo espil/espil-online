@@ -1000,7 +1000,15 @@
     '#city-list .espil-city-btn:focus,#city-list .espil-city-btn:focus-visible{outline:none !important;box-shadow:none !important}' +
     '#city-list .city-name.is-active{animation:none}' +
     '#city-list .city-name.is-active::before,#city-list .city-name.is-active::after{content:none}' +
-    '#city-list .espil-city-btn.is-centered{font-size:clamp(1.5rem,4.4vw,2rem)}';
+    '#city-list .espil-city-btn.is-centered{font-size:clamp(1.5rem,4.4vw,2rem)}' +
+    /* CITY SCOPE REVISION (Han 2026-11-26): an inactive city's
+       row carries a small state tag after its name (the text is
+       the language table's cityInactive row, carried on a
+       data-i18n span so a language switch re-renders it). The
+       dimming itself is pair.css's own .city-name.is-inactive
+       treatment - the same grey monolith's inactive entries
+       wear - so no rule for it lives here. */
+    '#city-list .espil-inactive-tag{margin-left:.55em;font-size:.62em;font-weight:700;letter-spacing:.14em;white-space:nowrap}';
   document.head.appendChild(css);
 
   /* ---------------- DOM: menu + panels ---------------- */
@@ -1448,7 +1456,10 @@
         c.pin.disabled = false;
         c.pin.classList.remove('is-inactive');
       });
-      /* the reel: hide monolith's own entries, list all cities */
+      /* the reel: hide monolith's own entries, list all cities
+         (CITY SCOPE REVISION, Han 2026-11-26: every city keeps
+         its row - a city that cannot be entered is INACTIVE in
+         the list, not absent from it) */
       var orig = [];
       for (var i = 0; i < list.children.length; i++) {
         orig.push(list.children[i]);
@@ -1459,10 +1470,43 @@
         var b = document.createElement('button');
         b.type = 'button';
         b.className = 'city-name espil-city-btn';
-        b.textContent = c.name;
         b.setAttribute('data-city', c.name);
+        var nm = document.createElement('span');
+        nm.textContent = c.name;
+        b.appendChild(nm);
         b.setAttribute('aria-label', c.pin.getAttribute('aria-label') || c.name);
+        if (!BUNDLE_CITIES[c.name]) {
+          /* CITY SCOPE REVISION (Han 2026-11-26): a city with
+             no data bundle is INACTIVE in the list - present
+             like every other city, but dimmed in pair.css's
+             .city-name.is-inactive treatment, disabled, and
+             tagged with the language table's cityInactive text
+             (a data-i18n span, so a language switch re-renders
+             the tag; city names themselves are not translated,
+             as before). The row's click handler below refuses
+             it outright, the centre tracker never centres or
+             marks it, and the keyboard pass steps over it: from
+             the LIST it can never be selected, confirmed or
+             routed to the preparation panel. Its own address
+             still opens that panel (the path preselect below
+             reads the harvest, not the rows), and its pin keeps
+             its standing behaviour - neither is the list. */
+          b.classList.add('is-inactive');
+          b.disabled = true;
+          b.setAttribute('aria-label', (c.pin.getAttribute('aria-label') || c.name) + ', ' + efT('cityInactive'));
+          var tag = document.createElement('span');
+          tag.className = 'espil-inactive-tag';
+          tag.setAttribute('data-i18n', 'cityInactive');
+          tag.textContent = efT('cityInactive');
+          b.appendChild(tag);
+        }
         b.addEventListener('click', function () {
+          /* CITY SCOPE REVISION: an inactive row's click is
+             inert - it selects nothing, cancels nothing, opens
+             nothing (a real click never reaches here: the
+             button is disabled; this guard covers a dispatched
+             one). */
+          if (!BUNDLE_CITIES[c.name]) return;
           /* ENTRY CONFIRMATION (Han 2026-11-26, directive 1): a
              click SELECTS - it never enters by itself. A click on
              the already-marked row is the confirm (the "click
@@ -1514,6 +1558,13 @@
         var centre = lr.top + lr.height / 2;
         var closest = null, dist = Infinity;
         for (var n = 0; n < btns.length; n++) {
+          /* CITY SCOPE REVISION (Han 2026-11-26): the centre
+             search passes over inactive rows - the centred
+             treatment (the big name, the mark, DOM focus) only
+             ever rests on a city that can be entered, however
+             the list was scrolled. The nearest enterable row to
+             the centre carries it. */
+          if (!BUNDLE_CITIES[btns[n].getAttribute('data-city')]) continue;
           var r = btns[n].getBoundingClientRect();
           var d = Math.abs(r.top + r.height / 2 - centre);
           if (d < dist) { dist = d; closest = btns[n]; }
@@ -2734,11 +2785,27 @@
              selection-move feedback (stepCity's old idiom). */
           var ec = window.__espilEntryConfirm;
           if (ec && ec.cancel) ec.cancel();
-          if (e.key === 'Home') list.scrollTop = 0;
-          else if (e.key === 'End') list.scrollTop = list.scrollHeight;
-          else {
-            var rowH = rows[0] && rows[0].offsetHeight ? rows[0].offsetHeight : 44;
-            list.scrollTop += (e.key === 'ArrowDown' ? rowH : -rowH);
+          /* CITY SCOPE REVISION (Han 2026-11-26): the step
+             lands on the next ENTERABLE row, skipping inactive
+             rows outright - the mark only ever rests on a city
+             that can be entered, so an arrow press scrolls the
+             list by as many rows as the skip takes (the scroll
+             event then settles the centre tracker on that same
+             row, exactly the wheel/touch path). Home/End step
+             to the first/last enterable row. The scroll target
+             is centred through scrollIntoView - the pin-pick
+             path's own centring idiom in the flow above. */
+          var active = rows.filter(function (r) { return !r.classList.contains('is-inactive'); });
+          if (active.length) {
+            var cen = list.querySelector('.espil-city-btn.is-centered');
+            var idx = active.indexOf(cen);
+            var target = null;
+            if (e.key === 'Home') target = active[0];
+            else if (e.key === 'End') target = active[active.length - 1];
+            else if (idx < 0) target = active[0];
+            else if (e.key === 'ArrowDown') target = active[Math.min(active.length - 1, idx + 1)];
+            else if (e.key === 'ArrowUp') target = active[Math.max(0, idx - 1)];
+            if (target && target.scrollIntoView) { try { target.scrollIntoView({ block: 'center' }); } catch (err) {} }
           }
           if (ec && ec.tick) ec.tick();
           return;
