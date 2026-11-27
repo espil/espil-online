@@ -899,6 +899,22 @@
   var step = 'boot'; /* boot -> login -> menu -> city -> done */
   var chosenMode = null;
 
+  /* SHOP + ZEALANDIA LIVE-SURFACE SWITCH (Han 2026-11-26,
+     item 2: "일단 존재하지 않기때문에 우선은 없애고 테스팅에만
+     넣어줘"): neither the Shop destination (the MROS Center -
+     the cauldron window has not shipped) nor Zealandia exists
+     yet, so their entry surfaces stay OFF the live menu while
+     this switch is false: the Shop and Zealandia rows are not
+     built, the Zealandia panel is not built, and the Shop
+     destination of record below reports live:false. Nothing
+     underneath is deleted - the rows' handlers, the panel
+     copy, ESPIL_SHOP_DESTINATION and chooseMode('shop') all
+     stay in the tree, and the testing tree gets the full menu
+     back by flipping this one var to true. The idiom is
+     ESPIL_CASH_SHOP_CLOSED's (cashshop.js): one module-scope
+     var, read at the build sites. */
+  var ESPIL_SHOP_ZEALANDIA_LIVE = false;
+
   /* Cities with a data bundle in the shipped config (monolith's
      ESPIL_CITIES keys). Every other city on the globe is
      bundle-less and gets the preparation panel. Of the bundle
@@ -1059,24 +1075,30 @@
       '<p class="espil-flow-sub">A digital replica of this world, in real time.</p>' +
       '<div class="espil-flow-reel">' +
       flowItem('espil-menu-play', 'Play') +
-      flowItem('espil-menu-shop', 'Shop') +
-      flowItem('espil-menu-zealandia', 'Zealandia') +
+      (ESPIL_SHOP_ZEALANDIA_LIVE ? flowItem('espil-menu-shop', 'Shop') : '') +
+      (ESPIL_SHOP_ZEALANDIA_LIVE ? flowItem('espil-menu-zealandia', 'Zealandia') : '') +
       flowItem('espil-menu-about', 'About') +
       flowItem('espil-menu-back', 'Back') +
       '</div>';
     ui.appendChild(menu);
 
-    var zea = el('div', 'espil-zealandia-panel', 'espil-flow-view');
-    zea.setAttribute('role', 'dialog');
-    zea.setAttribute('aria-label', 'Zealandia');
-    zea.innerHTML =
-      '<div class="espil-flow-title">Zealandia</div>' +
-      '<p class="espil-flow-copy">Zealandia is where the real game continues - in the Espil app for mobile and PC. ' +
-      'There is no entry into Zealandia on the web: here the journey ends at the Auckland Time Stone, and the app takes over from there.</p>' +
-      '<div class="espil-flow-reel">' +
-      flowItem('espil-zealandia-back', 'Back') +
-      '</div>';
-    ui.appendChild(zea);
+    /* The Zealandia panel is a live surface of the same order:
+       built only while ESPIL_SHOP_ZEALANDIA_LIVE is on (the
+       testing tree). FLOW_VIEW_IDS keeps its id - every reader
+       of that list already guards a missing node. */
+    if (ESPIL_SHOP_ZEALANDIA_LIVE) {
+      var zea = el('div', 'espil-zealandia-panel', 'espil-flow-view');
+      zea.setAttribute('role', 'dialog');
+      zea.setAttribute('aria-label', 'Zealandia');
+      zea.innerHTML =
+        '<div class="espil-flow-title">Zealandia</div>' +
+        '<p class="espil-flow-copy">Zealandia is where the real game continues - in the Espil app for mobile and PC. ' +
+        'There is no entry into Zealandia on the web: here the journey ends at the Auckland Time Stone, and the app takes over from there.</p>' +
+        '<div class="espil-flow-reel">' +
+        flowItem('espil-zealandia-back', 'Back') +
+        '</div>';
+      ui.appendChild(zea);
+    }
 
     var about = el('div', 'espil-about-panel', 'espil-flow-view');
     about.setAttribute('role', 'dialog');
@@ -1108,12 +1130,16 @@
     cs.appendChild(ui);
 
     $('espil-menu-play').addEventListener('click', function () { chooseMode('play'); });
-    $('espil-menu-shop').addEventListener('click', function () { chooseMode('shop'); });
-    (function () { var sr = $('espil-menu-shop'); if (sr) { sr.setAttribute('data-destination', ESPIL_SHOP_DESTINATION.id); sr.setAttribute('data-destination-route', ESPIL_SHOP_DESTINATION.route); sr.setAttribute('data-destination-arrival', ESPIL_SHOP_DESTINATION.arrival); } })(); /* Amendment A: the destination of record rides the row; the click behaviour above is the interim city path until the cauldron window ships. */
-    $('espil-menu-zealandia').addEventListener('click', function () { presentFlowView($('espil-zealandia-panel')); });
+    /* The Shop and Zealandia listeners attach only when their
+       rows were built (ESPIL_SHOP_ZEALANDIA_LIVE on - the
+       testing tree); with the rows absent these lookups are
+       null and stay unattached, exactly as the guarded
+       destination stamp below already behaved. */
+    (function () { var sr = $('espil-menu-shop'); if (!sr) return; sr.addEventListener('click', function () { chooseMode('shop'); }); sr.setAttribute('data-destination', ESPIL_SHOP_DESTINATION.id); sr.setAttribute('data-destination-route', ESPIL_SHOP_DESTINATION.route); sr.setAttribute('data-destination-arrival', ESPIL_SHOP_DESTINATION.arrival); })(); /* Amendment A: the destination of record rides the row; the click behaviour above is the interim city path until the cauldron window ships. */
+    (function () { var zr = $('espil-menu-zealandia'); if (zr) zr.addEventListener('click', function () { presentFlowView($('espil-zealandia-panel')); }); })();
     $('espil-menu-about').addEventListener('click', function () { presentFlowView($('espil-about-panel')); });
     $('espil-menu-back').addEventListener('click', function () { backToLogin(); });
-    $('espil-zealandia-back').addEventListener('click', function () { presentFlowView($('espil-mainmenu')); });
+    (function () { var zb = $('espil-zealandia-back'); if (zb) zb.addEventListener('click', function () { presentFlowView($('espil-mainmenu')); }); })();
     $('espil-about-back').addEventListener('click', function () { presentFlowView($('espil-mainmenu')); });
     $('espil-cityprep-back').addEventListener('click', function () { closePrep(); });
     /* ESPIL-FLOW REEL (Han 2026-11-26, item 1) - supersedes the
@@ -1961,8 +1987,13 @@
      destination lives here as structure only - when stage 1
      lands, flipping `live` to true and routing chooseMode's shop
      branch to this target is the whole change, not a redesign.
-     The row is NEVER pointed at the route before it exists. */
-  var ESPIL_SHOP_DESTINATION = { id: 'mros-center', label: 'MROS Center', route: '/cauldron', arrival: 'cherry-blossom-plaza', live: false };
+     The row is NEVER pointed at the route before it exists.
+     SHOP + ZEALANDIA SWITCH (Han 2026-11-26, item 2): `live`
+     now reads ESPIL_SHOP_ZEALANDIA_LIVE, the one switch at the
+     top of this flow - false on the live build (the row is not
+     built at all), true in the testing tree. Nothing read this
+     flag before; the record now at least tells the truth. */
+  var ESPIL_SHOP_DESTINATION = { id: 'mros-center', label: 'MROS Center', route: '/cauldron', arrival: 'cherry-blossom-plaza', live: ESPIL_SHOP_ZEALANDIA_LIVE };
   window.__espilShopDestination = ESPIL_SHOP_DESTINATION;
 
   var espilNameStepReady = false;
