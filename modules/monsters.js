@@ -573,8 +573,8 @@
   var S = {
     monsters: [], seq: 0, playerZone: null, forcedZone: null,
     activeZones: {}, zoneEvalAt: 0, spawnAcc: {}, zoneFilled: {},
-    place: { draws: 0, placed: 0, rejWalk: 0, rejSafe: 0, rejZone: 0,
-             rejPlayer: 0, rejSep: 0 },
+    place: { draws: 0, placed: 0, rejWalk: 0, rejStreet: 0, rejSafe: 0,
+             rejZone: 0, rejPlayer: 0, rejSep: 0 },
     gates: [], gatesBuilt: false,
     gateTryAt: 0, sepAt: 0, tickN: 0, outMapSince: 0, booted: false,
     feel: { hits: 0, crits: 0, cancels: 0, numbers: 0, flashes: 0, evades: 0,
@@ -651,6 +651,18 @@
   function walkable(x, z) {
     var p = probe(x, z);
     return !!(p && p.walkable && !p.blocked && !p.swimmable);
+  }
+  /* STREET SPAWNING (Han 2026-11-26): a field placement must
+     stand on the road surface. The baked collision grid the
+     probe already reads carries the surface class per 2 m
+     cell; class 'road' is walkable by palette and exclusive
+     of the building and water classes in the bake, so a road
+     point is on the street by construction. walkable() stays
+     in the chain ahead of this test as the footprint/water
+     backstop. */
+  function streetPoint(x, z) {
+    var p = probe(x, z);
+    return !!(p && p.cls === 'road' && p.walkable && !p.blocked && !p.swimmable);
   }
   function playerPose() {
     try {
@@ -1017,7 +1029,17 @@
      (ring-boundary rounding), never within PLACE_MIN_PLAYER_DIST
      of the player, and never on top of a field body already placed
      in the zone (the step-time separation distance, reused at
-     placement). Line of sight is NOT required - monsters also
+     placement). STREET LAW (Han 2026-11-26, "summon the monsters
+     on the streets"): the candidate must also stand on the road
+     surface - its baked collision class must be 'road'
+     (streetPoint). Area-uniform ring draws conditioned on the
+     road class are uniform over the zone's road surface, so
+     placement stays world-anchored random, now on streets:
+     never inside a building footprint and never on water (the
+     classes are exclusive in the bake, and the walkable
+     rejection ahead of the street test stays as the backstop).
+     The same sampler serves the initial fill and the death
+     refill - respawns land on streets too. Line of sight is NOT required - monsters also
      stand behind buildings and around corners; the 25 m floor and
      the 0.9 s fade-in are the only anti-pop-in devices. A failed
      draw returns null and the fill loop retries on a later tick:
@@ -1038,6 +1060,7 @@
       var z = GALLERY.z + Math.sin(a) * r;
       S.place.draws++;
       if (!walkable(x, z)) { S.place.rejWalk++; continue; }
+      if (!streetPoint(x, z)) { S.place.rejStreet++; continue; }
       if (inSafeZone(x, z)) { S.place.rejSafe++; continue; }
       if (zoneAt(x, z).zone !== zone) { S.place.rejZone++; continue; }
       var pdx = x - px, pdz = z - pz;
@@ -1655,7 +1678,8 @@
       cap: CAP,
       placement: {
         draws: S.place.draws, placed: S.place.placed,
-        rejected: { walkable: S.place.rejWalk, safeZone: S.place.rejSafe,
+        rejected: { walkable: S.place.rejWalk, street: S.place.rejStreet,
+                    safeZone: S.place.rejSafe,
                     zone: S.place.rejZone, player: S.place.rejPlayer,
                     separation: S.place.rejSep },
         targets: { tutorial: ZONE_TARGET.tutorial, low: ZONE_TARGET.low,
