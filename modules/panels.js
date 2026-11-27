@@ -974,7 +974,26 @@
       'body.espil-panels-both #character-panel{left:0;right:0;width:auto;top:0;bottom:auto;height:50%}' +
       'body.espil-panels-both #inventory-panel{left:0;right:0;width:auto;top:auto;bottom:0;height:50%}' +
       'body.espil-panels-both .st-card{max-height:calc(100% - 10px)}' +
-      'body.espil-panels-both #character-panel .st-grid{overflow-y:auto;scrollbar-width:thin}}'
+      'body.espil-panels-both #character-panel .st-grid{overflow-y:auto;scrollbar-width:thin}}',
+    /* BAG WINDOW REWORK (Han 2026-11-26, directive 10): the bag
+       and the equipment (profile) windows no longer open like a
+       new window over a blurred, dimmed scene - referencing
+       general MMORPG panels, the overlay paints NOTHING (no
+       backdrop blur, no dim gradient) and the card floats over
+       the live world. The overlay keeps its shipped click role
+       (a click outside the card still closes the window); only
+       its paint is removed. Each card also keeps ONE fixed size
+       on every tab and at every item count: the heights below
+       are the largest footprints measured on the production
+       bytes (bag 688 = the equip tab with a weapon selected and
+       its craft strip open; gear 752 = the profile skeleton,
+       already constant across its tabs), so no content loses
+       room and the card's own scroll absorbs outliers. Scoped
+       to these two panels only - the skill tree, friends, stall
+       and shop overlays keep the shared .skill-tree paint. */
+    '#inventory-panel.skill-tree,#character-panel.skill-tree{background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none}',
+    '.skill-tree#inventory-panel .st-card{height:688px}',
+    '.skill-tree#character-panel .st-card{height:752px}'
   ].join('\n');
   var WOOD_CSS = [
     '.espil-gear,.espil-bag{' + WOOD_BG + '}',
