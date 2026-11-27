@@ -14010,8 +14010,8 @@
       if(k==='Escape'&&!e.repeat){
         e.preventDefault();
         /* The snapshot reads every state this branch closes, plus
-           three surfaces closed by their own listeners on the same
-           press (the notice panel, the dive guide, the auth
+           two surfaces closed by their own listeners on the same
+           press (the notice panel and the auth
            modal), so one press never both closes one of those and
            opens the options. */
         var _escAny=!!(skillTreeOpen||inventoryOpen||characterOpen||friendsOpen||stallOpen||espilBldgPanelRec||settingsOpen||window.__espilNoticeOpen);
@@ -14019,7 +14019,6 @@
         if(!_escAny){ var _sh=document.getElementById('shop-ui'); if(_sh&&_sh.classList.contains('open'))_escAny=true; }
         if(!_escAny){ var _sm0=document.getElementById('store-modal'); if(_sm0&&!_sm0.classList.contains('hidden'))_escAny=true; }
         if(!_escAny){ var _am=document.getElementById('signin-modal'); if(_am&&_am.getAttribute('aria-hidden')==='false')_escAny=true; }
-        if(!_escAny){ var _dg=document.getElementById('espil-diveguide'); if(_dg&&!_dg.hidden)_escAny=true; }
         if(skillTreeOpen)toggleSkillTree(false);
         if(inventoryOpen)toggleInventory(false);
         if(characterOpen)toggleCharacterPanel(false);
